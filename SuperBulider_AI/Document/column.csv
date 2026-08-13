@@ -1,0 +1,513 @@
+﻿5131,429,SCHED_NAME,,varchar,255,0,1,QRTZ_BLOB_TRIGGERS SCHED_NAME varchar,3ce0c8e9-1084-4058-8c19-13f3b0229a5a,2026-08-11 16:47:02.6216537,NULL
+5132,429,TRIGGER_GROUP,,varchar,255,0,1,QRTZ_BLOB_TRIGGERS TRIGGER_GROUP varchar,7ccc77c5-21fe-435e-9b37-c2b58eba9cef,2026-08-11 16:47:02.6275355,NULL
+5133,429,TRIGGER_NAME,,varchar,255,0,1,QRTZ_BLOB_TRIGGERS TRIGGER_NAME varchar,a64b113f-252a-4601-9510-27e3b53a53c8,2026-08-11 16:47:02.6275882,NULL
+5134,429,BLOB_DATA,,longblob,4294967295,1,0,QRTZ_BLOB_TRIGGERS BLOB_DATA longblob,da34796b-295b-467e-bcd4-54d10106a1bb,2026-08-11 16:47:02.6275920,NULL
+5135,430,CALENDAR_NAME,,varchar,255,0,1,QRTZ_CALENDARS CALENDAR_NAME varchar,4b1b0892-3d52-49e5-8362-5edaf9ca3d71,2026-08-11 16:47:02.6333870,NULL
+5136,430,SCHED_NAME,,varchar,255,0,1,QRTZ_CALENDARS SCHED_NAME varchar,48c332fc-1e67-4939-aad2-95e4a02a2c37,2026-08-11 16:47:02.6334043,NULL
+5137,430,CALENDAR,,longblob,4294967295,1,0,QRTZ_CALENDARS CALENDAR longblob,8af36c3f-6220-4634-a80f-f066f2e5a297,2026-08-11 16:47:02.6334075,NULL
+5138,431,SCHED_NAME,,varchar,255,0,1,QRTZ_CRON_TRIGGERS SCHED_NAME varchar,f9b4d308-1764-4ccd-9750-8913832fd997,2026-08-11 16:47:02.6335983,NULL
+5139,431,TRIGGER_GROUP,,varchar,255,0,1,QRTZ_CRON_TRIGGERS TRIGGER_GROUP varchar,8dc7c9ed-566e-43f1-8679-77801fb074a3,2026-08-11 16:47:02.6336037,NULL
+5140,431,TRIGGER_NAME,,varchar,255,0,1,QRTZ_CRON_TRIGGERS TRIGGER_NAME varchar,51e4e495-1cd7-42c6-97bd-48d52942aeee,2026-08-11 16:47:02.6336063,NULL
+5141,431,CRON_EXPRESSION,,varchar,255,0,0,QRTZ_CRON_TRIGGERS CRON_EXPRESSION varchar,ec9bb875-2621-4927-85c6-a778bb64a1d1,2026-08-11 16:47:02.6336127,NULL
+5142,431,TIME_ZONE_ID,,varchar,255,1,0,QRTZ_CRON_TRIGGERS TIME_ZONE_ID varchar,9b479c86-f186-4145-bddf-12110c39ee7a,2026-08-11 16:47:02.6336156,NULL
+5143,432,ENTRY_ID,,varchar,255,0,1,QRTZ_FIRED_TRIGGERS ENTRY_ID varchar,0f02a36b-a576-4386-b0e2-bd286485ae68,2026-08-11 16:47:02.6338844,NULL
+5144,432,SCHED_NAME,,varchar,255,0,1,QRTZ_FIRED_TRIGGERS SCHED_NAME varchar,ee6d7413-3033-4933-97a5-0558ec5043cb,2026-08-11 16:47:02.6338904,NULL
+5145,432,FIRED_TIME,,decimal,NULL,0,0,QRTZ_FIRED_TRIGGERS FIRED_TIME decimal,0825b83b-4350-448c-9279-c50be2dd3f34,2026-08-11 16:47:02.6338932,NULL
+5146,432,INSTANCE_NAME,,varchar,255,0,0,QRTZ_FIRED_TRIGGERS INSTANCE_NAME varchar,864727a3-3ccb-4584-aeec-8053a908ce5e,2026-08-11 16:47:02.6338958,NULL
+5147,432,IS_NONCONCURRENT,,bit,NULL,0,0,QRTZ_FIRED_TRIGGERS IS_NONCONCURRENT bit,d75020ad-80cf-4ed3-90cb-673036b7bf0b,2026-08-11 16:47:02.6338981,NULL
+5148,432,JOB_GROUP,,varchar,255,1,0,QRTZ_FIRED_TRIGGERS JOB_GROUP varchar,f4c01b3d-0386-4cc2-9271-c36051d6866f,2026-08-11 16:47:02.6339010,NULL
+5149,432,JOB_NAME,,varchar,255,1,0,QRTZ_FIRED_TRIGGERS JOB_NAME varchar,c25e0e69-e8b7-41f2-a3c7-d6eeae12a7df,2026-08-11 16:47:02.6339034,NULL
+5150,432,PRIORITY,,int,NULL,1,0,QRTZ_FIRED_TRIGGERS PRIORITY int,b09bfe6f-3cbe-4a0d-aef1-e566e8404a33,2026-08-11 16:47:02.6339057,NULL
+5151,432,REQUESTS_RECOVERY,,bit,NULL,0,0,QRTZ_FIRED_TRIGGERS REQUESTS_RECOVERY bit,3028f100-bb8a-4186-9670-b92e5b05331d,2026-08-11 16:47:02.6339107,NULL
+5152,432,SCHED_TIME,,decimal,NULL,0,0,QRTZ_FIRED_TRIGGERS SCHED_TIME decimal,86c08c2c-63df-4669-990a-93d9918daa77,2026-08-11 16:47:02.6339156,NULL
+5153,432,STATE,,varchar,255,0,0,QRTZ_FIRED_TRIGGERS STATE varchar,b0d8724d-0f98-4dad-b797-2e263443ddec,2026-08-11 16:47:02.6339212,NULL
+5154,432,TRIGGER_GROUP,,varchar,255,0,0,QRTZ_FIRED_TRIGGERS TRIGGER_GROUP varchar,1319ddfa-9edc-4a21-b7fc-7009e5e12e18,2026-08-11 16:47:02.6339237,NULL
+5155,432,TRIGGER_NAME,,varchar,255,0,0,QRTZ_FIRED_TRIGGERS TRIGGER_NAME varchar,e3757fe6-2cd7-4e4c-88c4-aa71efaf3170,2026-08-11 16:47:02.6339261,NULL
+5156,433,JOB_GROUP,,varchar,255,0,1,QRTZ_JOB_DETAILS JOB_GROUP varchar,ef875c8c-d227-4dd3-a9dd-c69e7fde4526,2026-08-11 16:47:02.6340610,NULL
+5157,433,JOB_NAME,,varchar,255,0,1,QRTZ_JOB_DETAILS JOB_NAME varchar,f886e16d-57ec-48ae-97ea-1da9cc4282fe,2026-08-11 16:47:02.6340674,NULL
+5158,433,SCHED_NAME,,varchar,255,0,1,QRTZ_JOB_DETAILS SCHED_NAME varchar,31d89052-50d1-4d2c-bea7-54f0cb29a6ae,2026-08-11 16:47:02.6340702,NULL
+5159,433,CREATOR,,varchar,255,1,0,QRTZ_JOB_DETAILS CREATOR varchar,8441ba51-f85f-4533-ac5d-46407b721144,2026-08-11 16:47:02.6340750,NULL
+5160,433,DESCRIPTION,,varchar,255,1,0,QRTZ_JOB_DETAILS DESCRIPTION varchar,3bfb0121-23cc-462a-bcfa-411ed2d0a288,2026-08-11 16:47:02.6340774,NULL
+5161,433,IS_DURABLE,,bit,NULL,0,0,QRTZ_JOB_DETAILS IS_DURABLE bit,4646ac86-7dcf-4093-944d-32563d14a16a,2026-08-11 16:47:02.6340800,NULL
+5162,433,IS_NONCONCURRENT,,bit,NULL,0,0,QRTZ_JOB_DETAILS IS_NONCONCURRENT bit,a1ef0f66-f945-42bb-a853-619a185c338b,2026-08-11 16:47:02.6340824,NULL
+5163,433,IS_UPDATE_DATA,,bit,NULL,0,0,QRTZ_JOB_DETAILS IS_UPDATE_DATA bit,f590bd6b-211f-4d7b-b019-f54f749d1b68,2026-08-11 16:47:02.6340847,NULL
+5164,433,JOB_CLASS_NAME,,varchar,255,0,0,QRTZ_JOB_DETAILS JOB_CLASS_NAME varchar,8b8728e9-9e53-4b43-a70a-4132eb3d8946,2026-08-11 16:47:02.6340867,NULL
+5165,433,JOB_DATA,,longblob,4294967295,1,0,QRTZ_JOB_DETAILS JOB_DATA longblob,fac942e3-93bf-4422-8257-279b1dff8af5,2026-08-11 16:47:02.6340891,NULL
+5166,433,REQUESTS_RECOVERY,,bit,NULL,0,0,QRTZ_JOB_DETAILS REQUESTS_RECOVERY bit,b292598f-eafc-4b9a-b6e3-5d4c88be5c6a,2026-08-11 16:47:02.6340915,NULL
+5167,434,LOCK_NAME,,varchar,255,0,1,QRTZ_LOCKS LOCK_NAME varchar,07e68848-bb28-47e8-b5e6-d9f8b0733441,2026-08-11 16:47:02.6342066,NULL
+5168,434,SCHED_NAME,,varchar,255,0,1,QRTZ_LOCKS SCHED_NAME varchar,cbe5b7f7-95a2-412a-9657-82b141c3947f,2026-08-11 16:47:02.6342111,NULL
+5169,435,SCHED_NAME,,varchar,255,0,1,QRTZ_PAUSED_TRIGGER_GRPS SCHED_NAME varchar,c1b6fb1a-28a1-4220-abd2-1a84004700f9,2026-08-11 16:47:02.6344534,NULL
+5170,435,TRIGGER_GROUP,,varchar,255,0,1,QRTZ_PAUSED_TRIGGER_GRPS TRIGGER_GROUP varchar,eb16aa57-5ec1-4857-ad57-d21382ee5627,2026-08-11 16:47:02.6344593,NULL
+5171,436,INSTANCE_NAME,,varchar,255,0,1,QRTZ_SCHEDULER_STATE INSTANCE_NAME varchar,30204513-9922-47ce-a8f5-ed506b2deca1,2026-08-11 16:47:02.6346177,NULL
+5172,436,SCHED_NAME,,varchar,255,0,1,QRTZ_SCHEDULER_STATE SCHED_NAME varchar,0ba2fe9b-f9c6-40df-aa15-8929afdc0318,2026-08-11 16:47:02.6346229,NULL
+5173,436,CHECKIN_INTERVAL,,decimal,NULL,0,0,QRTZ_SCHEDULER_STATE CHECKIN_INTERVAL decimal,b9ae37df-5165-4b6d-a08b-388aa410848d,2026-08-11 16:47:02.6346255,NULL
+5174,436,LAST_CHECKIN_TIME,,decimal,NULL,0,0,QRTZ_SCHEDULER_STATE LAST_CHECKIN_TIME decimal,cd9b8132-500f-4a0e-8ede-254eb6c8aadf,2026-08-11 16:47:02.6346278,NULL
+5175,437,SCHED_NAME,,varchar,255,0,1,QRTZ_SIMPLE_TRIGGERS SCHED_NAME varchar,4669bdb1-4211-43b4-9f76-35aaab38e82b,2026-08-11 16:47:02.6347513,NULL
+5176,437,TRIGGER_GROUP,,varchar,255,0,1,QRTZ_SIMPLE_TRIGGERS TRIGGER_GROUP varchar,72aff41a-bdde-458b-8afe-0406f009c3c9,2026-08-11 16:47:02.6347563,NULL
+5177,437,TRIGGER_NAME,,varchar,255,0,1,QRTZ_SIMPLE_TRIGGERS TRIGGER_NAME varchar,32c3f00c-5c0e-4167-882d-730b02fb6f75,2026-08-11 16:47:02.6347589,NULL
+5178,437,REPEAT_COUNT,,decimal,NULL,0,0,QRTZ_SIMPLE_TRIGGERS REPEAT_COUNT decimal,62f534e5-8f29-4c95-9fb9-8e12c9d42dce,2026-08-11 16:47:02.6347615,NULL
+5179,437,REPEAT_INTERVAL,,decimal,NULL,0,0,QRTZ_SIMPLE_TRIGGERS REPEAT_INTERVAL decimal,4744e186-d700-4060-a20b-0e6c2c50b952,2026-08-11 16:47:02.6347638,NULL
+5180,437,TIMES_TRIGGERED,,decimal,NULL,0,0,QRTZ_SIMPLE_TRIGGERS TIMES_TRIGGERED decimal,874b4d2d-50a0-4a39-a373-080fb294e8e1,2026-08-11 16:47:02.6347664,NULL
+5181,438,SCHED_NAME,,varchar,255,0,1,QRTZ_SIMPROP_TRIGGERS SCHED_NAME varchar,6415dd3f-8969-47e5-bef4-5af13eaff935,2026-08-11 16:47:02.6348797,NULL
+5182,438,TRIGGER_GROUP,,varchar,255,0,1,QRTZ_SIMPROP_TRIGGERS TRIGGER_GROUP varchar,ecca4461-1731-47bd-80ca-3d7787cbc1aa,2026-08-11 16:47:02.6348842,NULL
+5183,438,TRIGGER_NAME,,varchar,255,0,1,QRTZ_SIMPROP_TRIGGERS TRIGGER_NAME varchar,e6f69d54-51f0-4491-bf9c-d482832a2813,2026-08-11 16:47:02.6348867,NULL
+5184,438,BOOL_PROP_1,,bit,NULL,1,0,QRTZ_SIMPROP_TRIGGERS BOOL_PROP_1 bit,6378310e-e1e2-43b0-b1b8-c0b16b61b938,2026-08-11 16:47:02.6348890,NULL
+5185,438,BOOL_PROP_2,,bit,NULL,1,0,QRTZ_SIMPROP_TRIGGERS BOOL_PROP_2 bit,44e0808a-9733-4f80-aec2-9ff3e82a0a7c,2026-08-11 16:47:02.6348912,NULL
+5186,438,DEC_PROP_1,,decimal,NULL,1,0,QRTZ_SIMPROP_TRIGGERS DEC_PROP_1 decimal,accf8646-a8cd-4584-9618-e06739cc50d6,2026-08-11 16:47:02.6348940,NULL
+5187,438,DEC_PROP_2,,decimal,NULL,1,0,QRTZ_SIMPROP_TRIGGERS DEC_PROP_2 decimal,64c67905-0d95-46cc-81a2-71c60fb6d04c,2026-08-11 16:47:02.6348963,NULL
+5188,438,INT_PROP_1,,int,NULL,1,0,QRTZ_SIMPROP_TRIGGERS INT_PROP_1 int,2c79fddb-4008-49bc-a813-1a9bd1fa0c93,2026-08-11 16:47:02.6348987,NULL
+5189,438,INT_PROP_2,,int,NULL,1,0,QRTZ_SIMPROP_TRIGGERS INT_PROP_2 int,632c8c80-b041-4eb3-bfd6-ad924cee1a05,2026-08-11 16:47:02.6349010,NULL
+5190,438,LONG_PROP_1,,decimal,NULL,1,0,QRTZ_SIMPROP_TRIGGERS LONG_PROP_1 decimal,2a603f25-cb39-4ace-88fa-03dfe8d2f5d3,2026-08-11 16:47:02.6349037,NULL
+5191,438,LONG_PROP_2,,decimal,NULL,1,0,QRTZ_SIMPROP_TRIGGERS LONG_PROP_2 decimal,a4c5a08d-3e09-4e42-a404-70906f525c72,2026-08-11 16:47:02.6349061,NULL
+5192,438,STR_PROP_1,,varchar,255,1,0,QRTZ_SIMPROP_TRIGGERS STR_PROP_1 varchar,e64c3d58-a7d2-4d7f-9b27-b56b0ed0fab9,2026-08-11 16:47:02.6349087,NULL
+5193,438,STR_PROP_2,,varchar,255,1,0,QRTZ_SIMPROP_TRIGGERS STR_PROP_2 varchar,1b8e8b37-c632-4e7b-a4da-8fa51e4b35c1,2026-08-11 16:47:02.6349110,NULL
+5194,438,STR_PROP_3,,varchar,255,1,0,QRTZ_SIMPROP_TRIGGERS STR_PROP_3 varchar,80f2a90a-522c-4069-bcfd-a1c38483f140,2026-08-11 16:47:02.6349135,NULL
+5195,439,SCHED_NAME,,varchar,255,0,1,QRTZ_TRIGGERS SCHED_NAME varchar,0c5c261c-bd4a-4b73-887b-48a00efbd500,2026-08-11 16:47:02.6350253,NULL
+5196,439,TRIGGER_GROUP,,varchar,255,0,1,QRTZ_TRIGGERS TRIGGER_GROUP varchar,b6ffd036-33fc-4870-9060-7299db63ca6e,2026-08-11 16:47:02.6350298,NULL
+5197,439,TRIGGER_NAME,,varchar,255,0,1,QRTZ_TRIGGERS TRIGGER_NAME varchar,94a2158a-6651-4306-81d0-4088fd523925,2026-08-11 16:47:02.6350323,NULL
+5198,439,APPOINT_ID,,varchar,255,1,0,QRTZ_TRIGGERS APPOINT_ID varchar,638ba66f-7e85-4abe-96d9-925e709f99a9,2026-08-11 16:47:02.6350345,NULL
+5199,439,CALENDAR_NAME,,varchar,255,1,0,QRTZ_TRIGGERS CALENDAR_NAME varchar,cb66676e-1a3e-43de-9bd6-cbd27ba2df35,2026-08-11 16:47:02.6350368,NULL
+5200,439,DESCRIPTION,,varchar,255,1,0,QRTZ_TRIGGERS DESCRIPTION varchar,9e8872b4-3731-44a9-9d61-fd406e17cdfb,2026-08-11 16:47:02.6350391,NULL
+5201,439,END_TIME,,decimal,NULL,0,0,QRTZ_TRIGGERS END_TIME decimal,06309ccf-32a0-4e27-9dfd-cd240c7f41a4,2026-08-11 16:47:02.6350415,NULL
+5202,439,JOB_DATA,,longblob,4294967295,1,0,QRTZ_TRIGGERS JOB_DATA longblob,6e8354ad-3592-43ab-aa85-2eca66c28914,2026-08-11 16:47:02.6350441,NULL
+5203,439,JOB_GROUP,,varchar,255,0,0,QRTZ_TRIGGERS JOB_GROUP varchar,32a6d9fe-2b0a-4539-a40f-cd6125476a9a,2026-08-11 16:47:02.6350465,NULL
+5204,439,JOB_NAME,,varchar,255,0,0,QRTZ_TRIGGERS JOB_NAME varchar,6acc1315-8e2c-4583-9de7-57b6a9038010,2026-08-11 16:47:02.6350490,NULL
+5205,439,MISFIRE_INSTR,,int,NULL,1,0,QRTZ_TRIGGERS MISFIRE_INSTR int,d1c17d5d-0a0e-4a7b-827e-f381d54002a0,2026-08-11 16:47:02.6350513,NULL
+5206,439,NEXT_FIRE_TIME,,decimal,NULL,1,0,QRTZ_TRIGGERS NEXT_FIRE_TIME decimal,2d65fe87-12bd-4066-ac23-5b165aa0b119,2026-08-11 16:47:02.6350555,NULL
+5207,439,PREV_FIRE_TIME,,decimal,NULL,1,0,QRTZ_TRIGGERS PREV_FIRE_TIME decimal,49f40dce-04dc-4772-8af6-21ca2f023a0f,2026-08-11 16:47:02.6350585,NULL
+5208,439,PRIORITY,,int,NULL,1,0,QRTZ_TRIGGERS PRIORITY int,b13bccef-9e7f-46c4-859d-38b57accef3a,2026-08-11 16:47:02.6350609,NULL
+5209,439,START_TIME,,decimal,NULL,0,0,QRTZ_TRIGGERS START_TIME decimal,fe8a97be-3ac0-4fba-adef-68a7790f7722,2026-08-11 16:47:02.6350635,NULL
+5210,439,TRIGGER_STATE,,varchar,255,0,0,QRTZ_TRIGGERS TRIGGER_STATE varchar,2b7f7d36-d217-4694-8038-e96ea2f8ab8a,2026-08-11 16:47:02.6350659,NULL
+5211,439,TRIGGER_TYPE,,varchar,255,0,0,QRTZ_TRIGGERS TRIGGER_TYPE varchar,789344d5-c3ad-4159-8901-2383678f33f6,2026-08-11 16:47:02.6350680,NULL
+5212,440,id,,varchar,255,0,1,updaterec id varchar,6d553aa9-aeb4-47fc-b92f-8c3b1e6934e5,2026-08-11 16:47:02.6351724,NULL
+5213,440,is_segment,,int,NULL,0,0,updaterec is_segment int,f4c30f8e-e10c-40ce-a085-7698ef452e42,2026-08-11 16:47:02.6351769,NULL
+5214,440,key_class,,varchar,255,0,0,updaterec key_class varchar,df04ba12-d5d9-4f76-9d6c-9f5a726019df,2026-08-11 16:47:02.6351793,NULL
+5215,440,entity_key,,varchar,4000,0,0,updaterec entity_key varchar,6a05fda1-e0bc-47bb-bbe2-c66add881f42,2026-08-11 16:47:02.6351834,NULL
+5216,440,namespace,,varchar,255,0,0,updaterec namespace varchar,af5a6e2f-9b2f-4653-a3f2-9bae77f3666d,2026-08-11 16:47:02.6351859,NULL
+5217,440,segment_length,,int,NULL,0,0,updaterec segment_length int,799f512f-16a3-4956-bb24-b6c4ac30206c,2026-08-11 16:47:02.6351886,NULL
+5218,440,value_class,,varchar,255,0,0,updaterec value_class varchar,34bef0db-6fa5-4e71-8407-c16c6705330d,2026-08-11 16:47:02.6351908,NULL
+5219,440,entity_value,,longtext,4294967295,0,0,updaterec entity_value longtext,ab4418d6-e820-46b6-8d87-04780922221e,2026-08-11 16:47:02.6351929,NULL
+5220,440,values_index,,longtext,4294967295,1,0,updaterec values_index longtext,a378c450-6c45-4700-8766-d5fd58a9103f,2026-08-11 16:47:02.6351951,NULL
+5221,440,values_length,,int,NULL,0,0,updaterec values_length int,4ff8d2da-fffc-464f-8948-3902a131261f,2026-08-11 16:47:02.6351973,NULL
+5222,441,id,主键,bigint,NULL,0,1,wms_check_order id 主键 bigint,31c60f6c-1829-4f4f-8031-584139a1ef0a,2026-08-11 16:47:02.6353073,NULL
+5223,441,code,编码,varchar,30,0,0,wms_check_order code 编码 varchar,a5f8f895-c811-47a4-92eb-cdc7c902326b,2026-08-11 16:47:02.6353150,NULL
+5224,441,name,名称,varchar,255,0,0,wms_check_order name 名称 varchar,abe090a5-f85a-4c46-83a8-922fda6b531a,2026-08-11 16:47:02.6353176,NULL
+5225,441,type,类型,bigint,NULL,1,0,wms_check_order type 类型 bigint,5da79620-0860-4e5c-b44f-12891695e185,2026-08-11 16:47:02.6353201,NULL
+5226,441,status,状态 0-已创建 1-执行中 2-已完成 3-已关闭 4-已归档,tinyint,NULL,1,0,wms_check_order status 状态 0-已创建 1-执行中 2-已完成 3-已关闭 4-已归档 tinyint,aa966571-4a81-48cd-acf0-81dc82e0a48a,2026-08-11 16:47:02.6353248,NULL
+5227,441,post,盘点岗位,int,NULL,0,0,wms_check_order post 盘点岗位 int,a652951d-5974-4514-a73c-a50826c02e2d,2026-08-11 16:47:02.6353278,NULL
+5228,441,check_time,盘点开始时间,datetime,NULL,0,0,wms_check_order check_time 盘点开始时间 datetime,43be8eb4-fcaf-4d5d-a2fe-f9aafe559d59,2026-08-11 16:47:02.6353304,NULL
+5229,441,check_scope,盘点范围（0：仓库 1：货架 2：物料分类 3：物料）,tinyint,NULL,0,0,wms_check_order check_scope 盘点范围（0：仓库 1：货架 2：物料分类 3：物料） tinyint,0a63affe-f0e3-4674-933a-95b15aa24028,2026-08-11 16:47:02.6353331,NULL
+5230,441,check_area,盘点区域,json,NULL,1,0,wms_check_order check_area 盘点区域 json,63b8d68e-edbc-49a8-a4cf-a35f1b4727a4,2026-08-11 16:47:02.6353354,NULL
+5231,441,note,备注,varchar,255,1,0,wms_check_order note 备注 varchar,60bf2d7c-07df-4bed-964b-e6ce5dd2c2ca,2026-08-11 16:47:02.6353382,NULL
+5232,441,create_by,创建人id,bigint,NULL,1,0,wms_check_order create_by 创建人id bigint,61df4c59-1f5b-42fa-8fd2-0f4b35cbd25a,2026-08-11 16:47:02.6353407,NULL
+5233,441,create_name,创建人名称,varchar,255,1,0,wms_check_order create_name 创建人名称 varchar,1df30b1c-bdc4-4f7c-b427-586f0e96925c,2026-08-11 16:47:02.6353433,NULL
+5234,441,create_time,创建时间,datetime,NULL,1,0,wms_check_order create_time 创建时间 datetime,82897306-1a89-4e2b-9675-67068c48e006,2026-08-11 16:47:02.6353459,NULL
+5235,441,update_by,更新人id,bigint,NULL,1,0,wms_check_order update_by 更新人id bigint,59ee282f-205d-4f3d-b298-e8c929ec624f,2026-08-11 16:47:02.6353485,NULL
+5236,441,update_name,更新人名称,varchar,255,1,0,wms_check_order update_name 更新人名称 varchar,e37eceb9-0b84-4d95-b844-d0fccf193599,2026-08-11 16:47:02.6353512,NULL
+5237,441,update_time,更新人时间,datetime,NULL,1,0,wms_check_order update_time 更新人时间 datetime,ad66b489-cad1-4412-a5c6-70342ebf71a0,2026-08-11 16:47:02.6353541,NULL
+5238,441,del_flag,是否删除标识：0否 1是,tinyint,NULL,1,0,wms_check_order del_flag 是否删除标识：0否 1是 tinyint,9032a61a-c767-4f0e-a45e-7f7d11f9061b,2026-08-11 16:47:02.6353569,NULL
+5239,441,warehouse_id,仓库id,bigint,NULL,1,0,wms_check_order warehouse_id 仓库id bigint,5a3bbd0f-8477-4da4-b37f-26fde6556143,2026-08-11 16:47:02.6353596,NULL
+5240,441,warehouse_name,仓库名称,varchar,255,1,0,wms_check_order warehouse_name 仓库名称 varchar,cf191b50-79fa-4920-97f9-dbec352e26dc,2026-08-11 16:47:02.6353623,NULL
+5241,442,id,,bigint,NULL,0,1,wms_check_order_info id bigint,a41c528a-472b-406c-9304-e7b9b0fa8851,2026-08-11 16:47:02.6354774,NULL
+5242,442,warehouse,仓库,int,NULL,1,0,wms_check_order_info warehouse 仓库 int,0186e287-237b-44c4-827f-a8cc8bc2a4e0,2026-08-11 16:47:02.6354819,NULL
+5243,442,shelf,货架,int,NULL,1,0,wms_check_order_info shelf 货架 int,46ca0a8b-3d30-4e20-954f-13d593f41e94,2026-08-11 16:47:02.6354848,NULL
+5244,442,material_id,物料id,bigint,NULL,1,0,wms_check_order_info material_id 物料id bigint,832b8cbe-85a8-400a-98b3-6fd055728c46,2026-08-11 16:47:02.6354872,NULL
+5245,442,quantity,数量,decimal,NULL,1,0,wms_check_order_info quantity 数量 decimal,8e1fd913-275d-4a67-9726-bcd88fce8f25,2026-08-11 16:47:02.6354897,NULL
+5246,442,batch,批次,varchar,50,1,0,wms_check_order_info batch 批次 varchar,ecd46d78-fb5c-40cd-80c4-687c5b8b5e6a,2026-08-11 16:47:02.6354924,NULL
+5247,442,case_no,箱号,varchar,50,1,0,wms_check_order_info case_no 箱号 varchar,9cb213b5-e1e6-4d0d-90c3-60219ce01d41,2026-08-11 16:47:02.6354948,NULL
+5248,442,unit_id,单位id,bigint,NULL,1,0,wms_check_order_info unit_id 单位id bigint,74ba5fed-a5c4-45fe-b007-9802ef7e751d,2026-08-11 16:47:02.6354970,NULL
+5249,442,unit,单位,varchar,50,1,0,wms_check_order_info unit 单位 varchar,2d274df9-fd30-48ed-911c-e2aaab0b6e0f,2026-08-11 16:47:02.6354993,NULL
+5250,442,result,结果,decimal,NULL,1,0,wms_check_order_info result 结果 decimal,d6fb1801-e73b-4dc7-aabe-f07f222a9242,2026-08-11 16:47:02.6355043,NULL
+5251,442,difference,差额,decimal,NULL,1,0,wms_check_order_info difference 差额 decimal,ae8b70b7-e912-41d2-bb3e-f8574f05dda2,2026-08-11 16:47:02.6355070,NULL
+5252,442,check_by,盘点人id,bigint,NULL,1,0,wms_check_order_info check_by 盘点人id bigint,b1a34804-7105-46e8-ac6c-adb16ce8f8e8,2026-08-11 16:47:02.6355113,NULL
+5253,442,check_name,盘点人名称,varchar,255,1,0,wms_check_order_info check_name 盘点人名称 varchar,680e93cd-ae64-472d-b6dc-c0be018cef54,2026-08-11 16:47:02.6355140,NULL
+5254,442,check_time,盘点时间,datetime,NULL,1,0,wms_check_order_info check_time 盘点时间 datetime,489405c3-5d75-43bb-8570-85616b58f0c9,2026-08-11 16:47:02.6355166,NULL
+5255,442,note,备注,varchar,255,1,0,wms_check_order_info note 备注 varchar,ccb88807-435c-49a3-b15c-77b453977dce,2026-08-11 16:47:02.6355192,NULL
+5256,442,status,状态（0：未执行 1：已执行）,tinyint,NULL,1,0,wms_check_order_info status 状态（0：未执行 1：已执行） tinyint,65ba7a38-8fa9-4c83-9cc0-5f469e4cb2f4,2026-08-11 16:47:02.6355218,NULL
+5257,442,check_order_id,盘点单id,bigint,NULL,1,0,wms_check_order_info check_order_id 盘点单id bigint,fef786c8-0c5b-4079-aa09-4f324187a1c2,2026-08-11 16:47:02.6355243,NULL
+5258,442,create_by,创建人id,bigint,NULL,1,0,wms_check_order_info create_by 创建人id bigint,206f9c20-098c-43d4-b8f7-383ab194cf37,2026-08-11 16:47:02.6355274,NULL
+5259,442,create_name,创建人名称,varchar,255,1,0,wms_check_order_info create_name 创建人名称 varchar,3e87c9d8-6b49-4d3d-9ae5-4b54ef78d6e4,2026-08-11 16:47:02.6355299,NULL
+5260,442,create_time,创建时间,datetime,NULL,1,0,wms_check_order_info create_time 创建时间 datetime,e699953b-1d10-4d6e-a4a4-46a5d0c57091,2026-08-11 16:47:02.6355328,NULL
+5261,442,update_by,更新人id,bigint,NULL,1,0,wms_check_order_info update_by 更新人id bigint,c9e65a23-6d30-467a-9105-e06ab0a07530,2026-08-11 16:47:02.6355354,NULL
+5262,442,update_name,更新人名称,varchar,255,1,0,wms_check_order_info update_name 更新人名称 varchar,afc5d20d-787d-451d-a172-87066eb452be,2026-08-11 16:47:02.6355382,NULL
+5263,442,update_time,更新人时间,datetime,NULL,1,0,wms_check_order_info update_time 更新人时间 datetime,abb1992f-e6dc-4cd9-b89c-4b39bf2f0676,2026-08-11 16:47:02.6355410,NULL
+5264,442,del_flag,是否删除标识：0否 1是,tinyint,NULL,1,0,wms_check_order_info del_flag 是否删除标识：0否 1是 tinyint,5a19b850-5d7d-4a3e-935a-2827f1afe1fc,2026-08-11 16:47:02.6355436,NULL
+5265,443,id,主键,bigint,NULL,0,1,wms_check_order_scan_info id 主键 bigint,0f3a0e43-7550-4cf4-8e14-4746361e2a68,2026-08-11 16:47:02.6356734,NULL
+5266,443,material_id,物料id,bigint,NULL,1,0,wms_check_order_scan_info material_id 物料id bigint,a02b1a8b-f2d4-449b-966d-62131e1e020e,2026-08-11 16:47:02.6356782,NULL
+5267,443,material_code,物料code,varchar,255,1,0,wms_check_order_scan_info material_code 物料code varchar,0ab4d436-b4b9-4edd-9f53-b705cf7a42a3,2026-08-11 16:47:02.6356810,NULL
+5268,443,material_name,物料名称,varchar,255,1,0,wms_check_order_scan_info material_name 物料名称 varchar,0d57f2e9-87ad-4622-8985-077e11658102,2026-08-11 16:47:02.6356835,NULL
+5269,443,quantity,数量,decimal,NULL,1,0,wms_check_order_scan_info quantity 数量 decimal,32f49b2c-ec75-468b-b8ec-23e0d40e3ca1,2026-08-11 16:47:02.6356859,NULL
+5270,443,unit_id,单位id,bigint,NULL,1,0,wms_check_order_scan_info unit_id 单位id bigint,d3dd9dd7-3c2d-4ab1-aec5-303145eb74a0,2026-08-11 16:47:02.6356885,NULL
+5271,443,check_by,盘点人id,bigint,NULL,1,0,wms_check_order_scan_info check_by 盘点人id bigint,82d2a79a-df76-416c-b63c-92c80d5fbfcb,2026-08-11 16:47:02.6356910,NULL
+5272,443,check_name,盘点人名称,varchar,255,1,0,wms_check_order_scan_info check_name 盘点人名称 varchar,0e9cb707-a9ef-4295-8376-bcadbd62e41e,2026-08-11 16:47:02.6356934,NULL
+5273,443,check_time,盘点时间,datetime,NULL,1,0,wms_check_order_scan_info check_time 盘点时间 datetime,d70445b8-1566-4ca2-a569-19a11abcbcb0,2026-08-11 16:47:02.6356959,NULL
+5274,443,note,备注,varchar,255,1,0,wms_check_order_scan_info note 备注 varchar,4cc5fcca-c5d6-448f-891a-601164685577,2026-08-11 16:47:02.6356985,NULL
+5275,443,batch,批次,varchar,50,1,0,wms_check_order_scan_info batch 批次 varchar,cf1b797c-fb3a-42ff-ade4-9ffd486935a5,2026-08-11 16:47:02.6357011,NULL
+5276,443,case_no,箱号,varchar,50,1,0,wms_check_order_scan_info case_no 箱号 varchar,90f3b033-5a5d-48ca-8718-56330a05952a,2026-08-11 16:47:02.6357034,NULL
+5277,443,warehouse,仓库,int,NULL,1,0,wms_check_order_scan_info warehouse 仓库 int,eb9806ae-9872-47dc-b5f5-0785c1503cf9,2026-08-11 16:47:02.6357058,NULL
+5278,443,shelf,货架,int,NULL,1,0,wms_check_order_scan_info shelf 货架 int,fbc4958c-3b2f-4b14-aabe-77a6d6126a51,2026-08-11 16:47:02.6357085,NULL
+5279,443,check_order_id,盘点单id,bigint,NULL,1,0,wms_check_order_scan_info check_order_id 盘点单id bigint,e9ac8ac8-dd1a-44e2-9882-05ce659ba1ec,2026-08-11 16:47:02.6357111,NULL
+5280,443,create_by,创建人id,bigint,NULL,1,0,wms_check_order_scan_info create_by 创建人id bigint,10626497-ff6e-4ba2-b8e0-bc584159bf9d,2026-08-11 16:47:02.6357155,NULL
+5281,443,create_name,创建人名称,varchar,255,1,0,wms_check_order_scan_info create_name 创建人名称 varchar,d6d462df-06ac-4a2c-82ce-3816fe50daa0,2026-08-11 16:47:02.6357184,NULL
+5282,443,create_time,创建时间,datetime,NULL,1,0,wms_check_order_scan_info create_time 创建时间 datetime,005d3227-b44c-4948-aa35-71761e9f0952,2026-08-11 16:47:02.6357214,NULL
+5283,443,update_by,更新人id,bigint,NULL,1,0,wms_check_order_scan_info update_by 更新人id bigint,24b818a4-e633-4078-aaad-7a81a81754ed,2026-08-11 16:47:02.6357240,NULL
+5284,443,update_name,更新人名称,varchar,255,1,0,wms_check_order_scan_info update_name 更新人名称 varchar,bc39536c-1fb2-4332-9c77-d107dc2c839b,2026-08-11 16:47:02.6357267,NULL
+5285,443,update_time,更新人时间,datetime,NULL,1,0,wms_check_order_scan_info update_time 更新人时间 datetime,2ad8b03c-f9c6-42b6-b4e5-8b9ec4545043,2026-08-11 16:47:02.6357294,NULL
+5286,443,del_flag,是否删除标识：0否 1是,tinyint,NULL,1,0,wms_check_order_scan_info del_flag 是否删除标识：0否 1是 tinyint,e246101c-663a-4168-8acc-18472deeddc9,2026-08-11 16:47:02.6357318,NULL
+5287,444,id,id,bigint,NULL,0,1,wms_customer_barcode id id bigint,2a1a9586-3ae8-46bd-967f-e2090cab7044,2026-08-11 16:47:02.6358411,NULL
+5288,444,case_no,箱号,varchar,200,0,0,wms_customer_barcode case_no 箱号 varchar,a5bf897b-c80a-4946-80e9-93834e942715,2026-08-11 16:47:02.6358454,NULL
+5289,444,customer_barcode,客户条码,varchar,200,1,0,wms_customer_barcode customer_barcode 客户条码 varchar,9b7b7cec-2464-4104-9aa4-63300fc45168,2026-08-11 16:47:02.6358481,NULL
+5290,444,create_by,创建人id,bigint,NULL,1,0,wms_customer_barcode create_by 创建人id bigint,1a3daaa4-6e9e-4d08-9e63-74f3b18470a6,2026-08-11 16:47:02.6358507,NULL
+5291,444,create_name,创建人名称,varchar,255,1,0,wms_customer_barcode create_name 创建人名称 varchar,6e6708b1-8756-4d06-9e98-f0a904555e5f,2026-08-11 16:47:02.6358532,NULL
+5292,444,create_time,创建时间,datetime,NULL,1,0,wms_customer_barcode create_time 创建时间 datetime,7c9bed80-b8dd-48a5-8207-c75b38d954f5,2026-08-11 16:47:02.6358558,NULL
+5293,444,update_by,更新人id,bigint,NULL,1,0,wms_customer_barcode update_by 更新人id bigint,6131ebde-18e6-422c-a418-44b738bfee8f,2026-08-11 16:47:02.6358580,NULL
+5294,444,update_name,更新人名称,varchar,255,1,0,wms_customer_barcode update_name 更新人名称 varchar,656df813-87d5-47a7-bf74-794157ca5676,2026-08-11 16:47:02.6358605,NULL
+5295,444,update_time,更新人时间,datetime,NULL,1,0,wms_customer_barcode update_time 更新人时间 datetime,b5c97cc7-91f2-47d3-83ac-7c679d1a53a0,2026-08-11 16:47:02.6358630,NULL
+5296,444,del_flag,是否删除标识：0否 1是,tinyint,NULL,1,0,wms_customer_barcode del_flag 是否删除标识：0否 1是 tinyint,e91c955a-c274-4558-8284-1900cbe300a0,2026-08-11 16:47:02.6358655,NULL
+5297,445,id,主键,bigint,NULL,0,1,wms_delivery_receipt id 主键 bigint,988bc588-769f-4c3c-b45b-b37acfc0eb50,2026-08-11 16:47:02.6359727,NULL
+5298,445,code,编码,varchar,50,0,0,wms_delivery_receipt code 编码 varchar,e608609a-f607-41ca-8acb-d4b79367de18,2026-08-11 16:47:02.6359773,NULL
+5299,445,type,类型,bigint,NULL,0,0,wms_delivery_receipt type 类型 bigint,2c31c5db-a05f-4bed-867c-01822b5910e4,2026-08-11 16:47:02.6359801,NULL
+5300,445,status,状态,tinyint,NULL,0,0,wms_delivery_receipt status 状态 tinyint,ef94928a-6cf8-40c2-9e77-7717d83aacba,2026-08-11 16:47:02.6359827,NULL
+5301,445,warehouse_id,仓库id,bigint,NULL,0,0,wms_delivery_receipt warehouse_id 仓库id bigint,223355c1-cf88-41d9-9533-63d2be444dbe,2026-08-11 16:47:02.6359851,NULL
+5302,445,affirm_time,确认时间,datetime,NULL,1,0,wms_delivery_receipt affirm_time 确认时间 datetime,99beb758-ca6e-494a-b154-21db9bd98136,2026-08-11 16:47:02.6360072,NULL
+5303,445,affirm_name,确认人,varchar,50,1,0,wms_delivery_receipt affirm_name 确认人 varchar,49e7fe6c-e287-438f-9d80-39f35fd210bb,2026-08-11 16:47:02.6360108,NULL
+5304,445,syn_name,同步人,varchar,50,1,0,wms_delivery_receipt syn_name 同步人 varchar,29ecd445-04d7-46b5-bb41-6407c4cc05f1,2026-08-11 16:47:02.6360133,NULL
+5305,445,product_line_id,产线id,int,NULL,1,0,wms_delivery_receipt product_line_id 产线id int,cc298dd5-ed0a-4846-a952-165fed34d0b2,2026-08-11 16:47:02.6360157,NULL
+5306,445,product_line_name,产线名称,varchar,50,1,0,wms_delivery_receipt product_line_name 产线名称 varchar,ed17496c-89c5-4eed-a203-3e961a15b54b,2026-08-11 16:47:02.6360184,NULL
+5307,445,out_time,出库时间,datetime,NULL,1,0,wms_delivery_receipt out_time 出库时间 datetime,1dd591e0-efea-42eb-8e1f-931abf35d700,2026-08-11 16:47:02.6360213,NULL
+5308,445,note,备注,varchar,255,1,0,wms_delivery_receipt note 备注 varchar,7b313b6b-1362-4ca1-bda3-a41ca6267229,2026-08-11 16:47:02.6360239,NULL
+5309,445,create_by,创建人id,bigint,NULL,1,0,wms_delivery_receipt create_by 创建人id bigint,36ebefeb-343c-4a48-b633-94b264ff399c,2026-08-11 16:47:02.6360262,NULL
+5310,445,create_name,创建人名称,varchar,255,1,0,wms_delivery_receipt create_name 创建人名称 varchar,4e0a3bc3-0426-49fc-95c8-e51b5366a94c,2026-08-11 16:47:02.6360287,NULL
+5311,445,create_time,创建时间,datetime,NULL,1,0,wms_delivery_receipt create_time 创建时间 datetime,5d21b372-41cf-4236-b5ad-fbbfe374d62f,2026-08-11 16:47:02.6360312,NULL
+5312,445,update_by,更新人id,bigint,NULL,1,0,wms_delivery_receipt update_by 更新人id bigint,7e1ba1e5-ec53-4cb0-8168-5bd2fccaf44c,2026-08-11 16:47:02.6360361,NULL
+5313,445,update_name,更新人名称,varchar,255,1,0,wms_delivery_receipt update_name 更新人名称 varchar,b3cdb42e-75b9-48e1-9bd7-d4dabfaf7347,2026-08-11 16:47:02.6360388,NULL
+5314,445,update_time,更新人时间,datetime,NULL,1,0,wms_delivery_receipt update_time 更新人时间 datetime,6ac5e1fc-02d7-4896-a850-f2d2ba6992d4,2026-08-11 16:47:02.6360419,NULL
+5315,445,del_flag,是否删除标识：0否 1是,tinyint,NULL,1,0,wms_delivery_receipt del_flag 是否删除标识：0否 1是 tinyint,ed6d6e4d-336b-46e7-b6ad-7355c0b6f853,2026-08-11 16:47:02.6360446,NULL
+5316,445,sales_order,关联sales 物流单号,varchar,50,1,0,wms_delivery_receipt sales_order 关联sales 物流单号 varchar,b14681f5-3e74-42fa-939c-1db877f0ec31,2026-08-11 16:47:02.6360474,NULL
+5317,445,linked_id,关联的主键-报工id,bigint,NULL,1,0,wms_delivery_receipt linked_id 关联的主键-报工id bigint,72f73256-5b64-40cb-8236-c1bae6a99359,2026-08-11 16:47:02.6360502,NULL
+5318,446,id,,bigint,NULL,0,1,wms_delivery_receipt_demander id bigint,b2d779aa-a461-481a-b4df-0dd1857cc5a6,2026-08-11 16:47:02.6361693,NULL
+5319,446,demander_id,需求人id,bigint,NULL,1,0,wms_delivery_receipt_demander demander_id 需求人id bigint,4ad1df68-5e2d-47dd-b136-eebc0c99fcbd,2026-08-11 16:47:02.6361737,NULL
+5320,446,demander_name,需求人名称,varchar,20,1,0,wms_delivery_receipt_demander demander_name 需求人名称 varchar,857d655d-9768-4c78-aa88-eb7066c3b0a0,2026-08-11 16:47:02.6361767,NULL
+5321,446,delivery_receipt_info_id,出库单明细id,bigint,NULL,0,0,wms_delivery_receipt_demander delivery_receipt_info_id 出库单明细id bigint,32f876a9-643b-447e-8c9e-a78435babfae,2026-08-11 16:47:02.6361789,NULL
+5322,446,delivery_receipt_id,出库单id,bigint,NULL,0,0,wms_delivery_receipt_demander delivery_receipt_id 出库单id bigint,bc8637df-37ce-4388-a7a8-f38b439f98ff,2026-08-11 16:47:02.6361815,NULL
+5323,447,id,主键,bigint,NULL,0,1,wms_delivery_receipt_info id 主键 bigint,df4601e4-a922-4d78-a11d-8818fbdcd958,2026-08-11 16:47:02.6362846,NULL
+5324,447,material_id,物料id,bigint,NULL,0,0,wms_delivery_receipt_info material_id 物料id bigint,6a572c3d-5acc-4245-8a79-4500bdad40cf,2026-08-11 16:47:02.6362893,NULL
+5325,447,inventory_id,库存id,bigint,NULL,0,0,wms_delivery_receipt_info inventory_id 库存id bigint,8b4af432-9c94-4cd6-9252-91459c6fee49,2026-08-11 16:47:02.6362941,NULL
+5326,447,quantity,数量,decimal,NULL,0,0,wms_delivery_receipt_info quantity 数量 decimal,83e1c86c-3bb5-4ddd-8297-659ceba0674e,2026-08-11 16:47:02.6362965,NULL
+5327,447,delivery_receipt_id,出库单id,bigint,NULL,0,0,wms_delivery_receipt_info delivery_receipt_id 出库单id bigint,134fc086-0527-45cd-9175-14e67ef4e70c,2026-08-11 16:47:02.6362989,NULL
+5328,447,associated_no,关联单据,varchar,50,1,0,wms_delivery_receipt_info associated_no 关联单据 varchar,5488ba2e-f127-46dd-a465-198203636101,2026-08-11 16:47:02.6363015,NULL
+5329,447,create_by,创建人id,bigint,NULL,1,0,wms_delivery_receipt_info create_by 创建人id bigint,1ff4a827-c6fd-4306-a81c-68e126809d70,2026-08-11 16:47:02.6363039,NULL
+5330,447,create_name,创建人名称,varchar,255,1,0,wms_delivery_receipt_info create_name 创建人名称 varchar,a1ed533a-48c9-48b3-9e71-e9f3caec7333,2026-08-11 16:47:02.6363064,NULL
+5331,447,create_time,创建时间,datetime,NULL,1,0,wms_delivery_receipt_info create_time 创建时间 datetime,e87e3711-817c-49b8-b762-dcaf69fee7bd,2026-08-11 16:47:02.6363089,NULL
+5332,447,update_by,更新人id,bigint,NULL,1,0,wms_delivery_receipt_info update_by 更新人id bigint,4c24143c-613c-43df-9b3a-ee4c387fb28a,2026-08-11 16:47:02.6363115,NULL
+5333,447,update_name,更新人名称,varchar,255,1,0,wms_delivery_receipt_info update_name 更新人名称 varchar,649f312a-0284-4105-b6fc-84d7b7baa69d,2026-08-11 16:47:02.6363139,NULL
+5334,447,update_time,更新人时间,datetime,NULL,1,0,wms_delivery_receipt_info update_time 更新人时间 datetime,84585324-723b-4410-bd46-08ab5c0a0abe,2026-08-11 16:47:02.6363163,NULL
+5335,447,del_flag,是否删除标识：0否 1是,tinyint,NULL,1,0,wms_delivery_receipt_info del_flag 是否删除标识：0否 1是 tinyint,18016069-22b7-4463-b72d-a645d82353ad,2026-08-11 16:47:02.6363189,NULL
+5336,448,id,主键,bigint,NULL,0,1,wms_inventory id 主键 bigint,c1a7258c-ea57-4ab8-a1c3-9d547fbdc8bf,2026-08-11 16:47:02.6364232,NULL
+5337,448,material_id,物料id,bigint,NULL,0,0,wms_inventory material_id 物料id bigint,c43d696e-2b92-4635-b5ec-f680d3df7c0f,2026-08-11 16:47:02.6364279,NULL
+5338,448,material_name,物料名称,varchar,50,0,0,wms_inventory material_name 物料名称 varchar,64a69e70-1441-4a07-aeef-6154255afbaa,2026-08-11 16:47:02.6364307,NULL
+5339,448,material_code,物料编码,varchar,50,0,0,wms_inventory material_code 物料编码 varchar,a5a151d4-16e1-4c64-b074-8da659593490,2026-08-11 16:47:02.6364330,NULL
+5340,448,warehouse_id,仓库id,int,NULL,0,0,wms_inventory warehouse_id 仓库id int,36d7927c-10eb-4fef-9cb0-5277407d2ac3,2026-08-11 16:47:02.6364354,NULL
+5341,448,warehouse_code,仓库编码,varchar,50,1,0,wms_inventory warehouse_code 仓库编码 varchar,8891ee72-743f-4af3-a301-79cef7748d31,2026-08-11 16:47:02.6364380,NULL
+5342,448,warehouse_name,仓库名称,varchar,50,0,0,wms_inventory warehouse_name 仓库名称 varchar,fed44512-2c60-47f4-9456-d99e9b863fab,2026-08-11 16:47:02.6364403,NULL
+5343,448,shelf_id,货架id,int,NULL,0,0,wms_inventory shelf_id 货架id int,7e759a13-15e6-4cde-877d-5dde1c6f72d7,2026-08-11 16:47:02.6364427,NULL
+5344,448,shelf_code,货架编码,varchar,50,0,0,wms_inventory shelf_code 货架编码 varchar,0f808040-3058-4659-b3da-168cb56a5b54,2026-08-11 16:47:02.6364451,NULL
+5345,448,shelf_name,货架名称,varchar,50,0,0,wms_inventory shelf_name 货架名称 varchar,d87f74ab-9f2e-46fd-9d3e-b2307501ee11,2026-08-11 16:47:02.6364476,NULL
+5346,448,total_quantity,总数,decimal,NULL,0,0,wms_inventory total_quantity 总数 decimal,bf75688b-6995-4464-8d58-b18ccf5de854,2026-08-11 16:47:02.6364502,NULL
+5347,448,available_quantity,可用数量,decimal,NULL,0,0,wms_inventory available_quantity 可用数量 decimal,fc01f066-f7f2-4f13-a65f-a89585bccb76,2026-08-11 16:47:02.6364525,NULL
+5348,448,stock_quantity,在途库存,decimal,NULL,0,0,wms_inventory stock_quantity 在途库存 decimal,5318f0ee-fb26-417c-a822-4eead1559bce,2026-08-11 16:47:02.6364550,NULL
+5349,448,freeze_quantity,冻结库存,decimal,NULL,0,0,wms_inventory freeze_quantity 冻结库存 decimal,c64dd15a-a99e-44b4-8750-d5cf3b8684c3,2026-08-11 16:47:02.6364592,NULL
+5350,448,lock_quantity,锁定库存,decimal,NULL,0,0,wms_inventory lock_quantity 锁定库存 decimal,97a01604-e6e0-4b25-8b9e-391d63c56a5c,2026-08-11 16:47:02.6364622,NULL
+5351,448,detection_quantity,质检库存,decimal,NULL,0,0,wms_inventory detection_quantity 质检库存 decimal,74a4c601-e23d-4e92-970a-1b43795c3437,2026-08-11 16:47:02.6364649,NULL
+5352,448,unit,单位id,bigint,NULL,0,0,wms_inventory unit 单位id bigint,f4c0992a-74fa-4a92-b144-12e980982a62,2026-08-11 16:47:02.6364676,NULL
+5353,448,case_no,箱号,varchar,50,0,0,wms_inventory case_no 箱号 varchar,d6c7a519-dace-4c82-b98e-62fca6e3a8ee,2026-08-11 16:47:02.6364703,NULL
+5354,448,batch,批次,varchar,50,1,0,wms_inventory batch 批次 varchar,1858231d-d073-4c56-96dc-2af40c89f7b5,2026-08-11 16:47:02.6364731,NULL
+5355,448,pack_time,打包时间,datetime,NULL,1,0,wms_inventory pack_time 打包时间 datetime,679724a2-cf58-4b74-8e4f-041abc8f365b,2026-08-11 16:47:02.6364758,NULL
+5356,448,create_by,创建人id,bigint,NULL,1,0,wms_inventory create_by 创建人id bigint,724fbea5-5674-4b52-8c0c-9f57f86b58d5,2026-08-11 16:47:02.6364786,NULL
+5357,448,create_name,创建人名称,varchar,255,1,0,wms_inventory create_name 创建人名称 varchar,fac5eca0-da62-4017-8a54-1072a70a45a5,2026-08-11 16:47:02.6364814,NULL
+5358,448,create_time,创建时间,datetime,NULL,1,0,wms_inventory create_time 创建时间 datetime,2b611d71-9f49-40a7-b1c4-f60e14b64d66,2026-08-11 16:47:02.6364840,NULL
+5359,448,update_by,更新人id,bigint,NULL,1,0,wms_inventory update_by 更新人id bigint,8bf36fc4-ce89-4c9d-8e9e-841d708134f0,2026-08-11 16:47:02.6364868,NULL
+5360,448,update_name,更新人名称,varchar,255,1,0,wms_inventory update_name 更新人名称 varchar,888e7688-7a6c-4dfe-b76f-9b68fc3f49e8,2026-08-11 16:47:02.6364896,NULL
+5361,448,update_time,更新人时间,datetime,NULL,1,0,wms_inventory update_time 更新人时间 datetime,7e3c9304-728c-4300-af78-ff9161873996,2026-08-11 16:47:02.6364923,NULL
+5362,448,del_flag,是否删除标识：0否 1是,tinyint,NULL,1,0,wms_inventory del_flag 是否删除标识：0否 1是 tinyint,68d6ef8b-ee19-4585-b0d1-69898a8f9e21,2026-08-11 16:47:02.6364950,NULL
+5363,448,note,备注,varchar,255,1,0,wms_inventory note 备注 varchar,73c3a0e1-9b95-496e-951f-5adcc11a0999,2026-08-11 16:47:02.6364980,NULL
+5364,449,id,主键,bigint,NULL,0,1,wms_inventory_record id 主键 bigint,6bef2cdf-177f-4144-942f-3205a76e50ca,2026-08-11 16:47:02.6366240,NULL
+5365,449,type,变动类型,bigint,NULL,0,0,wms_inventory_record type 变动类型 bigint,293b75f1-8a7f-4c08-b3e9-8e18f3cffb4d,2026-08-11 16:47:02.6366287,NULL
+5366,449,code,单据编号,varchar,50,0,0,wms_inventory_record code 单据编号 varchar,8fbf8787-9b22-4e64-848d-469e74fae53c,2026-08-11 16:47:02.6366314,NULL
+5367,449,material_id,物料id,bigint,NULL,0,0,wms_inventory_record material_id 物料id bigint,5a0353e8-fab7-4090-8ef5-797a426a871f,2026-08-11 16:47:02.6366340,NULL
+5368,449,material_name,物料名称,varchar,50,0,0,wms_inventory_record material_name 物料名称 varchar,026b9cf7-b4b2-49e4-bbd9-ac1d7258165e,2026-08-11 16:47:02.6366363,NULL
+5369,449,warehouse_id,仓库id,int,NULL,0,0,wms_inventory_record warehouse_id 仓库id int,d4275495-8366-4223-bd1a-d1cfb4349280,2026-08-11 16:47:02.6366387,NULL
+5370,449,shelf_id,货架id,int,NULL,0,0,wms_inventory_record shelf_id 货架id int,808f0f4d-c0bc-4d76-8bfc-03dec8a54e64,2026-08-11 16:47:02.6366410,NULL
+5371,449,variable_quantity,变动数量,decimal,NULL,0,0,wms_inventory_record variable_quantity 变动数量 decimal,9fe50dd1-49c4-47dc-8db7-a24988117e90,2026-08-11 16:47:02.6366433,NULL
+5372,449,front_total_quantity,变动前总数量,decimal,NULL,0,0,wms_inventory_record front_total_quantity 变动前总数量 decimal,c77dc5a7-3163-45cf-b925-423c9607e947,2026-08-11 16:47:02.6366474,NULL
+5373,449,front_available_quantity,变动前可用数量,decimal,NULL,0,0,wms_inventory_record front_available_quantity 变动前可用数量 decimal,964980be-35e5-4499-aa23-05653b52fac3,2026-08-11 16:47:02.6366504,NULL
+5374,449,front_lock_quantity,变动前锁定数量,decimal,NULL,0,0,wms_inventory_record front_lock_quantity 变动前锁定数量 decimal,569ca10e-ce0f-4b0f-9372-c1fb199e3bd0,2026-08-11 16:47:02.6366530,NULL
+5375,449,front_stock_quantity,变动前在途数量,decimal,NULL,0,0,wms_inventory_record front_stock_quantity 变动前在途数量 decimal,5f657141-5a95-4791-81ba-27b59abe6040,2026-08-11 16:47:02.6366553,NULL
+5376,449,back_total_quantity,变动后总数量,decimal,NULL,0,0,wms_inventory_record back_total_quantity 变动后总数量 decimal,3cae224c-dd73-40af-8f65-b6038430fe0a,2026-08-11 16:47:02.6366578,NULL
+5377,449,back_available_quantity,变动后可用数量,decimal,NULL,0,0,wms_inventory_record back_available_quantity 变动后可用数量 decimal,f71edf8f-04f3-4ffc-9813-f213c4394236,2026-08-11 16:47:02.6366603,NULL
+5378,449,back_lock_quantity,变动后锁定数量,decimal,NULL,0,0,wms_inventory_record back_lock_quantity 变动后锁定数量 decimal,9de41f29-b116-411e-9efc-6870ce0a82dc,2026-08-11 16:47:02.6366629,NULL
+5379,449,back_stock_quantity,变动后在途数量,decimal,NULL,0,0,wms_inventory_record back_stock_quantity 变动后在途数量 decimal,0361b481-c273-4bc7-ac9e-cb0162c2fe0b,2026-08-11 16:47:02.6366654,NULL
+5380,449,create_by,创建人id,bigint,NULL,1,0,wms_inventory_record create_by 创建人id bigint,9b3e6141-6673-4aa0-9b50-d5cd9dc2a4c1,2026-08-11 16:47:02.6366679,NULL
+5381,449,create_name,创建人名称,varchar,255,1,0,wms_inventory_record create_name 创建人名称 varchar,8f1a8e44-343e-4623-8c65-1724322f9130,2026-08-11 16:47:02.6366708,NULL
+5382,449,create_time,创建时间,datetime,NULL,1,0,wms_inventory_record create_time 创建时间 datetime,d55ca882-726c-47da-b0be-b0e58f147c85,2026-08-11 16:47:02.6366733,NULL
+5383,449,update_by,更新人id,bigint,NULL,1,0,wms_inventory_record update_by 更新人id bigint,01d7e57d-f274-434e-98e6-f74918fc1351,2026-08-11 16:47:02.6366757,NULL
+5384,449,update_name,更新人名称,varchar,255,1,0,wms_inventory_record update_name 更新人名称 varchar,346b49de-cdb3-4dc6-892b-4eb70093a419,2026-08-11 16:47:02.6366782,NULL
+5385,449,update_time,更新人时间,datetime,NULL,1,0,wms_inventory_record update_time 更新人时间 datetime,4c6c6d6f-106a-4e84-981e-0d869d9849f4,2026-08-11 16:47:02.6366807,NULL
+5386,449,del_flag,是否删除标识：0否 1是,tinyint,NULL,1,0,wms_inventory_record del_flag 是否删除标识：0否 1是 tinyint,2f9e86c6-b707-496e-9197-6f4a17c59431,2026-08-11 16:47:02.6366832,NULL
+5387,449,note,备注,varchar,255,1,0,wms_inventory_record note 备注 varchar,c0dd56bb-ea38-4da2-88ee-d46093f82415,2026-08-11 16:47:02.6366862,NULL
+5388,450,id,主键,bigint,NULL,0,1,wms_logistics_detail id 主键 bigint,f0544e53-1a95-4f6f-ab78-9c28bb3fdf40,2026-08-11 16:47:02.6368133,NULL
+5389,450,logistics_id,物流单id,bigint,NULL,0,0,wms_logistics_detail logistics_id 物流单id bigint,b8c1f325-34ad-468a-ac9b-20852e5686f5,2026-08-11 16:47:02.6368181,NULL
+5390,450,material_id,物料id,bigint,NULL,0,0,wms_logistics_detail material_id 物料id bigint,a5d86375-44db-4bfd-b268-b6f8521466c5,2026-08-11 16:47:02.6368207,NULL
+5391,450,shipped_quantity,发货数量,decimal,NULL,0,0,wms_logistics_detail shipped_quantity 发货数量 decimal,8cd63a80-f11e-417c-b80f-b36cbe501436,2026-08-11 16:47:02.6368231,NULL
+5392,450,aog_quantity,到货数量,decimal,NULL,1,0,wms_logistics_detail aog_quantity 到货数量 decimal,eec4790d-e6cd-4ef7-b3cc-5de6e271748e,2026-08-11 16:47:02.6368255,NULL
+5393,450,weight,重量,decimal,NULL,1,0,wms_logistics_detail weight 重量 decimal,194635f6-62c5-4cd2-acf0-5aeeee48ea33,2026-08-11 16:47:02.6368280,NULL
+5394,450,volume,体积,decimal,NULL,1,0,wms_logistics_detail volume 体积 decimal,480f89ef-e5d7-4dc6-97ab-11b869ad5d8c,2026-08-11 16:47:02.6368326,NULL
+5395,450,weight_unit,重量单位,bigint,NULL,1,0,wms_logistics_detail weight_unit 重量单位 bigint,b848c77c-a6a4-4404-9a27-cde3cd68de61,2026-08-11 16:47:02.6368355,NULL
+5396,450,volume_unit,体积单位,bigint,NULL,1,0,wms_logistics_detail volume_unit 体积单位 bigint,8c825fae-792b-4673-b919-416ee2187cdd,2026-08-11 16:47:02.6368381,NULL
+5397,450,associated_no,关联单据,varchar,50,1,0,wms_logistics_detail associated_no 关联单据 varchar,b586a31f-cd36-47ad-8b29-5db679ee7f79,2026-08-11 16:47:02.6368406,NULL
+5398,450,batch,批次,varchar,50,1,0,wms_logistics_detail batch 批次 varchar,916bdbf5-9884-4871-9081-5ac05b65e642,2026-08-11 16:47:02.6368430,NULL
+5399,450,case_no,箱号,varchar,50,1,0,wms_logistics_detail case_no 箱号 varchar,4ac18289-4a06-42b2-8e50-187f5387d5de,2026-08-11 16:47:02.6368454,NULL
+5400,450,unpack_flag,是否拆包装（0：否  1：是）,tinyint,NULL,1,0,wms_logistics_detail unpack_flag 是否拆包装（0：否  1：是） tinyint,a1961bbf-b001-4d55-8c8d-8f34a4f72970,2026-08-11 16:47:02.6368479,NULL
+5401,450,pack_quantity,包装数量,int,NULL,1,0,wms_logistics_detail pack_quantity 包装数量 int,32066d3a-e1bc-4f29-970b-7836ee9bd7f2,2026-08-11 16:47:02.6368506,NULL
+5402,450,unit_pack_quantity,单位包装数量,int,NULL,1,0,wms_logistics_detail unit_pack_quantity 单位包装数量 int,5168cee4-0386-4369-8d7d-59bf4898c6ef,2026-08-11 16:47:02.6368531,NULL
+5403,450,unit_id,单位id,bigint,NULL,1,0,wms_logistics_detail unit_id 单位id bigint,30531151-e256-406b-854f-4a3451e50dd4,2026-08-11 16:47:02.6368556,NULL
+5404,450,create_by,创建人id,bigint,NULL,1,0,wms_logistics_detail create_by 创建人id bigint,94a50289-ec1f-4e3e-a411-93ca5701951b,2026-08-11 16:47:02.6368581,NULL
+5405,450,create_name,创建人名称,varchar,255,1,0,wms_logistics_detail create_name 创建人名称 varchar,4d6b24dc-f8a0-4850-bda1-23d0fccfd0cd,2026-08-11 16:47:02.6368609,NULL
+5406,450,create_time,创建时间,datetime,NULL,1,0,wms_logistics_detail create_time 创建时间 datetime,c2d10af4-48fc-414f-9ff2-35596a065071,2026-08-11 16:47:02.6368634,NULL
+5407,450,update_by,更新人id,bigint,NULL,1,0,wms_logistics_detail update_by 更新人id bigint,5b37eef9-9d13-4c0b-8c3c-952a58831cb0,2026-08-11 16:47:02.6368660,NULL
+5408,450,update_name,更新人名称,varchar,255,1,0,wms_logistics_detail update_name 更新人名称 varchar,94f9d371-bec7-4885-8dff-179f8e738a18,2026-08-11 16:47:02.6368685,NULL
+5409,450,update_time,更新人时间,datetime,NULL,1,0,wms_logistics_detail update_time 更新人时间 datetime,9da37857-983c-4b22-bda3-3400d78046e4,2026-08-11 16:47:02.6368712,NULL
+5410,450,del_flag,是否删除标识：0否 1是,tinyint,NULL,1,0,wms_logistics_detail del_flag 是否删除标识：0否 1是 tinyint,8eb769b7-57fd-47d0-83e6-45ee3f9d368c,2026-08-11 16:47:02.6368758,NULL
+5411,451,id,主键,bigint,NULL,0,1,wms_logistics_info id 主键 bigint,e5938129-1d67-4d31-83d5-1f7aa322b35c,2026-08-11 16:47:02.6369848,NULL
+5412,451,logistics_id,物流单id,bigint,NULL,0,0,wms_logistics_info logistics_id 物流单id bigint,11c15c11-8272-4dd2-bbe5-7c5b4531fbaf,2026-08-11 16:47:02.6369892,NULL
+5413,451,type,收发货类型（0：收 1：发）,tinyint,NULL,1,0,wms_logistics_info type 收发货类型（0：收 1：发） tinyint,d0053b72-b3f5-4b9c-bfa8-d48ed3101e81,2026-08-11 16:47:02.6369920,NULL
+5414,451,office_id,机构id,int,NULL,1,0,wms_logistics_info office_id 机构id int,69af26d0-b74e-494b-8aed-ae49c1600305,2026-08-11 16:47:02.6369943,NULL
+5415,451,office_name,机构名称,varchar,100,1,0,wms_logistics_info office_name 机构名称 varchar,9033cccb-6bb9-4d5d-a703-161ee321db0d,2026-08-11 16:47:02.6369967,NULL
+5416,451,site,地址,varchar,255,1,0,wms_logistics_info site 地址 varchar,b9563184-b389-4010-995f-22b151650575,2026-08-11 16:47:02.6370013,NULL
+5417,451,linkman,联系人,varchar,64,1,0,wms_logistics_info linkman 联系人 varchar,8e466aa5-c56a-4c0c-8fed-e62a386f47d0,2026-08-11 16:47:02.6370040,NULL
+5418,451,contact_way,联系方式,char,11,1,0,wms_logistics_info contact_way 联系方式 char,84b8a33d-23b4-4aac-aaec-f7375182586b,2026-08-11 16:47:02.6370064,NULL
+5419,451,create_by,创建人id,bigint,NULL,1,0,wms_logistics_info create_by 创建人id bigint,594b53e8-5856-4155-8bc3-142fa2356741,2026-08-11 16:47:02.6370088,NULL
+5420,451,create_name,创建人名称,varchar,255,1,0,wms_logistics_info create_name 创建人名称 varchar,ef24230d-2ce7-45be-8a39-862cb1f1d8c8,2026-08-11 16:47:02.6370116,NULL
+5421,451,create_time,创建时间,datetime,NULL,1,0,wms_logistics_info create_time 创建时间 datetime,03d7d862-c7ea-482a-a239-4c537542e3b6,2026-08-11 16:47:02.6370139,NULL
+5422,451,update_by,更新人id,bigint,NULL,1,0,wms_logistics_info update_by 更新人id bigint,2faae86f-8de1-42de-a5b6-4419d07d9b28,2026-08-11 16:47:02.6370164,NULL
+5423,451,update_name,更新人名称,varchar,255,1,0,wms_logistics_info update_name 更新人名称 varchar,28d6aca9-8e1f-40ab-916a-32608be93176,2026-08-11 16:47:02.6370189,NULL
+5424,451,update_time,更新人时间,datetime,NULL,1,0,wms_logistics_info update_time 更新人时间 datetime,1e1de9d0-55d2-4962-a7d9-a8a2648adcf5,2026-08-11 16:47:02.6370213,NULL
+5425,451,del_flag,是否删除标识：0否 1是,tinyint,NULL,1,0,wms_logistics_info del_flag 是否删除标识：0否 1是 tinyint,13b3f3b7-fcc5-4cfb-802b-8cfdf49dcc39,2026-08-11 16:47:02.6370236,NULL
+5426,452,id,主键,bigint,NULL,0,1,wms_logistics_order id 主键 bigint,cb6ca023-5dbd-4ce8-bcc1-5879d0d28cb3,2026-08-11 16:47:02.6371414,NULL
+5427,452,code,编码,varchar,30,0,0,wms_logistics_order code 编码 varchar,5cf72cc3-80dd-4150-989b-b989f2452373,2026-08-11 16:47:02.6371461,NULL
+5428,452,type,类型,bigint,NULL,0,0,wms_logistics_order type 类型 bigint,832c0621-5e08-4499-8b1e-c1827aec64b2,2026-08-11 16:47:02.6371490,NULL
+5429,452,status,状态（0：已创建 1：运输中 2：已签收）,tinyint,NULL,0,0,wms_logistics_order status 状态（0：已创建 1：运输中 2：已签收） tinyint,7d2d5c18-15da-40f5-8fe2-80ba52ecd418,2026-08-11 16:47:02.6371513,NULL
+5430,452,logistics_company,物流方,int,NULL,0,0,wms_logistics_order logistics_company 物流方 int,0989b9ad-66fb-486c-8a1c-2403dc15841c,2026-08-11 16:47:02.6371538,NULL
+5431,452,associated_no,关联单据,varchar,50,1,0,wms_logistics_order associated_no 关联单据 varchar,6c94d34b-ae9d-4b03-8e2d-01b97460e477,2026-08-11 16:47:02.6371565,NULL
+5432,452,predict_time,预计送达时间,datetime,NULL,1,0,wms_logistics_order predict_time 预计送达时间 datetime,b1caabed-bda8-4690-94f3-a4c23046d95c,2026-08-11 16:47:02.6371587,NULL
+5433,452,practical_time,实际送达时间,datetime,NULL,1,0,wms_logistics_order practical_time 实际送达时间 datetime,0d8e4bba-7e10-4742-a96e-16b0e280f07b,2026-08-11 16:47:02.6371611,NULL
+5434,452,note,备注,varchar,255,1,0,wms_logistics_order note 备注 varchar,4bfc133e-52ad-4006-8b9d-6ee21eff56b3,2026-08-11 16:47:02.6371636,NULL
+5435,452,create_by,创建人id,bigint,NULL,1,0,wms_logistics_order create_by 创建人id bigint,e698a151-4ca3-4958-9076-359c46290ee5,2026-08-11 16:47:02.6371663,NULL
+5436,452,create_name,创建人名称,varchar,255,1,0,wms_logistics_order create_name 创建人名称 varchar,dc7d0915-4feb-4701-8ea7-6c33b48b245b,2026-08-11 16:47:02.6371690,NULL
+5437,452,create_time,创建时间,datetime,NULL,1,0,wms_logistics_order create_time 创建时间 datetime,c623c19d-ad15-4efc-a674-204e4077e68d,2026-08-11 16:47:02.6371714,NULL
+5438,452,update_by,更新人id,bigint,NULL,1,0,wms_logistics_order update_by 更新人id bigint,f94b617c-6a50-4ee1-9197-efa15ffa6136,2026-08-11 16:47:02.6371739,NULL
+5439,452,update_name,更新人名称,varchar,255,1,0,wms_logistics_order update_name 更新人名称 varchar,9adc6ca0-e63d-42a7-800b-8b623382a945,2026-08-11 16:47:02.6371762,NULL
+5440,452,update_time,更新人时间,datetime,NULL,1,0,wms_logistics_order update_time 更新人时间 datetime,c97db20f-3acf-403e-b821-766ba62e8cfa,2026-08-11 16:47:02.6371788,NULL
+5441,452,del_flag,是否删除标识：0否 1是,tinyint,NULL,1,0,wms_logistics_order del_flag 是否删除标识：0否 1是 tinyint,81b65743-1c89-4a71-8e11-45ff315c3494,2026-08-11 16:47:02.6371833,NULL
+5442,453,id,主键,bigint,NULL,0,1,wms_logistics_transportation id 主键 bigint,a95c4960-bb82-4bf9-8010-bca5cd0ccedd,2026-08-11 16:47:02.6373068,NULL
+5443,453,logistics_id,物流单id,bigint,NULL,0,0,wms_logistics_transportation logistics_id 物流单id bigint,96cf0001-5402-4ed3-b839-6ff839463fbc,2026-08-11 16:47:02.6373119,NULL
+5444,453,way,运输方式,json,NULL,0,0,wms_logistics_transportation way 运输方式 json,e4f0b8c1-9cd0-4615-a779-3285486f94f6,2026-08-11 16:47:02.6373145,NULL
+5445,453,classification_id,分类id,bigint,NULL,0,0,wms_logistics_transportation classification_id 分类id bigint,bf1c7ba6-5b39-4c25-84b6-533307854506,2026-08-11 16:47:02.6373171,NULL
+5446,453,classification_name,分类名称,varchar,255,1,0,wms_logistics_transportation classification_name 分类名称 varchar,4eb52a19-9b34-4989-9ad4-0f4f5598a3d4,2026-08-11 16:47:02.6373195,NULL
+5447,453,create_by,创建人id,bigint,NULL,1,0,wms_logistics_transportation create_by 创建人id bigint,d86501a0-e3a2-4ac5-aa1f-4c96431cfe81,2026-08-11 16:47:02.6373221,NULL
+5448,453,create_name,创建人名称,varchar,255,1,0,wms_logistics_transportation create_name 创建人名称 varchar,15590046-6bd5-4fd3-99f1-6a87c1df9e02,2026-08-11 16:47:02.6373246,NULL
+5449,453,create_time,创建时间,datetime,NULL,1,0,wms_logistics_transportation create_time 创建时间 datetime,e48e013f-3c87-470e-9aa6-05f80fb3fc4b,2026-08-11 16:47:02.6373295,NULL
+5450,453,update_by,更新人id,bigint,NULL,1,0,wms_logistics_transportation update_by 更新人id bigint,a8b0abcc-f68f-4e05-8c93-dc1da5191038,2026-08-11 16:47:02.6373322,NULL
+5451,453,update_name,更新人名称,varchar,255,1,0,wms_logistics_transportation update_name 更新人名称 varchar,fd8f3b23-4634-4a7e-97a6-241dbc42deee,2026-08-11 16:47:02.6373349,NULL
+5452,453,update_time,更新人时间,datetime,NULL,1,0,wms_logistics_transportation update_time 更新人时间 datetime,58a97843-6817-4802-8374-8a973d2c986f,2026-08-11 16:47:02.6373375,NULL
+5453,453,del_flag,是否删除标识：0否 1是,tinyint,NULL,1,0,wms_logistics_transportation del_flag 是否删除标识：0否 1是 tinyint,09fa277b-327e-46cb-a4c7-71d3220ebba9,2026-08-11 16:47:02.6373401,NULL
+5454,454,id,主键,bigint,NULL,0,1,wms_shelf_down_strategy id 主键 bigint,4922a8a8-d002-4877-bcdc-aa5b6b7feeec,2026-08-11 16:47:02.6374584,NULL
+5455,454,material_id,物料id,bigint,NULL,0,0,wms_shelf_down_strategy material_id 物料id bigint,d2078b0a-2362-4423-b184-7907e97ebc4f,2026-08-11 16:47:02.6374632,NULL
+5456,454,material_code,物料编码,varchar,50,0,0,wms_shelf_down_strategy material_code 物料编码 varchar,d3816cc3-4e9a-4699-966b-e0886ef915d1,2026-08-11 16:47:02.6374659,NULL
+5457,454,material_name,物料名称,varchar,50,0,0,wms_shelf_down_strategy material_name 物料名称 varchar,2118e543-94d0-488d-85c4-09a276aa959e,2026-08-11 16:47:02.6374701,NULL
+5458,454,sold_out_type,下架类型,bigint,NULL,0,0,wms_shelf_down_strategy sold_out_type 下架类型 bigint,ffeee836-08b8-4b06-825f-c3d6e689186d,2026-08-11 16:47:02.6374728,NULL
+5459,454,shelf_order,货架排序,bigint,NULL,0,0,wms_shelf_down_strategy shelf_order 货架排序 bigint,08e59a40-91f8-4ba1-989e-6420f5f85dd6,2026-08-11 16:47:02.6374755,NULL
+5460,454,create_by,创建人id,bigint,NULL,1,0,wms_shelf_down_strategy create_by 创建人id bigint,30d316a9-1be1-43d5-969e-185f173e50b2,2026-08-11 16:47:02.6374779,NULL
+5461,454,create_name,创建人名称,varchar,255,1,0,wms_shelf_down_strategy create_name 创建人名称 varchar,66f75a24-b270-42b0-bfb2-a839a765e3fb,2026-08-11 16:47:02.6374803,NULL
+5462,454,create_time,创建时间,datetime,NULL,1,0,wms_shelf_down_strategy create_time 创建时间 datetime,a4e08145-e919-4dfc-9c4c-b2444f78265f,2026-08-11 16:47:02.6374828,NULL
+5463,454,update_by,更新人id,bigint,NULL,1,0,wms_shelf_down_strategy update_by 更新人id bigint,1667650c-42a9-4631-9822-5e8a990b2408,2026-08-11 16:47:02.6374855,NULL
+5464,454,update_name,更新人名称,varchar,255,1,0,wms_shelf_down_strategy update_name 更新人名称 varchar,7baa3f58-499d-431f-b69a-125a8449aafd,2026-08-11 16:47:02.6374881,NULL
+5465,454,update_time,更新人时间,datetime,NULL,1,0,wms_shelf_down_strategy update_time 更新人时间 datetime,3b7b08b4-3919-4a2a-8d10-87ea8640b852,2026-08-11 16:47:02.6374908,NULL
+5466,454,del_flag,是否删除标识：0否 1是,tinyint,NULL,1,0,wms_shelf_down_strategy del_flag 是否删除标识：0否 1是 tinyint,4283a713-e28e-48c5-a8f2-fad27303cb99,2026-08-11 16:47:02.6374933,NULL
+5467,454,note,备注,varchar,512,1,0,wms_shelf_down_strategy note 备注 varchar,ad4d540b-31ec-4f9c-838a-d3bebe14f563,2026-08-11 16:47:02.6374960,NULL
+5468,455,id,主键,bigint,NULL,0,1,wms_shelf_up_strategy id 主键 bigint,4d620100-a83d-45d4-b69d-bf94c974648c,2026-08-11 16:47:02.6376175,NULL
+5469,455,material_id,物料id,bigint,NULL,0,0,wms_shelf_up_strategy material_id 物料id bigint,4d229883-6caa-483c-a789-6d5825e0c906,2026-08-11 16:47:02.6376225,NULL
+5470,455,material_code,物料编码,varchar,50,0,0,wms_shelf_up_strategy material_code 物料编码 varchar,eacc40ab-fa0c-4fe2-9ce1-44d4c6272e77,2026-08-11 16:47:02.6376250,NULL
+5471,455,material_name,物料名称,varchar,50,0,0,wms_shelf_up_strategy material_name 物料名称 varchar,d8ea5a10-2af8-414d-b0ee-732b488bfb1b,2026-08-11 16:47:02.6376273,NULL
+5472,455,storage_location,存储位置,json,NULL,0,0,wms_shelf_up_strategy storage_location 存储位置 json,838a4c0c-497d-469a-ae1d-11f82e0ba1d5,2026-08-11 16:47:02.6376297,NULL
+5473,455,max_storage_quantity,最大存储数量,decimal,NULL,1,0,wms_shelf_up_strategy max_storage_quantity 最大存储数量 decimal,fce17f9a-8eb2-4fc9-977c-00f3b53f7105,2026-08-11 16:47:02.6376323,NULL
+5474,455,create_by,创建人id,bigint,NULL,1,0,wms_shelf_up_strategy create_by 创建人id bigint,efdd85c7-194d-42cb-904a-6ed738549c62,2026-08-11 16:47:02.6376349,NULL
+5475,455,create_name,创建人名称,varchar,255,1,0,wms_shelf_up_strategy create_name 创建人名称 varchar,68d275b8-97d5-4f5e-ab9f-8e4d9a33b6da,2026-08-11 16:47:02.6376373,NULL
+5476,455,create_time,创建时间,datetime,NULL,1,0,wms_shelf_up_strategy create_time 创建时间 datetime,6264e79a-11af-4879-b7ed-93459f814335,2026-08-11 16:47:02.6376399,NULL
+5477,455,update_by,更新人id,bigint,NULL,1,0,wms_shelf_up_strategy update_by 更新人id bigint,a81c28bb-e76c-4e97-bed3-ecb2c669eca2,2026-08-11 16:47:02.6376426,NULL
+5478,455,update_name,更新人名称,varchar,255,1,0,wms_shelf_up_strategy update_name 更新人名称 varchar,094e5cdf-4035-4c00-a02e-79dd45f3d63d,2026-08-11 16:47:02.6376452,NULL
+5479,455,update_time,更新人时间,datetime,NULL,1,0,wms_shelf_up_strategy update_time 更新人时间 datetime,f79ae7ad-a730-47cd-83f1-a6ee843d12bd,2026-08-11 16:47:02.6376476,NULL
+5480,455,del_flag,是否删除标识：0否 1是,tinyint,NULL,1,0,wms_shelf_up_strategy del_flag 是否删除标识：0否 1是 tinyint,b934b8be-ba8e-4c7c-b53a-34ccfdef848d,2026-08-11 16:47:02.6376502,NULL
+5481,455,note,备注,varchar,512,1,0,wms_shelf_up_strategy note 备注 varchar,513572f5-3fd3-4b42-91c2-cb249a1a7044,2026-08-11 16:47:02.6376526,NULL
+5482,456,id,,bigint,NULL,0,1,wms_sign_feedback id bigint,03c1a1d1-24de-4fd7-903d-5b83d985d438,2026-08-11 16:47:02.6377616,NULL
+5483,456,sales_order,物流单号,varchar,255,1,0,wms_sign_feedback sales_order 物流单号 varchar,1330fe85-6538-4006-abf4-4d6736cf81d0,2026-08-11 16:47:02.6377661,NULL
+5484,456,logistics_company,"物流公司 ",varchar,255,1,0,wms_sign_feedback logistics_company 物流公司  varchar,e3de8ad9-a3ea-431a-83a3-5765261ec4b3,2026-08-11 16:47:02.6377690,NULL
+5485,456,product,产品,varchar,255,1,0,wms_sign_feedback product 产品 varchar,0fcf2bcf-b7d3-4f70-9c07-a8e14179e50a,2026-08-11 16:47:02.6377715,NULL
+5486,456,state,反馈状态（0:待确认反馈 1：已反馈 3:已退回）,int,NULL,1,0,wms_sign_feedback state 反馈状态（0:待确认反馈 1：已反馈 3:已退回） int,97d24b2f-b22d-4cb6-adf4-c456b489e465,2026-08-11 16:47:02.6377737,NULL
+5487,456,car_code,车牌号,varchar,255,1,0,wms_sign_feedback car_code 车牌号 varchar,be76372b-2c51-4a3e-80f7-872d5dee0589,2026-08-11 16:47:02.6377764,NULL
+5488,456,client,客户,varchar,255,1,0,wms_sign_feedback client 客户 varchar,b6e98bfa-7a2e-4d81-90ae-4dc339613154,2026-08-11 16:47:02.6377786,NULL
+5489,456,send_date,发货日期,date,NULL,1,0,wms_sign_feedback send_date 发货日期 date,54b2715d-3c7f-470a-896a-970e0453164e,2026-08-11 16:47:02.6377809,NULL
+5490,456,send_quantity,发货数量,decimal,NULL,1,0,wms_sign_feedback send_quantity 发货数量 decimal,ada12024-2895-4604-9f8c-3d24ff5692ac,2026-08-11 16:47:02.6377832,NULL
+5491,456,price_quantity,发货面积,decimal,NULL,1,0,wms_sign_feedback price_quantity 发货面积 decimal,52e284da-4eba-4ec4-870e-74c0bb691322,2026-08-11 16:47:02.6377882,NULL
+5492,456,signature_type,签收类型,varchar,255,1,0,wms_sign_feedback signature_type 签收类型 varchar,720a18c5-092f-4245-8322-fedf1d8c837d,2026-08-11 16:47:02.6377908,NULL
+5493,456,signed_quantity,签收数量,decimal,NULL,1,0,wms_sign_feedback signed_quantity 签收数量 decimal,90f9af84-6570-4109-b1b7-aa868e4addf4,2026-08-11 16:47:02.6377932,NULL
+5494,456,signed_price_quantity,签收面积,decimal,NULL,1,0,wms_sign_feedback signed_price_quantity 签收面积 decimal,d4ebe741-ab05-443d-9565-0f87782857b6,2026-08-11 16:47:02.6377956,NULL
+5495,456,address,收货地址,varchar,100,1,0,wms_sign_feedback address 收货地址 varchar,b27f3581-859b-46d9-8b66-4b756a290bf7,2026-08-11 16:47:02.6377981,NULL
+5496,456,signed_date,签收日期,date,NULL,1,0,wms_sign_feedback signed_date 签收日期 date,36b9133b-56a6-4bfc-8f3a-ba2a7374a397,2026-08-11 16:47:02.6378006,NULL
+5497,456,abnormal_cause,异常原因,varchar,255,1,0,wms_sign_feedback abnormal_cause 异常原因 varchar,806f9851-b5df-4223-bb41-6a3f572af93d,2026-08-11 16:47:02.6378033,NULL
+5498,456,file_id,文件id,bigint,NULL,1,0,wms_sign_feedback file_id 文件id bigint,f6ed67a8-737a-4340-b9a1-b8eea6e3b27c,2026-08-11 16:47:02.6378058,NULL
+5499,456,create_by,创建人id,bigint,NULL,1,0,wms_sign_feedback create_by 创建人id bigint,7c4b7dd0-f32d-4e8a-95c8-57631d745ae6,2026-08-11 16:47:02.6378086,NULL
+5500,456,create_name,创建人名称,varchar,255,1,0,wms_sign_feedback create_name 创建人名称 varchar,f3d7267d-cc9f-4717-9106-5f1a7cb64b24,2026-08-11 16:47:02.6378112,NULL
+5501,456,create_time,创建时间,datetime,NULL,1,0,wms_sign_feedback create_time 创建时间 datetime,6d72bd2e-6723-414c-abc4-323d21412a0b,2026-08-11 16:47:02.6378140,NULL
+5502,456,update_by,更新人id,bigint,NULL,1,0,wms_sign_feedback update_by 更新人id bigint,d25f300c-dc62-443a-8154-aefb3c74a758,2026-08-11 16:47:02.6378167,NULL
+5503,456,update_name,更新人名称,varchar,255,1,0,wms_sign_feedback update_name 更新人名称 varchar,5cd275d1-9a40-4105-9714-ad8c56cbe3d0,2026-08-11 16:47:02.6378192,NULL
+5504,456,update_time,更新人时间,datetime,NULL,1,0,wms_sign_feedback update_time 更新人时间 datetime,50909460-b6b7-484d-9979-a237d11e84e4,2026-08-11 16:47:02.6378217,NULL
+5505,456,del_flag,是否删除标识：0否 1是,tinyint,NULL,1,0,wms_sign_feedback del_flag 是否删除标识：0否 1是 tinyint,957fc0a2-c0c6-48ca-90fa-be5feee52026,2026-08-11 16:47:02.6378242,NULL
+5506,456,note,备注,varchar,255,1,0,wms_sign_feedback note 备注 varchar,9432d623-e9cd-4234-8ac6-d49bb11ac6f7,2026-08-11 16:47:02.6378268,NULL
+5507,456,send_back_reason,退回原因,varchar,255,1,0,wms_sign_feedback send_back_reason 退回原因 varchar,df17a883-9d97-4688-b361-cd2161df2ff4,2026-08-11 16:47:02.6378314,NULL
+5508,457,id,主键,bigint,NULL,0,1,wms_storage_receipt id 主键 bigint,69dc1d46-b239-4a1c-9883-99f7ffbade11,2026-08-11 16:47:02.6379522,NULL
+5509,457,code,编码,varchar,50,0,0,wms_storage_receipt code 编码 varchar,9036c609-7af3-48df-85fb-6cbe03ce02bb,2026-08-11 16:47:02.6379572,NULL
+5510,457,type,类型,bigint,NULL,0,0,wms_storage_receipt type 类型 bigint,2098ffea-1600-4af3-a14d-55d792a2af8e,2026-08-11 16:47:02.6379598,NULL
+5511,457,status,状态,tinyint,NULL,0,0,wms_storage_receipt status 状态 tinyint,081404b3-1e3b-4f49-86af-9e9b548fc9df,2026-08-11 16:47:02.6379622,NULL
+5512,457,warehouse_id,仓库id,bigint,NULL,0,0,wms_storage_receipt warehouse_id 仓库id bigint,158bf47a-27b4-4885-b76e-2f5f32139bb1,2026-08-11 16:47:02.6379645,NULL
+5513,457,shelf_id,货架id,bigint,NULL,1,0,wms_storage_receipt shelf_id 货架id bigint,d4c8cfb4-ff36-41f6-aa2f-c8d40b38ef0a,2026-08-11 16:47:02.6379690,NULL
+5514,457,affirm_time,确认时间,datetime,NULL,1,0,wms_storage_receipt affirm_time 确认时间 datetime,618ec3b2-4d1b-423f-bc55-733ad308edc0,2026-08-11 16:47:02.6379720,NULL
+5515,457,affirm_name,确认人,varchar,50,1,0,wms_storage_receipt affirm_name 确认人 varchar,98fe2e30-1196-466f-88ac-f3c57f87c854,2026-08-11 16:47:02.6379746,NULL
+5516,457,syn_name,同步人,varchar,50,1,0,wms_storage_receipt syn_name 同步人 varchar,efd0f2d0-84c0-41f4-b0d2-fc7b002009c1,2026-08-11 16:47:02.6379771,NULL
+5517,457,charge_time,冲销时间,datetime,NULL,1,0,wms_storage_receipt charge_time 冲销时间 datetime,3caf127a-e902-4df4-8ae7-056d3141eb52,2026-08-11 16:47:02.6379799,NULL
+5518,457,charge_name,冲销人名称,varchar,255,1,0,wms_storage_receipt charge_name 冲销人名称 varchar,c3d3de8b-b80e-4abd-81e2-b941f866d72e,2026-08-11 16:47:02.6379824,NULL
+5519,457,create_by,创建人id,bigint,NULL,1,0,wms_storage_receipt create_by 创建人id bigint,99b2880f-9b80-4678-a8f2-45d03865d649,2026-08-11 16:47:02.6379849,NULL
+5520,457,create_name,创建人名称,varchar,255,1,0,wms_storage_receipt create_name 创建人名称 varchar,6a2ff23c-f982-4258-8863-97526248a99b,2026-08-11 16:47:02.6379875,NULL
+5521,457,create_time,创建时间,datetime,NULL,1,0,wms_storage_receipt create_time 创建时间 datetime,e36c7f9e-d0d3-4602-a146-13956968b77b,2026-08-11 16:47:02.6379900,NULL
+5522,457,update_by,更新人id,bigint,NULL,1,0,wms_storage_receipt update_by 更新人id bigint,f1b9acb8-2608-4f40-bf40-f52bf698170e,2026-08-11 16:47:02.6379927,NULL
+5523,457,update_name,更新人名称,varchar,255,1,0,wms_storage_receipt update_name 更新人名称 varchar,287cfc97-7881-4918-a5b1-aa3469623bff,2026-08-11 16:47:02.6379954,NULL
+5524,457,update_time,更新人时间,datetime,NULL,1,0,wms_storage_receipt update_time 更新人时间 datetime,b69ae73a-6879-49ed-87f5-654a54ff8c6d,2026-08-11 16:47:02.6379981,NULL
+5525,457,del_flag,是否删除标识：0否 1是,tinyint,NULL,1,0,wms_storage_receipt del_flag 是否删除标识：0否 1是 tinyint,bddf7e60-1c8c-455c-8fde-ba9d4146df17,2026-08-11 16:47:02.6380594,NULL
+5526,457,note,备注,varchar,255,1,0,wms_storage_receipt note 备注 varchar,65a98c37-0cba-472c-8616-f53c4c7bd8a9,2026-08-11 16:47:02.6380660,NULL
+5527,457,source_type,单据来源类型（0：生产 1：采购地磅 2采购入库）,tinyint,NULL,1,0,wms_storage_receipt source_type 单据来源类型（0：生产 1：采购地磅 2采购入库） tinyint,7734281a-f693-4c92-bbe5-5c8feaa05039,2026-08-11 16:47:02.6380697,NULL
+5528,457,source_code,单据来源单号,varchar,50,1,0,wms_storage_receipt source_code 单据来源单号 varchar,53b918a4-dc96-4470-a8ab-2bddc3afe8f2,2026-08-11 16:47:02.6380733,NULL
+5529,457,erp_receipt_code,金蝶收料通知单编码,varchar,50,1,0,wms_storage_receipt erp_receipt_code 金蝶收料通知单编码 varchar,9cc4dc9f-4f79-4c8b-873f-3eac94e8f45e,2026-08-11 16:47:02.6380808,NULL
+5530,457,erp_receipt_id,金蝶收料通知单id,varchar,50,1,0,wms_storage_receipt erp_receipt_id 金蝶收料通知单id varchar,3707110a-068c-49d5-bffc-0c1ff1e64685,2026-08-11 16:47:02.6380841,NULL
+5531,457,come_time,入库时间,datetime,NULL,1,0,wms_storage_receipt come_time 入库时间 datetime,8b888bba-d2b8-4033-a043-30ecdb485208,2026-08-11 16:47:02.6380874,NULL
+5532,457,es_supplier_code,供应商代码,varchar,100,1,0,wms_storage_receipt es_supplier_code 供应商代码 varchar,5923de2e-96fb-4049-81cd-18843a5060db,2026-08-11 16:47:02.6380905,NULL
+5533,458,id,主键,bigint,NULL,0,1,wms_storage_receipt_info id 主键 bigint,812a3494-80a1-4578-8a0d-bcb81fa4db1f,2026-08-11 16:47:02.6383064,NULL
+5534,458,storage_receipt_id,入库单id,bigint,NULL,0,0,wms_storage_receipt_info storage_receipt_id 入库单id bigint,feab1ee2-fcfc-4b0b-85fc-b6b5f113bbe1,2026-08-11 16:47:02.6383131,NULL
+5535,458,material_id,物料id,bigint,NULL,0,0,wms_storage_receipt_info material_id 物料id bigint,2f6dfe49-5ec5-4644-a780-fb430e4ddbed,2026-08-11 16:47:02.6383161,NULL
+5536,458,material_name,物料名称,varchar,50,1,0,wms_storage_receipt_info material_name 物料名称 varchar,6b8dd172-5082-4045-b3c8-0a907a9e623d,2026-08-11 16:47:02.6383214,NULL
+5537,458,material_code,物料编码,varchar,50,1,0,wms_storage_receipt_info material_code 物料编码 varchar,ec415acc-e700-4355-ab42-7cd89b1d50dd,2026-08-11 16:47:02.6383241,NULL
+5538,458,shelf_id,货架id,int,NULL,1,0,wms_storage_receipt_info shelf_id 货架id int,974a7ceb-043e-4b96-b95b-2c86527e551d,2026-08-11 16:47:02.6383270,NULL
+5539,458,shelf_code,货架编码,varchar,50,1,0,wms_storage_receipt_info shelf_code 货架编码 varchar,a4c183c9-a179-426b-8dbc-0489f789ae16,2026-08-11 16:47:02.6383296,NULL
+5540,458,shelf_name,货架名称,varchar,50,1,0,wms_storage_receipt_info shelf_name 货架名称 varchar,5da45519-db2c-4c3d-9a2e-8942d03939c8,2026-08-11 16:47:02.6383322,NULL
+5541,458,quantity,数量,decimal,NULL,0,0,wms_storage_receipt_info quantity 数量 decimal,aa90ed49-705a-4941-a977-16225bd54c64,2026-08-11 16:47:02.6383348,NULL
+5542,458,unit,单位,bigint,NULL,1,0,wms_storage_receipt_info unit 单位 bigint,0f159617-d73f-4473-ac20-f9eaae0d03af,2026-08-11 16:47:02.6383376,NULL
+5543,458,batch,批次,varchar,50,1,0,wms_storage_receipt_info batch 批次 varchar,a3ebf103-25e6-436f-9f52-91655bff5205,2026-08-11 16:47:02.6383401,NULL
+5544,458,case_no,箱号,varchar,50,1,0,wms_storage_receipt_info case_no 箱号 varchar,48f3314b-3ea0-4da1-929f-bb7c9c78d288,2026-08-11 16:47:02.6383426,NULL
+5545,458,associated_no,关联箱号,varchar,50,1,0,wms_storage_receipt_info associated_no 关联箱号 varchar,48d2f521-637b-439a-b0cd-1b0570fe5d9e,2026-08-11 16:47:02.6383453,NULL
+5546,458,valid_time,有效期截至时间,date,NULL,1,0,wms_storage_receipt_info valid_time 有效期截至时间 date,09d0c802-2f1f-451f-9a65-7b29b7d6a09e,2026-08-11 16:47:02.6383479,NULL
+5547,458,create_by,创建人id,bigint,NULL,1,0,wms_storage_receipt_info create_by 创建人id bigint,bb2cd285-5a1a-43fe-9786-b77df357b43e,2026-08-11 16:47:02.6383505,NULL
+5548,458,create_name,创建人名称,varchar,255,1,0,wms_storage_receipt_info create_name 创建人名称 varchar,f1e06bde-622d-4d99-ae3c-a11458c13ac8,2026-08-11 16:47:02.6383532,NULL
+5549,458,create_time,创建时间,datetime,NULL,1,0,wms_storage_receipt_info create_time 创建时间 datetime,a2f6359c-67d0-4428-b8ae-3d598ccf6cbc,2026-08-11 16:47:02.6383559,NULL
+5550,458,update_by,更新人id,bigint,NULL,1,0,wms_storage_receipt_info update_by 更新人id bigint,60298a05-3f61-4996-9f70-33ee6a45ea1d,2026-08-11 16:47:02.6383590,NULL
+5551,458,update_name,更新人名称,varchar,255,1,0,wms_storage_receipt_info update_name 更新人名称 varchar,89490570-66b2-44e2-90c2-a3637d4b076c,2026-08-11 16:47:02.6383638,NULL
+5552,458,update_time,更新人时间,datetime,NULL,1,0,wms_storage_receipt_info update_time 更新人时间 datetime,9c72d347-9a65-4c9a-a8e9-5db830b726dd,2026-08-11 16:47:02.6383667,NULL
+5553,458,del_flag,是否删除标识：0否 1是,tinyint,NULL,1,0,wms_storage_receipt_info del_flag 是否删除标识：0否 1是 tinyint,f8c22590-c0ab-43b2-b02f-42aaf2cbec50,2026-08-11 16:47:02.6383694,NULL
+5554,458,erp_line_id,金蝶通知单行号,varchar,50,1,0,wms_storage_receipt_info erp_line_id 金蝶通知单行号 varchar,fb8db42e-1936-41bd-a8c9-5c57dfa14bef,2026-08-11 16:47:02.6383722,NULL
+5555,458,production_line_name,产线名称,varchar,50,1,0,wms_storage_receipt_info production_line_name 产线名称 varchar,3f4ff156-e0ca-42bd-ad3c-426b512a832b,2026-08-11 16:47:02.6383750,NULL
+5556,459,id,主键,bigint,NULL,0,1,wms_test_inventory id 主键 bigint,ebedc352-652c-4140-9b76-6a9027bd6ea4,2026-08-11 16:47:02.6385001,NULL
+5557,459,value,值,decimal,NULL,1,0,wms_test_inventory value 值 decimal,dbe90794-0dc6-4bac-a518-cea43bade391,2026-08-11 16:47:02.6385069,NULL
+5558,459,type,类型 0：当前所有数据（实时库存） 1：445仓库当前数据（实时库存） 2：更新时间8点之前数据 3：更新时间8点之前 445 仓库数据,int,NULL,1,0,wms_test_inventory type 类型 0：当前所有数据（实时库存） 1：445仓库当前数据（实时库存） 2：更新时间8点之前数据 3：更新时间8点之前 445 仓库数据 int,b12e5872-01af-45df-984f-b66e95380470,2026-08-11 16:47:02.6385102,NULL
+5559,459,create_time,创建时间,datetime,NULL,1,0,wms_test_inventory create_time 创建时间 datetime,756e0b22-2131-4d60-a258-ff76408bea7d,2026-08-11 16:47:02.6385128,NULL
+5560,460,id,主键,bigint,NULL,0,1,wms_transfer_slip id 主键 bigint,2ea95ac4-88ed-47dc-83d7-991d80f96cea,2026-08-11 16:47:02.6386183,NULL
+5561,460,code,调拨单编码,varchar,20,1,0,wms_transfer_slip code 调拨单编码 varchar,d5112c76-28b6-4e1b-91cc-0703e78f5120,2026-08-11 16:47:02.6386231,NULL
+5562,460,source_warehouse,来源仓库,int,NULL,0,0,wms_transfer_slip source_warehouse 来源仓库 int,ce30c0dc-d00b-46a8-bc2a-5bad0a47ac57,2026-08-11 16:47:02.6386257,NULL
+5563,460,target_warehouse,目标仓库,int,NULL,0,0,wms_transfer_slip target_warehouse 目标仓库 int,c89f4cc0-fb0a-4a9a-b866-34399b095e50,2026-08-11 16:47:02.6386281,NULL
+5564,460,type,类型,bigint,NULL,0,0,wms_transfer_slip type 类型 bigint,167bfa39-de32-4db5-af8f-cacd962af079,2026-08-11 16:47:02.6386304,NULL
+5565,460,status,状态,tinyint,NULL,0,0,wms_transfer_slip status 状态 tinyint,9edffa0c-2ee1-4483-bdf8-a68001609e8a,2026-08-11 16:47:02.6386330,NULL
+5566,460,syn_name,同步人名称,varchar,50,1,0,wms_transfer_slip syn_name 同步人名称 varchar,8f8d9c27-a741-4dd1-9ed3-a5432a17ef95,2026-08-11 16:47:02.6386353,NULL
+5567,460,note,备注,varchar,255,1,0,wms_transfer_slip note 备注 varchar,b9484e59-08b6-48f7-be4f-d1969f38a8f8,2026-08-11 16:47:02.6386378,NULL
+5568,460,affirm_by,确认人,bigint,NULL,1,0,wms_transfer_slip affirm_by 确认人 bigint,1b026300-3043-438e-9177-d1fb41801a22,2026-08-11 16:47:02.6386418,NULL
+5569,460,affirm_time,确认时间,datetime,NULL,1,0,wms_transfer_slip affirm_time 确认时间 datetime,b494ce4c-bd89-43ad-8bcc-6c9cb377260c,2026-08-11 16:47:02.6386450,NULL
+5570,460,affirm_name,确认人名称,varchar,255,1,0,wms_transfer_slip affirm_name 确认人名称 varchar,da6ae6e0-7720-448a-a1b7-79cf495a77af,2026-08-11 16:47:02.6386477,NULL
+5571,460,create_by,创建人id,bigint,NULL,1,0,wms_transfer_slip create_by 创建人id bigint,f4cce635-98d6-489d-874e-c6fcf5998dfc,2026-08-11 16:47:02.6386501,NULL
+5572,460,create_name,创建人名称,varchar,255,1,0,wms_transfer_slip create_name 创建人名称 varchar,44f6b46b-0c5f-4449-a20b-042b9a570fe3,2026-08-11 16:47:02.6386527,NULL
+5573,460,create_time,创建时间,datetime,NULL,1,0,wms_transfer_slip create_time 创建时间 datetime,21b3d85d-0257-4b37-8ff6-235ff113cd0e,2026-08-11 16:47:02.6386553,NULL
+5574,460,update_by,更新人id,bigint,NULL,1,0,wms_transfer_slip update_by 更新人id bigint,97815c4e-c119-45ec-8d61-8ce489f21673,2026-08-11 16:47:02.6386578,NULL
+5575,460,update_name,更新人名称,varchar,255,1,0,wms_transfer_slip update_name 更新人名称 varchar,ebf75ec2-2306-4250-a3d8-19638dde8640,2026-08-11 16:47:02.6386602,NULL
+5576,460,update_time,更新人时间,datetime,NULL,1,0,wms_transfer_slip update_time 更新人时间 datetime,837db128-6f17-4ad2-a1a0-23afe960d76b,2026-08-11 16:47:02.6386628,NULL
+5577,460,del_flag,是否删除标识：0否 1是,tinyint,NULL,1,0,wms_transfer_slip del_flag 是否删除标识：0否 1是 tinyint,883d4d22-a820-4ba4-a84f-74a6f770dd85,2026-08-11 16:47:02.6386655,NULL
+5578,461,id,主键,bigint,NULL,0,1,wms_transfer_slip_info id 主键 bigint,3c094f51-cd8c-46d9-baf4-264777efe777,2026-08-11 16:47:02.6387768,NULL
+5579,461,transfer_slip_id,调拨单id,bigint,NULL,0,0,wms_transfer_slip_info transfer_slip_id 调拨单id bigint,1deeacdf-47c6-4cbb-b61b-ceed0bfb458b,2026-08-11 16:47:02.6387816,NULL
+5580,461,source_inventory_id,来源货架id,bigint,NULL,0,0,wms_transfer_slip_info source_inventory_id 来源货架id bigint,ff125f28-be08-442f-b6dc-c659d133ef2e,2026-08-11 16:47:02.6387842,NULL
+5581,461,source_shelf,来源货架,int,NULL,0,0,wms_transfer_slip_info source_shelf 来源货架 int,d7ea49a6-9245-4b0f-95cc-6b4c085fb20b,2026-08-11 16:47:02.6387865,NULL
+5582,461,source_shelf_code,来源货架编码,varchar,50,0,0,wms_transfer_slip_info source_shelf_code 来源货架编码 varchar,46e069fc-2cc7-46da-8f24-b8f0b181cb37,2026-08-11 16:47:02.6387891,NULL
+5583,461,source_shelf_name,来源货架名称,varchar,50,0,0,wms_transfer_slip_info source_shelf_name 来源货架名称 varchar,81c5105e-5be8-45e5-b138-47ee0dfc47ed,2026-08-11 16:47:02.6387917,NULL
+5584,461,target_shelf,目标货架,int,NULL,0,0,wms_transfer_slip_info target_shelf 目标货架 int,e3ebf16c-3642-45e0-83fc-cf27c8b55cfb,2026-08-11 16:47:02.6387944,NULL
+5585,461,target_shelf_code,目标货架编码,varchar,50,0,0,wms_transfer_slip_info target_shelf_code 目标货架编码 varchar,c6107943-5267-4295-a097-c3c79bcdcf58,2026-08-11 16:47:02.6387969,NULL
+5586,461,target_shelf_name,目标货架名称,varchar,50,0,0,wms_transfer_slip_info target_shelf_name 目标货架名称 varchar,07865427-9d70-40d3-9cf4-a718a64451a4,2026-08-11 16:47:02.6387994,NULL
+5587,461,material_id,物料id,bigint,NULL,0,0,wms_transfer_slip_info material_id 物料id bigint,d75029d6-78be-4ee5-868d-df4fd10134ae,2026-08-11 16:47:02.6388017,NULL
+5588,461,material_name,物料名称,varchar,50,0,0,wms_transfer_slip_info material_name 物料名称 varchar,89ddae14-92df-4c25-9b66-9efb998fc49f,2026-08-11 16:47:02.6388041,NULL
+5589,461,material_code,物料编码,varchar,50,0,0,wms_transfer_slip_info material_code 物料编码 varchar,405b4466-f0f9-44a9-85f8-a7703934bd88,2026-08-11 16:47:02.6388067,NULL
+5590,461,quantity,数量,decimal,NULL,0,0,wms_transfer_slip_info quantity 数量 decimal,dbac608d-2635-45f5-a8b6-3cef70411c7d,2026-08-11 16:47:02.6388092,NULL
+5591,461,unit,单位,bigint,NULL,1,0,wms_transfer_slip_info unit 单位 bigint,1a689523-34b3-4b31-9c1d-3e2a889647a7,2026-08-11 16:47:02.6388114,NULL
+5592,461,associated_no,关联单据,varchar,30,1,0,wms_transfer_slip_info associated_no 关联单据 varchar,87388a69-de3b-440e-a016-4dab04e15055,2026-08-11 16:47:02.6388168,NULL
+5593,461,batch,批次,varchar,50,1,0,wms_transfer_slip_info batch 批次 varchar,d42e3a4a-d917-4ee3-94fb-1310d20d96e1,2026-08-11 16:47:02.6388195,NULL
+5594,461,case_no,箱号,varchar,50,1,0,wms_transfer_slip_info case_no 箱号 varchar,e4a5b1f1-62a0-4f8a-9bdf-40e232c9eb4b,2026-08-11 16:47:02.6388220,NULL
+5595,461,target_case_no,目标箱号,varchar,50,1,0,wms_transfer_slip_info target_case_no 目标箱号 varchar,e53de054-a7e6-41af-942a-f8476b18af6f,2026-08-11 16:47:02.6388248,NULL
+5596,461,create_by,创建人id,bigint,NULL,1,0,wms_transfer_slip_info create_by 创建人id bigint,59ef5340-66a3-42a6-8a1f-a1d171e228b4,2026-08-11 16:47:02.6388274,NULL
+5597,461,create_name,创建人名称,varchar,255,1,0,wms_transfer_slip_info create_name 创建人名称 varchar,2db16ab9-995c-4a4a-b1c1-974d870f27e8,2026-08-11 16:47:02.6388301,NULL
+5598,461,create_time,创建时间,datetime,NULL,1,0,wms_transfer_slip_info create_time 创建时间 datetime,1d59b580-cceb-4e7d-b600-0804cd8b3290,2026-08-11 16:47:02.6388328,NULL
+5599,461,update_by,更新人id,bigint,NULL,1,0,wms_transfer_slip_info update_by 更新人id bigint,0b520801-585a-4fdf-81ab-919b6d74817a,2026-08-11 16:47:02.6388353,NULL
+5600,461,update_name,更新人名称,varchar,255,1,0,wms_transfer_slip_info update_name 更新人名称 varchar,11d10343-97ce-4e2d-bc95-31c1a6595e20,2026-08-11 16:47:02.6388382,NULL
+5601,461,update_time,更新人时间,datetime,NULL,1,0,wms_transfer_slip_info update_time 更新人时间 datetime,ce628998-caf8-4080-9077-f96118658a72,2026-08-11 16:47:02.6388410,NULL
+5602,461,del_flag,是否删除标识：0否 1是,tinyint,NULL,1,0,wms_transfer_slip_info del_flag 是否删除标识：0否 1是 tinyint,54b20142-4d28-4a9e-891d-c0eab877ef66,2026-08-11 16:47:02.6388437,NULL
+5603,462,id,主键,bigint,NULL,0,1,wms_warehouse_material_allocation id 主键 bigint,c13f4a79-b3fa-481d-ba1f-173bb75c7324,2026-08-11 16:47:02.6389636,NULL
+5604,462,material_id,物料id,bigint,NULL,0,0,wms_warehouse_material_allocation material_id 物料id bigint,833dfed7-8f33-40c5-969b-d148ae273032,2026-08-11 16:47:02.6389687,NULL
+5605,462,material_code,物料编码,varchar,50,0,0,wms_warehouse_material_allocation material_code 物料编码 varchar,3fe9b754-aa55-4436-a81d-9f1202bad4ef,2026-08-11 16:47:02.6389714,NULL
+5606,462,material_name,物料名称,varchar,50,0,0,wms_warehouse_material_allocation material_name 物料名称 varchar,818cad18-f961-4750-9945-d237cdcb08ce,2026-08-11 16:47:02.6389739,NULL
+5607,462,safe_inventory,安全库存,decimal,NULL,0,0,wms_warehouse_material_allocation safe_inventory 安全库存 decimal,ca76f710-c1f1-4435-8a58-c1fd2e813510,2026-08-11 16:47:02.6389763,NULL
+5608,462,batch_delivery_quantity,批次送货量,decimal,NULL,0,0,wms_warehouse_material_allocation batch_delivery_quantity 批次送货量 decimal,38d64aff-e949-4fe8-b6f3-e2c72aa2bff9,2026-08-11 16:47:02.6389789,NULL
+5609,462,delivery_period,送货周期,decimal,NULL,0,0,wms_warehouse_material_allocation delivery_period 送货周期 decimal,90f47eeb-c26a-479b-a156-7852156d06de,2026-08-11 16:47:02.6389813,NULL
+5610,462,delivery_period_unit,送货周期单位,bigint,NULL,1,0,wms_warehouse_material_allocation delivery_period_unit 送货周期单位 bigint,2f049f0c-5d30-40a0-86fd-a56bc2760e0e,2026-08-11 16:47:02.6389838,NULL
+5611,462,create_by,创建人id,bigint,NULL,1,0,wms_warehouse_material_allocation create_by 创建人id bigint,13b93948-6397-41d0-99b3-d22d8475e8e6,2026-08-11 16:47:02.6389864,NULL
+5612,462,create_name,创建人名称,varchar,255,1,0,wms_warehouse_material_allocation create_name 创建人名称 varchar,af560cb2-31fe-4e30-8619-c05639daf569,2026-08-11 16:47:02.6389892,NULL
+5613,462,create_time,创建时间,datetime,NULL,1,0,wms_warehouse_material_allocation create_time 创建时间 datetime,5b0f7452-23b8-4bc7-90ec-037a41ade52b,2026-08-11 16:47:02.6389941,NULL
+5614,462,update_by,更新人id,bigint,NULL,1,0,wms_warehouse_material_allocation update_by 更新人id bigint,bb059452-831e-4a47-8f69-b0e40ebb1dc0,2026-08-11 16:47:02.6389968,NULL
+5615,462,update_name,更新人名称,varchar,255,1,0,wms_warehouse_material_allocation update_name 更新人名称 varchar,3851bbfe-bd7a-4d0c-a854-80c33eaac06a,2026-08-11 16:47:02.6389995,NULL
+5616,462,update_time,更新人时间,datetime,NULL,1,0,wms_warehouse_material_allocation update_time 更新人时间 datetime,08a35adb-53d2-44f8-a779-09d344dcaccd,2026-08-11 16:47:02.6390020,NULL
+5617,462,del_flag,是否删除标识：0否 1是,tinyint,NULL,1,0,wms_warehouse_material_allocation del_flag 是否删除标识：0否 1是 tinyint,7f7267d0-5294-421e-b636-787d582d1040,2026-08-11 16:47:02.6390045,NULL
+5618,462,note,备注,varchar,512,1,0,wms_warehouse_material_allocation note 备注 varchar,e0ff3774-88be-4e38-9fa7-3ae3bcb3717a,2026-08-11 16:47:02.6390070,NULL
+5619,463,id,主键,bigint,NULL,0,1,wms_weighbridge_info id 主键 bigint,902317e3-1004-4f34-bb8a-58de27e8d585,2026-08-11 16:47:02.6391617,NULL
+5620,463,material_id,物料id,bigint,NULL,1,0,wms_weighbridge_info material_id 物料id bigint,4b08299a-3cec-43a6-ae8b-da76c3bfe70c,2026-08-11 16:47:02.6391889,NULL
+5621,463,material_name,物料名称,varchar,50,1,0,wms_weighbridge_info material_name 物料名称 varchar,691540a2-0e72-4018-9dc1-a2f2be5fd61d,2026-08-11 16:47:02.6391921,NULL
+5622,463,material_code,物料编码,varchar,50,1,0,wms_weighbridge_info material_code 物料编码 varchar,c880a695-40ef-4ee0-a377-c90810f393af,2026-08-11 16:47:02.6391948,NULL
+5623,463,flow_code,流程单号,varchar,100,1,0,wms_weighbridge_info flow_code 流程单号 varchar,d7b0b655-7579-4d13-bd03-5cd62068ae22,2026-08-11 16:47:02.6391973,NULL
+5624,463,license_plate,车牌号,varchar,50,1,0,wms_weighbridge_info license_plate 车牌号 varchar,c4c32faf-e274-4438-b2d9-30a1e0dba1fb,2026-08-11 16:47:02.6391998,NULL
+5625,463,driver_name,司机名称,varchar,50,1,0,wms_weighbridge_info driver_name 司机名称 varchar,ed4b198c-023e-41c5-9f83-c6dcac4cc8df,2026-08-11 16:47:02.6392021,NULL
+5626,463,driver_phone,联系方式,varchar,50,1,0,wms_weighbridge_info driver_phone 联系方式 varchar,9e6a8a3a-2e02-4cf9-b054-a9de6b2af379,2026-08-11 16:47:02.6392045,NULL
+5627,463,company_id,供应商id,varchar,50,1,0,wms_weighbridge_info company_id 供应商id varchar,a3ecb6ef-2fbc-4a69-9a31-3312c58a9072,2026-08-11 16:47:02.6392069,NULL
+5628,463,company_name,供应商名称,varchar,50,1,0,wms_weighbridge_info company_name 供应商名称 varchar,86f3d760-f414-4be8-87ff-302335d189bf,2026-08-11 16:47:02.6392097,NULL
+5629,463,gross_weight,毛重,decimal,NULL,1,0,wms_weighbridge_info gross_weight 毛重 decimal,9b11bb66-721a-4870-b4b8-c4e8bfc8df30,2026-08-11 16:47:02.6392122,NULL
+5630,463,tare_weight,皮重,decimal,NULL,1,0,wms_weighbridge_info tare_weight 皮重 decimal,b23f8a10-468a-4906-9d7f-10b8522d65fa,2026-08-11 16:47:02.6392147,NULL
+5631,463,deduct_weight,扣重,decimal,NULL,1,0,wms_weighbridge_info deduct_weight 扣重 decimal,09d7526b-8759-4734-bed8-06ffeec53cca,2026-08-11 16:47:02.6392172,NULL
+5632,463,net_weight,净重,decimal,NULL,1,0,wms_weighbridge_info net_weight 净重 decimal,d1773b30-1055-4528-bdd6-d7ad95cb9950,2026-08-11 16:47:02.6392197,NULL
+5633,463,finish_time,完成时间,datetime,NULL,1,0,wms_weighbridge_info finish_time 完成时间 datetime,cbee8532-7732-438d-9e27-92da7c31cf5d,2026-08-11 16:47:02.6392223,NULL
+5634,463,create_time,创建时间,datetime,NULL,1,0,wms_weighbridge_info create_time 创建时间 datetime,9bbc91cc-c173-4783-a6cc-64cfb8687568,2026-08-11 16:47:02.6392249,NULL
+5635,463,is_generate_list,是否生成入库单：0否 1是,tinyint,NULL,1,0,wms_weighbridge_info is_generate_list 是否生成入库单：0否 1是 tinyint,0be16565-b806-46c5-8153-2a18eb80c498,2026-08-11 16:47:02.6392273,NULL
+5636,463,receipt_code,入库单号,varchar,50,1,0,wms_weighbridge_info receipt_code 入库单号 varchar,9241290a-8397-40eb-bdbc-cc5693968e0e,2026-08-11 16:47:02.6392407,NULL
+5637,463,gross_weight_time,毛重时间,datetime,NULL,1,0,wms_weighbridge_info gross_weight_time 毛重时间 datetime,4f740331-6f92-4a9f-9e88-f20dd9878745,2026-08-11 16:47:02.6392435,NULL
+5638,463,tare_weight_time,皮重时间,datetime,NULL,1,0,wms_weighbridge_info tare_weight_time 皮重时间 datetime,21da8835-b776-42cd-933f-2bc61cf0e68c,2026-08-11 16:47:02.6392462,NULL
+5639,463,update_by,更新人id,bigint,NULL,1,0,wms_weighbridge_info update_by 更新人id bigint,f9ffcd24-1a2e-4e4a-84b8-6ba2e1ddb956,2026-08-11 16:47:02.6392490,NULL
+5640,463,update_name,更新人名称,varchar,255,1,0,wms_weighbridge_info update_name 更新人名称 varchar,b925038c-62e2-4e8d-ad45-9e60f65dcee6,2026-08-11 16:47:02.6392517,NULL
+5641,463,update_time,更新人时间,datetime,NULL,1,0,wms_weighbridge_info update_time 更新人时间 datetime,801dcc87-04b8-4edf-a072-68a9fbffa3f6,2026-08-11 16:47:02.6392545,NULL
+5642,463,del_flag,是否删除标识：0否 1是,tinyint,NULL,1,0,wms_weighbridge_info del_flag 是否删除标识：0否 1是 tinyint,edb27116-7e00-4520-899e-374a8b13b33e,2026-08-11 16:47:02.6392571,NULL
+5643,463,note,备注,varchar,255,1,0,wms_weighbridge_info note 备注 varchar,d8824c39-7238-4da1-8f30-858f9523f325,2026-08-11 16:47:02.6392598,NULL

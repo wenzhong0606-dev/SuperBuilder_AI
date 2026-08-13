@@ -75,25 +75,43 @@ public class QueryPlanBuilder
 	private readonly IMetadataSemanticSearchService
 		_metadataSearch;
 
-
-
+	/// <summary>
+	/// 动态JOIN推理服务。
+	///
+	/// 用于根据当前查询召回的Metadata结果，
+	/// 推断本次QueryPlan可能需要的JOIN关系。
+	/// </summary>
+	private readonly IQueryJoinInferenceService
+		_joinInference;
 
 	/// <summary>
 	/// 创建 QueryPlanBuilder。
 	/// </summary>
+	/// <param name="metadataSearch">
+	/// Metadata语义检索服务。
+	/// </param>
+	/// <param name="joinInference">
+	/// 动态JOIN推理服务。
+	/// </param>
 	public QueryPlanBuilder(
-		IMetadataSemanticSearchService metadataSearch)
+		IMetadataSemanticSearchService metadataSearch,
+		IQueryJoinInferenceService joinInference)
 	{
-
 		_metadataSearch =
-			metadataSearch;
+			metadataSearch
+			?? throw new ArgumentNullException(
+				nameof(metadataSearch));
 
+		_joinInference =
+			joinInference
+			?? throw new ArgumentNullException(
+				nameof(joinInference));
 	}
 
-		/// <summary>
-		/// 判断某个列是否为非信息化展示字段（例如仅表示删除标记或内部用户ID），不适合单列展示。
-		/// </summary>
-		private bool IsNonInformativeColumn(MetadataColumn col)
+	/// <summary>
+	/// 判断某个列是否为非信息化展示字段（例如仅表示删除标记或内部用户ID），不适合单列展示。
+	/// </summary>
+	private bool IsNonInformativeColumn(MetadataColumn col)
 		{
 			if (col == null) return true;
 			var name = (col.ColumnName ?? string.Empty).ToLowerInvariant();
@@ -542,6 +560,155 @@ public class QueryPlanBuilder
 				TableComment =
 					table.TableComment
 			});
+
+
+		/*
+ * ============================================================
+ * Step 5.5
+ *
+ * Phase 1.6.2.1
+ *
+ * 推断当前主表可能存在的动态JOIN关系。
+ *
+ * 注意:
+ *
+ * 当前阶段只构建:
+ *
+ * QueryPlan.Tables
+ * +
+ * QueryPlan.Joins
+ *
+ * 暂时不改变后续Metric / Filter / Dimension
+ * 的字段解析逻辑。
+ * ============================================================
+ */
+
+		var joinCandidates =
+			await BuildJoinsAsync(
+				table,
+				metadataResults);
+
+		foreach (var candidate in joinCandidates)
+		{
+			/*
+			 * ========================================================
+			 * 1.
+			 * 创建QueryJoin
+			 * ========================================================
+			 */
+
+			var queryJoin =
+				BuildQueryJoin(
+					candidate);
+
+			/*
+			 * ========================================================
+			 * 2.
+			 * 防止重复添加JOIN
+			 * ========================================================
+			 */
+
+			var joinExists =
+				plan.Joins.Any(x =>
+					(
+						x.LeftTableId ==
+							queryJoin.LeftTableId
+						&&
+						x.LeftColumnId ==
+							queryJoin.LeftColumnId
+						&&
+						x.RightTableId ==
+							queryJoin.RightTableId
+						&&
+						x.RightColumnId ==
+							queryJoin.RightColumnId
+					)
+					||
+					(
+						x.LeftTableId ==
+							queryJoin.RightTableId
+						&&
+						x.LeftColumnId ==
+							queryJoin.RightColumnId
+						&&
+						x.RightTableId ==
+							queryJoin.LeftTableId
+						&&
+						x.RightColumnId ==
+							queryJoin.LeftColumnId
+					));
+
+			if (joinExists)
+			{
+				continue;
+			}
+
+			/*
+			 * ========================================================
+			 * 3.
+			 * 添加JOIN
+			 * ========================================================
+			 */
+
+			plan.Joins.Add(
+				queryJoin);
+
+			/*
+			 * ========================================================
+			 * 4.
+			 * 添加JOIN目标表
+			 * ========================================================
+			 */
+
+			var joinedTableId =
+				candidate.LeftTableId == table.Id
+					? candidate.RightTableId
+					: candidate.LeftTableId;
+
+			var joinedTable =
+				metadataResults
+					.Where(x =>
+						x.Table != null &&
+						x.Table.Id == joinedTableId)
+					.Select(x =>
+						x.Table!)
+					.FirstOrDefault();
+
+			if (joinedTable == null)
+			{
+				continue;
+			}
+
+			/*
+			 * 防止重复添加Table。
+			 */
+
+			var tableExists =
+				plan.Tables.Any(x =>
+					x.MetadataTableId ==
+						joinedTable.Id);
+
+			if (tableExists)
+			{
+				continue;
+			}
+
+			plan.Tables.Add(
+				new QueryTable
+				{
+					MetadataTableId =
+						joinedTable.Id,
+
+					DataSourceId =
+						joinedTable.DataSourceId,
+
+					TableName =
+						joinedTable.TableName,
+
+					TableComment =
+						joinedTable.TableComment
+				});
+		}
 
 		// 强制规则: 如果用户意图是 Top-N / 最近 查询，优先使用时间列做 OrderBy，字段使用主键或 id
 		if (intent.Limit != null ||
@@ -3010,4 +3177,191 @@ public class QueryPlanBuilder
 
 	}
 
+
+	/// <summary>
+	/// 根据当前查询召回的Metadata结果推断QueryPlan中的JOIN关系。
+	///
+	/// Phase 1.6.2.1
+	///
+	/// 当前阶段采用保守策略：
+	///
+	/// 1. 只考虑当前主表直接连接的候选表。
+	/// 2. 使用现有IQueryJoinInferenceService进行关系推断。
+	/// 3. 只接受InferenceService已经通过阈值的Candidate。
+	/// 4. 同一目标表只保留Confidence最高的一条JOIN。
+	/// 5. 当前最多增加2个直接关联表。
+	/// 6. 当前默认使用INNER JOIN。
+	///
+	/// 注意：
+	///
+	/// 本方法只负责:
+	///
+	/// QueryJoinCandidate
+	///        ↓
+	/// QueryJoin
+	///
+	/// 不负责SQL生成。
+	/// </summary>
+	private async Task<List<QueryJoinCandidate>> BuildJoinsAsync(
+		MetadataTable mainTable,
+		List<MetadataSemanticSearchResult> metadataResults)
+	{
+		if (mainTable == null)
+		{
+			throw new ArgumentNullException(
+				nameof(mainTable));
+		}
+
+		if (metadataResults == null ||
+			metadataResults.Count == 0)
+		{
+			return new List<QueryJoinCandidate>();
+		}
+
+		/*
+		 * ============================================================
+		 * Step 1
+		 *
+		 * 调用现有JOIN推理服务。
+		 *
+		 * QueryJoinInferenceService内部已经负责:
+		 *
+		 * 字段名称
+		 * 数据类型
+		 * 表名称
+		 * MetadataSemantic
+		 *
+		 * 的关系判断。
+		 * ============================================================
+		 */
+
+		var candidates =
+			await _joinInference.InferAsync(
+				metadataResults);
+
+		if (candidates.Count == 0)
+		{
+			return new List<QueryJoinCandidate>();
+		}
+
+		/*
+		 * ============================================================
+		 * Step 2
+		 *
+		 * 只保留与当前主表直接相关的JOIN。
+		 *
+		 * Phase 1.6.2.1暂时不构建完整Join Graph。
+		 *
+		 * 例如:
+		 *
+		 * Customer
+		 *     ↓
+		 * SalesOrder
+		 *
+		 * 可以。
+		 *
+		 * Customer
+		 *     ↓
+		 * SalesOrder
+		 *     ↓
+		 * Product
+		 *
+		 * 当前阶段暂不自动扩展第二层。
+		 * ============================================================
+		 */
+
+		var mainTableCandidates =
+			candidates
+				.Where(x =>
+					x.LeftTableId == mainTable.Id ||
+					x.RightTableId == mainTable.Id)
+				.OrderByDescending(x =>
+					x.Confidence)
+				.ToList();
+
+		if (mainTableCandidates.Count == 0)
+		{
+			return new List<QueryJoinCandidate>();
+		}
+
+		/*
+		 * ============================================================
+		 * Step 3
+		 *
+		 * 同一个目标表可能存在多个JOIN候选。
+		 *
+		 * 例如:
+		 *
+		 * Customer.Id
+		 *      ↕
+		 * SalesOrder.CustomerId
+		 *
+		 * Customer.CustomerCode
+		 *      ↕
+		 * SalesOrder.CustomerCode
+		 *
+		 * 第一阶段只保留Confidence最高的一条。
+		 * ============================================================
+		 */
+
+		var selected =
+			mainTableCandidates
+				.GroupBy(x =>
+					x.LeftTableId == mainTable.Id
+						? x.RightTableId
+						: x.LeftTableId)
+				.Select(g =>
+					g.OrderByDescending(x =>
+						x.Confidence)
+					.First())
+				.OrderByDescending(x =>
+					x.Confidence)
+				.Take(2)
+				.ToList();
+
+		return selected;
+	}
+
+	/// <summary>
+	/// 将JOIN候选转换为QueryPlan使用的QueryJoin。
+	/// </summary>
+	private static QueryJoin BuildQueryJoin(
+		QueryJoinCandidate candidate)
+	{
+		if (candidate == null)
+		{
+			throw new ArgumentNullException(
+				nameof(candidate));
+		}
+
+		return new QueryJoin
+		{
+			LeftTableId =
+				candidate.LeftTableId,
+
+			LeftColumnId =
+				candidate.LeftColumnId,
+
+			RightTableId =
+				candidate.RightTableId,
+
+			RightColumnId =
+				candidate.RightColumnId,
+
+			LeftTableName =
+				candidate.LeftTableName,
+
+			LeftColumnName =
+				candidate.LeftColumnName,
+
+			RightTableName =
+				candidate.RightTableName,
+
+			RightColumnName =
+				candidate.RightColumnName,
+
+			JoinType =
+				"INNER"
+		};
+	}
 }
