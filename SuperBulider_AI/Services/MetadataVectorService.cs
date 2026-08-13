@@ -1,12 +1,13 @@
-﻿using SuperBulider_AI.Interfaces;
+using System.Security.Cryptography;
+using System.Text;
+using SuperBulider_AI.Interfaces;
 using SuperBulider_AI.Models.AI;
 using SuperBulider_AI.Models.Metadata;
-
 
 namespace SuperBulider_AI.Services;
 
 /// <summary>
-/// Metadata向量服务
+/// Metadata 向量服务。
 ///
 /// 负责创建:
 ///
@@ -24,282 +25,171 @@ namespace SuperBulider_AI.Services;
 ///
 ///        ↓
 /// Qdrant
-///
 /// </summary>
 public class MetadataVectorService
 	: IMetadataVectorService
 {
-
-
 	private readonly IEmbeddingService _embedding;
-
-
 	private readonly IQdrantService _qdrant;
 
-
-
+	/// <summary>
+	/// 创建 MetadataVectorService。
+	/// </summary>
 	public MetadataVectorService(
 		IEmbeddingService embedding,
 		IQdrantService qdrant)
 	{
-
 		_embedding = embedding;
-
 		_qdrant = qdrant;
-
 	}
 
-
-
-
-
 	/// <summary>
-	/// 创建Metadata全部向量
+	/// 创建 Metadata 全部向量。
 	///
 	/// 包含:
 	///
-	/// 1. 表向量
-	/// 2. 字段向量
-	/// 3. 字段语义向量
-	///
+	/// 1. Table Vector
+	/// 2. Column Vector
+	/// 3. Semantic Vector
 	/// </summary>
 	public async Task<MetadataVectorIndexResult>
 		IndexAsync(
 			MetadataTable metadataTable)
 	{
-
-
 		var result =
 			new MetadataVectorIndexResult();
 
-
-
-
 		/*
-		 * ============================
-		 *
-		 * 1.
-		 * Table Vector
-		 *
-		 * ============================
-		 */
-
+         * ============================
+         * 1.
+         * Table Vector
+         * ============================
+         */
 
 		if (!string.IsNullOrWhiteSpace(
 			metadataTable.SearchText))
 		{
-
-
 			var tableVector =
-				await _embedding
-				.GenerateAsync(
-					metadataTable.SearchText);
-
-
+				await _embedding.GenerateAsync(
+					metadataTable.SearchText,
+					"document");
 
 			var tableVectorId =
-				Guid.NewGuid()
-				.ToString();
+				CreateStableVectorId(
+					"table",
+					metadataTable.Id);
 
-
-
-			await _qdrant
-				.UpsertAsync(
-
-					tableVectorId,
-
-					tableVector,
-
-
-					new Dictionary<string, object>
-					{
-
-						["type"]
-						=
+			await _qdrant.UpsertAsync(
+				tableVectorId,
+				tableVector,
+				new Dictionary<string, object>
+				{
+					["type"] =
 						"table",
 
-
-						["metadataType"]
-						=
+					["metadataType"] =
 						"table",
 
-
-						["metadataId"]
-						=
+					["metadataId"] =
 						metadataTable.Id,
 
-
-						["tableId"]
-						=
+					["tableId"] =
 						metadataTable.Id,
 
-
-						["table"]
-						=
+					["table"] =
 						metadataTable.TableName
-						??
-						"",
+						?? string.Empty,
 
-
-						["description"]
-						=
+					["description"] =
 						metadataTable.TableComment
-						??
-						""
-
-					});
-
-
+						?? string.Empty
+				});
 
 			result.TableVectorId =
 				tableVectorId;
-
 		}
 
-
-
-
-
-
-
 		/*
-		 * ============================
-		 *
-		 * 2.
-		 * Column Vector
-		 *
-		 * ============================
-		 */
+         * ============================
+         * 2.
+         * Column Vector
+         * ============================
+         */
 
-
-		foreach (var column in metadataTable.Columns)
+		foreach (var column
+				 in metadataTable.Columns)
 		{
-
-
 			if (string.IsNullOrWhiteSpace(
 				column.SearchText))
 			{
 				continue;
 			}
 
-
-
-
 			var columnVector =
-				await _embedding
-				.GenerateAsync(
-					column.SearchText);
-
-
-
+				await _embedding.GenerateAsync(
+					column.SearchText,
+					"document");
 
 			var columnVectorId =
-				Guid.NewGuid()
-				.ToString();
+				CreateStableVectorId(
+					"column",
+					column.Id);
 
-
-
-
-			await _qdrant
-				.UpsertAsync(
-
-					columnVectorId,
-
-					columnVector,
-
-
-					new Dictionary<string, object>
-					{
-
-						["type"]
-						=
+			await _qdrant.UpsertAsync(
+				columnVectorId,
+				columnVector,
+				new Dictionary<string, object>
+				{
+					["type"] =
 						"column",
 
-
-						["metadataType"]
-						=
+					["metadataType"] =
 						"column",
 
-
-						["metadataId"]
-						=
+					["metadataId"] =
 						column.Id,
 
-
-						["columnId"]
-						=
+					["columnId"] =
 						column.Id,
 
-
-						["tableId"]
-						=
+					["tableId"] =
 						metadataTable.Id,
 
-
-						["table"]
-						=
+					["table"] =
 						metadataTable.TableName
-						??
-						"",
+						?? string.Empty,
 
-
-						["column"]
-						=
+					["column"] =
 						column.ColumnName
-						??
-						"",
+						?? string.Empty,
 
-
-						["description"]
-						=
+					["description"] =
 						column.ColumnComment
-						??
-						""
+						?? string.Empty
+				});
 
-					});
-
-
-
-
-			result.ColumnVectors
-				.Add(
-					column.Id,
-					columnVectorId);
-
+			result.ColumnVectors.Add(
+				column.Id,
+				columnVectorId);
 		}
 
-
-
-
-
-
-
 		/*
-		 * ============================
-		 *
-		 * 3.
-		 * Semantic Vector
-		 *
-		 * ============================
-		 */
+         * ============================
+         * 3.
+         * Semantic Vector
+         * ============================
+         */
 
-
-		foreach (var column in metadataTable.Columns)
+		foreach (var column
+				 in metadataTable.Columns)
 		{
-
-
 			var semantic =
 				column.Semantic;
-
-
 
 			if (semantic == null)
 			{
 				continue;
 			}
-
-
-
 
 			if (string.IsNullOrWhiteSpace(
 				semantic.SearchText))
@@ -307,106 +197,102 @@ public class MetadataVectorService
 				continue;
 			}
 
-
-
-
 			var semanticVector =
-				await _embedding
-				.GenerateAsync(
-					semantic.SearchText);
-
-
-
+				await _embedding.GenerateAsync(
+					semantic.SearchText,
+					"document");
 
 			var semanticVectorId =
-				Guid.NewGuid()
-				.ToString();
+				CreateStableVectorId(
+					"semantic",
+					semantic.Id);
 
-
-
-
-
-			await _qdrant
-				.UpsertAsync(
-
-					semanticVectorId,
-
-					semanticVector,
-
-
-					new Dictionary<string, object>
-					{
-
-						["type"]
-						=
+			await _qdrant.UpsertAsync(
+				semanticVectorId,
+				semanticVector,
+				new Dictionary<string, object>
+				{
+					["type"] =
 						"semantic",
 
-
-						["metadataType"]
-						=
+					["metadataType"] =
 						"semantic",
 
-
-						["semanticId"]
-						=
+					["metadataId"] =
 						semantic.Id,
 
+					["semanticId"] =
+						semantic.Id,
 
-						["columnId"]
-						=
+					["columnId"] =
 						column.Id,
 
-
-						["tableId"]
-						=
+					["tableId"] =
 						metadataTable.Id,
 
-
-						["table"]
-						=
+					["table"] =
 						metadataTable.TableName
-						??
-						"",
+						?? string.Empty,
 
-
-						["column"]
-						=
+					["column"] =
 						column.ColumnName
-						??
-						"",
+						?? string.Empty,
 
-
-						["businessMeaning"]
-						=
+					["businessMeaning"] =
 						semantic.BusinessMeaning
-						??
-						"",
+						?? string.Empty,
 
-
-						["keywords"]
-						=
+					["keywords"] =
 						semantic.Keywords
-						??
-						""
+						?? string.Empty
+				});
 
-					});
-
-
-
-
-			result.SemanticVectors
-				.Add(
-					semantic.Id,
-					semanticVectorId);
-
-
+			result.SemanticVectors.Add(
+				semantic.Id,
+				semanticVectorId);
 		}
 
-
-
-
 		return result;
-
 	}
 
+	/// <summary>
+	/// 创建稳定的 Qdrant Vector ID。
+	///
+	/// 不能使用 Guid.NewGuid()，
+	/// 因为重新建立索引时会产生新的 Vector。
+	///
+	/// 当前规则:
+	///
+	/// table:123
+	/// column:456
+	/// semantic:789
+	///
+	/// ↓
+	///
+	/// SHA256
+	/// ↓
+	///
+	/// 固定 GUID
+	///
+	/// 因此同一个 Metadata 永远对应同一个
+	/// Qdrant Point ID。
+	/// </summary>
+	private static string CreateStableVectorId(
+		string type,
+		long metadataId)
+	{
+		var key =
+			$"{type}:{metadataId}";
+
+		var hash =
+			SHA256.HashData(
+				Encoding.UTF8.GetBytes(key));
+
+		var guidBytes =
+			hash[..16];
+
+		return new Guid(
+			guidBytes)
+			.ToString();
+	}
 }
