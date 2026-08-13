@@ -1,4 +1,4 @@
-﻿namespace SuperBulider_AI.Models.AI;
+﻿namespace SuperBulider_AI.Models.BI;
 
 /// <summary>
 /// AI BI完整响应结果。

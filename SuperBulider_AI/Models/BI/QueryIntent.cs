@@ -2,7 +2,7 @@
 using System.Text.Json.Serialization;
 
 
-namespace SuperBulider_AI.Models.AI;
+namespace SuperBulider_AI.Models.BI;
 
 /// <summary>
 /// 用户查询意图模型。

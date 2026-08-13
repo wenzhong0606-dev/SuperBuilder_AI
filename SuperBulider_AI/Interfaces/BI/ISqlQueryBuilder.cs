@@ -1,8 +1,8 @@
 ﻿using SuperBulider_AI.Infrastructure.Database;
-using SuperBulider_AI.Models.AI;
+using SuperBulider_AI.Models.BI;
 
 
-namespace SuperBulider_AI.Interfaces;
+namespace SuperBulider_AI.Interfaces.BI;
 
 /// <summary>
 /// SQL查询构建器。

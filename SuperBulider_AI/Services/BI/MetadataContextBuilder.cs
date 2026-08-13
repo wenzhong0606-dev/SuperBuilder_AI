@@ -1,8 +1,9 @@
 ﻿using System.Text;
 using SuperBulider_AI.Interfaces;
+using SuperBulider_AI.Interfaces.BI;
 
 
-namespace SuperBulider_AI.Services;
+namespace SuperBulider_AI.Services.BI;
 
 /// <summary>
 /// Metadata上下文构建器。

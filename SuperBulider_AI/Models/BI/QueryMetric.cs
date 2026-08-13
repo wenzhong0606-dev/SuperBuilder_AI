@@ -1,5 +1,4 @@
-﻿
-namespace SuperBulider_AI.Models.AI;
+﻿namespace SuperBulider_AI.Models.BI;
 
 /// <summary>
 /// 查询指标。

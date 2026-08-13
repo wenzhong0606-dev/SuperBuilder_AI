@@ -4,10 +4,10 @@ using MySqlConnector;
 using Npgsql;
 using Microsoft.EntityFrameworkCore;
 using SuperBulider_AI.Data;
-using SuperBulider_AI.Interfaces;
+using SuperBulider_AI.Interfaces.Database;
 
 
-namespace SuperBulider_AI.Services;
+namespace SuperBulider_AI.Services.Database;
 
 /// <summary>
 /// 数据源连接工厂。

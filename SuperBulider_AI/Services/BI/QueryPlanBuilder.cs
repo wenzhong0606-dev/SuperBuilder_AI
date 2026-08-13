@@ -1,11 +1,13 @@
 ﻿using System;
 using System.Text.RegularExpressions;
 using SuperBulider_AI.Interfaces;
+using SuperBulider_AI.Interfaces.BI;
 using SuperBulider_AI.Models.AI;
+using SuperBulider_AI.Models.BI;
 using SuperBulider_AI.Models.Metadata;
 
 
-namespace SuperBulider_AI.Services;
+namespace SuperBulider_AI.Services.BI;
 
 /// <summary>
 /// Query计划构建服务。

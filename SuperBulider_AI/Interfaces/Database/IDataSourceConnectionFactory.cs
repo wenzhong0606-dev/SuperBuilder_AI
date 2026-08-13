@@ -1,7 +1,7 @@
 ﻿using System.Data.Common;
 
 
-namespace SuperBulider_AI.Interfaces;
+namespace SuperBulider_AI.Interfaces.Database;
 
 /// <summary>
 /// 数据源连接工厂。
