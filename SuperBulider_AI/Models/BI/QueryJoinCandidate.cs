@@ -1,4 +1,4 @@
-﻿namespace SuperBulider_AI.Models.AI;
+﻿namespace SuperBulider_AI.Models.BI;
 
 /// <summary>
 /// 动态JOIN候选。

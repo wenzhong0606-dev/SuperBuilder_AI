@@ -1,9 +1,9 @@
 ﻿using System.Text;
 using SuperBulider_AI.Infrastructure.Database;
-using SuperBulider_AI.Interfaces;
-using SuperBulider_AI.Models.AI;
+using SuperBulider_AI.Interfaces.BI;
+using SuperBulider_AI.Models.BI;
 
-namespace SuperBulider_AI.Services;
+namespace SuperBulider_AI.Services.BI;
 
 /// <summary>
 /// 动态SQL生成服务。

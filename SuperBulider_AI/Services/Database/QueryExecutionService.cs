@@ -1,10 +1,10 @@
 ﻿using System.Data.Common;
 using Dapper;
-using SuperBulider_AI.Interfaces;
-using SuperBulider_AI.Models.AI;
+using SuperBulider_AI.Interfaces.Database;
+using SuperBulider_AI.Models.BI;
 
 
-namespace SuperBulider_AI.Services;
+namespace SuperBulider_AI.Services.Database;
 
 /// <summary>
 /// 查询执行引擎。

@@ -2,7 +2,10 @@
 using Microsoft.AspNetCore.Mvc;
 using SuperBulider_AI.Infrastructure.Database;
 using SuperBulider_AI.Interfaces;
-using SuperBulider_AI.Models.AI;
+using SuperBulider_AI.Interfaces.BI;
+using SuperBulider_AI.Interfaces.Database;
+using SuperBulider_AI.Models.BI;
+using SuperBulider_AI.Services.BI;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -150,7 +153,7 @@ public class AITestController
 
 		// 生成诊断信息（仅当 QueryPlanBuilder 为具体实现时）
 		object? diagnostics = null;
-		if (_queryPlanBuilder is SuperBulider_AI.Services.QueryPlanBuilder concreteBuilder)
+		if (_queryPlanBuilder is QueryPlanBuilder concreteBuilder)
 		{
 			diagnostics = await concreteBuilder.BuildWithDiagnosticsAsync(intent);
 		}
@@ -159,7 +162,7 @@ public class AITestController
 		if (diagnostics is not null)
 		{
 			// 如果诊断已经包含可用的 Plan，则复用，避免重复抛出异常
-			var dyn = diagnostics as SuperBulider_AI.Services.QueryPlanBuilder.QueryPlanDiagnostics;
+			var dyn = diagnostics as QueryPlanBuilder.QueryPlanDiagnostics;
 			if (dyn?.Plan != null)
 			{
 				plan = dyn.Plan;

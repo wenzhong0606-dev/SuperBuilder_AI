@@ -1,4 +1,4 @@
-﻿namespace SuperBulider_AI.Models.AI;
+﻿namespace SuperBulider_AI.Models.BI;
 
 /// <summary>
 /// 数据可视化建议。

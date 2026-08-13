@@ -1,7 +1,7 @@
 ﻿using SuperBulider_AI.Models.Metadata;
 
 
-namespace SuperBulider_AI.Models.AI;
+namespace SuperBulider_AI.Models.BI;
 
 /// <summary>
 /// 查询表计划。
