@@ -83,8 +83,9 @@ public class MetadataSemanticSearchService
 		 */
 
 		var vector =
-			await _embedding
-			.GenerateAsync(question);
+			await _embedding.GenerateAsync(
+				question,
+				"query");
 
 
 
