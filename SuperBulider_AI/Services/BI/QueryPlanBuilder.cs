@@ -710,75 +710,280 @@ public class QueryPlanBuilder
 				});
 		}
 
-		// 强制规则: 如果用户意图是 Top-N / 最近 查询，优先使用时间列做 OrderBy，字段使用主键或 id
-		if (intent.Limit != null ||
-			(!string.IsNullOrWhiteSpace(intent.OriginalQuestion) &&
-				(intent.OriginalQuestion.Contains("最近") || intent.OriginalQuestion.Contains("Top", StringComparison.OrdinalIgnoreCase) || intent.OriginalQuestion.Contains("前"))))
+		/*
+ * ============================================================
+ * 默认时间排序规则
+ * ============================================================
+ *
+ * 非常重要：
+ *
+ * Limit != 时间排序。
+ *
+ * 例如：
+ *
+ * 数量最多的十条库存
+ *
+ * 应该由：
+ *
+ * OrderBy = 库存数量
+ * OrderDirection = DESC
+ * Limit = 10
+ *
+ * 决定。
+ *
+ * 只有用户明确表达：
+ *
+ * 最近
+ * 最新
+ * 最近创建
+ * 最新创建
+ *
+ * 时，才允许自动使用时间字段排序。
+ * ============================================================
+ */
+
+		var isRecentQuery =
+			!string.IsNullOrWhiteSpace(
+				intent.OriginalQuestion)
+			&&
+			(
+				intent.OriginalQuestion.Contains(
+					"最近",
+					StringComparison.OrdinalIgnoreCase)
+				||
+				intent.OriginalQuestion.Contains(
+					"最新",
+					StringComparison.OrdinalIgnoreCase)
+				||
+				intent.OriginalQuestion.Contains(
+					"最近创建",
+					StringComparison.OrdinalIgnoreCase)
+				||
+				intent.OriginalQuestion.Contains(
+					"最新创建",
+					StringComparison.OrdinalIgnoreCase)
+				||
+				intent.OriginalQuestion.Contains(
+					"最近新增",
+					StringComparison.OrdinalIgnoreCase)
+				||
+				intent.OriginalQuestion.Contains(
+					"最新新增",
+					StringComparison.OrdinalIgnoreCase)
+			);
+
+		/*
+		 * 只有：
+		 *
+		 * 1. 用户明确要求最近/最新
+		 * 2. AI没有已经识别出的OrderBy
+		 *
+		 * 才允许自动设置时间排序。
+		 *
+		 * 绝不能覆盖AI已经识别出的业务排序字段。
+		 */
+
+		if (isRecentQuery &&
+			string.IsNullOrWhiteSpace(intent.OrderBy))
 		{
 			try
 			{
-				// 选择时间列优先候选
-				var timeCandidates = new[] { "create_time", "come_time", "update_time", "affirm_time", "created_time", "createdat", "created" };
+				/*
+				 * 选择时间列优先候选。
+				 */
+
+				var timeCandidates =
+					new[]
+					{
+				"create_time",
+				"come_time",
+				"update_time",
+				"affirm_time",
+				"created_time",
+				"createdat",
+				"created"
+					};
+
 				MetadataColumn? timeCol = null;
+
 				if (table.Columns != null)
 				{
-					// 精确匹配候选名称
-					timeCol = table.Columns.FirstOrDefault(c => c.ColumnName != null && timeCandidates.Any(tc => string.Equals(tc, c.ColumnName, StringComparison.OrdinalIgnoreCase)));
-					// 其次按数据类型包含 date/time
+					/*
+					 * 第一优先级：
+					 *
+					 * 常见时间字段名称。
+					 */
+
+					timeCol =
+						table.Columns.FirstOrDefault(
+							c =>
+								c.ColumnName != null
+								&&
+								timeCandidates.Any(
+									tc =>
+										string.Equals(
+											tc,
+											c.ColumnName,
+											StringComparison.OrdinalIgnoreCase)));
+
+					/*
+					 * 第二优先级：
+					 *
+					 * 根据数据类型寻找时间字段。
+					 */
+
 					if (timeCol == null)
-						timeCol = table.Columns.FirstOrDefault(c => !string.IsNullOrWhiteSpace(c.DataType) && (c.DataType.IndexOf("date", StringComparison.OrdinalIgnoreCase) >= 0 || c.DataType.IndexOf("time", StringComparison.OrdinalIgnoreCase) >= 0));
+					{
+						timeCol =
+							table.Columns.FirstOrDefault(
+								c =>
+									!string.IsNullOrWhiteSpace(
+										c.DataType)
+									&&
+									(
+										c.DataType.IndexOf(
+											"date",
+											StringComparison.OrdinalIgnoreCase) >= 0
+										||
+										c.DataType.IndexOf(
+											"time",
+											StringComparison.OrdinalIgnoreCase) >= 0
+									));
+					}
 				}
 
 				if (timeCol != null)
 				{
-					intent.OrderBy = timeCol.ColumnName;
-					intent.OrderDirection = "DESC";
+					intent.OrderBy =
+						timeCol.ColumnName;
+
+					intent.OrderDirection =
+						"DESC";
 				}
 
-				// 确保至少有一个字段用于 SELECT：优先主键或 id，其次优先 code 类字段，避免选择类似 update_by 这样的用户ID列作为默认展示字段
+				/*
+				 * 确保至少有一个字段用于SELECT。
+				 *
+				 * 这里仅负责没有Metric/Dimension/Filter/OrderBy
+				 * 的纯“最近N条”查询。
+				 */
+
 				if (plan.Fields.Count == 0)
 				{
 					MetadataColumn? defaultCol = null;
+
 					if (table.Columns != null)
 					{
-						// 1) 主键
-						defaultCol = table.Columns.FirstOrDefault(c => c.IsPrimaryKey == true);
+						/*
+						 * 1. 主键
+						 */
 
-						// 2) 明确的 id 字段
-						if (defaultCol == null)
-							defaultCol = table.Columns.FirstOrDefault(c => string.Equals(c.ColumnName, "id", StringComparison.OrdinalIgnoreCase));
+						defaultCol =
+							table.Columns.FirstOrDefault(
+								c =>
+									c.IsPrimaryKey == true);
 
-						// 3) code / no 类型字段（常用于业务单号）
-						if (defaultCol == null)
-							defaultCol = table.Columns.FirstOrDefault(c => c.ColumnName != null && (
-								string.Equals(c.ColumnName, "code", StringComparison.OrdinalIgnoreCase)
-								|| c.ColumnName.EndsWith("_code", StringComparison.OrdinalIgnoreCase)
-								|| c.ColumnName.EndsWith("_no", StringComparison.OrdinalIgnoreCase)
-								|| c.ColumnName.IndexOf("code", StringComparison.OrdinalIgnoreCase) >= 0
-							));
+						/*
+						 * 2. id
+						 */
 
-						// 4) 避免选择以 _by 结尾或明显的用户ID列（create_by/update_by）作为默认展示列
 						if (defaultCol == null)
-							defaultCol = table.Columns.FirstOrDefault(c => c.ColumnName != null && !(
-								c.ColumnName.EndsWith("_by", StringComparison.OrdinalIgnoreCase)
-								|| string.Equals(c.ColumnName, "create_by", StringComparison.OrdinalIgnoreCase)
-								|| string.Equals(c.ColumnName, "update_by", StringComparison.OrdinalIgnoreCase)
-							));
+						{
+							defaultCol =
+								table.Columns.FirstOrDefault(
+									c =>
+										string.Equals(
+											c.ColumnName,
+											"id",
+											StringComparison.OrdinalIgnoreCase));
+						}
 
-						// 5) 最后兜底为第一列
+						/*
+						 * 3. code / no
+						 */
+
 						if (defaultCol == null)
-							defaultCol = table.Columns.FirstOrDefault();
+						{
+							defaultCol =
+								table.Columns.FirstOrDefault(
+									c =>
+										c.ColumnName != null
+										&&
+										(
+											string.Equals(
+												c.ColumnName,
+												"code",
+												StringComparison.OrdinalIgnoreCase)
+											||
+											c.ColumnName.EndsWith(
+												"_code",
+												StringComparison.OrdinalIgnoreCase)
+											||
+											c.ColumnName.EndsWith(
+												"_no",
+												StringComparison.OrdinalIgnoreCase)
+											||
+											c.ColumnName.IndexOf(
+												"code",
+												StringComparison.OrdinalIgnoreCase) >= 0
+										));
+						}
+
+						/*
+						 * 4. 避免 create_by / update_by 等内部字段。
+						 */
+
+						if (defaultCol == null)
+						{
+							defaultCol =
+								table.Columns.FirstOrDefault(
+									c =>
+										c.ColumnName != null
+										&&
+										!(
+											c.ColumnName.EndsWith(
+												"_by",
+												StringComparison.OrdinalIgnoreCase)
+											||
+											string.Equals(
+												c.ColumnName,
+												"create_by",
+												StringComparison.OrdinalIgnoreCase)
+											||
+											string.Equals(
+												c.ColumnName,
+												"update_by",
+												StringComparison.OrdinalIgnoreCase)
+										));
+						}
+
+						/*
+						 * 5. 最终兜底。
+						 */
+
+						if (defaultCol == null)
+						{
+							defaultCol =
+								table.Columns.FirstOrDefault();
+						}
 					}
 
 					if (defaultCol != null)
 					{
-						AddOrUpdateQueryField(plan, defaultCol, "NONE");
+						AddOrUpdateQueryField(
+							plan,
+							defaultCol,
+							"NONE");
 					}
 				}
 			}
 			catch
 			{
-				// 忽略任何异常，保持原有行为
+				/*
+				 * 默认排序属于辅助逻辑。
+				 *
+				 * 如果发生异常，不影响正常QueryPlan生成。
+				 */
 			}
 		}
 
@@ -853,62 +1058,7 @@ public class QueryPlanBuilder
 
 		}
 
-		// 如果没有任何字段，但用户意图是查询最近 N 条或明确限制数量，则生成默认字段和排序：
-		// - 默认字段优先选择主键 (IsPrimaryKey) 或列名为 id 的列，或第一列作为兜底
-		// - 排序优先选择常见时间字段（create_time/update_time/come_time/affirm_time 等），否则按主键降序
-		if (plan.Fields.Count == 0 && (intent.Limit != null ||
-			(string.Equals(intent.IntentType, "QUERY", StringComparison.OrdinalIgnoreCase)) ||
-			(!string.IsNullOrWhiteSpace(intent.OriginalQuestion) &&
-				(intent.OriginalQuestion.Contains("最近") || intent.OriginalQuestion.Contains("Top", StringComparison.OrdinalIgnoreCase) || intent.OriginalQuestion.Contains("前")))))
-		{
-			// 选取主表的默认列
-			MetadataColumn? defaultColumn = null;
-			try
-			{
-				if (table.Columns != null)
-				{
-					defaultColumn = table.Columns.FirstOrDefault(c => c.IsPrimaryKey == true);
-					if (defaultColumn == null)
-						defaultColumn = table.Columns.FirstOrDefault(c => string.Equals(c.ColumnName, "id", StringComparison.OrdinalIgnoreCase));
-					if (defaultColumn == null)
-						defaultColumn = table.Columns.FirstOrDefault();
-				}
-			}
-			catch { }
-
-			if (defaultColumn != null)
-			{
-				AddOrUpdateQueryField(plan, defaultColumn, "NONE");
-			}
-
-			// 选择时间排序字段
-			MetadataColumn? timeColumn = null;
-			try
-			{
-				var timeCandidates = new[] { "create_time", "update_time", "come_time", "affirm_time", "created_time", "createdat", "created" };
-				if (table.Columns != null)
-				{
-					// 优先按候选时间字段名匹配
-					timeColumn = table.Columns.FirstOrDefault(c => c.ColumnName != null && timeCandidates.Any(tc => string.Equals(tc, c.ColumnName, StringComparison.OrdinalIgnoreCase)));
-					// 其次按数据类型包含 date/datetime/timestamp
-					if (timeColumn == null)
-						timeColumn = table.Columns.FirstOrDefault(c => !string.IsNullOrWhiteSpace(c.DataType) && (c.DataType.IndexOf("date", StringComparison.OrdinalIgnoreCase) >= 0 || c.DataType.IndexOf("time", StringComparison.OrdinalIgnoreCase) >= 0));
-						// patch: no-op to ensure patch format consistency
-				}
-			}
-			catch { }
-
-			if (timeColumn != null)
-			{
-				intent.OrderBy = timeColumn.ColumnName;
-				intent.OrderDirection = "DESC";
-			}
-			else if (defaultColumn != null)
-			{
-				intent.OrderBy = defaultColumn.ColumnName;
-				intent.OrderDirection = "DESC";
-			}
-		}
+		
 
 
 
