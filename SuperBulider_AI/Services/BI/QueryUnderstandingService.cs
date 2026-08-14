@@ -1,7 +1,8 @@
-﻿using System.Text.Json;
-using SuperBulider_AI.Interfaces;
+﻿using SuperBulider_AI.Interfaces;
 using SuperBulider_AI.Interfaces.BI;
 using SuperBulider_AI.Models.BI;
+using SuperBulider_AI.Services.BI.Planning;
+using System.Text.Json;
 
 namespace SuperBulider_AI.Services.BI;
 
@@ -31,16 +32,19 @@ public class QueryUnderstandingService
 {
 	private readonly IMetadataContextBuilder _contextBuilder;
 	private readonly IQwenService _qwenService;
+	private readonly QueryIntentNormalizer _intentNormalizer;
 
 	/// <summary>
 	/// 创建查询理解服务。
 	/// </summary>
 	public QueryUnderstandingService(
 		IMetadataContextBuilder contextBuilder,
-		IQwenService qwenService)
+		IQwenService qwenService,
+	    QueryIntentNormalizer intentNormalizer)
 	{
 		_contextBuilder = contextBuilder;
 		_qwenService = qwenService;
+		_intentNormalizer = intentNormalizer;
 	}
 
 	/// <summary>
@@ -600,7 +604,7 @@ public class QueryUnderstandingService
 		intent.OriginalQuestion =
 			question;
 
-		return intent;
+		return _intentNormalizer.Normalize(intent);
 	}
 
 	/// <summary>
