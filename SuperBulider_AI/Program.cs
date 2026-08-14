@@ -8,6 +8,7 @@ using SuperBulider_AI.Interfaces.Database;
 using SuperBulider_AI.Models.BI;
 using SuperBulider_AI.Services;
 using SuperBulider_AI.Services.BI;
+using SuperBulider_AI.Services.BI.Planning;
 using SuperBulider_AI.Services.Database;
 
 // Program: 应用启动项
@@ -160,6 +161,7 @@ builder.Services
 // BI 核心服务
 // -----------------------------
 builder.Services.AddScoped<QueryPlanValidator>();
+builder.Services.AddScoped<QueryIntentNormalizer>();
 
 builder.Services
 	.AddScoped<
