@@ -5,6 +5,7 @@ using SuperBulider_AI.Infrastructure.Database;
 using SuperBulider_AI.Interfaces;
 using SuperBulider_AI.Interfaces.BI;
 using SuperBulider_AI.Interfaces.Database;
+using SuperBulider_AI.Models.BI;
 using SuperBulider_AI.Services;
 using SuperBulider_AI.Services.BI;
 using SuperBulider_AI.Services.Database;
@@ -158,6 +159,8 @@ builder.Services
 // -----------------------------
 // BI 核心服务
 // -----------------------------
+builder.Services.AddScoped<QueryPlanValidator>();
+
 builder.Services
 	.AddScoped<
 		IQueryUnderstandingService,
