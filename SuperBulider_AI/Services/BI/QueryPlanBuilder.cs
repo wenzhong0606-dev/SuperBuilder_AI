@@ -83,6 +83,7 @@ public class QueryPlanBuilder
 	/// </summary>
 	private readonly IQueryJoinInferenceService
 		_joinInference;
+	private readonly QueryPlanValidator _validator;
 
 	/// <summary>
 	/// 创建 QueryPlanBuilder。
@@ -95,7 +96,8 @@ public class QueryPlanBuilder
 	/// </param>
 	public QueryPlanBuilder(
 		IMetadataSemanticSearchService metadataSearch,
-		IQueryJoinInferenceService joinInference)
+		IQueryJoinInferenceService joinInference,
+		QueryPlanValidator validator)
 	{
 		_metadataSearch =
 			metadataSearch
@@ -106,6 +108,7 @@ public class QueryPlanBuilder
 			joinInference
 			?? throw new ArgumentNullException(
 				nameof(joinInference));
+		_validator = validator;
 	}
 
 	/// <summary>
@@ -1378,7 +1381,7 @@ public class QueryPlanBuilder
 
 
 
-
+		plan = _validator.Validate(plan);
 
 		return plan;
 
