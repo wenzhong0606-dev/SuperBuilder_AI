@@ -1,0 +1,2275 @@
+{
+  "$id": "1",
+  "intent": {
+    "$id": "2",
+    "OriginalQuestion": "\u6570\u91CF\u6700\u591A\u7684\u5341\u6761\u5165\u5E93\u51ED\u8BC1",
+    "IntentType": "Ranking",
+    "Metrics": {
+      "$id": "3",
+      "$values": [
+        {
+          "$id": "4",
+          "Name": "\u6570\u91CF",
+          "Field": "quantity",
+          "Aggregation": "NONE"
+        }
+      ]
+    },
+    "Filters": {
+      "$id": "5",
+      "$values": []
+    },
+    "Dimensions": {
+      "$id": "6",
+      "$values": []
+    },
+    "OrderBy": "send_quantity",
+    "OrderDirection": "DESC",
+    "Limit": 10,
+    "Explanation": "\u7528\u6237\u5E0C\u671B\u67E5\u8BE2\u6570\u91CF\u6700\u591A\u7684\u5341\u6761\u5165\u5E93\u51ED\u8BC1\uFF0C\u56E0\u6B64\u610F\u56FE\u4E3A\u6392\u540D(Ranking)\uFF0C\u6307\u6807\u4E3A\u5165\u5E93\u6570\u91CF(quantity)\uFF0C\u6309\u6570\u91CF\u964D\u5E8F\u6392\u5217(DESC)\uFF0C\u5E76\u9650\u5236\u8FD4\u56DE10\u6761\u8BB0\u5F55\u3002"
+  },
+  "diagnostics": {
+    "$id": "7",
+    "Intent": {
+      "$ref": "2"
+    },
+    "BusinessTerms": {
+      "$id": "8",
+      "$values": [
+        "\u6570\u91CF",
+        "quantity"
+      ]
+    },
+    "PerTermResults": {
+      "$id": "9",
+      "\u6570\u91CF": {
+        "$id": "10",
+        "$values": [
+          {
+            "$id": "11",
+            "VectorType": "semantic",
+            "VectorId": "faee9f43-2a09-0b49-51b0-e77c9805fb93",
+            "Table": {
+              "$id": "12",
+              "TenantId": 1,
+              "DataSourceId": 1,
+              "DataSource": {
+                "$id": "13",
+                "TenantId": 1,
+                "Tenant": null,
+                "Name": "\u4ED3\u5E93\u7BA1\u7406",
+                "DbType": "MySql",
+                "ConnectionString": "Server=192.168.16.120;Port=3306;Database=steccn_wms;Uid=admin;Pwd=***REMOVED***;CharSet=utf8mb4;SslMode=Required;",
+                "Enabled": true,
+                "Tables": {
+                  "$id": "14",
+                  "$values": [
+                    {
+                      "$id": "15",
+                      "TenantId": 1,
+                      "DataSourceId": 1,
+                      "DataSource": {
+                        "$ref": "13"
+                      },
+                      "TableName": "wms_storage_receipt_info",
+                      "TableComment": "\u5165\u5E93\u51ED\u8BC1\u660E\u7EC6",
+                      "BusinessDomain": null,
+                      "SearchText": "wms_storage_receipt_info \u5165\u5E93\u51ED\u8BC1\u660E\u7EC6 wms_storage_receipt_info id \u4E3B\u952E bigint wms_storage_receipt_info storage_receipt_id \u5165\u5E93\u5355id bigint wms_storage_receipt_info material_id \u7269\u6599id bigint wms_storage_receipt_info material_name \u7269\u6599\u540D\u79F0 varchar wms_storage_receipt_info material_code \u7269\u6599\u7F16\u7801 varchar wms_storage_receipt_info shelf_id \u8D27\u67B6id int wms_storage_receipt_info shelf_code \u8D27\u67B6\u7F16\u7801 varchar wms_storage_receipt_info shelf_name \u8D27\u67B6\u540D\u79F0 varchar wms_storage_receipt_info quantity \u6570\u91CF decimal wms_storage_receipt_info unit \u5355\u4F4D bigint wms_storage_receipt_info batch \u6279\u6B21 varchar wms_storage_receipt_info case_no \u7BB1\u53F7 varchar wms_storage_receipt_info associated_no \u5173\u8054\u7BB1\u53F7 varchar wms_storage_receipt_info valid_time \u6709\u6548\u671F\u622A\u81F3\u65F6\u95F4 date wms_storage_receipt_info create_by \u521B\u5EFA\u4EBAid bigint wms_storage_receipt_info create_name \u521B\u5EFA\u4EBA\u540D\u79F0 varchar wms_storage_receipt_info create_time \u521B\u5EFA\u65F6\u95F4 datetime wms_storage_receipt_info update_by \u66F4\u65B0\u4EBAid bigint wms_storage_receipt_info update_name \u66F4\u65B0\u4EBA\u540D\u79F0 varchar wms_storage_receipt_info update_time \u66F4\u65B0\u4EBA\u65F6\u95F4 datetime wms_storage_receipt_info del_flag \u662F\u5426\u5220\u9664\u6807\u8BC6\uFF1A0\u5426 1\u662F tinyint wms_storage_receipt_info erp_line_id \u91D1\u8776\u901A\u77E5\u5355\u884C\u53F7 varchar wms_storage_receipt_info production_line_name \u4EA7\u7EBF\u540D\u79F0 varchar",
+                      "VectorId": "4b65ad1e-16bf-44b6-990c-cab33f8f1ac0",
+                      "EmbeddingModel": null,
+                      "VectorDimension": null,
+                      "Columns": {
+                        "$id": "16",
+                        "$values": [
+                          {
+                            "$id": "17",
+                            "MetadataTableId": 458,
+                            "MetadataTable": {
+                              "$ref": "15"
+                            },
+                            "BusinessKey": null,
+                            "Semantic": {
+                              "$id": "18",
+                              "MetadataColumnId": 5541,
+                              "MetadataColumn": {
+                                "$ref": "17"
+                              },
+                              "BusinessMeaning": "\u5165\u5E93\u660E\u7EC6\u7684\u5B9E\u9645\u5165\u5E93\u6570\u91CF\u3002",
+                              "Keywords": "\u6570\u91CF,\u5165\u5E93\u6570\u91CF,\u5165\u5E93",
+                              "Synonyms": "\u5165\u5E93\u6570,\u6536\u8D27\u6570\u91CF,\u8FDB\u5E93\u6570\u91CF",
+                              "ExampleQuestions": "\u4ECA\u5929\u5404\u7269\u6599\u7684\u5165\u5E93\u6570\u91CF\u662F\u591A\u5C11\uFF1F\u5165\u5E93\u6570\u91CF\u5927\u4E8E100\u7684\u660E\u7EC6\u3002",
+                              "BusinessDomain": "\u4ED3\u50A8\u7BA1\u7406-\u5165\u5E93\u7BA1\u7406",
+                              "Confidence": 0.9900,
+                              "Source": "AI",
+                              "SearchText": "\u8868:\r\nwms_storage_receipt_info\r\n\r\n\r\n\u5B57\u6BB5:\r\nquantity\r\n\r\n\r\n\u5B57\u6BB5\u8BF4\u660E:\r\n\u6570\u91CF\r\n\r\n\r\n\u4E1A\u52A1\u542B\u4E49:\r\n\u5165\u5E93\u660E\u7EC6\u7684\u5B9E\u9645\u5165\u5E93\u6570\u91CF\u3002\r\n\r\n\r\n\u5173\u952E\u8BCD:\r\n\u6570\u91CF,\u5165\u5E93\u6570\u91CF,\u5165\u5E93\r\n\r\n\r\n\u540C\u4E49\u8BCD:\r\n\u5165\u5E93\u6570,\u6536\u8D27\u6570\u91CF,\u8FDB\u5E93\u6570\u91CF\r\n\r\n\r\n\u793A\u4F8B\u95EE\u9898:\r\n\u4ECA\u5929\u5404\u7269\u6599\u7684\u5165\u5E93\u6570\u91CF\u662F\u591A\u5C11\uFF1F\u5165\u5E93\u6570\u91CF\u5927\u4E8E100\u7684\u660E\u7EC6\u3002\r\n\r\n\r\n\u4E1A\u52A1\u9886\u57DF:\r\n\u4ED3\u50A8\u7BA1\u7406-\u5165\u5E93\u7BA1\u7406\r\n",
+                              "VectorId": "f508bf96-6557-4cf8-9e81-24f06012b0dd",
+                              "EmbeddingModel": null,
+                              "VectorDimension": null,
+                              "Id": 431,
+                              "CreatedTime": "2026-08-12T09:26:47.8523431"
+                            },
+                            "ColumnName": "quantity",
+                            "ColumnComment": "\u6570\u91CF",
+                            "DataType": "decimal",
+                            "Length": null,
+                            "IsNullable": false,
+                            "IsPrimaryKey": false,
+                            "SearchText": "wms_storage_receipt_info quantity \u6570\u91CF decimal",
+                            "VectorId": "aa90ed49-705a-4941-a977-16225bd54c64",
+                            "Id": 5541,
+                            "CreatedTime": "2026-08-11T16:47:02.6383348"
+                          },
+                          {
+                            "$id": "19",
+                            "MetadataTableId": 458,
+                            "MetadataTable": {
+                              "$ref": "15"
+                            },
+                            "BusinessKey": null,
+                            "Semantic": null,
+                            "ColumnName": "id",
+                            "ColumnComment": "\u4E3B\u952E",
+                            "DataType": "bigint",
+                            "Length": null,
+                            "IsNullable": false,
+                            "IsPrimaryKey": true,
+                            "SearchText": "wms_storage_receipt_info id \u4E3B\u952E bigint",
+                            "VectorId": "812a3494-80a1-4578-8a0d-bcb81fa4db1f",
+                            "Id": 5533,
+                            "CreatedTime": "2026-08-11T16:47:02.6383064"
+                          },
+                          {
+                            "$id": "20",
+                            "MetadataTableId": 458,
+                            "MetadataTable": {
+                              "$ref": "15"
+                            },
+                            "BusinessKey": null,
+                            "Semantic": {
+                              "$id": "21",
+                              "MetadataColumnId": 5534,
+                              "MetadataColumn": {
+                                "$ref": "20"
+                              },
+                              "BusinessMeaning": "\u5165\u5E93\u5355\u660E\u7EC6\u5173\u8054\u7684\u5165\u5E93\u5355\u4E3B\u8868ID\uFF0C\u7528\u4E8E\u5173\u8054\u5165\u5E93\u5355\u5934\u4FE1\u606F\u3002",
+                              "Keywords": "\u5165\u5E93\u5355ID,\u5165\u5E93\u5355,\u5173\u8054ID",
+                              "Synonyms": "\u5165\u5E93\u5355\u4E3B\u952E,\u5165\u5E93\u5355\u53F7ID,\u5355\u636EID",
+                              "ExampleQuestions": "\u5165\u5E93\u5355ID\u4E3A200\u5305\u542B\u54EA\u4E9B\u660E\u7EC6\uFF1F",
+                              "BusinessDomain": "\u4ED3\u50A8\u7BA1\u7406-\u5165\u5E93\u7BA1\u7406",
+                              "Confidence": 0.9800,
+                              "Source": "AI",
+                              "SearchText": "\u8868:\r\nwms_storage_receipt_info\r\n\r\n\r\n\u5B57\u6BB5:\r\nstorage_receipt_id\r\n\r\n\r\n\u5B57\u6BB5\u8BF4\u660E:\r\n\u5165\u5E93\u5355id\r\n\r\n\r\n\u4E1A\u52A1\u542B\u4E49:\r\n\u5165\u5E93\u5355\u660E\u7EC6\u5173\u8054\u7684\u5165\u5E93\u5355\u4E3B\u8868ID\uFF0C\u7528\u4E8E\u5173\u8054\u5165\u5E93\u5355\u5934\u4FE1\u606F\u3002\r\n\r\n\r\n\u5173\u952E\u8BCD:\r\n\u5165\u5E93\u5355ID,\u5165\u5E93\u5355,\u5173\u8054ID\r\n\r\n\r\n\u540C\u4E49\u8BCD:\r\n\u5165\u5E93\u5355\u4E3B\u952E,\u5165\u5E93\u5355\u53F7ID,\u5355\u636EID\r\n\r\n\r\n\u793A\u4F8B\u95EE\u9898:\r\n\u5165\u5E93\u5355ID\u4E3A200\u5305\u542B\u54EA\u4E9B\u660E\u7EC6\uFF1F\r\n\r\n\r\n\u4E1A\u52A1\u9886\u57DF:\r\n\u4ED3\u50A8\u7BA1\u7406-\u5165\u5E93\u7BA1\u7406\r\n",
+                              "VectorId": "b4250f99-7d04-47ec-9d3f-fdc63b5853c1",
+                              "EmbeddingModel": null,
+                              "VectorDimension": null,
+                              "Id": 424,
+                              "CreatedTime": "2026-08-12T09:26:47.8514935"
+                            },
+                            "ColumnName": "storage_receipt_id",
+                            "ColumnComment": "\u5165\u5E93\u5355id",
+                            "DataType": "bigint",
+                            "Length": null,
+                            "IsNullable": false,
+                            "IsPrimaryKey": false,
+                            "SearchText": "wms_storage_receipt_info storage_receipt_id \u5165\u5E93\u5355id bigint",
+                            "VectorId": "feab1ee2-fcfc-4b0b-85fc-b6b5f113bbe1",
+                            "Id": 5534,
+                            "CreatedTime": "2026-08-11T16:47:02.6383131"
+                          },
+                          {
+                            "$id": "22",
+                            "MetadataTableId": 458,
+                            "MetadataTable": {
+                              "$ref": "15"
+                            },
+                            "BusinessKey": null,
+                            "Semantic": null,
+                            "ColumnName": "material_id",
+                            "ColumnComment": "\u7269\u6599id",
+                            "DataType": "bigint",
+                            "Length": null,
+                            "IsNullable": false,
+                            "IsPrimaryKey": false,
+                            "SearchText": "wms_storage_receipt_info material_id \u7269\u6599id bigint",
+                            "VectorId": "2f6dfe49-5ec5-4644-a780-fb430e4ddbed",
+                            "Id": 5535,
+                            "CreatedTime": "2026-08-11T16:47:02.6383161"
+                          },
+                          {
+                            "$id": "23",
+                            "MetadataTableId": 458,
+                            "MetadataTable": {
+                              "$ref": "15"
+                            },
+                            "BusinessKey": null,
+                            "Semantic": null,
+                            "ColumnName": "material_name",
+                            "ColumnComment": "\u7269\u6599\u540D\u79F0",
+                            "DataType": "varchar",
+                            "Length": 50,
+                            "IsNullable": true,
+                            "IsPrimaryKey": false,
+                            "SearchText": "wms_storage_receipt_info material_name \u7269\u6599\u540D\u79F0 varchar",
+                            "VectorId": "6b8dd172-5082-4045-b3c8-0a907a9e623d",
+                            "Id": 5536,
+                            "CreatedTime": "2026-08-11T16:47:02.6383214"
+                          },
+                          {
+                            "$id": "24",
+                            "MetadataTableId": 458,
+                            "MetadataTable": {
+                              "$ref": "15"
+                            },
+                            "BusinessKey": null,
+                            "Semantic": null,
+                            "ColumnName": "material_code",
+                            "ColumnComment": "\u7269\u6599\u7F16\u7801",
+                            "DataType": "varchar",
+                            "Length": 50,
+                            "IsNullable": true,
+                            "IsPrimaryKey": false,
+                            "SearchText": "wms_storage_receipt_info material_code \u7269\u6599\u7F16\u7801 varchar",
+                            "VectorId": "ec415acc-e700-4355-ab42-7cd89b1d50dd",
+                            "Id": 5537,
+                            "CreatedTime": "2026-08-11T16:47:02.6383241"
+                          },
+                          {
+                            "$id": "25",
+                            "MetadataTableId": 458,
+                            "MetadataTable": {
+                              "$ref": "15"
+                            },
+                            "BusinessKey": null,
+                            "Semantic": null,
+                            "ColumnName": "shelf_id",
+                            "ColumnComment": "\u8D27\u67B6id",
+                            "DataType": "int",
+                            "Length": null,
+                            "IsNullable": true,
+                            "IsPrimaryKey": false,
+                            "SearchText": "wms_storage_receipt_info shelf_id \u8D27\u67B6id int",
+                            "VectorId": "974a7ceb-043e-4b96-b95b-2c86527e551d",
+                            "Id": 5538,
+                            "CreatedTime": "2026-08-11T16:47:02.638327"
+                          },
+                          {
+                            "$id": "26",
+                            "MetadataTableId": 458,
+                            "MetadataTable": {
+                              "$ref": "15"
+                            },
+                            "BusinessKey": null,
+                            "Semantic": null,
+                            "ColumnName": "shelf_code",
+                            "ColumnComment": "\u8D27\u67B6\u7F16\u7801",
+                            "DataType": "varchar",
+                            "Length": 50,
+                            "IsNullable": true,
+                            "IsPrimaryKey": false,
+                            "SearchText": "wms_storage_receipt_info shelf_code \u8D27\u67B6\u7F16\u7801 varchar",
+                            "VectorId": "a4c183c9-a179-426b-8dbc-0489f789ae16",
+                            "Id": 5539,
+                            "CreatedTime": "2026-08-11T16:47:02.6383296"
+                          },
+                          {
+                            "$id": "27",
+                            "MetadataTableId": 458,
+                            "MetadataTable": {
+                              "$ref": "15"
+                            },
+                            "BusinessKey": null,
+                            "Semantic": null,
+                            "ColumnName": "shelf_name",
+                            "ColumnComment": "\u8D27\u67B6\u540D\u79F0",
+                            "DataType": "varchar",
+                            "Length": 50,
+                            "IsNullable": true,
+                            "IsPrimaryKey": false,
+                            "SearchText": "wms_storage_receipt_info shelf_name \u8D27\u67B6\u540D\u79F0 varchar",
+                            "VectorId": "5da45519-db2c-4c3d-9a2e-8942d03939c8",
+                            "Id": 5540,
+                            "CreatedTime": "2026-08-11T16:47:02.6383322"
+                          },
+                          {
+                            "$id": "28",
+                            "MetadataTableId": 458,
+                            "MetadataTable": {
+                              "$ref": "15"
+                            },
+                            "BusinessKey": null,
+                            "Semantic": null,
+                            "ColumnName": "unit",
+                            "ColumnComment": "\u5355\u4F4D",
+                            "DataType": "bigint",
+                            "Length": null,
+                            "IsNullable": true,
+                            "IsPrimaryKey": false,
+                            "SearchText": "wms_storage_receipt_info unit \u5355\u4F4D bigint",
+                            "VectorId": "0f159617-d73f-4473-ac20-f9eaae0d03af",
+                            "Id": 5542,
+                            "CreatedTime": "2026-08-11T16:47:02.6383376"
+                          },
+                          {
+                            "$id": "29",
+                            "MetadataTableId": 458,
+                            "MetadataTable": {
+                              "$ref": "15"
+                            },
+                            "BusinessKey": null,
+                            "Semantic": {
+                              "$id": "30",
+                              "MetadataColumnId": 5543,
+                              "MetadataColumn": {
+                                "$ref": "29"
+                              },
+                              "BusinessMeaning": "\u5165\u5E93\u7269\u6599\u7684\u751F\u4EA7\u6279\u6B21\u53F7\uFF0C\u7528\u4E8E\u6279\u6B21\u8FFD\u6EAF\u548C\u6548\u671F\u7BA1\u7406\u3002",
+                              "Keywords": "\u6279\u6B21,\u6279\u6B21\u53F7,\u751F\u4EA7\u6279\u6B21",
+                              "Synonyms": "\u6279\u53F7,\u751F\u4EA7\u6279\u53F7,\u5165\u5E93\u6279\u6B21",
+                              "ExampleQuestions": "\u6279\u6B21\u53F7\u4E3AB202310\u7684\u5165\u5E93\u8BB0\u5F55\u6709\u54EA\u4E9B\uFF1F\u5404\u6279\u6B21\u7684\u5165\u5E93\u6570\u91CF\u7EDF\u8BA1\u3002",
+                              "BusinessDomain": "\u4ED3\u50A8\u7BA1\u7406-\u5165\u5E93\u7BA1\u7406",
+                              "Confidence": 0.9800,
+                              "Source": "AI",
+                              "SearchText": "\u8868:\r\nwms_storage_receipt_info\r\n\r\n\r\n\u5B57\u6BB5:\r\nbatch\r\n\r\n\r\n\u5B57\u6BB5\u8BF4\u660E:\r\n\u6279\u6B21\r\n\r\n\r\n\u4E1A\u52A1\u542B\u4E49:\r\n\u5165\u5E93\u7269\u6599\u7684\u751F\u4EA7\u6279\u6B21\u53F7\uFF0C\u7528\u4E8E\u6279\u6B21\u8FFD\u6EAF\u548C\u6548\u671F\u7BA1\u7406\u3002\r\n\r\n\r\n\u5173\u952E\u8BCD:\r\n\u6279\u6B21,\u6279\u6B21\u53F7,\u751F\u4EA7\u6279\u6B21\r\n\r\n\r\n\u540C\u4E49\u8BCD:\r\n\u6279\u53F7,\u751F\u4EA7\u6279\u53F7,\u5165\u5E93\u6279\u6B21\r\n\r\n\r\n\u793A\u4F8B\u95EE\u9898:\r\n\u6279\u6B21\u53F7\u4E3AB202310\u7684\u5165\u5E93\u8BB0\u5F55\u6709\u54EA\u4E9B\uFF1F\u5404\u6279\u6B21\u7684\u5165\u5E93\u6570\u91CF\u7EDF\u8BA1\u3002\r\n\r\n\r\n\u4E1A\u52A1\u9886\u57DF:\r\n\u4ED3\u50A8\u7BA1\u7406-\u5165\u5E93\u7BA1\u7406\r\n",
+                              "VectorId": "d9055274-258a-4258-92f1-1cbc73890dc5",
+                              "EmbeddingModel": null,
+                              "VectorDimension": null,
+                              "Id": 433,
+                              "CreatedTime": "2026-08-12T09:26:47.8525829"
+                            },
+                            "ColumnName": "batch",
+                            "ColumnComment": "\u6279\u6B21",
+                            "DataType": "varchar",
+                            "Length": 50,
+                            "IsNullable": true,
+                            "IsPrimaryKey": false,
+                            "SearchText": "wms_storage_receipt_info batch \u6279\u6B21 varchar",
+                            "VectorId": "a3ebf103-25e6-436f-9f52-91655bff5205",
+                            "Id": 5543,
+                            "CreatedTime": "2026-08-11T16:47:02.6383401"
+                          },
+                          {
+                            "$id": "31",
+                            "MetadataTableId": 458,
+                            "MetadataTable": {
+                              "$ref": "15"
+                            },
+                            "BusinessKey": null,
+                            "Semantic": null,
+                            "ColumnName": "case_no",
+                            "ColumnComment": "\u7BB1\u53F7",
+                            "DataType": "varchar",
+                            "Length": 50,
+                            "IsNullable": true,
+                            "IsPrimaryKey": false,
+                            "SearchText": "wms_storage_receipt_info case_no \u7BB1\u53F7 varchar",
+                            "VectorId": "48f3314b-3ea0-4da1-929f-bb7c9c78d288",
+                            "Id": 5544,
+                            "CreatedTime": "2026-08-11T16:47:02.6383426"
+                          },
+                          {
+                            "$id": "32",
+                            "MetadataTableId": 458,
+                            "MetadataTable": {
+                              "$ref": "15"
+                            },
+                            "BusinessKey": null,
+                            "Semantic": null,
+                            "ColumnName": "associated_no",
+                            "ColumnComment": "\u5173\u8054\u7BB1\u53F7",
+                            "DataType": "varchar",
+                            "Length": 50,
+                            "IsNullable": true,
+                            "IsPrimaryKey": false,
+                            "SearchText": "wms_storage_receipt_info associated_no \u5173\u8054\u7BB1\u53F7 varchar",
+                            "VectorId": "48d2f521-637b-439a-b0cd-1b0570fe5d9e",
+                            "Id": 5545,
+                            "CreatedTime": "2026-08-11T16:47:02.6383453"
+                          },
+                          {
+                            "$id": "33",
+                            "MetadataTableId": 458,
+                            "MetadataTable": {
+                              "$ref": "15"
+                            },
+                            "BusinessKey": null,
+                            "Semantic": null,
+                            "ColumnName": "valid_time",
+                            "ColumnComment": "\u6709\u6548\u671F\u622A\u81F3\u65F6\u95F4",
+                            "DataType": "date",
+                            "Length": null,
+                            "IsNullable": true,
+                            "IsPrimaryKey": false,
+                            "SearchText": "wms_storage_receipt_info valid_time \u6709\u6548\u671F\u622A\u81F3\u65F6\u95F4 date",
+                            "VectorId": "09d0c802-2f1f-451f-9a65-7b29b7d6a09e",
+                            "Id": 5546,
+                            "CreatedTime": "2026-08-11T16:47:02.6383479"
+                          },
+                          {
+                            "$id": "34",
+                            "MetadataTableId": 458,
+                            "MetadataTable": {
+                              "$ref": "15"
+                            },
+                            "BusinessKey": null,
+                            "Semantic": null,
+                            "ColumnName": "create_by",
+                            "ColumnComment": "\u521B\u5EFA\u4EBAid",
+                            "DataType": "bigint",
+                            "Length": null,
+                            "IsNullable": true,
+                            "IsPrimaryKey": false,
+                            "SearchText": "wms_storage_receipt_info create_by \u521B\u5EFA\u4EBAid bigint",
+                            "VectorId": "bb2cd285-5a1a-43fe-9786-b77df357b43e",
+                            "Id": 5547,
+                            "CreatedTime": "2026-08-11T16:47:02.6383505"
+                          },
+                          {
+                            "$id": "35",
+                            "MetadataTableId": 458,
+                            "MetadataTable": {
+                              "$ref": "15"
+                            },
+                            "BusinessKey": null,
+                            "Semantic": null,
+                            "ColumnName": "create_name",
+                            "ColumnComment": "\u521B\u5EFA\u4EBA\u540D\u79F0",
+                            "DataType": "varchar",
+                            "Length": 255,
+                            "IsNullable": true,
+                            "IsPrimaryKey": false,
+                            "SearchText": "wms_storage_receipt_info create_name \u521B\u5EFA\u4EBA\u540D\u79F0 varchar",
+                            "VectorId": "f1e06bde-622d-4d99-ae3c-a11458c13ac8",
+                            "Id": 5548,
+                            "CreatedTime": "2026-08-11T16:47:02.6383532"
+                          },
+                          {
+                            "$id": "36",
+                            "MetadataTableId": 458,
+                            "MetadataTable": {
+                              "$ref": "15"
+                            },
+                            "BusinessKey": null,
+                            "Semantic": null,
+                            "ColumnName": "create_time",
+                            "ColumnComment": "\u521B\u5EFA\u65F6\u95F4",
+                            "DataType": "datetime",
+                            "Length": null,
+                            "IsNullable": true,
+                            "IsPrimaryKey": false,
+                            "SearchText": "wms_storage_receipt_info create_time \u521B\u5EFA\u65F6\u95F4 datetime",
+                            "VectorId": "a2f6359c-67d0-4428-b8ae-3d598ccf6cbc",
+                            "Id": 5549,
+                            "CreatedTime": "2026-08-11T16:47:02.6383559"
+                          },
+                          {
+                            "$id": "37",
+                            "MetadataTableId": 458,
+                            "MetadataTable": {
+                              "$ref": "15"
+                            },
+                            "BusinessKey": null,
+                            "Semantic": null,
+                            "ColumnName": "update_by",
+                            "ColumnComment": "\u66F4\u65B0\u4EBAid",
+                            "DataType": "bigint",
+                            "Length": null,
+                            "IsNullable": true,
+                            "IsPrimaryKey": false,
+                            "SearchText": "wms_storage_receipt_info update_by \u66F4\u65B0\u4EBAid bigint",
+                            "VectorId": "60298a05-3f61-4996-9f70-33ee6a45ea1d",
+                            "Id": 5550,
+                            "CreatedTime": "2026-08-11T16:47:02.638359"
+                          },
+                          {
+                            "$id": "38",
+                            "MetadataTableId": 458,
+                            "MetadataTable": {
+                              "$ref": "15"
+                            },
+                            "BusinessKey": null,
+                            "Semantic": null,
+                            "ColumnName": "update_name",
+                            "ColumnComment": "\u66F4\u65B0\u4EBA\u540D\u79F0",
+                            "DataType": "varchar",
+                            "Length": 255,
+                            "IsNullable": true,
+                            "IsPrimaryKey": false,
+                            "SearchText": "wms_storage_receipt_info update_name \u66F4\u65B0\u4EBA\u540D\u79F0 varchar",
+                            "VectorId": "89490570-66b2-44e2-90c2-a3637d4b076c",
+                            "Id": 5551,
+                            "CreatedTime": "2026-08-11T16:47:02.6383638"
+                          },
+                          {
+                            "$id": "39",
+                            "MetadataTableId": 458,
+                            "MetadataTable": {
+                              "$ref": "15"
+                            },
+                            "BusinessKey": null,
+                            "Semantic": null,
+                            "ColumnName": "update_time",
+                            "ColumnComment": "\u66F4\u65B0\u4EBA\u65F6\u95F4",
+                            "DataType": "datetime",
+                            "Length": null,
+                            "IsNullable": true,
+                            "IsPrimaryKey": false,
+                            "SearchText": "wms_storage_receipt_info update_time \u66F4\u65B0\u4EBA\u65F6\u95F4 datetime",
+                            "VectorId": "9c72d347-9a65-4c9a-a8e9-5db830b726dd",
+                            "Id": 5552,
+                            "CreatedTime": "2026-08-11T16:47:02.6383667"
+                          },
+                          {
+                            "$id": "40",
+                            "MetadataTableId": 458,
+                            "MetadataTable": {
+                              "$ref": "15"
+                            },
+                            "BusinessKey": null,
+                            "Semantic": null,
+                            "ColumnName": "del_flag",
+                            "ColumnComment": "\u662F\u5426\u5220\u9664\u6807\u8BC6\uFF1A0\u5426 1\u662F",
+                            "DataType": "tinyint",
+                            "Length": null,
+                            "IsNullable": true,
+                            "IsPrimaryKey": false,
+                            "SearchText": "wms_storage_receipt_info del_flag \u662F\u5426\u5220\u9664\u6807\u8BC6\uFF1A0\u5426 1\u662F tinyint",
+                            "VectorId": "f8c22590-c0ab-43b2-b02f-42aaf2cbec50",
+                            "Id": 5553,
+                            "CreatedTime": "2026-08-11T16:47:02.6383694"
+                          },
+                          {
+                            "$id": "41",
+                            "MetadataTableId": 458,
+                            "MetadataTable": {
+                              "$ref": "15"
+                            },
+                            "BusinessKey": null,
+                            "Semantic": null,
+                            "ColumnName": "erp_line_id",
+                            "ColumnComment": "\u91D1\u8776\u901A\u77E5\u5355\u884C\u53F7",
+                            "DataType": "varchar",
+                            "Length": 50,
+                            "IsNullable": true,
+                            "IsPrimaryKey": false,
+                            "SearchText": "wms_storage_receipt_info erp_line_id \u91D1\u8776\u901A\u77E5\u5355\u884C\u53F7 varchar",
+                            "VectorId": "fb8db42e-1936-41bd-a8c9-5c57dfa14bef",
+                            "Id": 5554,
+                            "CreatedTime": "2026-08-11T16:47:02.6383722"
+                          },
+                          {
+                            "$id": "42",
+                            "MetadataTableId": 458,
+                            "MetadataTable": {
+                              "$ref": "15"
+                            },
+                            "BusinessKey": null,
+                            "Semantic": null,
+                            "ColumnName": "production_line_name",
+                            "ColumnComment": "\u4EA7\u7EBF\u540D\u79F0",
+                            "DataType": "varchar",
+                            "Length": 50,
+                            "IsNullable": true,
+                            "IsPrimaryKey": false,
+                            "SearchText": "wms_storage_receipt_info production_line_name \u4EA7\u7EBF\u540D\u79F0 varchar",
+                            "VectorId": "3f4ff156-e0ca-42bd-ad3c-426b512a832b",
+                            "Id": 5555,
+                            "CreatedTime": "2026-08-11T16:47:02.638375"
+                          }
+                        ]
+                      },
+                      "Id": 458,
+                      "CreatedTime": "2026-08-11T16:47:02.6381125"
+                    },
+                    {
+                      "$id": "43",
+                      "TenantId": 1,
+                      "DataSourceId": 1,
+                      "DataSource": {
+                        "$ref": "13"
+                      },
+                      "TableName": "wms_storage_receipt",
+                      "TableComment": "\u5165\u5E93\u51ED\u8BC1",
+                      "BusinessDomain": null,
+                      "SearchText": "wms_storage_receipt \u5165\u5E93\u51ED\u8BC1 wms_storage_receipt id \u4E3B\u952E bigint wms_storage_receipt code \u7F16\u7801 varchar wms_storage_receipt type \u7C7B\u578B bigint wms_storage_receipt status \u72B6\u6001 tinyint wms_storage_receipt warehouse_id \u4ED3\u5E93id bigint wms_storage_receipt shelf_id \u8D27\u67B6id bigint wms_storage_receipt affirm_time \u786E\u8BA4\u65F6\u95F4 datetime wms_storage_receipt affirm_name \u786E\u8BA4\u4EBA varchar wms_storage_receipt syn_name \u540C\u6B65\u4EBA varchar wms_storage_receipt charge_time \u51B2\u9500\u65F6\u95F4 datetime wms_storage_receipt charge_name \u51B2\u9500\u4EBA\u540D\u79F0 varchar wms_storage_receipt create_by \u521B\u5EFA\u4EBAid bigint wms_storage_receipt create_name \u521B\u5EFA\u4EBA\u540D\u79F0 varchar wms_storage_receipt create_time \u521B\u5EFA\u65F6\u95F4 datetime wms_storage_receipt update_by \u66F4\u65B0\u4EBAid bigint wms_storage_receipt update_name \u66F4\u65B0\u4EBA\u540D\u79F0 varchar wms_storage_receipt update_time \u66F4\u65B0\u4EBA\u65F6\u95F4 datetime wms_storage_receipt del_flag \u662F\u5426\u5220\u9664\u6807\u8BC6\uFF1A0\u5426 1\u662F tinyint wms_storage_receipt note \u5907\u6CE8 varchar wms_storage_receipt source_type \u5355\u636E\u6765\u6E90\u7C7B\u578B\uFF080\uFF1A\u751F\u4EA7 1\uFF1A\u91C7\u8D2D\u5730\u78C5 2\u91C7\u8D2D\u5165\u5E93\uFF09 tinyint wms_storage_receipt source_code \u5355\u636E\u6765\u6E90\u5355\u53F7 varchar wms_storage_receipt erp_receipt_code \u91D1\u8776\u6536\u6599\u901A\u77E5\u5355\u7F16\u7801 varchar wms_storage_receipt erp_receipt_id \u91D1\u8776\u6536\u6599\u901A\u77E5\u5355id varchar wms_storage_receipt come_time \u5165\u5E93\u65F6\u95F4 datetime wms_storage_receipt es_supplier_code \u4F9B\u5E94\u5546\u4EE3\u7801 varchar",
+                      "VectorId": "6463a83c-0dbc-4ef4-a381-263e7dfa6650",
+                      "EmbeddingModel": null,
+                      "VectorDimension": null,
+                      "Columns": {
+                        "$id": "44",
+                        "$values": [
+                          {
+                            "$id": "45",
+                            "MetadataTableId": 457,
+                            "MetadataTable": {
+                              "$ref": "43"
+                            },
+                            "BusinessKey": null,
+                            "Semantic": null,
+                            "ColumnName": "id",
+                            "ColumnComment": "\u4E3B\u952E",
+                            "DataType": "bigint",
+                            "Length": null,
+                            "IsNullable": false,
+                            "IsPrimaryKey": true,
+                            "SearchText": "wms_storage_receipt id \u4E3B\u952E bigint",
+                            "VectorId": "69dc1d46-b239-4a1c-9883-99f7ffbade11",
+                            "Id": 5508,
+                            "CreatedTime": "2026-08-11T16:47:02.6379522"
+                          },
+                          {
+                            "$id": "46",
+                            "MetadataTableId": 457,
+                            "MetadataTable": {
+                              "$ref": "43"
+                            },
+                            "BusinessKey": null,
+                            "Semantic": null,
+                            "ColumnName": "code",
+                            "ColumnComment": "\u7F16\u7801",
+                            "DataType": "varchar",
+                            "Length": 50,
+                            "IsNullable": false,
+                            "IsPrimaryKey": false,
+                            "SearchText": "wms_storage_receipt code \u7F16\u7801 varchar",
+                            "VectorId": "9036c609-7af3-48df-85fb-6cbe03ce02bb",
+                            "Id": 5509,
+                            "CreatedTime": "2026-08-11T16:47:02.6379572"
+                          },
+                          {
+                            "$id": "47",
+                            "MetadataTableId": 457,
+                            "MetadataTable": {
+                              "$ref": "43"
+                            },
+                            "BusinessKey": null,
+                            "Semantic": {
+                              "$id": "48",
+                              "MetadataColumnId": 5510,
+                              "MetadataColumn": {
+                                "$ref": "47"
+                              },
+                              "BusinessMeaning": "\u5165\u5E93\u5355\u636E\u7684\u4E1A\u52A1\u7C7B\u578B\u5206\u7C7B",
+                              "Keywords": "\u7C7B\u578B,\u5165\u5E93\u7C7B\u578B,\u5355\u636E\u7C7B\u578B",
+                              "Synonyms": "\u4E1A\u52A1\u7C7B\u578B,\u5206\u7C7B,\u5165\u5E93\u7C7B\u522B",
+                              "ExampleQuestions": "\u8FD9\u5F20\u5165\u5E93\u5355\u662F\u4EC0\u4E48\u7C7B\u578B\u7684\uFF1F;\u7EDF\u8BA1\u5404\u7C7B\u578B\u5165\u5E93\u5355\u7684\u6570\u91CF",
+                              "BusinessDomain": "\u4ED3\u50A8\u7BA1\u7406",
+                              "Confidence": 0.9500,
+                              "Source": "AI",
+                              "SearchText": "\u8868:\r\nwms_storage_receipt\r\n\r\n\r\n\u5B57\u6BB5:\r\ntype\r\n\r\n\r\n\u5B57\u6BB5\u8BF4\u660E:\r\n\u7C7B\u578B\r\n\r\n\r\n\u4E1A\u52A1\u542B\u4E49:\r\n\u5165\u5E93\u5355\u636E\u7684\u4E1A\u52A1\u7C7B\u578B\u5206\u7C7B\r\n\r\n\r\n\u5173\u952E\u8BCD:\r\n\u7C7B\u578B,\u5165\u5E93\u7C7B\u578B,\u5355\u636E\u7C7B\u578B\r\n\r\n\r\n\u540C\u4E49\u8BCD:\r\n\u4E1A\u52A1\u7C7B\u578B,\u5206\u7C7B,\u5165\u5E93\u7C7B\u522B\r\n\r\n\r\n\u793A\u4F8B\u95EE\u9898:\r\n\u8FD9\u5F20\u5165\u5E93\u5355\u662F\u4EC0\u4E48\u7C7B\u578B\u7684\uFF1F;\u7EDF\u8BA1\u5404\u7C7B\u578B\u5165\u5E93\u5355\u7684\u6570\u91CF\r\n\r\n\r\n\u4E1A\u52A1\u9886\u57DF:\r\n\u4ED3\u50A8\u7BA1\u7406\r\n",
+                              "VectorId": "89294a35-16a1-4d36-9ded-2adde9334b11",
+                              "EmbeddingModel": null,
+                              "VectorDimension": null,
+                              "Id": 400,
+                              "CreatedTime": "2026-08-12T09:26:47.848416"
+                            },
+                            "ColumnName": "type",
+                            "ColumnComment": "\u7C7B\u578B",
+                            "DataType": "bigint",
+                            "Length": null,
+                            "IsNullable": false,
+                            "IsPrimaryKey": false,
+                            "SearchText": "wms_storage_receipt type \u7C7B\u578B bigint",
+                            "VectorId": "2098ffea-1600-4af3-a14d-55d792a2af8e",
+                            "Id": 5510,
+                            "CreatedTime": "2026-08-11T16:47:02.6379598"
+                          },
+                          {
+                            "$id": "49",
+                            "MetadataTableId": 457,
+                            "MetadataTable": {
+                              "$ref": "43"
+                            },
+                            "BusinessKey": null,
+                            "Semantic": null,
+                            "ColumnName": "status",
+                            "ColumnComment": "\u72B6\u6001",
+                            "DataType": "tinyint",
+                            "Length": null,
+                            "IsNullable": false,
+                            "IsPrimaryKey": false,
+                            "SearchText": "wms_storage_receipt status \u72B6\u6001 tinyint",
+                            "VectorId": "081404b3-1e3b-4f49-86af-9e9b548fc9df",
+                            "Id": 5511,
+                            "CreatedTime": "2026-08-11T16:47:02.6379622"
+                          },
+                          {
+                            "$id": "50",
+                            "MetadataTableId": 457,
+                            "MetadataTable": {
+                              "$ref": "43"
+                            },
+                            "BusinessKey": null,
+                            "Semantic": null,
+                            "ColumnName": "warehouse_id",
+                            "ColumnComment": "\u4ED3\u5E93id",
+                            "DataType": "bigint",
+                            "Length": null,
+                            "IsNullable": false,
+                            "IsPrimaryKey": false,
+                            "SearchText": "wms_storage_receipt warehouse_id \u4ED3\u5E93id bigint",
+                            "VectorId": "158bf47a-27b4-4885-b76e-2f5f32139bb1",
+                            "Id": 5512,
+                            "CreatedTime": "2026-08-11T16:47:02.6379645"
+                          },
+                          {
+                            "$id": "51",
+                            "MetadataTableId": 457,
+                            "MetadataTable": {
+                              "$ref": "43"
+                            },
+                            "BusinessKey": null,
+                            "Semantic": null,
+                            "ColumnName": "shelf_id",
+                            "ColumnComment": "\u8D27\u67B6id",
+                            "DataType": "bigint",
+                            "Length": null,
+                            "IsNullable": true,
+                            "IsPrimaryKey": false,
+                            "SearchText": "wms_storage_receipt shelf_id \u8D27\u67B6id bigint",
+                            "VectorId": "d4c8cfb4-ff36-41f6-aa2f-c8d40b38ef0a",
+                            "Id": 5513,
+                            "CreatedTime": "2026-08-11T16:47:02.637969"
+                          },
+                          {
+                            "$id": "52",
+                            "MetadataTableId": 457,
+                            "MetadataTable": {
+                              "$ref": "43"
+                            },
+                            "BusinessKey": null,
+                            "Semantic": null,
+                            "ColumnName": "affirm_time",
+                            "ColumnComment": "\u786E\u8BA4\u65F6\u95F4",
+                            "DataType": "datetime",
+                            "Length": null,
+                            "IsNullable": true,
+                            "IsPrimaryKey": false,
+                            "SearchText": "wms_storage_receipt affirm_time \u786E\u8BA4\u65F6\u95F4 datetime",
+                            "VectorId": "618ec3b2-4d1b-423f-bc55-733ad308edc0",
+                            "Id": 5514,
+                            "CreatedTime": "2026-08-11T16:47:02.637972"
+                          },
+                          {
+                            "$id": "53",
+                            "MetadataTableId": 457,
+                            "MetadataTable": {
+                              "$ref": "43"
+                            },
+                            "BusinessKey": null,
+                            "Semantic": null,
+                            "ColumnName": "affirm_name",
+                            "ColumnComment": "\u786E\u8BA4\u4EBA",
+                            "DataType": "varchar",
+                            "Length": 50,
+                            "IsNullable": true,
+                            "IsPrimaryKey": false,
+                            "SearchText": "wms_storage_receipt affirm_name \u786E\u8BA4\u4EBA varchar",
+                            "VectorId": "98fe2e30-1196-466f-88ac-f3c57f87c854",
+                            "Id": 5515,
+                            "CreatedTime": "2026-08-11T16:47:02.6379746"
+                          },
+                          {
+                            "$id": "54",
+                            "MetadataTableId": 457,
+                            "MetadataTable": {
+                              "$ref": "43"
+                            },
+                            "BusinessKey": null,
+                            "Semantic": null,
+                            "ColumnName": "syn_name",
+                            "ColumnComment": "\u540C\u6B65\u4EBA",
+                            "DataType": "varchar",
+                            "Length": 50,
+                            "IsNullable": true,
+                            "IsPrimaryKey": false,
+                            "SearchText": "wms_storage_receipt syn_name \u540C\u6B65\u4EBA varchar",
+                            "VectorId": "efd0f2d0-84c0-41f4-b0d2-fc7b002009c1",
+                            "Id": 5516,
+                            "CreatedTime": "2026-08-11T16:47:02.6379771"
+                          },
+                          {
+                            "$id": "55",
+                            "MetadataTableId": 457,
+                            "MetadataTable": {
+                              "$ref": "43"
+                            },
+                            "BusinessKey": null,
+                            "Semantic": null,
+                            "ColumnName": "charge_time",
+                            "ColumnComment": "\u51B2\u9500\u65F6\u95F4",
+                            "DataType": "datetime",
+                            "Length": null,
+                            "IsNullable": true,
+                            "IsPrimaryKey": false,
+                            "SearchText": "wms_storage_receipt charge_time \u51B2\u9500\u65F6\u95F4 datetime",
+                            "VectorId": "3caf127a-e902-4df4-8ae7-056d3141eb52",
+                            "Id": 5517,
+                            "CreatedTime": "2026-08-11T16:47:02.6379799"
+                          },
+                          {
+                            "$id": "56",
+                            "MetadataTableId": 457,
+                            "MetadataTable": {
+                              "$ref": "43"
+                            },
+                            "BusinessKey": null,
+                            "Semantic": null,
+                            "ColumnName": "charge_name",
+                            "ColumnComment": "\u51B2\u9500\u4EBA\u540D\u79F0",
+                            "DataType": "varchar",
+                            "Length": 255,
+                            "IsNullable": true,
+                            "IsPrimaryKey": false,
+                            "SearchText": "wms_storage_receipt charge_name \u51B2\u9500\u4EBA\u540D\u79F0 varchar",
+                            "VectorId": "c3d3de8b-b80e-4abd-81e2-b941f866d72e",
+                            "Id": 5518,
+                            "CreatedTime": "2026-08-11T16:47:02.6379824"
+                          },
+                          {
+                            "$id": "57",
+                            "MetadataTableId": 457,
+                            "MetadataTable": {
+                              "$ref": "43"
+                            },
+                            "BusinessKey": null,
+                            "Semantic": null,
+                            "ColumnName": "create_by",
+                            "ColumnComment": "\u521B\u5EFA\u4EBAid",
+                            "DataType": "bigint",
+                            "Length": null,
+                            "IsNullable": true,
+                            "IsPrimaryKey": false,
+                            "SearchText": "wms_storage_receipt create_by \u521B\u5EFA\u4EBAid bigint",
+                            "VectorId": "99b2880f-9b80-4678-a8f2-45d03865d649",
+                            "Id": 5519,
+                            "CreatedTime": "2026-08-11T16:47:02.6379849"
+                          },
+                          {
+                            "$id": "58",
+                            "MetadataTableId": 457,
+                            "MetadataTable": {
+                              "$ref": "43"
+                            },
+                            "BusinessKey": null,
+                            "Semantic": null,
+                            "ColumnName": "create_name",
+                            "ColumnComment": "\u521B\u5EFA\u4EBA\u540D\u79F0",
+                            "DataType": "varchar",
+                            "Length": 255,
+                            "IsNullable": true,
+                            "IsPrimaryKey": false,
+                            "SearchText": "wms_storage_receipt create_name \u521B\u5EFA\u4EBA\u540D\u79F0 varchar",
+                            "VectorId": "6a2ff23c-f982-4258-8863-97526248a99b",
+                            "Id": 5520,
+                            "CreatedTime": "2026-08-11T16:47:02.6379875"
+                          },
+                          {
+                            "$id": "59",
+                            "MetadataTableId": 457,
+                            "MetadataTable": {
+                              "$ref": "43"
+                            },
+                            "BusinessKey": null,
+                            "Semantic": null,
+                            "ColumnName": "create_time",
+                            "ColumnComment": "\u521B\u5EFA\u65F6\u95F4",
+                            "DataType": "datetime",
+                            "Length": null,
+                            "IsNullable": true,
+                            "IsPrimaryKey": false,
+                            "SearchText": "wms_storage_receipt create_time \u521B\u5EFA\u65F6\u95F4 datetime",
+                            "VectorId": "e36c7f9e-d0d3-4602-a146-13956968b77b",
+                            "Id": 5521,
+                            "CreatedTime": "2026-08-11T16:47:02.63799"
+                          },
+                          {
+                            "$id": "60",
+                            "MetadataTableId": 457,
+                            "MetadataTable": {
+                              "$ref": "43"
+                            },
+                            "BusinessKey": null,
+                            "Semantic": null,
+                            "ColumnName": "update_by",
+                            "ColumnComment": "\u66F4\u65B0\u4EBAid",
+                            "DataType": "bigint",
+                            "Length": null,
+                            "IsNullable": true,
+                            "IsPrimaryKey": false,
+                            "SearchText": "wms_storage_receipt update_by \u66F4\u65B0\u4EBAid bigint",
+                            "VectorId": "f1b9acb8-2608-4f40-bf40-f52bf698170e",
+                            "Id": 5522,
+                            "CreatedTime": "2026-08-11T16:47:02.6379927"
+                          },
+                          {
+                            "$id": "61",
+                            "MetadataTableId": 457,
+                            "MetadataTable": {
+                              "$ref": "43"
+                            },
+                            "BusinessKey": null,
+                            "Semantic": null,
+                            "ColumnName": "update_name",
+                            "ColumnComment": "\u66F4\u65B0\u4EBA\u540D\u79F0",
+                            "DataType": "varchar",
+                            "Length": 255,
+                            "IsNullable": true,
+                            "IsPrimaryKey": false,
+                            "SearchText": "wms_storage_receipt update_name \u66F4\u65B0\u4EBA\u540D\u79F0 varchar",
+                            "VectorId": "287cfc97-7881-4918-a5b1-aa3469623bff",
+                            "Id": 5523,
+                            "CreatedTime": "2026-08-11T16:47:02.6379954"
+                          },
+                          {
+                            "$id": "62",
+                            "MetadataTableId": 457,
+                            "MetadataTable": {
+                              "$ref": "43"
+                            },
+                            "BusinessKey": null,
+                            "Semantic": null,
+                            "ColumnName": "update_time",
+                            "ColumnComment": "\u66F4\u65B0\u4EBA\u65F6\u95F4",
+                            "DataType": "datetime",
+                            "Length": null,
+                            "IsNullable": true,
+                            "IsPrimaryKey": false,
+                            "SearchText": "wms_storage_receipt update_time \u66F4\u65B0\u4EBA\u65F6\u95F4 datetime",
+                            "VectorId": "b69ae73a-6879-49ed-87f5-654a54ff8c6d",
+                            "Id": 5524,
+                            "CreatedTime": "2026-08-11T16:47:02.6379981"
+                          },
+                          {
+                            "$id": "63",
+                            "MetadataTableId": 457,
+                            "MetadataTable": {
+                              "$ref": "43"
+                            },
+                            "BusinessKey": null,
+                            "Semantic": null,
+                            "ColumnName": "del_flag",
+                            "ColumnComment": "\u662F\u5426\u5220\u9664\u6807\u8BC6\uFF1A0\u5426 1\u662F",
+                            "DataType": "tinyint",
+                            "Length": null,
+                            "IsNullable": true,
+                            "IsPrimaryKey": false,
+                            "SearchText": "wms_storage_receipt del_flag \u662F\u5426\u5220\u9664\u6807\u8BC6\uFF1A0\u5426 1\u662F tinyint",
+                            "VectorId": "bddf7e60-1c8c-455c-8fde-ba9d4146df17",
+                            "Id": 5525,
+                            "CreatedTime": "2026-08-11T16:47:02.6380594"
+                          },
+                          {
+                            "$id": "64",
+                            "MetadataTableId": 457,
+                            "MetadataTable": {
+                              "$ref": "43"
+                            },
+                            "BusinessKey": null,
+                            "Semantic": null,
+                            "ColumnName": "note",
+                            "ColumnComment": "\u5907\u6CE8",
+                            "DataType": "varchar",
+                            "Length": 255,
+                            "IsNullable": true,
+                            "IsPrimaryKey": false,
+                            "SearchText": "wms_storage_receipt note \u5907\u6CE8 varchar",
+                            "VectorId": "65a98c37-0cba-472c-8616-f53c4c7bd8a9",
+                            "Id": 5526,
+                            "CreatedTime": "2026-08-11T16:47:02.638066"
+                          },
+                          {
+                            "$id": "65",
+                            "MetadataTableId": 457,
+                            "MetadataTable": {
+                              "$ref": "43"
+                            },
+                            "BusinessKey": null,
+                            "Semantic": {
+                              "$id": "66",
+                              "MetadataColumnId": 5527,
+                              "MetadataColumn": {
+                                "$ref": "65"
+                              },
+                              "BusinessMeaning": "\u5165\u5E93\u5355\u636E\u7684\u6765\u6E90\u4E1A\u52A1\u7C7B\u578B\uFF080:\u751F\u4EA7 1:\u91C7\u8D2D\u5730\u78C5 2:\u91C7\u8D2D\u5165\u5E93\uFF09",
+                              "Keywords": "\u6765\u6E90\u7C7B\u578B,\u5355\u636E\u6765\u6E90,\u4E1A\u52A1\u6765\u6E90",
+                              "Synonyms": "\u6765\u6E90\u5206\u7C7B,\u4E0A\u6E38\u5355\u636E\u7C7B\u578B,\u6E90\u5934\u7C7B\u578B",
+                              "ExampleQuestions": "\u8FD9\u5F20\u5165\u5E93\u5355\u6765\u6E90\u4E8E\u54EA\u79CD\u4E1A\u52A1\uFF1F;\u7EDF\u8BA1\u5404\u6765\u6E90\u7C7B\u578B\u7684\u5165\u5E93\u5355\u6570\u91CF",
+                              "BusinessDomain": "\u4ED3\u50A8\u7BA1\u7406",
+                              "Confidence": 0.9800,
+                              "Source": "AI",
+                              "SearchText": "\u8868:\r\nwms_storage_receipt\r\n\r\n\r\n\u5B57\u6BB5:\r\nsource_type\r\n\r\n\r\n\u5B57\u6BB5\u8BF4\u660E:\r\n\u5355\u636E\u6765\u6E90\u7C7B\u578B\uFF080\uFF1A\u751F\u4EA7 1\uFF1A\u91C7\u8D2D\u5730\u78C5 2\u91C7\u8D2D\u5165\u5E93\uFF09\r\n\r\n\r\n\u4E1A\u52A1\u542B\u4E49:\r\n\u5165\u5E93\u5355\u636E\u7684\u6765\u6E90\u4E1A\u52A1\u7C7B\u578B\uFF080:\u751F\u4EA7 1:\u91C7\u8D2D\u5730\u78C5 2:\u91C7\u8D2D\u5165\u5E93\uFF09\r\n\r\n\r\n\u5173\u952E\u8BCD:\r\n\u6765\u6E90\u7C7B\u578B,\u5355\u636E\u6765\u6E90,\u4E1A\u52A1\u6765\u6E90\r\n\r\n\r\n\u540C\u4E49\u8BCD:\r\n\u6765\u6E90\u5206\u7C7B,\u4E0A\u6E38\u5355\u636E\u7C7B\u578B,\u6E90\u5934\u7C7B\u578B\r\n\r\n\r\n\u793A\u4F8B\u95EE\u9898:\r\n\u8FD9\u5F20\u5165\u5E93\u5355\u6765\u6E90\u4E8E\u54EA\u79CD\u4E1A\u52A1\uFF1F;\u7EDF\u8BA1\u5404\u6765\u6E90\u7C7B\u578B\u7684\u5165\u5E93\u5355\u6570\u91CF\r\n\r\n\r\n\u4E1A\u52A1\u9886\u57DF:\r\n\u4ED3\u50A8\u7BA1\u7406\r\n",
+                              "VectorId": "75176a2d-3acc-40da-99b1-c28f7180f27e",
+                              "EmbeddingModel": null,
+                              "VectorDimension": null,
+                              "Id": 417,
+                              "CreatedTime": "2026-08-12T09:26:47.8506063"
+                            },
+                            "ColumnName": "source_type",
+                            "ColumnComment": "\u5355\u636E\u6765\u6E90\u7C7B\u578B\uFF080\uFF1A\u751F\u4EA7 1\uFF1A\u91C7\u8D2D\u5730\u78C5 2\u91C7\u8D2D\u5165\u5E93\uFF09",
+                            "DataType": "tinyint",
+                            "Length": null,
+                            "IsNullable": true,
+                            "IsPrimaryKey": false,
+                            "SearchText": "wms_storage_receipt source_type \u5355\u636E\u6765\u6E90\u7C7B\u578B\uFF080\uFF1A\u751F\u4EA7 1\uFF1A\u91C7\u8D2D\u5730\u78C5 2\u91C7\u8D2D\u5165\u5E93\uFF09 tinyint",
+                            "VectorId": "7734281a-f693-4c92-bbe5-5c8feaa05039",
+                            "Id": 5527,
+                            "CreatedTime": "2026-08-11T16:47:02.6380697"
+                          },
+                          {
+                            "$id": "67",
+                            "MetadataTableId": 457,
+                            "MetadataTable": {
+                              "$ref": "43"
+                            },
+                            "BusinessKey": null,
+                            "Semantic": null,
+                            "ColumnName": "source_code",
+                            "ColumnComment": "\u5355\u636E\u6765\u6E90\u5355\u53F7",
+                            "DataType": "varchar",
+                            "Length": 50,
+                            "IsNullable": true,
+                            "IsPrimaryKey": false,
+                            "SearchText": "wms_storage_receipt source_code \u5355\u636E\u6765\u6E90\u5355\u53F7 varchar",
+                            "VectorId": "53b918a4-dc96-4470-a8ab-2bddc3afe8f2",
+                            "Id": 5528,
+                            "CreatedTime": "2026-08-11T16:47:02.6380733"
+                          },
+                          {
+                            "$id": "68",
+                            "MetadataTableId": 457,
+                            "MetadataTable": {
+                              "$ref": "43"
+                            },
+                            "BusinessKey": null,
+                            "Semantic": null,
+                            "ColumnName": "erp_receipt_code",
+                            "ColumnComment": "\u91D1\u8776\u6536\u6599\u901A\u77E5\u5355\u7F16\u7801",
+                            "DataType": "varchar",
+                            "Length": 50,
+                            "IsNullable": true,
+                            "IsPrimaryKey": false,
+                            "SearchText": "wms_storage_receipt erp_receipt_code \u91D1\u8776\u6536\u6599\u901A\u77E5\u5355\u7F16\u7801 varchar",
+                            "VectorId": "9cc4dc9f-4f79-4c8b-873f-3eac94e8f45e",
+                            "Id": 5529,
+                            "CreatedTime": "2026-08-11T16:47:02.6380808"
+                          },
+                          {
+                            "$id": "69",
+                            "MetadataTableId": 457,
+                            "MetadataTable": {
+                              "$ref": "43"
+                            },
+                            "BusinessKey": null,
+                            "Semantic": null,
+                            "ColumnName": "erp_receipt_id",
+                            "ColumnComment": "\u91D1\u8776\u6536\u6599\u901A\u77E5\u5355id",
+                            "DataType": "varchar",
+                            "Length": 50,
+                            "IsNullable": true,
+                            "IsPrimaryKey": false,
+                            "SearchText": "wms_storage_receipt erp_receipt_id \u91D1\u8776\u6536\u6599\u901A\u77E5\u5355id varchar",
+                            "VectorId": "3707110a-068c-49d5-bffc-0c1ff1e64685",
+                            "Id": 5530,
+                            "CreatedTime": "2026-08-11T16:47:02.6380841"
+                          },
+                          {
+                            "$id": "70",
+                            "MetadataTableId": 457,
+                            "MetadataTable": {
+                              "$ref": "43"
+                            },
+                            "BusinessKey": null,
+                            "Semantic": null,
+                            "ColumnName": "come_time",
+                            "ColumnComment": "\u5165\u5E93\u65F6\u95F4",
+                            "DataType": "datetime",
+                            "Length": null,
+                            "IsNullable": true,
+                            "IsPrimaryKey": false,
+                            "SearchText": "wms_storage_receipt come_time \u5165\u5E93\u65F6\u95F4 datetime",
+                            "VectorId": "8b888bba-d2b8-4033-a043-30ecdb485208",
+                            "Id": 5531,
+                            "CreatedTime": "2026-08-11T16:47:02.6380874"
+                          },
+                          {
+                            "$id": "71",
+                            "MetadataTableId": 457,
+                            "MetadataTable": {
+                              "$ref": "43"
+                            },
+                            "BusinessKey": null,
+                            "Semantic": null,
+                            "ColumnName": "es_supplier_code",
+                            "ColumnComment": "\u4F9B\u5E94\u5546\u4EE3\u7801",
+                            "DataType": "varchar",
+                            "Length": 100,
+                            "IsNullable": true,
+                            "IsPrimaryKey": false,
+                            "SearchText": "wms_storage_receipt es_supplier_code \u4F9B\u5E94\u5546\u4EE3\u7801 varchar",
+                            "VectorId": "5923de2e-96fb-4049-81cd-18843a5060db",
+                            "Id": 5532,
+                            "CreatedTime": "2026-08-11T16:47:02.6380905"
+                          }
+                        ]
+                      },
+                      "Id": 457,
+                      "CreatedTime": "2026-08-11T16:47:02.6378488"
+                    },
+                    {
+                      "$ref": "12"
+                    },
+                    {
+                      "$id": "72",
+                      "TenantId": 1,
+                      "DataSourceId": 1,
+                      "DataSource": {
+                        "$ref": "13"
+                      },
+                      "TableName": "wms_check_order_info",
+                      "TableComment": "\u76D8\u70B9\u5355\u660E\u7EC6",
+                      "BusinessDomain": null,
+                      "SearchText": "wms_check_order_info \u76D8\u70B9\u5355\u660E\u7EC6 wms_check_order_info id bigint wms_check_order_info warehouse \u4ED3\u5E93 int wms_check_order_info shelf \u8D27\u67B6 int wms_check_order_info material_id \u7269\u6599id bigint wms_check_order_info quantity \u6570\u91CF decimal wms_check_order_info batch \u6279\u6B21 varchar wms_check_order_info case_no \u7BB1\u53F7 varchar wms_check_order_info unit_id \u5355\u4F4Did bigint wms_check_order_info unit \u5355\u4F4D varchar wms_check_order_info result \u7ED3\u679C decimal wms_check_order_info difference \u5DEE\u989D decimal wms_check_order_info check_by \u76D8\u70B9\u4EBAid bigint wms_check_order_info check_name \u76D8\u70B9\u4EBA\u540D\u79F0 varchar wms_check_order_info check_time \u76D8\u70B9\u65F6\u95F4 datetime wms_check_order_info note \u5907\u6CE8 varchar wms_check_order_info status \u72B6\u6001\uFF080\uFF1A\u672A\u6267\u884C 1\uFF1A\u5DF2\u6267\u884C\uFF09 tinyint wms_check_order_info check_order_id \u76D8\u70B9\u5355id bigint wms_check_order_info create_by \u521B\u5EFA\u4EBAid bigint wms_check_order_info create_name \u521B\u5EFA\u4EBA\u540D\u79F0 varchar wms_check_order_info create_time \u521B\u5EFA\u65F6\u95F4 datetime wms_check_order_info update_by \u66F4\u65B0\u4EBAid bigint wms_check_order_info update_name \u66F4\u65B0\u4EBA\u540D\u79F0 varchar wms_check_order_info update_time \u66F4\u65B0\u4EBA\u65F6\u95F4 datetime wms_check_order_info del_flag \u662F\u5426\u5220\u9664\u6807\u8BC6\uFF1A0\u5426 1\u662F tinyint",
+                      "VectorId": "816c56d5-99f7-41ef-b5bf-c84bc0bdc6aa",
+                      "EmbeddingModel": null,
+                      "VectorDimension": null,
+                      "Columns": {
+                        "$id": "73",
+                        "$values": [
+                          {
+                            "$id": "74",
+                            "MetadataTableId": 442,
+                            "MetadataTable": {
+                              "$ref": "72"
+                            },
+                            "BusinessKey": null,
+                            "Semantic": {
+                              "$id": "75",
+                              "MetadataColumnId": 5245,
+                              "MetadataColumn": {
+                                "$ref": "74"
+                              },
+                              "BusinessMeaning": "\u76D8\u70B9\u660E\u7EC6\u4E2D\u7269\u6599\u7684\u8D26\u9762\u6570\u91CF\u6216\u5E94\u76D8\u6570\u91CF",
+                              "Keywords": "\u6570\u91CF,\u8D26\u9762\u6570\u91CF,\u5E94\u76D8\u6570\u91CF",
+                              "Synonyms": "\u7CFB\u7EDF\u6570\u91CF,\u5E93\u5B58\u6570\u91CF,\u5E94\u6709\u6570\u91CF",
+                              "ExampleQuestions": "\u7269\u6599\u7684\u8D26\u9762\u6570\u91CF\u662F\u591A\u5C11\uFF1F,\u5E94\u76D8\u6570\u91CF\u662F\u591A\u5C11\uFF1F",
+                              "BusinessDomain": "\u4ED3\u50A8\u7BA1\u7406-\u76D8\u70B9\u660E\u7EC6",
+                              "Confidence": 0.9500,
+                              "Source": "AI",
+                              "SearchText": "\u8868:\r\nwms_check_order_info\r\n\r\n\r\n\u5B57\u6BB5:\r\nquantity\r\n\r\n\r\n\u5B57\u6BB5\u8BF4\u660E:\r\n\u6570\u91CF\r\n\r\n\r\n\u4E1A\u52A1\u542B\u4E49:\r\n\u76D8\u70B9\u660E\u7EC6\u4E2D\u7269\u6599\u7684\u8D26\u9762\u6570\u91CF\u6216\u5E94\u76D8\u6570\u91CF\r\n\r\n\r\n\u5173\u952E\u8BCD:\r\n\u6570\u91CF,\u8D26\u9762\u6570\u91CF,\u5E94\u76D8\u6570\u91CF\r\n\r\n\r\n\u540C\u4E49\u8BCD:\r\n\u7CFB\u7EDF\u6570\u91CF,\u5E93\u5B58\u6570\u91CF,\u5E94\u6709\u6570\u91CF\r\n\r\n\r\n\u793A\u4F8B\u95EE\u9898:\r\n\u7269\u6599\u7684\u8D26\u9762\u6570\u91CF\u662F\u591A\u5C11\uFF1F,\u5E94\u76D8\u6570\u91CF\u662F\u591A\u5C11\uFF1F\r\n\r\n\r\n\u4E1A\u52A1\u9886\u57DF:\r\n\u4ED3\u50A8\u7BA1\u7406-\u76D8\u70B9\u660E\u7EC6\r\n",
+                              "VectorId": "9564536e-bc19-4768-a6ed-b2a1b7fe84ca",
+                              "EmbeddingModel": null,
+                              "VectorDimension": null,
+                              "Id": 135,
+                              "CreatedTime": "2026-08-12T09:26:47.8089216"
+                            },
+                            "ColumnName": "quantity",
+                            "ColumnComment": "\u6570\u91CF",
+                            "DataType": "decimal",
+                            "Length": null,
+                            "IsNullable": true,
+                            "IsPrimaryKey": false,
+                            "SearchText": "wms_check_order_info quantity \u6570\u91CF decimal",
+                            "VectorId": "8e1fd913-275d-4a67-9726-bcd88fce8f25",
+                            "Id": 5245,
+                            "CreatedTime": "2026-08-11T16:47:02.6354897"
+                          }
+                        ]
+                      },
+                      "Id": 442,
+                      "CreatedTime": "2026-08-11T16:47:02.6353904"
+                    },
+                    {
+                      "$id": "76",
+                      "TenantId": 1,
+                      "DataSourceId": 1,
+                      "DataSource": {
+                        "$ref": "13"
+                      },
+                      "TableName": "wms_sign_feedback",
+                      "TableComment": "\u5F02\u5E38\u53CD\u9988",
+                      "BusinessDomain": null,
+                      "SearchText": "wms_sign_feedback \u5F02\u5E38\u53CD\u9988 wms_sign_feedback id bigint wms_sign_feedback sales_order \u7269\u6D41\u5355\u53F7 varchar wms_sign_feedback logistics_company \u7269\u6D41\u516C\u53F8  varchar wms_sign_feedback product \u4EA7\u54C1 varchar wms_sign_feedback state \u53CD\u9988\u72B6\u6001\uFF080:\u5F85\u786E\u8BA4\u53CD\u9988 1\uFF1A\u5DF2\u53CD\u9988 3:\u5DF2\u9000\u56DE\uFF09 int wms_sign_feedback car_code \u8F66\u724C\u53F7 varchar wms_sign_feedback client \u5BA2\u6237 varchar wms_sign_feedback send_date \u53D1\u8D27\u65E5\u671F date wms_sign_feedback send_quantity \u53D1\u8D27\u6570\u91CF decimal wms_sign_feedback price_quantity \u53D1\u8D27\u9762\u79EF decimal wms_sign_feedback signature_type \u7B7E\u6536\u7C7B\u578B varchar wms_sign_feedback signed_quantity \u7B7E\u6536\u6570\u91CF decimal wms_sign_feedback signed_price_quantity \u7B7E\u6536\u9762\u79EF decimal wms_sign_feedback address \u6536\u8D27\u5730\u5740 varchar wms_sign_feedback signed_date \u7B7E\u6536\u65E5\u671F date wms_sign_feedback abnormal_cause \u5F02\u5E38\u539F\u56E0 varchar wms_sign_feedback file_id \u6587\u4EF6id bigint wms_sign_feedback create_by \u521B\u5EFA\u4EBAid bigint wms_sign_feedback create_name \u521B\u5EFA\u4EBA\u540D\u79F0 varchar wms_sign_feedback create_time \u521B\u5EFA\u65F6\u95F4 datetime wms_sign_feedback update_by \u66F4\u65B0\u4EBAid bigint wms_sign_feedback update_name \u66F4\u65B0\u4EBA\u540D\u79F0 varchar wms_sign_feedback update_time \u66F4\u65B0\u4EBA\u65F6\u95F4 datetime wms_sign_feedback del_flag \u662F\u5426\u5220\u9664\u6807\u8BC6\uFF1A0\u5426 1\u662F tinyint wms_sign_feedback note \u5907\u6CE8 varchar wms_sign_feedback send_back_reason \u9000\u56DE\u539F\u56E0 varchar",
+                      "VectorId": "e22cca22-b936-489d-91fe-d3e62ceab7d0",
+                      "EmbeddingModel": null,
+                      "VectorDimension": null,
+                      "Columns": {
+                        "$id": "77",
+                        "$values": [
+                          {
+                            "$id": "78",
+                            "MetadataTableId": 456,
+                            "MetadataTable": {
+                              "$ref": "76"
+                            },
+                            "BusinessKey": null,
+                            "Semantic": {
+                              "$id": "79",
+                              "MetadataColumnId": 5490,
+                              "MetadataColumn": {
+                                "$ref": "78"
+                              },
+                              "BusinessMeaning": "\u5B9E\u9645\u53D1\u8D27\u7684\u8D27\u7269\u6570\u91CF",
+                              "Keywords": "\u53D1\u8D27\u6570\u91CF,\u53D1\u51FA\u6570\u91CF,\u51FA\u5E93\u6570\u91CF",
+                              "Synonyms": "\u53D1\u8D27\u6570,\u51FA\u5E93\u6570,\u53D1\u9001\u6570\u91CF",
+                              "ExampleQuestions": "\u8FD9\u6279\u8D27\u53D1\u4E86\u591A\u5C11\u6570\u91CF\uFF1F;\u7EDF\u8BA1\u5404\u4EA7\u54C1\u7684\u53D1\u8D27\u603B\u6570\u91CF",
+                              "BusinessDomain": "\u7269\u6D41\u914D\u9001",
+                              "Confidence": 0.9500,
+                              "Source": "AI",
+                              "SearchText": "\u8868:\r\nwms_sign_feedback\r\n\r\n\r\n\u5B57\u6BB5:\r\nsend_quantity\r\n\r\n\r\n\u5B57\u6BB5\u8BF4\u660E:\r\n\u53D1\u8D27\u6570\u91CF\r\n\r\n\r\n\u4E1A\u52A1\u542B\u4E49:\r\n\u5B9E\u9645\u53D1\u8D27\u7684\u8D27\u7269\u6570\u91CF\r\n\r\n\r\n\u5173\u952E\u8BCD:\r\n\u53D1\u8D27\u6570\u91CF,\u53D1\u51FA\u6570\u91CF,\u51FA\u5E93\u6570\u91CF\r\n\r\n\r\n\u540C\u4E49\u8BCD:\r\n\u53D1\u8D27\u6570,\u51FA\u5E93\u6570,\u53D1\u9001\u6570\u91CF\r\n\r\n\r\n\u793A\u4F8B\u95EE\u9898:\r\n\u8FD9\u6279\u8D27\u53D1\u4E86\u591A\u5C11\u6570\u91CF\uFF1F;\u7EDF\u8BA1\u5404\u4EA7\u54C1\u7684\u53D1\u8D27\u603B\u6570\u91CF\r\n\r\n\r\n\u4E1A\u52A1\u9886\u57DF:\r\n\u7269\u6D41\u914D\u9001\r\n",
+                              "VectorId": "600281a8-3ae0-408f-9c29-8c70c4f2322b",
+                              "EmbeddingModel": null,
+                              "VectorDimension": null,
+                              "Id": 380,
+                              "CreatedTime": "2026-08-12T09:26:47.8455107"
+                            },
+                            "ColumnName": "send_quantity",
+                            "ColumnComment": "\u53D1\u8D27\u6570\u91CF",
+                            "DataType": "decimal",
+                            "Length": null,
+                            "IsNullable": true,
+                            "IsPrimaryKey": false,
+                            "SearchText": "wms_sign_feedback send_quantity \u53D1\u8D27\u6570\u91CF decimal",
+                            "VectorId": "ada12024-2895-4604-9f8c-3d24ff5692ac",
+                            "Id": 5490,
+                            "CreatedTime": "2026-08-11T16:47:02.6377832"
+                          },
+                          {
+                            "$id": "80",
+                            "MetadataTableId": 456,
+                            "MetadataTable": {
+                              "$ref": "76"
+                            },
+                            "BusinessKey": null,
+                            "Semantic": {
+                              "$id": "81",
+                              "MetadataColumnId": 5493,
+                              "MetadataColumn": {
+                                "$ref": "80"
+                              },
+                              "BusinessMeaning": "\u5BA2\u6237\u5B9E\u9645\u7B7E\u6536\u786E\u8BA4\u7684\u8D27\u7269\u6570\u91CF",
+                              "Keywords": "\u7B7E\u6536\u6570\u91CF,\u6536\u8D27\u6570\u91CF,\u5B9E\u6536\u6570\u91CF",
+                              "Synonyms": "\u5B9E\u6536\u6570,\u7B7E\u6536\u6570,\u786E\u8BA4\u6570\u91CF",
+                              "ExampleQuestions": "\u5BA2\u6237\u5B9E\u9645\u7B7E\u6536\u4E86\u591A\u5C11\u6570\u91CF\uFF1F;\u5BF9\u6BD4\u53D1\u8D27\u6570\u91CF\u548C\u7B7E\u6536\u6570\u91CF",
+                              "BusinessDomain": "\u7269\u6D41\u914D\u9001",
+                              "Confidence": 0.9500,
+                              "Source": "AI",
+                              "SearchText": "\u8868:\r\nwms_sign_feedback\r\n\r\n\r\n\u5B57\u6BB5:\r\nsigned_quantity\r\n\r\n\r\n\u5B57\u6BB5\u8BF4\u660E:\r\n\u7B7E\u6536\u6570\u91CF\r\n\r\n\r\n\u4E1A\u52A1\u542B\u4E49:\r\n\u5BA2\u6237\u5B9E\u9645\u7B7E\u6536\u786E\u8BA4\u7684\u8D27\u7269\u6570\u91CF\r\n\r\n\r\n\u5173\u952E\u8BCD:\r\n\u7B7E\u6536\u6570\u91CF,\u6536\u8D27\u6570\u91CF,\u5B9E\u6536\u6570\u91CF\r\n\r\n\r\n\u540C\u4E49\u8BCD:\r\n\u5B9E\u6536\u6570,\u7B7E\u6536\u6570,\u786E\u8BA4\u6570\u91CF\r\n\r\n\r\n\u793A\u4F8B\u95EE\u9898:\r\n\u5BA2\u6237\u5B9E\u9645\u7B7E\u6536\u4E86\u591A\u5C11\u6570\u91CF\uFF1F;\u5BF9\u6BD4\u53D1\u8D27\u6570\u91CF\u548C\u7B7E\u6536\u6570\u91CF\r\n\r\n\r\n\u4E1A\u52A1\u9886\u57DF:\r\n\u7269\u6D41\u914D\u9001\r\n",
+                              "VectorId": "a46612f7-220a-4df5-884d-82f76e7ce84a",
+                              "EmbeddingModel": null,
+                              "VectorDimension": null,
+                              "Id": 383,
+                              "CreatedTime": "2026-08-12T09:26:47.8459146"
+                            },
+                            "ColumnName": "signed_quantity",
+                            "ColumnComment": "\u7B7E\u6536\u6570\u91CF",
+                            "DataType": "decimal",
+                            "Length": null,
+                            "IsNullable": true,
+                            "IsPrimaryKey": false,
+                            "SearchText": "wms_sign_feedback signed_quantity \u7B7E\u6536\u6570\u91CF decimal",
+                            "VectorId": "90f9af84-6570-4109-b1b7-aa868e4addf4",
+                            "Id": 5493,
+                            "CreatedTime": "2026-08-11T16:47:02.6377932"
+                          },
+                          {
+                            "$id": "82",
+                            "MetadataTableId": 456,
+                            "MetadataTable": {
+                              "$ref": "76"
+                            },
+                            "BusinessKey": null,
+                            "Semantic": {
+                              "$id": "83",
+                              "MetadataColumnId": 5491,
+                              "MetadataColumn": {
+                                "$ref": "82"
+                              },
+                              "BusinessMeaning": "\u53D1\u8D27\u8D27\u7269\u7684\u603B\u9762\u79EF\u6216\u8BA1\u4EF7\u9762\u79EF\uFF08\u5E38\u89C1\u4E8E\u677F\u6750\u3001\u5EFA\u6750\u884C\u4E1A\uFF09",
+                              "Keywords": "\u53D1\u8D27\u9762\u79EF,\u8BA1\u4EF7\u9762\u79EF,\u5E73\u65B9\u6570",
+                              "Synonyms": "\u53D1\u8D27\u5E73\u7C73\u6570,\u9762\u79EF,\u53D1\u8D27\u5E73\u65B9",
+                              "ExampleQuestions": "\u8FD9\u6279\u8D27\u7684\u53D1\u8D27\u9762\u79EF\u662F\u591A\u5C11\uFF1F;\u7EDF\u8BA1\u672C\u6708\u7684\u53D1\u8D27\u603B\u9762\u79EF",
+                              "BusinessDomain": "\u7269\u6D41\u914D\u9001",
+                              "Confidence": 0.9000,
+                              "Source": "AI",
+                              "SearchText": "\u8868:\r\nwms_sign_feedback\r\n\r\n\r\n\u5B57\u6BB5:\r\nprice_quantity\r\n\r\n\r\n\u5B57\u6BB5\u8BF4\u660E:\r\n\u53D1\u8D27\u9762\u79EF\r\n\r\n\r\n\u4E1A\u52A1\u542B\u4E49:\r\n\u53D1\u8D27\u8D27\u7269\u7684\u603B\u9762\u79EF\u6216\u8BA1\u4EF7\u9762\u79EF\uFF08\u5E38\u89C1\u4E8E\u677F\u6750\u3001\u5EFA\u6750\u884C\u4E1A\uFF09\r\n\r\n\r\n\u5173\u952E\u8BCD:\r\n\u53D1\u8D27\u9762\u79EF,\u8BA1\u4EF7\u9762\u79EF,\u5E73\u65B9\u6570\r\n\r\n\r\n\u540C\u4E49\u8BCD:\r\n\u53D1\u8D27\u5E73\u7C73\u6570,\u9762\u79EF,\u53D1\u8D27\u5E73\u65B9\r\n\r\n\r\n\u793A\u4F8B\u95EE\u9898:\r\n\u8FD9\u6279\u8D27\u7684\u53D1\u8D27\u9762\u79EF\u662F\u591A\u5C11\uFF1F;\u7EDF\u8BA1\u672C\u6708\u7684\u53D1\u8D27\u603B\u9762\u79EF\r\n\r\n\r\n\u4E1A\u52A1\u9886\u57DF:\r\n\u7269\u6D41\u914D\u9001\r\n",
+                              "VectorId": "b1bf5d1a-e5a6-41df-a517-36ef03bac05c",
+                              "EmbeddingModel": null,
+                              "VectorDimension": null,
+                              "Id": 381,
+                              "CreatedTime": "2026-08-12T09:26:47.8456447"
+                            },
+                            "ColumnName": "price_quantity",
+                            "ColumnComment": "\u53D1\u8D27\u9762\u79EF",
+                            "DataType": "decimal",
+                            "Length": null,
+                            "IsNullable": true,
+                            "IsPrimaryKey": false,
+                            "SearchText": "wms_sign_feedback price_quantity \u53D1\u8D27\u9762\u79EF decimal",
+                            "VectorId": "52e284da-4eba-4ec4-870e-74c0bb691322",
+                            "Id": 5491,
+                            "CreatedTime": "2026-08-11T16:47:02.6377882"
+                          }
+                        ]
+                      },
+                      "Id": 456,
+                      "CreatedTime": "2026-08-11T16:47:02.6376699"
+                    },
+                    {
+                      "$id": "84",
+                      "TenantId": 1,
+                      "DataSourceId": 1,
+                      "DataSource": {
+                        "$ref": "13"
+                      },
+                      "TableName": "wms_check_order_scan_info",
+                      "TableComment": "\u76D8\u70B9\u626B\u63CF\u660E\u7EC6",
+                      "BusinessDomain": null,
+                      "SearchText": "wms_check_order_scan_info \u76D8\u70B9\u626B\u63CF\u660E\u7EC6 wms_check_order_scan_info id \u4E3B\u952E bigint wms_check_order_scan_info material_id \u7269\u6599id bigint wms_check_order_scan_info material_code \u7269\u6599code varchar wms_check_order_scan_info material_name \u7269\u6599\u540D\u79F0 varchar wms_check_order_scan_info quantity \u6570\u91CF decimal wms_check_order_scan_info unit_id \u5355\u4F4Did bigint wms_check_order_scan_info check_by \u76D8\u70B9\u4EBAid bigint wms_check_order_scan_info check_name \u76D8\u70B9\u4EBA\u540D\u79F0 varchar wms_check_order_scan_info check_time \u76D8\u70B9\u65F6\u95F4 datetime wms_check_order_scan_info note \u5907\u6CE8 varchar wms_check_order_scan_info batch \u6279\u6B21 varchar wms_check_order_scan_info case_no \u7BB1\u53F7 varchar wms_check_order_scan_info warehouse \u4ED3\u5E93 int wms_check_order_scan_info shelf \u8D27\u67B6 int wms_check_order_scan_info check_order_id \u76D8\u70B9\u5355id bigint wms_check_order_scan_info create_by \u521B\u5EFA\u4EBAid bigint wms_check_order_scan_info create_name \u521B\u5EFA\u4EBA\u540D\u79F0 varchar wms_check_order_scan_info create_time \u521B\u5EFA\u65F6\u95F4 datetime wms_check_order_scan_info update_by \u66F4\u65B0\u4EBAid bigint wms_check_order_scan_info update_name \u66F4\u65B0\u4EBA\u540D\u79F0 varchar wms_check_order_scan_info update_time \u66F4\u65B0\u4EBA\u65F6\u95F4 datetime wms_check_order_scan_info del_flag \u662F\u5426\u5220\u9664\u6807\u8BC6\uFF1A0\u5426 1\u662F tinyint",
+                      "VectorId": "bf3ae893-cb7b-4b12-8db2-e844dbef1fac",
+                      "EmbeddingModel": null,
+                      "VectorDimension": null,
+                      "Columns": {
+                        "$id": "85",
+                        "$values": [
+                          {
+                            "$id": "86",
+                            "MetadataTableId": 443,
+                            "MetadataTable": {
+                              "$ref": "84"
+                            },
+                            "BusinessKey": null,
+                            "Semantic": {
+                              "$id": "87",
+                              "MetadataColumnId": 5269,
+                              "MetadataColumn": {
+                                "$ref": "86"
+                              },
+                              "BusinessMeaning": "\u626B\u7801\u8BB0\u5F55\u4E2D\u5B9E\u9645\u626B\u63CF\u6E05\u70B9\u51FA\u7684\u7269\u6599\u6570\u91CF",
+                              "Keywords": "\u6570\u91CF,\u626B\u7801\u6570\u91CF,\u5B9E\u626B\u6570\u91CF",
+                              "Synonyms": "\u626B\u63CF\u6570\u91CF,\u6E05\u70B9\u6570\u91CF",
+                              "ExampleQuestions": "\u626B\u7801\u626B\u4E86\u591A\u5C11\u4E2A\uFF1F,\u67E5\u770B\u626B\u7801\u6570\u91CF",
+                              "BusinessDomain": "\u4ED3\u50A8\u7BA1\u7406-\u76D8\u70B9\u626B\u7801",
+                              "Confidence": 0.9500,
+                              "Source": "AI",
+                              "SearchText": "\u8868:\r\nwms_check_order_scan_info\r\n\r\n\r\n\u5B57\u6BB5:\r\nquantity\r\n\r\n\r\n\u5B57\u6BB5\u8BF4\u660E:\r\n\u6570\u91CF\r\n\r\n\r\n\u4E1A\u52A1\u542B\u4E49:\r\n\u626B\u7801\u8BB0\u5F55\u4E2D\u5B9E\u9645\u626B\u63CF\u6E05\u70B9\u51FA\u7684\u7269\u6599\u6570\u91CF\r\n\r\n\r\n\u5173\u952E\u8BCD:\r\n\u6570\u91CF,\u626B\u7801\u6570\u91CF,\u5B9E\u626B\u6570\u91CF\r\n\r\n\r\n\u540C\u4E49\u8BCD:\r\n\u626B\u63CF\u6570\u91CF,\u6E05\u70B9\u6570\u91CF\r\n\r\n\r\n\u793A\u4F8B\u95EE\u9898:\r\n\u626B\u7801\u626B\u4E86\u591A\u5C11\u4E2A\uFF1F,\u67E5\u770B\u626B\u7801\u6570\u91CF\r\n\r\n\r\n\u4E1A\u52A1\u9886\u57DF:\r\n\u4ED3\u50A8\u7BA1\u7406-\u76D8\u70B9\u626B\u7801\r\n",
+                              "VectorId": "ebc9f13f-4d58-41e1-9547-7d0947bb82e7",
+                              "EmbeddingModel": null,
+                              "VectorDimension": null,
+                              "Id": 159,
+                              "CreatedTime": "2026-08-12T09:26:47.8121291"
+                            },
+                            "ColumnName": "quantity",
+                            "ColumnComment": "\u6570\u91CF",
+                            "DataType": "decimal",
+                            "Length": null,
+                            "IsNullable": true,
+                            "IsPrimaryKey": false,
+                            "SearchText": "wms_check_order_scan_info quantity \u6570\u91CF decimal",
+                            "VectorId": "32f49b2c-ec75-468b-b8ec-23e0d40e3ca1",
+                            "Id": 5269,
+                            "CreatedTime": "2026-08-11T16:47:02.6356859"
+                          }
+                        ]
+                      },
+                      "Id": 443,
+                      "CreatedTime": "2026-08-11T16:47:02.6355758"
+                    },
+                    {
+                      "$id": "88",
+                      "TenantId": 1,
+                      "DataSourceId": 1,
+                      "DataSource": {
+                        "$ref": "13"
+                      },
+                      "TableName": "wms_transfer_slip_info",
+                      "TableComment": "\u8C03\u62E8\u5355\u660E\u7EC6",
+                      "BusinessDomain": null,
+                      "SearchText": "wms_transfer_slip_info \u8C03\u62E8\u5355\u660E\u7EC6 wms_transfer_slip_info id \u4E3B\u952E bigint wms_transfer_slip_info transfer_slip_id \u8C03\u62E8\u5355id bigint wms_transfer_slip_info source_inventory_id \u6765\u6E90\u8D27\u67B6id bigint wms_transfer_slip_info source_shelf \u6765\u6E90\u8D27\u67B6 int wms_transfer_slip_info source_shelf_code \u6765\u6E90\u8D27\u67B6\u7F16\u7801 varchar wms_transfer_slip_info source_shelf_name \u6765\u6E90\u8D27\u67B6\u540D\u79F0 varchar wms_transfer_slip_info target_shelf \u76EE\u6807\u8D27\u67B6 int wms_transfer_slip_info target_shelf_code \u76EE\u6807\u8D27\u67B6\u7F16\u7801 varchar wms_transfer_slip_info target_shelf_name \u76EE\u6807\u8D27\u67B6\u540D\u79F0 varchar wms_transfer_slip_info material_id \u7269\u6599id bigint wms_transfer_slip_info material_name \u7269\u6599\u540D\u79F0 varchar wms_transfer_slip_info material_code \u7269\u6599\u7F16\u7801 varchar wms_transfer_slip_info quantity \u6570\u91CF decimal wms_transfer_slip_info unit \u5355\u4F4D bigint wms_transfer_slip_info associated_no \u5173\u8054\u5355\u636E varchar wms_transfer_slip_info batch \u6279\u6B21 varchar wms_transfer_slip_info case_no \u7BB1\u53F7 varchar wms_transfer_slip_info target_case_no \u76EE\u6807\u7BB1\u53F7 varchar wms_transfer_slip_info create_by \u521B\u5EFA\u4EBAid bigint wms_transfer_slip_info create_name \u521B\u5EFA\u4EBA\u540D\u79F0 varchar wms_transfer_slip_info create_time \u521B\u5EFA\u65F6\u95F4 datetime wms_transfer_slip_info update_by \u66F4\u65B0\u4EBAid bigint wms_transfer_slip_info update_name \u66F4\u65B0\u4EBA\u540D\u79F0 varchar wms_transfer_slip_info update_time \u66F4\u65B0\u4EBA\u65F6\u95F4 datetime wms_transfer_slip_info del_flag \u662F\u5426\u5220\u9664\u6807\u8BC6\uFF1A0\u5426 1\u662F tinyint",
+                      "VectorId": "f98b4638-0cd3-4d5e-9413-7e4d677abe35",
+                      "EmbeddingModel": null,
+                      "VectorDimension": null,
+                      "Columns": {
+                        "$id": "89",
+                        "$values": [
+                          {
+                            "$id": "90",
+                            "MetadataTableId": 461,
+                            "MetadataTable": {
+                              "$ref": "88"
+                            },
+                            "BusinessKey": null,
+                            "Semantic": {
+                              "$id": "91",
+                              "MetadataColumnId": 5590,
+                              "MetadataColumn": {
+                                "$ref": "90"
+                              },
+                              "BusinessMeaning": "\u79FB\u5E93\u5355\u4E2D\u7269\u6599\u5B9E\u9645\u8F6C\u79FB\u7684\u6570\u91CF",
+                              "Keywords": "\u6570\u91CF,\u8F6C\u79FB\u6570\u91CF,\u79FB\u5E93\u6570\u91CF",
+                              "Synonyms": "\u79FB\u5E93\u91CF,\u8C03\u62E8\u6570\u91CF,\u4EF6\u6570",
+                              "ExampleQuestions": "\u8FD9\u6B21\u79FB\u5E93\u7684\u6570\u91CF\u662F\u591A\u5C11\uFF1F,\u8F6C\u79FB\u4E86\u591A\u5C11\u4EF6\u7269\u6599\uFF1F",
+                              "BusinessDomain": "\u4ED3\u50A8\u7BA1\u7406",
+                              "Confidence": 0.9500,
+                              "Source": "AI",
+                              "SearchText": "\u8868:\r\nwms_transfer_slip_info\r\n\r\n\r\n\u5B57\u6BB5:\r\nquantity\r\n\r\n\r\n\u5B57\u6BB5\u8BF4\u660E:\r\n\u6570\u91CF\r\n\r\n\r\n\u4E1A\u52A1\u542B\u4E49:\r\n\u79FB\u5E93\u5355\u4E2D\u7269\u6599\u5B9E\u9645\u8F6C\u79FB\u7684\u6570\u91CF\r\n\r\n\r\n\u5173\u952E\u8BCD:\r\n\u6570\u91CF,\u8F6C\u79FB\u6570\u91CF,\u79FB\u5E93\u6570\u91CF\r\n\r\n\r\n\u540C\u4E49\u8BCD:\r\n\u79FB\u5E93\u91CF,\u8C03\u62E8\u6570\u91CF,\u4EF6\u6570\r\n\r\n\r\n\u793A\u4F8B\u95EE\u9898:\r\n\u8FD9\u6B21\u79FB\u5E93\u7684\u6570\u91CF\u662F\u591A\u5C11\uFF1F,\u8F6C\u79FB\u4E86\u591A\u5C11\u4EF6\u7269\u6599\uFF1F\r\n\r\n\r\n\u4E1A\u52A1\u9886\u57DF:\r\n\u4ED3\u50A8\u7BA1\u7406\r\n",
+                              "VectorId": "64efaeb9-334d-43d2-b083-1ae348e16661",
+                              "EmbeddingModel": null,
+                              "VectorDimension": null,
+                              "Id": 480,
+                              "CreatedTime": "2026-08-12T09:26:47.8589571"
+                            },
+                            "ColumnName": "quantity",
+                            "ColumnComment": "\u6570\u91CF",
+                            "DataType": "decimal",
+                            "Length": null,
+                            "IsNullable": false,
+                            "IsPrimaryKey": false,
+                            "SearchText": "wms_transfer_slip_info quantity \u6570\u91CF decimal",
+                            "VectorId": "dbac608d-2635-45f5-a8b6-3cef70411c7d",
+                            "Id": 5590,
+                            "CreatedTime": "2026-08-11T16:47:02.6388092"
+                          }
+                        ]
+                      },
+                      "Id": 461,
+                      "CreatedTime": "2026-08-11T16:47:02.6386769"
+                    },
+                    {
+                      "$id": "92",
+                      "TenantId": 1,
+                      "DataSourceId": 1,
+                      "DataSource": {
+                        "$ref": "13"
+                      },
+                      "TableName": "wms_inventory",
+                      "TableComment": "\u4ED3\u50A8\u5E93\u5B58",
+                      "BusinessDomain": null,
+                      "SearchText": "wms_inventory \u4ED3\u50A8\u5E93\u5B58 wms_inventory id \u4E3B\u952E bigint wms_inventory material_id \u7269\u6599id bigint wms_inventory material_name \u7269\u6599\u540D\u79F0 varchar wms_inventory material_code \u7269\u6599\u7F16\u7801 varchar wms_inventory warehouse_id \u4ED3\u5E93id int wms_inventory warehouse_code \u4ED3\u5E93\u7F16\u7801 varchar wms_inventory warehouse_name \u4ED3\u5E93\u540D\u79F0 varchar wms_inventory shelf_id \u8D27\u67B6id int wms_inventory shelf_code \u8D27\u67B6\u7F16\u7801 varchar wms_inventory shelf_name \u8D27\u67B6\u540D\u79F0 varchar wms_inventory total_quantity \u603B\u6570 decimal wms_inventory available_quantity \u53EF\u7528\u6570\u91CF decimal wms_inventory stock_quantity \u5728\u9014\u5E93\u5B58 decimal wms_inventory freeze_quantity \u51BB\u7ED3\u5E93\u5B58 decimal wms_inventory lock_quantity \u9501\u5B9A\u5E93\u5B58 decimal wms_inventory detection_quantity \u8D28\u68C0\u5E93\u5B58 decimal wms_inventory unit \u5355\u4F4Did bigint wms_inventory case_no \u7BB1\u53F7 varchar wms_inventory batch \u6279\u6B21 varchar wms_inventory pack_time \u6253\u5305\u65F6\u95F4 datetime wms_inventory create_by \u521B\u5EFA\u4EBAid bigint wms_inventory create_name \u521B\u5EFA\u4EBA\u540D\u79F0 varchar wms_inventory create_time \u521B\u5EFA\u65F6\u95F4 datetime wms_inventory update_by \u66F4\u65B0\u4EBAid bigint wms_inventory update_name \u66F4\u65B0\u4EBA\u540D\u79F0 varchar wms_inventory update_time \u66F4\u65B0\u4EBA\u65F6\u95F4 datetime wms_inventory del_flag \u662F\u5426\u5220\u9664\u6807\u8BC6\uFF1A0\u5426 1\u662F tinyint wms_inventory note \u5907\u6CE8 varchar",
+                      "VectorId": "ea63ba1f-290f-45ab-bba8-9dfeba290d95",
+                      "EmbeddingModel": null,
+                      "VectorDimension": null,
+                      "Columns": {
+                        "$id": "93",
+                        "$values": [
+                          {
+                            "$id": "94",
+                            "MetadataTableId": 448,
+                            "MetadataTable": {
+                              "$ref": "92"
+                            },
+                            "BusinessKey": null,
+                            "Semantic": {
+                              "$id": "95",
+                              "MetadataColumnId": 5351,
+                              "MetadataColumn": {
+                                "$ref": "94"
+                              },
+                              "BusinessMeaning": "\u6B63\u5728\u63A5\u53D7\u8D28\u91CF\u68C0\u9A8C\uFF0C\u5C1A\u672A\u5224\u5B9A\u5408\u683C\u4E0E\u5426\u7684\u5E93\u5B58\u6570\u91CF",
+                              "Keywords": "\u8D28\u68C0\u5E93\u5B58,\u8D28\u68C0\u6570\u91CF,\u5E93\u5B58",
+                              "Synonyms": "\u5F85\u68C0\u5E93\u5B58,\u68C0\u9A8C\u4E2D\u6570\u91CF",
+                              "ExampleQuestions": "\u8FD9\u4E2A\u7269\u6599\u8FD8\u6709\u591A\u5C11\u5728\u8D28\u68C0\u4E2D\uFF1F,\u5F85\u68C0\u9A8C\u7684\u5E93\u5B58\u6570\u91CF\u662F\u591A\u5C11\uFF1F",
+                              "BusinessDomain": "\u5E93\u5B58\u7BA1\u7406",
+                              "Confidence": 0.9500,
+                              "Source": "AI",
+                              "SearchText": "\u8868:\r\nwms_inventory\r\n\r\n\r\n\u5B57\u6BB5:\r\ndetection_quantity\r\n\r\n\r\n\u5B57\u6BB5\u8BF4\u660E:\r\n\u8D28\u68C0\u5E93\u5B58\r\n\r\n\r\n\u4E1A\u52A1\u542B\u4E49:\r\n\u6B63\u5728\u63A5\u53D7\u8D28\u91CF\u68C0\u9A8C\uFF0C\u5C1A\u672A\u5224\u5B9A\u5408\u683C\u4E0E\u5426\u7684\u5E93\u5B58\u6570\u91CF\r\n\r\n\r\n\u5173\u952E\u8BCD:\r\n\u8D28\u68C0\u5E93\u5B58,\u8D28\u68C0\u6570\u91CF,\u5E93\u5B58\r\n\r\n\r\n\u540C\u4E49\u8BCD:\r\n\u5F85\u68C0\u5E93\u5B58,\u68C0\u9A8C\u4E2D\u6570\u91CF\r\n\r\n\r\n\u793A\u4F8B\u95EE\u9898:\r\n\u8FD9\u4E2A\u7269\u6599\u8FD8\u6709\u591A\u5C11\u5728\u8D28\u68C0\u4E2D\uFF1F,\u5F85\u68C0\u9A8C\u7684\u5E93\u5B58\u6570\u91CF\u662F\u591A\u5C11\uFF1F\r\n\r\n\r\n\u4E1A\u52A1\u9886\u57DF:\r\n\u5E93\u5B58\u7BA1\u7406\r\n",
+                              "VectorId": "adf5e9d9-de5b-4924-b05e-6450e5e74cf2",
+                              "EmbeddingModel": null,
+                              "VectorDimension": null,
+                              "Id": 241,
+                              "CreatedTime": "2026-08-12T09:26:47.824202"
+                            },
+                            "ColumnName": "detection_quantity",
+                            "ColumnComment": "\u8D28\u68C0\u5E93\u5B58",
+                            "DataType": "decimal",
+                            "Length": null,
+                            "IsNullable": false,
+                            "IsPrimaryKey": false,
+                            "SearchText": "wms_inventory detection_quantity \u8D28\u68C0\u5E93\u5B58 decimal",
+                            "VectorId": "74a4c601-e23d-4e92-970a-1b43795c3437",
+                            "Id": 5351,
+                            "CreatedTime": "2026-08-11T16:47:02.6364649"
+                          },
+                          {
+                            "$id": "96",
+                            "MetadataTableId": 448,
+                            "MetadataTable": {
+                              "$ref": "92"
+                            },
+                            "BusinessKey": null,
+                            "Semantic": {
+                              "$id": "97",
+                              "MetadataColumnId": 5346,
+                              "MetadataColumn": {
+                                "$ref": "96"
+                              },
+                              "BusinessMeaning": "\u5E93\u5B58\u7684\u603B\u6570\u91CF\uFF08\u5305\u542B\u53EF\u7528\u3001\u9501\u5B9A\u3001\u5728\u9014\u3001\u51BB\u7ED3\u7B49\u6240\u6709\u72B6\u6001\u7684\u6570\u91CF\uFF09",
+                              "Keywords": "\u603B\u6570\u91CF,\u5E93\u5B58\u603B\u6570,\u5E93\u5B58",
+                              "Synonyms": "\u603B\u5E93\u5B58,\u603B\u5E93\u5B58\u91CF,\u8D26\u9762\u5E93\u5B58",
+                              "ExampleQuestions": "\u8FD9\u4E2A\u7269\u6599\u7684\u603B\u5E93\u5B58\u662F\u591A\u5C11\uFF1F,\u76EE\u524D\u4ED3\u5E93\u91CC\u8BE5\u5546\u54C1\u4E00\u5171\u6709\u591A\u5C11\uFF1F",
+                              "BusinessDomain": "\u5E93\u5B58\u7BA1\u7406",
+                              "Confidence": 0.9500,
+                              "Source": "AI",
+                              "SearchText": "\u8868:\r\nwms_inventory\r\n\r\n\r\n\u5B57\u6BB5:\r\ntotal_quantity\r\n\r\n\r\n\u5B57\u6BB5\u8BF4\u660E:\r\n\u603B\u6570\r\n\r\n\r\n\u4E1A\u52A1\u542B\u4E49:\r\n\u5E93\u5B58\u7684\u603B\u6570\u91CF\uFF08\u5305\u542B\u53EF\u7528\u3001\u9501\u5B9A\u3001\u5728\u9014\u3001\u51BB\u7ED3\u7B49\u6240\u6709\u72B6\u6001\u7684\u6570\u91CF\uFF09\r\n\r\n\r\n\u5173\u952E\u8BCD:\r\n\u603B\u6570\u91CF,\u5E93\u5B58\u603B\u6570,\u5E93\u5B58\r\n\r\n\r\n\u540C\u4E49\u8BCD:\r\n\u603B\u5E93\u5B58,\u603B\u5E93\u5B58\u91CF,\u8D26\u9762\u5E93\u5B58\r\n\r\n\r\n\u793A\u4F8B\u95EE\u9898:\r\n\u8FD9\u4E2A\u7269\u6599\u7684\u603B\u5E93\u5B58\u662F\u591A\u5C11\uFF1F,\u76EE\u524D\u4ED3\u5E93\u91CC\u8BE5\u5546\u54C1\u4E00\u5171\u6709\u591A\u5C11\uFF1F\r\n\r\n\r\n\u4E1A\u52A1\u9886\u57DF:\r\n\u5E93\u5B58\u7BA1\u7406\r\n",
+                              "VectorId": "c0b8f676-5820-4d21-b442-75cd8be4bf34",
+                              "EmbeddingModel": null,
+                              "VectorDimension": null,
+                              "Id": 236,
+                              "CreatedTime": "2026-08-12T09:26:47.8234614"
+                            },
+                            "ColumnName": "total_quantity",
+                            "ColumnComment": "\u603B\u6570",
+                            "DataType": "decimal",
+                            "Length": null,
+                            "IsNullable": false,
+                            "IsPrimaryKey": false,
+                            "SearchText": "wms_inventory total_quantity \u603B\u6570 decimal",
+                            "VectorId": "bf75688b-6995-4464-8d58-b18ccf5de854",
+                            "Id": 5346,
+                            "CreatedTime": "2026-08-11T16:47:02.6364502"
+                          }
+                        ]
+                      },
+                      "Id": 448,
+                      "CreatedTime": "2026-08-11T16:47:02.6363409"
+                    },
+                    {
+                      "$id": "98",
+                      "TenantId": 1,
+                      "DataSourceId": 1,
+                      "DataSource": {
+                        "$ref": "13"
+                      },
+                      "TableName": "wms_logistics_detail",
+                      "TableComment": "\u7269\u6D41\u5355\u8BE6\u60C5",
+                      "BusinessDomain": null,
+                      "SearchText": "wms_logistics_detail \u7269\u6D41\u5355\u8BE6\u60C5 wms_logistics_detail id \u4E3B\u952E bigint wms_logistics_detail logistics_id \u7269\u6D41\u5355id bigint wms_logistics_detail material_id \u7269\u6599id bigint wms_logistics_detail shipped_quantity \u53D1\u8D27\u6570\u91CF decimal wms_logistics_detail aog_quantity \u5230\u8D27\u6570\u91CF decimal wms_logistics_detail weight \u91CD\u91CF decimal wms_logistics_detail volume \u4F53\u79EF decimal wms_logistics_detail weight_unit \u91CD\u91CF\u5355\u4F4D bigint wms_logistics_detail volume_unit \u4F53\u79EF\u5355\u4F4D bigint wms_logistics_detail associated_no \u5173\u8054\u5355\u636E varchar wms_logistics_detail batch \u6279\u6B21 varchar wms_logistics_detail case_no \u7BB1\u53F7 varchar wms_logistics_detail unpack_flag \u662F\u5426\u62C6\u5305\u88C5\uFF080\uFF1A\u5426  1\uFF1A\u662F\uFF09 tinyint wms_logistics_detail pack_quantity \u5305\u88C5\u6570\u91CF int wms_logistics_detail unit_pack_quantity \u5355\u4F4D\u5305\u88C5\u6570\u91CF int wms_logistics_detail unit_id \u5355\u4F4Did bigint wms_logistics_detail create_by \u521B\u5EFA\u4EBAid bigint wms_logistics_detail create_name \u521B\u5EFA\u4EBA\u540D\u79F0 varchar wms_logistics_detail create_time \u521B\u5EFA\u65F6\u95F4 datetime wms_logistics_detail update_by \u66F4\u65B0\u4EBAid bigint wms_logistics_detail update_name \u66F4\u65B0\u4EBA\u540D\u79F0 varchar wms_logistics_detail update_time \u66F4\u65B0\u4EBA\u65F6\u95F4 datetime wms_logistics_detail del_flag \u662F\u5426\u5220\u9664\u6807\u8BC6\uFF1A0\u5426 1\u662F tinyint",
+                      "VectorId": "d632fb55-6507-45b1-bf5d-94817a5d8e60",
+                      "EmbeddingModel": null,
+                      "VectorDimension": null,
+                      "Columns": {
+                        "$id": "99",
+                        "$values": [
+                          {
+                            "$id": "100",
+                            "MetadataTableId": 450,
+                            "MetadataTable": {
+                              "$ref": "98"
+                            },
+                            "BusinessKey": null,
+                            "Semantic": {
+                              "$id": "101",
+                              "MetadataColumnId": 5401,
+                              "MetadataColumn": {
+                                "$ref": "100"
+                              },
+                              "BusinessMeaning": "\u7269\u6D41\u8D27\u7269\u7684\u603B\u5305\u88C5\u6570\u91CF",
+                              "Keywords": "\u5305\u88C5\u6570\u91CF,\u4EF6\u6570,\u7BB1\u6570",
+                              "Synonyms": "\u603B\u4EF6\u6570,\u5305\u88F9\u6570",
+                              "ExampleQuestions": "\u8FD9\u6279\u7269\u6D41\u4E00\u5171\u6709\u591A\u5C11\u4EF6\u5305\u88C5\uFF1F;\u7269\u6D41\u660E\u7EC6\u7684\u5305\u88C5\u6570\u91CF\u662F\u591A\u5C11\uFF1F",
+                              "BusinessDomain": "\u7269\u6D41\u7BA1\u7406",
+                              "Confidence": 0.9500,
+                              "Source": "AI",
+                              "SearchText": "\u8868:\r\nwms_logistics_detail\r\n\r\n\r\n\u5B57\u6BB5:\r\npack_quantity\r\n\r\n\r\n\u5B57\u6BB5\u8BF4\u660E:\r\n\u5305\u88C5\u6570\u91CF\r\n\r\n\r\n\u4E1A\u52A1\u542B\u4E49:\r\n\u7269\u6D41\u8D27\u7269\u7684\u603B\u5305\u88C5\u6570\u91CF\r\n\r\n\r\n\u5173\u952E\u8BCD:\r\n\u5305\u88C5\u6570\u91CF,\u4EF6\u6570,\u7BB1\u6570\r\n\r\n\r\n\u540C\u4E49\u8BCD:\r\n\u603B\u4EF6\u6570,\u5305\u88F9\u6570\r\n\r\n\r\n\u793A\u4F8B\u95EE\u9898:\r\n\u8FD9\u6279\u7269\u6D41\u4E00\u5171\u6709\u591A\u5C11\u4EF6\u5305\u88C5\uFF1F;\u7269\u6D41\u660E\u7EC6\u7684\u5305\u88C5\u6570\u91CF\u662F\u591A\u5C11\uFF1F\r\n\r\n\r\n\u4E1A\u52A1\u9886\u57DF:\r\n\u7269\u6D41\u7BA1\u7406\r\n",
+                              "VectorId": "647b057b-a28d-4667-b8b4-5da718225309",
+                              "EmbeddingModel": null,
+                              "VectorDimension": null,
+                              "Id": 291,
+                              "CreatedTime": "2026-08-12T09:26:47.8322386"
+                            },
+                            "ColumnName": "pack_quantity",
+                            "ColumnComment": "\u5305\u88C5\u6570\u91CF",
+                            "DataType": "int",
+                            "Length": null,
+                            "IsNullable": true,
+                            "IsPrimaryKey": false,
+                            "SearchText": "wms_logistics_detail pack_quantity \u5305\u88C5\u6570\u91CF int",
+                            "VectorId": "32066d3a-e1bc-4f29-970b-7836ee9bd7f2",
+                            "Id": 5401,
+                            "CreatedTime": "2026-08-11T16:47:02.6368506"
+                          }
+                        ]
+                      },
+                      "Id": 450,
+                      "CreatedTime": "2026-08-11T16:47:02.6367102"
+                    },
+                    {
+                      "$id": "102",
+                      "TenantId": 1,
+                      "DataSourceId": 1,
+                      "DataSource": {
+                        "$ref": "13"
+                      },
+                      "TableName": "wms_warehouse_material_allocation",
+                      "TableComment": "\u4ED3\u50A8\u7269\u6599\u914D\u7F6E",
+                      "BusinessDomain": null,
+                      "SearchText": "wms_warehouse_material_allocation \u4ED3\u50A8\u7269\u6599\u914D\u7F6E wms_warehouse_material_allocation id \u4E3B\u952E bigint wms_warehouse_material_allocation material_id \u7269\u6599id bigint wms_warehouse_material_allocation material_code \u7269\u6599\u7F16\u7801 varchar wms_warehouse_material_allocation material_name \u7269\u6599\u540D\u79F0 varchar wms_warehouse_material_allocation safe_inventory \u5B89\u5168\u5E93\u5B58 decimal wms_warehouse_material_allocation batch_delivery_quantity \u6279\u6B21\u9001\u8D27\u91CF decimal wms_warehouse_material_allocation delivery_period \u9001\u8D27\u5468\u671F decimal wms_warehouse_material_allocation delivery_period_unit \u9001\u8D27\u5468\u671F\u5355\u4F4D bigint wms_warehouse_material_allocation create_by \u521B\u5EFA\u4EBAid bigint wms_warehouse_material_allocation create_name \u521B\u5EFA\u4EBA\u540D\u79F0 varchar wms_warehouse_material_allocation create_time \u521B\u5EFA\u65F6\u95F4 datetime wms_warehouse_material_allocation update_by \u66F4\u65B0\u4EBAid bigint wms_warehouse_material_allocation update_name \u66F4\u65B0\u4EBA\u540D\u79F0 varchar wms_warehouse_material_allocation update_time \u66F4\u65B0\u4EBA\u65F6\u95F4 datetime wms_warehouse_material_allocation del_flag \u662F\u5426\u5220\u9664\u6807\u8BC6\uFF1A0\u5426 1\u662F tinyint wms_warehouse_material_allocation note \u5907\u6CE8 varchar",
+                      "VectorId": "2842c0d5-861e-4853-ba85-6c2e76e33935",
+                      "EmbeddingModel": null,
+                      "VectorDimension": null,
+                      "Columns": {
+                        "$id": "103",
+                        "$values": [
+                          {
+                            "$id": "104",
+                            "MetadataTableId": 462,
+                            "MetadataTable": {
+                              "$ref": "102"
+                            },
+                            "BusinessKey": null,
+                            "Semantic": {
+                              "$id": "105",
+                              "MetadataColumnId": 5608,
+                              "MetadataColumn": {
+                                "$ref": "104"
+                              },
+                              "BusinessMeaning": "\u4ED3\u5E93\u7269\u6599\u5206\u914D\u914D\u7F6E\u4E2D\u8BBE\u5B9A\u7684\u6BCF\u6B21\u8865\u8D27\u6216\u9001\u8D27\u7684\u6807\u51C6\u6279\u6B21\u6570\u91CF",
+                              "Keywords": "\u6279\u6B21\u9001\u8D27\u91CF,\u5355\u6B21\u9001\u8D27\u91CF,\u8865\u8D27\u6279\u91CF",
+                              "Synonyms": "\u6BCF\u6B21\u9001\u8D27\u6570\u91CF,\u6279\u6B21\u8865\u8D27\u91CF,\u6807\u51C6\u9001\u8D27\u91CF",
+                              "ExampleQuestions": "\u6BCF\u6B21\u9001\u8D27\u7684\u6570\u91CF\u662F\u591A\u5C11\uFF1F,\u6279\u6B21\u8865\u8D27\u91CF\u8BBE\u5B9A\u4E3A\u591A\u5C11\uFF1F",
+                              "BusinessDomain": "\u5E93\u5B58\u7BA1\u7406",
+                              "Confidence": 0.9500,
+                              "Source": "AI",
+                              "SearchText": "\u8868:\r\nwms_warehouse_material_allocation\r\n\r\n\r\n\u5B57\u6BB5:\r\nbatch_delivery_quantity\r\n\r\n\r\n\u5B57\u6BB5\u8BF4\u660E:\r\n\u6279\u6B21\u9001\u8D27\u91CF\r\n\r\n\r\n\u4E1A\u52A1\u542B\u4E49:\r\n\u4ED3\u5E93\u7269\u6599\u5206\u914D\u914D\u7F6E\u4E2D\u8BBE\u5B9A\u7684\u6BCF\u6B21\u8865\u8D27\u6216\u9001\u8D27\u7684\u6807\u51C6\u6279\u6B21\u6570\u91CF\r\n\r\n\r\n\u5173\u952E\u8BCD:\r\n\u6279\u6B21\u9001\u8D27\u91CF,\u5355\u6B21\u9001\u8D27\u91CF,\u8865\u8D27\u6279\u91CF\r\n\r\n\r\n\u540C\u4E49\u8BCD:\r\n\u6BCF\u6B21\u9001\u8D27\u6570\u91CF,\u6279\u6B21\u8865\u8D27\u91CF,\u6807\u51C6\u9001\u8D27\u91CF\r\n\r\n\r\n\u793A\u4F8B\u95EE\u9898:\r\n\u6BCF\u6B21\u9001\u8D27\u7684\u6570\u91CF\u662F\u591A\u5C11\uFF1F,\u6279\u6B21\u8865\u8D27\u91CF\u8BBE\u5B9A\u4E3A\u591A\u5C11\uFF1F\r\n\r\n\r\n\u4E1A\u52A1\u9886\u57DF:\r\n\u5E93\u5B58\u7BA1\u7406\r\n",
+                              "VectorId": "dc45101a-0b4c-48db-b105-91d9df841db1",
+                              "EmbeddingModel": null,
+                              "VectorDimension": null,
+                              "Id": 498,
+                              "CreatedTime": "2026-08-12T09:26:47.861745"
+                            },
+                            "ColumnName": "batch_delivery_quantity",
+                            "ColumnComment": "\u6279\u6B21\u9001\u8D27\u91CF",
+                            "DataType": "decimal",
+                            "Length": null,
+                            "IsNullable": false,
+                            "IsPrimaryKey": false,
+                            "SearchText": "wms_warehouse_material_allocation batch_delivery_quantity \u6279\u6B21\u9001\u8D27\u91CF decimal",
+                            "VectorId": "38d64aff-e949-4fe8-b6f3-e2c72aa2bff9",
+                            "Id": 5608,
+                            "CreatedTime": "2026-08-11T16:47:02.6389789"
+                          }
+                        ]
+                      },
+                      "Id": 462,
+                      "CreatedTime": "2026-08-11T16:47:02.6388593"
+                    }
+                  ]
+                },
+                "Id": 1,
+                "CreatedTime": "2026-08-10T16:28:18.01"
+              },
+              "TableName": "wms_delivery_receipt_info",
+              "TableComment": "\u51FA\u5E93\u5355\u660E\u7EC6",
+              "BusinessDomain": null,
+              "SearchText": "wms_delivery_receipt_info \u51FA\u5E93\u5355\u660E\u7EC6 wms_delivery_receipt_info id \u4E3B\u952E bigint wms_delivery_receipt_info material_id \u7269\u6599id bigint wms_delivery_receipt_info inventory_id \u5E93\u5B58id bigint wms_delivery_receipt_info quantity \u6570\u91CF decimal wms_delivery_receipt_info delivery_receipt_id \u51FA\u5E93\u5355id bigint wms_delivery_receipt_info associated_no \u5173\u8054\u5355\u636E varchar wms_delivery_receipt_info create_by \u521B\u5EFA\u4EBAid bigint wms_delivery_receipt_info create_name \u521B\u5EFA\u4EBA\u540D\u79F0 varchar wms_delivery_receipt_info create_time \u521B\u5EFA\u65F6\u95F4 datetime wms_delivery_receipt_info update_by \u66F4\u65B0\u4EBAid bigint wms_delivery_receipt_info update_name \u66F4\u65B0\u4EBA\u540D\u79F0 varchar wms_delivery_receipt_info update_time \u66F4\u65B0\u4EBA\u65F6\u95F4 datetime wms_delivery_receipt_info del_flag \u662F\u5426\u5220\u9664\u6807\u8BC6\uFF1A0\u5426 1\u662F tinyint",
+              "VectorId": "62e2d731-6de7-4618-901f-04da1a5255d8",
+              "EmbeddingModel": null,
+              "VectorDimension": null,
+              "Columns": {
+                "$id": "106",
+                "$values": [
+                  {
+                    "$id": "107",
+                    "MetadataTableId": 447,
+                    "MetadataTable": {
+                      "$ref": "12"
+                    },
+                    "BusinessKey": null,
+                    "Semantic": {
+                      "$id": "108",
+                      "MetadataColumnId": 5326,
+                      "MetadataColumn": {
+                        "$ref": "107"
+                      },
+                      "BusinessMeaning": "\u51FA\u5E93\u5355\u660E\u7EC6\u7684\u5B9E\u9645\u51FA\u5E93\u6570\u91CF",
+                      "Keywords": "\u6570\u91CF,\u51FA\u5E93\u6570\u91CF,\u51FA\u5E93\u5355\u660E\u7EC6",
+                      "Synonyms": "\u51FA\u5E93\u6570,\u53D1\u8D27\u6570\u91CF",
+                      "ExampleQuestions": "\u8FD9\u6761\u51FA\u5E93\u660E\u7EC6\u7684\u51FA\u5E93\u6570\u91CF\u662F\u591A\u5C11\uFF1F,\u8FD9\u4E2A\u7269\u6599\u51FA\u4E86\u591A\u5C11\u4E2A\uFF1F",
+                      "BusinessDomain": "\u4ED3\u50A8\u51FA\u5E93\u7BA1\u7406",
+                      "Confidence": 0.9800,
+                      "Source": "AI",
+                      "SearchText": "\u8868:\r\nwms_delivery_receipt_info\r\n\r\n\r\n\u5B57\u6BB5:\r\nquantity\r\n\r\n\r\n\u5B57\u6BB5\u8BF4\u660E:\r\n\u6570\u91CF\r\n\r\n\r\n\u4E1A\u52A1\u542B\u4E49:\r\n\u51FA\u5E93\u5355\u660E\u7EC6\u7684\u5B9E\u9645\u51FA\u5E93\u6570\u91CF\r\n\r\n\r\n\u5173\u952E\u8BCD:\r\n\u6570\u91CF,\u51FA\u5E93\u6570\u91CF,\u51FA\u5E93\u5355\u660E\u7EC6\r\n\r\n\r\n\u540C\u4E49\u8BCD:\r\n\u51FA\u5E93\u6570,\u53D1\u8D27\u6570\u91CF\r\n\r\n\r\n\u793A\u4F8B\u95EE\u9898:\r\n\u8FD9\u6761\u51FA\u5E93\u660E\u7EC6\u7684\u51FA\u5E93\u6570\u91CF\u662F\u591A\u5C11\uFF1F,\u8FD9\u4E2A\u7269\u6599\u51FA\u4E86\u591A\u5C11\u4E2A\uFF1F\r\n\r\n\r\n\u4E1A\u52A1\u9886\u57DF:\r\n\u4ED3\u50A8\u51FA\u5E93\u7BA1\u7406\r\n",
+                      "VectorId": "ab1611ad-7122-4a82-a9ca-897990fc838d",
+                      "EmbeddingModel": null,
+                      "VectorDimension": null,
+                      "Id": 216,
+                      "CreatedTime": "2026-08-12T09:26:47.8204295"
+                    },
+                    "ColumnName": "quantity",
+                    "ColumnComment": "\u6570\u91CF",
+                    "DataType": "decimal",
+                    "Length": null,
+                    "IsNullable": false,
+                    "IsPrimaryKey": false,
+                    "SearchText": "wms_delivery_receipt_info quantity \u6570\u91CF decimal",
+                    "VectorId": "83e1c86c-3bb5-4ddd-8297-659ceba0674e",
+                    "Id": 5326,
+                    "CreatedTime": "2026-08-11T16:47:02.6362965"
+                  }
+                ]
+              },
+              "Id": 447,
+              "CreatedTime": "2026-08-11T16:47:02.6362009"
+            },
+            "Column": {
+              "$ref": "107"
+            },
+            "Semantic": {
+              "$ref": "108"
+            },
+            "Score": 0.6815254092216492,
+            "IsTableVector": false,
+            "IsColumnVector": false,
+            "IsSemanticVector": true
+          },
+          {
+            "$id": "109",
+            "VectorType": "semantic",
+            "VectorId": "a5e3258b-eaf8-8d8b-fc74-32b2bb88c22a",
+            "Table": {
+              "$ref": "72"
+            },
+            "Column": {
+              "$ref": "74"
+            },
+            "Semantic": {
+              "$ref": "75"
+            },
+            "Score": 0.6778805255889893,
+            "IsTableVector": false,
+            "IsColumnVector": false,
+            "IsSemanticVector": true
+          },
+          {
+            "$id": "110",
+            "VectorType": "semantic",
+            "VectorId": "423e1b38-818f-4096-077b-f93b6a039716",
+            "Table": {
+              "$ref": "76"
+            },
+            "Column": {
+              "$ref": "78"
+            },
+            "Semantic": {
+              "$ref": "79"
+            },
+            "Score": 0.6705687046051025,
+            "IsTableVector": false,
+            "IsColumnVector": false,
+            "IsSemanticVector": true
+          },
+          {
+            "$id": "111",
+            "VectorType": "semantic",
+            "VectorId": "51bac55b-a53a-2b93-f6f9-ad58b9054e7a",
+            "Table": {
+              "$ref": "84"
+            },
+            "Column": {
+              "$ref": "86"
+            },
+            "Semantic": {
+              "$ref": "87"
+            },
+            "Score": 0.6558847427368164,
+            "IsTableVector": false,
+            "IsColumnVector": false,
+            "IsSemanticVector": true
+          },
+          {
+            "$id": "112",
+            "VectorType": "semantic",
+            "VectorId": "d02ec397-5884-2135-7d67-da3f3471939c",
+            "Table": {
+              "$ref": "15"
+            },
+            "Column": {
+              "$ref": "17"
+            },
+            "Semantic": {
+              "$ref": "18"
+            },
+            "Score": 0.6531980037689209,
+            "IsTableVector": false,
+            "IsColumnVector": false,
+            "IsSemanticVector": true
+          },
+          {
+            "$id": "113",
+            "VectorType": "semantic",
+            "VectorId": "f70d7acf-412b-ae0a-11fd-8d4c546b48c3",
+            "Table": {
+              "$ref": "88"
+            },
+            "Column": {
+              "$ref": "90"
+            },
+            "Semantic": {
+              "$ref": "91"
+            },
+            "Score": 0.6387395858764648,
+            "IsTableVector": false,
+            "IsColumnVector": false,
+            "IsSemanticVector": true
+          },
+          {
+            "$id": "114",
+            "VectorType": "column",
+            "VectorId": "64e70df6-cfa6-1293-13df-e1cfaf15987b",
+            "Table": {
+              "$ref": "76"
+            },
+            "Column": {
+              "$ref": "78"
+            },
+            "Semantic": {
+              "$ref": "79"
+            },
+            "Score": 0.6325372457504272,
+            "IsTableVector": false,
+            "IsColumnVector": true,
+            "IsSemanticVector": false
+          },
+          {
+            "$id": "115",
+            "VectorType": "column",
+            "VectorId": "0059c06b-0d8f-728b-6100-02cc563afc15",
+            "Table": {
+              "$ref": "92"
+            },
+            "Column": {
+              "$ref": "94"
+            },
+            "Semantic": {
+              "$ref": "95"
+            },
+            "Score": 0.6318013072013855,
+            "IsTableVector": false,
+            "IsColumnVector": true,
+            "IsSemanticVector": false
+          },
+          {
+            "$id": "116",
+            "VectorType": "semantic",
+            "VectorId": "810a2665-2d32-c257-5f49-162216774903",
+            "Table": {
+              "$ref": "76"
+            },
+            "Column": {
+              "$ref": "80"
+            },
+            "Semantic": {
+              "$ref": "81"
+            },
+            "Score": 0.6285783052444458,
+            "IsTableVector": false,
+            "IsColumnVector": false,
+            "IsSemanticVector": true
+          },
+          {
+            "$id": "117",
+            "VectorType": "semantic",
+            "VectorId": "2ce0534b-e09a-a7f1-df50-c6bb142a8eb9",
+            "Table": {
+              "$ref": "98"
+            },
+            "Column": {
+              "$ref": "100"
+            },
+            "Semantic": {
+              "$ref": "101"
+            },
+            "Score": 0.6282474994659424,
+            "IsTableVector": false,
+            "IsColumnVector": false,
+            "IsSemanticVector": true
+          }
+        ]
+      },
+      "quantity": {
+        "$id": "118",
+        "$values": [
+          {
+            "$id": "119",
+            "VectorType": "semantic",
+            "VectorId": "a5e3258b-eaf8-8d8b-fc74-32b2bb88c22a",
+            "Table": {
+              "$ref": "72"
+            },
+            "Column": {
+              "$ref": "74"
+            },
+            "Semantic": {
+              "$ref": "75"
+            },
+            "Score": 0.6673180460929871,
+            "IsTableVector": false,
+            "IsColumnVector": false,
+            "IsSemanticVector": true
+          },
+          {
+            "$id": "120",
+            "VectorType": "semantic",
+            "VectorId": "423e1b38-818f-4096-077b-f93b6a039716",
+            "Table": {
+              "$ref": "76"
+            },
+            "Column": {
+              "$ref": "78"
+            },
+            "Semantic": {
+              "$ref": "79"
+            },
+            "Score": 0.6504477858543396,
+            "IsTableVector": false,
+            "IsColumnVector": false,
+            "IsSemanticVector": true
+          },
+          {
+            "$id": "121",
+            "VectorType": "semantic",
+            "VectorId": "faee9f43-2a09-0b49-51b0-e77c9805fb93",
+            "Table": {
+              "$ref": "12"
+            },
+            "Column": {
+              "$ref": "107"
+            },
+            "Semantic": {
+              "$ref": "108"
+            },
+            "Score": 0.6452804207801819,
+            "IsTableVector": false,
+            "IsColumnVector": false,
+            "IsSemanticVector": true
+          },
+          {
+            "$id": "122",
+            "VectorType": "semantic",
+            "VectorId": "c3ed9f91-8b87-e60d-1c98-25cb3b923ee5",
+            "Table": {
+              "$ref": "102"
+            },
+            "Column": {
+              "$ref": "104"
+            },
+            "Semantic": {
+              "$ref": "105"
+            },
+            "Score": 0.6383862495422363,
+            "IsTableVector": false,
+            "IsColumnVector": false,
+            "IsSemanticVector": true
+          },
+          {
+            "$id": "123",
+            "VectorType": "column",
+            "VectorId": "ca5b8495-c993-233c-1d52-5cf5ac0b72b3",
+            "Table": {
+              "$ref": "72"
+            },
+            "Column": {
+              "$ref": "74"
+            },
+            "Semantic": {
+              "$ref": "75"
+            },
+            "Score": 0.635708749294281,
+            "IsTableVector": false,
+            "IsColumnVector": true,
+            "IsSemanticVector": false
+          },
+          {
+            "$id": "124",
+            "VectorType": "column",
+            "VectorId": "0059c06b-0d8f-728b-6100-02cc563afc15",
+            "Table": {
+              "$ref": "92"
+            },
+            "Column": {
+              "$ref": "94"
+            },
+            "Semantic": {
+              "$ref": "95"
+            },
+            "Score": 0.6292976140975952,
+            "IsTableVector": false,
+            "IsColumnVector": true,
+            "IsSemanticVector": false
+          },
+          {
+            "$id": "125",
+            "VectorType": "semantic",
+            "VectorId": "d02ec397-5884-2135-7d67-da3f3471939c",
+            "Table": {
+              "$ref": "15"
+            },
+            "Column": {
+              "$ref": "17"
+            },
+            "Semantic": {
+              "$ref": "18"
+            },
+            "Score": 0.6232203245162964,
+            "IsTableVector": false,
+            "IsColumnVector": false,
+            "IsSemanticVector": true
+          },
+          {
+            "$id": "126",
+            "VectorType": "semantic",
+            "VectorId": "51bac55b-a53a-2b93-f6f9-ad58b9054e7a",
+            "Table": {
+              "$ref": "84"
+            },
+            "Column": {
+              "$ref": "86"
+            },
+            "Semantic": {
+              "$ref": "87"
+            },
+            "Score": 0.6213905215263367,
+            "IsTableVector": false,
+            "IsColumnVector": false,
+            "IsSemanticVector": true
+          },
+          {
+            "$id": "127",
+            "VectorType": "column",
+            "VectorId": "cacafb46-9bb8-ca3a-a7e8-3726184b4133",
+            "Table": {
+              "$ref": "76"
+            },
+            "Column": {
+              "$ref": "82"
+            },
+            "Semantic": {
+              "$ref": "83"
+            },
+            "Score": 0.6189060211181641,
+            "IsTableVector": false,
+            "IsColumnVector": true,
+            "IsSemanticVector": false
+          },
+          {
+            "$id": "128",
+            "VectorType": "column",
+            "VectorId": "8d8b2177-4139-cfbd-cf92-b090fd405d6b",
+            "Table": {
+              "$ref": "92"
+            },
+            "Column": {
+              "$ref": "96"
+            },
+            "Semantic": {
+              "$ref": "97"
+            },
+            "Score": 0.6140420436859131,
+            "IsTableVector": false,
+            "IsColumnVector": true,
+            "IsSemanticVector": false
+          }
+        ]
+      }
+    },
+    "Candidates": {
+      "$id": "129",
+      "$values": [
+        {
+          "$id": "130",
+          "TableId": 456,
+          "TableName": "wms_sign_feedback",
+          "MatchedColumns": 3,
+          "ColumnScore": 0.6705719828605652,
+          "TableScore": 0,
+          "Boost": 0,
+          "LocalMatch": 5,
+          "FinalScore": 133.35285991430283
+        },
+        {
+          "$id": "131",
+          "TableId": 448,
+          "TableName": "wms_inventory",
+          "MatchedColumns": 2,
+          "ColumnScore": 0.6318454742431641,
+          "TableScore": 0,
+          "Boost": 0,
+          "LocalMatch": 4,
+          "FinalScore": 103.15922737121582
+        },
+        {
+          "$id": "132",
+          "TableId": 458,
+          "TableName": "wms_storage_receipt_info",
+          "MatchedColumns": 1,
+          "ColumnScore": 0.6532235145568848,
+          "TableScore": 0,
+          "Boost": 0,
+          "LocalMatch": 3,
+          "FinalScore": 73.26611757278442
+        },
+        {
+          "$id": "133",
+          "TableId": 447,
+          "TableName": "wms_delivery_receipt_info",
+          "MatchedColumns": 1,
+          "ColumnScore": 0.6815499067306519,
+          "TableScore": 0,
+          "Boost": 0,
+          "LocalMatch": 2,
+          "FinalScore": 53.40774953365326
+        },
+        {
+          "$id": "134",
+          "TableId": 442,
+          "TableName": "wms_check_order_info",
+          "MatchedColumns": 1,
+          "ColumnScore": 0.6779302358627319,
+          "TableScore": 0,
+          "Boost": 0,
+          "LocalMatch": 2,
+          "FinalScore": 53.38965117931366
+        },
+        {
+          "$id": "135",
+          "TableId": 443,
+          "TableName": "wms_check_order_scan_info",
+          "MatchedColumns": 1,
+          "ColumnScore": 0.6558816432952881,
+          "TableScore": 0,
+          "Boost": 0,
+          "LocalMatch": 2,
+          "FinalScore": 53.27940821647644
+        },
+        {
+          "$id": "136",
+          "TableId": 461,
+          "TableName": "wms_transfer_slip_info",
+          "MatchedColumns": 1,
+          "ColumnScore": 0.638733983039856,
+          "TableScore": 0,
+          "Boost": 0,
+          "LocalMatch": 2,
+          "FinalScore": 53.19366991519928
+        },
+        {
+          "$id": "137",
+          "TableId": 462,
+          "TableName": "wms_warehouse_material_allocation",
+          "MatchedColumns": 1,
+          "ColumnScore": 0.6383862495422363,
+          "TableScore": 0,
+          "Boost": 0,
+          "LocalMatch": 2,
+          "FinalScore": 53.19193124771118
+        },
+        {
+          "$id": "138",
+          "TableId": 450,
+          "TableName": "wms_logistics_detail",
+          "MatchedColumns": 1,
+          "ColumnScore": 0.6282891035079956,
+          "TableScore": 0,
+          "Boost": 0,
+          "LocalMatch": 2,
+          "FinalScore": 53.14144551753998
+        }
+      ]
+    },
+    "Plan": {
+      "$id": "139",
+      "Intent": {
+        "$ref": "2"
+      },
+      "DataSourceId": 1,
+      "Tables": {
+        "$id": "140",
+        "$values": [
+          {
+            "$id": "141",
+            "MetadataTableId": 456,
+            "DataSourceId": 1,
+            "TableName": "wms_sign_feedback",
+            "TableComment": "\u5F02\u5E38\u53CD\u9988"
+          }
+        ]
+      },
+      "Fields": {
+        "$id": "142",
+        "$values": [
+          {
+            "$id": "143",
+            "MetadataColumnId": 5490,
+            "ColumnName": "send_quantity",
+            "Aggregation": "NONE",
+            "DataType": "decimal"
+          }
+        ]
+      },
+      "Filters": {
+        "$id": "144",
+        "$values": []
+      },
+      "IsAggregate": false,
+      "Joins": {
+        "$id": "145",
+        "$values": []
+      }
+    },
+    "PlanError": null
+  },
+  "sql": "SELECT \u0060send_quantity\u0060 FROM \u0060wms_sign_feedback\u0060 ORDER BY \u0060send_quantity\u0060 DESC LIMIT 10",
+  "parameters": {
+    "$id": "146"
+  },
+  "execution": {
+    "$id": "147",
+    "Success": true,
+    "Rows": {
+      "$id": "148",
+      "$values": [
+        {
+          "$id": "149",
+          "send_quantity": 4200
+        },
+        {
+          "$id": "150",
+          "send_quantity": 4200
+        },
+        {
+          "$id": "151",
+          "send_quantity": 4200
+        },
+        {
+          "$id": "152",
+          "send_quantity": 4200
+        },
+        {
+          "$id": "153",
+          "send_quantity": 4200
+        },
+        {
+          "$id": "154",
+          "send_quantity": 4200
+        },
+        {
+          "$id": "155",
+          "send_quantity": 4200
+        },
+        {
+          "$id": "156",
+          "send_quantity": 4050
+        },
+        {
+          "$id": "157",
+          "send_quantity": 4050
+        },
+        {
+          "$id": "158",
+          "send_quantity": 4050
+        }
+      ]
+    },
+    "Count": 10,
+    "ErrorMessage": null
+  }
+}
