@@ -3,27 +3,26 @@
 /// <summary>
 /// QueryPlan V2.0 校验器。
 ///
-/// 主要负责解决：
-///
+/// 职责：
 /// 1. Ranking / TopN
-/// 2. Detail Ranking 与 Aggregate Ranking 区分
+/// 2. Detail Ranking / Aggregate Ranking
 /// 3. Limit
 /// 4. Order
-/// 5. Aggregation 冲突
-/// 6. Invalid OrderDirection
+/// 5. Aggregation
+/// 6. 字段合法性
 ///
-/// 注意：
-///
-/// Validator 不负责 Metadata 查询。
-/// Validator 不负责 SQL 生成。
+/// Validator 不负责：
+/// - Metadata 查询
+/// - AI 意图理解
+/// - SQL 生成
 ///
 /// Validator 只负责：
 ///
 /// QueryPlan
 ///     ↓
-/// 校验
+/// Normalize
 ///     ↓
-/// 修正
+/// Validate
 ///     ↓
 /// QueryPlan
 /// </summary>
@@ -58,133 +57,188 @@ public class QueryPlanValidator
 	}
 
 	/// <summary>
-	/// 规范化聚合方式。
+	/// 规范化 QueryPlan 中的聚合。
+	///
+	/// 同时处理：
+	/// QueryField.Aggregation
+	/// QueryMetric.Aggregation
 	/// </summary>
 	private static void NormalizeAggregations(QueryPlan plan)
 	{
 		foreach (var field in plan.Fields)
 		{
-			if (string.IsNullOrWhiteSpace(field.Aggregation))
-			{
-				field.Aggregation = "NONE";
-				continue;
-			}
-
 			field.Aggregation =
-				field.Aggregation
-					.Trim()
-					.ToUpperInvariant();
-
-			field.Aggregation =
-				field.Aggregation switch
-				{
-					"AVERAGE" => "AVG",
-					"DISTINCT_COUNT" => "DISTINCTCOUNT",
-					_ => field.Aggregation
-				};
+				NormalizeAggregation(field.Aggregation);
 		}
 
 		foreach (var metric in plan.Metrics)
 		{
 			metric.Aggregation =
-				metric.Aggregation
-					.Trim()
-					.ToUpperInvariant();
-
-			if (string.IsNullOrWhiteSpace(metric.Aggregation))
-			{
-				metric.Aggregation = "NONE";
-			}
+				NormalizeAggregation(metric.Aggregation);
 		}
 	}
 
 	/// <summary>
+	/// 统一聚合名称。
+	/// </summary>
+	private static string NormalizeAggregation(
+		string? aggregation)
+	{
+		if (string.IsNullOrWhiteSpace(aggregation))
+		{
+			return "NONE";
+		}
+
+		return aggregation
+			.Trim()
+			.ToUpperInvariant() switch
+		{
+			"AVERAGE" => "AVG",
+			"DISTINCT_COUNT" => "DISTINCTCOUNT",
+			_ => aggregation.Trim().ToUpperInvariant()
+		};
+	}
+
+	/// <summary>
 	/// 规范化排序。
+	///
+	/// V2 优先使用：
+	/// plan.Orders
+	///
+	/// Legacy Intent 只作为兼容 fallback。
 	/// </summary>
 	private static void NormalizeOrders(QueryPlan plan)
 	{
 		foreach (var order in plan.Orders)
 		{
+			order.Field =
+				order.Field?.Trim() ?? string.Empty;
+
 			order.Direction =
-				string.Equals(
-					order.Direction,
-					"DESC",
-					StringComparison.OrdinalIgnoreCase)
-					? "DESC"
-					: "ASC";
+				NormalizeDirection(order.Direction);
 		}
 
 		/*
          * Legacy QueryIntent → QueryPlan。
          *
-         * 第一阶段兼容旧代码。
+         * 只有 V2 Orders 没有生成时，
+         * 才使用 Intent.OrderBy。
          */
 		if (plan.Orders.Count == 0 &&
 			plan.Intent != null &&
-			!string.IsNullOrWhiteSpace(plan.Intent.OrderBy))
+			!string.IsNullOrWhiteSpace(
+				plan.Intent.OrderBy))
 		{
 			plan.Orders.Add(
 				new QueryOrder
 				{
-					Field = plan.Intent.OrderBy!,
+					Field =
+						plan.Intent.OrderBy!.Trim(),
+
 					Direction =
-						string.Equals(
-							plan.Intent.OrderDirection,
-							"DESC",
-							StringComparison.OrdinalIgnoreCase)
-							? "DESC"
-							: "ASC"
+						NormalizeDirection(
+							plan.Intent.OrderDirection),
+
+					IsMetric = true,
+
+					MetricName =
+						plan.Intent.OrderBy
 				});
 		}
 	}
 
 	/// <summary>
+	/// 规范化排序方向。
+	/// </summary>
+	private static string NormalizeDirection(
+		string? direction)
+	{
+		return string.Equals(
+			direction?.Trim(),
+			"DESC",
+			StringComparison.OrdinalIgnoreCase)
+			? "DESC"
+			: "ASC";
+	}
+
+	/// <summary>
 	/// 规范化 Limit。
+	///
+	/// V2：
+	/// plan.Limit
+	///
+	/// Legacy：
+	/// plan.Intent.Limit
 	/// </summary>
 	private static void NormalizeLimit(QueryPlan plan)
 	{
-		if (plan.Limit == null &&
+		if (!plan.Limit.HasValue &&
 			plan.Intent?.Limit != null)
 		{
-			plan.Limit = plan.Intent.Limit;
+			plan.Limit =
+				plan.Intent.Limit;
 		}
 
-		if (plan.Limit.HasValue)
+		if (!plan.Limit.HasValue)
 		{
-			if (plan.Limit.Value <= 0)
-			{
-				plan.Limit = null;
-			}
-			else if (plan.Limit.Value > 1000)
-			{
-				/*
-                 * BI Agent 第一阶段安全限制。
-                 */
-				plan.Limit = 1000;
-			}
+			return;
+		}
+
+		if (plan.Limit.Value <= 0)
+		{
+			plan.Limit = null;
+			return;
+		}
+
+		/*
+         * BI Agent 第一阶段安全上限。
+         */
+		if (plan.Limit.Value > 1000)
+		{
+			plan.Limit = 1000;
 		}
 	}
 
 	/// <summary>
 	/// 判断 Ranking 类型。
+	///
+	/// 第一优先级：
+	/// QueryPlan V2
+	///
+	/// 第二优先级：
+	/// QueryIntent Legacy
 	/// </summary>
-	private static void DetectRanking(QueryPlan plan)
+	private static void DetectRanking(
+		QueryPlan plan)
 	{
 		var intent = plan.Intent;
 
+		/*
+         * Ranking 的基本条件：
+         *
+         * 1. Intent 明确要求 Ranking
+         * 或
+         * 2. 存在 Order + Limit
+         */
 		plan.IsRanking =
 			intent?.IsRanking == true
 			||
-			plan.Orders.Count > 0
-			&& plan.Limit.HasValue;
+			(
+				plan.Orders.Count > 0
+				&&
+				plan.Limit.HasValue
+			);
 
 		if (!plan.IsRanking)
 		{
+			plan.IsDetailRanking = false;
+			plan.IsAggregateRanking = false;
+
 			return;
 		}
 
 		/*
-         * 判断是否存在 Dimension。
+         * V2 Dimension。
          */
 		var hasDimension =
 			plan.Dimensions.Count > 0
@@ -192,18 +246,29 @@ public class QueryPlanValidator
 			plan.Intent?.Dimensions.Count > 0;
 
 		/*
-         * 判断是否存在聚合。
+         * V2 Metric。
+         *
+         * 优先使用 Metrics，
+         * Fields 作为兼容判断。
          */
 		var hasAggregation =
+			plan.Metrics.Any(
+				m => IsAggregation(
+					m.Aggregation))
+			||
 			plan.Fields.Any(
-				f => IsAggregation(f.Aggregation));
+				f => IsAggregation(
+					f.Aggregation));
 
 		/*
          * Ranking + Dimension + Aggregation
          *
-         * = Aggregate Ranking
+         * =
+         *
+         * Aggregate Ranking
          */
-		if (hasDimension && hasAggregation)
+		if (hasDimension &&
+			hasAggregation)
 		{
 			plan.IsAggregateRanking = true;
 			plan.IsDetailRanking = false;
@@ -213,7 +278,9 @@ public class QueryPlanValidator
 			/*
              * Ranking + 无聚合
              *
-             * = Detail Ranking
+             * =
+             *
+             * Detail Ranking
              */
 			plan.IsDetailRanking = true;
 			plan.IsAggregateRanking = false;
@@ -223,7 +290,8 @@ public class QueryPlanValidator
 	/// <summary>
 	/// 校验 Ranking。
 	/// </summary>
-	private static void ValidateRanking(QueryPlan plan)
+	private static void ValidateRanking(
+		QueryPlan plan)
 	{
 		if (!plan.IsRanking)
 		{
@@ -249,25 +317,31 @@ public class QueryPlanValidator
 		}
 
 		/*
+         * Ranking 的 Limit 必须有效。
+         */
+		if (plan.Limit.Value <= 0)
+		{
+			throw new InvalidOperationException(
+				"Ranking查询的Limit必须大于0。");
+		}
+
+		/*
          * ---------------------------------------------------------
          * Detail Ranking
          * ---------------------------------------------------------
          *
-         * 例如：
+         * 示例：
          *
          * 数量最多的十条入库凭证
          *
-         * 应该：
+         * 正确：
          *
-         * SELECT quantity
-         * FROM receipt
          * ORDER BY quantity DESC
          * LIMIT 10
          *
-         * 而不是：
+         * 不应该：
          *
-         * SELECT SUM(quantity)
-         * ...
+         * ORDER BY SUM(quantity) DESC
          */
 		if (plan.IsDetailRanking)
 		{
@@ -279,16 +353,10 @@ public class QueryPlanValidator
 				}
 
 				/*
-                 * 明细排名：
-                 *
-                 * 如果只有一个普通字段，
-                 * 不允许因为 Ranking 自动变成 SUM。
+                 * Detail Ranking 不允许排序聚合。
                  */
-				if (order.Aggregation != QueryAggregation.None)
-				{
-					order.Aggregation =
-						QueryAggregation.None;
-				}
+				order.Aggregation =
+					QueryAggregation.None;
 			}
 		}
 
@@ -297,12 +365,14 @@ public class QueryPlanValidator
          * Aggregate Ranking
          * ---------------------------------------------------------
          *
-         * 例如：
+         * 示例：
          *
          * 数量最多的十个物料
          *
          * GROUP BY material
+         *
          * ORDER BY SUM(quantity) DESC
+         *
          * LIMIT 10
          */
 		if (plan.IsAggregateRanking)
@@ -310,22 +380,133 @@ public class QueryPlanValidator
 			if (plan.Dimensions.Count == 0 &&
 				plan.Intent?.Dimensions.Count == 0)
 			{
-				/*
-                 * 有聚合 Ranking，
-                 * 但没有维度。
-                 *
-                 * 不能安全地认为是 TopN。
-                 */
 				throw new InvalidOperationException(
 					"Aggregate Ranking缺少Dimension。");
 			}
+
+			NormalizeAggregateOrders(plan);
 		}
+	}
+
+	/// <summary>
+	/// Aggregate Ranking 的 Order
+	/// 必须与对应 Metric 的聚合方式保持一致。
+	/// </summary>
+	private static void NormalizeAggregateOrders(
+		QueryPlan plan)
+	{
+		foreach (var order in plan.Orders)
+		{
+			if (!order.IsMetric)
+			{
+				continue;
+			}
+
+			/*
+             * 优先通过 MetricName 匹配。
+             */
+			QueryMetric? metric = null;
+
+			if (!string.IsNullOrWhiteSpace(
+					order.MetricName))
+			{
+				metric =
+					plan.Metrics.FirstOrDefault(
+						m =>
+							string.Equals(
+								m.Name,
+								order.MetricName,
+								StringComparison.OrdinalIgnoreCase)
+							||
+							string.Equals(
+								m.Field,
+								order.MetricName,
+								StringComparison.OrdinalIgnoreCase));
+			}
+
+			/*
+             * 如果没有 MetricName，
+             * 再通过 Field 匹配。
+             */
+			metric ??=
+				plan.Metrics.FirstOrDefault(
+					m =>
+						string.Equals(
+							m.Field,
+							order.Field,
+							StringComparison.OrdinalIgnoreCase));
+
+			if (metric == null)
+			{
+				/*
+                 * 当前无法确认对应 Metric。
+                 *
+                 * 不擅自制造 SUM。
+                 */
+				continue;
+			}
+
+			var aggregation =
+				NormalizeAggregation(
+					metric.Aggregation);
+
+			if (aggregation == "NONE")
+			{
+				/*
+                 * Aggregate Ranking 没有明确聚合，
+                 * 默认使用 SUM。
+                 *
+                 * 这是针对“数量最多的十个物料”
+                 * 这一类典型 BI TopN 的确定性兜底。
+                 */
+				aggregation = "SUM";
+
+				metric.Aggregation =
+					aggregation;
+			}
+
+			order.Aggregation =
+				ToQueryAggregation(
+					aggregation);
+		}
+	}
+
+	/// <summary>
+	/// 将字符串聚合转换成 QueryAggregation。
+	/// </summary>
+	private static QueryAggregation ToQueryAggregation(
+		string aggregation)
+	{
+		return aggregation switch
+		{
+			"SUM" =>
+				QueryAggregation.Sum,
+
+			"COUNT" =>
+				QueryAggregation.Count,
+
+			"AVG" =>
+				QueryAggregation.Average,
+
+			"MAX" =>
+				QueryAggregation.Max,
+
+			"MIN" =>
+				QueryAggregation.Min,
+
+			"DISTINCTCOUNT" =>
+				QueryAggregation.DistinctCount,
+
+			_ =>
+				QueryAggregation.None
+		};
 	}
 
 	/// <summary>
 	/// 校验字段。
 	/// </summary>
-	private static void ValidateFields(QueryPlan plan)
+	private static void ValidateFields(
+		QueryPlan plan)
 	{
 		if (plan.Fields.Count == 0)
 		{
@@ -335,17 +516,57 @@ public class QueryPlanValidator
 
 		foreach (var field in plan.Fields)
 		{
-			if (string.IsNullOrWhiteSpace(field.ColumnName))
+			if (string.IsNullOrWhiteSpace(
+					field.ColumnName))
 			{
 				throw new InvalidOperationException(
 					$"QueryPlan存在无效字段：MetadataColumnId={field.MetadataColumnId}");
 			}
 
-			if (!IsValidAggregation(field.Aggregation))
+			field.Aggregation =
+				NormalizeAggregation(
+					field.Aggregation);
+
+			if (!IsValidAggregation(
+					field.Aggregation))
 			{
 				throw new InvalidOperationException(
 					$"不支持的聚合方式：{field.Aggregation}");
 			}
+		}
+
+		/*
+         * Metrics 也必须拥有有效聚合。
+         */
+		foreach (var metric in plan.Metrics)
+		{
+			metric.Aggregation =
+				NormalizeAggregation(
+					metric.Aggregation);
+
+			if (!IsValidAggregation(
+					metric.Aggregation))
+			{
+				throw new InvalidOperationException(
+					$"Metric不支持的聚合方式：{metric.Aggregation}");
+			}
+		}
+
+		/*
+         * Orders 必须拥有字段。
+         */
+		foreach (var order in plan.Orders)
+		{
+			if (string.IsNullOrWhiteSpace(
+					order.Field))
+			{
+				throw new InvalidOperationException(
+					"QueryPlan存在没有Field的Order。");
+			}
+
+			order.Direction =
+				NormalizeDirection(
+					order.Direction);
 		}
 	}
 
@@ -355,14 +576,14 @@ public class QueryPlanValidator
 	private static bool IsAggregation(
 		string? aggregation)
 	{
-		if (string.IsNullOrWhiteSpace(aggregation))
+		if (string.IsNullOrWhiteSpace(
+				aggregation))
 		{
 			return false;
 		}
 
-		return aggregation
-			.Trim()
-			.ToUpperInvariant() switch
+		return NormalizeAggregation(
+				aggregation) switch
 		{
 			"SUM" => true,
 			"COUNT" => true,
@@ -380,14 +601,14 @@ public class QueryPlanValidator
 	private static bool IsValidAggregation(
 		string? aggregation)
 	{
-		if (string.IsNullOrWhiteSpace(aggregation))
+		if (string.IsNullOrWhiteSpace(
+				aggregation))
 		{
 			return true;
 		}
 
-		return aggregation
-			.Trim()
-			.ToUpperInvariant() switch
+		return NormalizeAggregation(
+				aggregation) switch
 		{
 			"NONE" => true,
 			"SUM" => true,

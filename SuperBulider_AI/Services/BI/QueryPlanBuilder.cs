@@ -112,32 +112,32 @@ public class QueryPlanBuilder
 	/// 判断某个列是否为非信息化展示字段（例如仅表示删除标记或内部用户ID），不适合单列展示。
 	/// </summary>
 	private bool IsNonInformativeColumn(MetadataColumn col)
-		{
-			if (col == null) return true;
-			var name = (col.ColumnName ?? string.Empty).ToLowerInvariant();
-			// 非信息字段包括布尔型删除标记、软删除标志、以及像 create_by/update_by 这样的用户 ID 列
-			if (name == "del_flag" || name == "is_deleted" || name == "deleted" || name.EndsWith("_flag") || name.EndsWith("_status"))
-				return true;
+	{
+		if (col == null) return true;
+		var name = (col.ColumnName ?? string.Empty).ToLowerInvariant();
+		// 非信息字段包括布尔型删除标记、软删除标志、以及像 create_by/update_by 这样的用户 ID 列
+		if (name == "del_flag" || name == "is_deleted" || name == "deleted" || name.EndsWith("_flag") || name.EndsWith("_status"))
+			return true;
 
-			if (name.EndsWith("_by") || name == "create_by" || name == "update_by" || name == "created_by")
-				return true;
+		if (name.EndsWith("_by") || name == "create_by" || name == "update_by" || name == "created_by")
+			return true;
 
-			// 长文本备注/描述字段单独判断为可选展示，但不是首选
-			if (name.Contains("note") || name.Contains("remark") || name.Contains("comment"))
-				return false;
-
+		// 长文本备注/描述字段单独判断为可选展示，但不是首选
+		if (name.Contains("note") || name.Contains("remark") || name.Contains("comment"))
 			return false;
-		}
 
-		/// <summary>
-		/// 根据表结构返回一个优先展示列的候选列表（按优先级排序）。
-		/// 首选单号/编号、时间、主键、物料/商品/数量等业务字段。
-		/// </summary>
-		private IEnumerable<MetadataColumn> GetPreferredDisplayColumns(MetadataTable table)
-		{
-			if (table == null || table.Columns == null) yield break;
+		return false;
+	}
 
-			// 1. 业务编号类字段：code / no / number
+	/// <summary>
+	/// 根据表结构返回一个优先展示列的候选列表（按优先级排序）。
+	/// 首选单号/编号、时间、主键、物料/商品/数量等业务字段。
+	/// </summary>
+	private IEnumerable<MetadataColumn> GetPreferredDisplayColumns(MetadataTable table)
+	{
+		if (table == null || table.Columns == null) yield break;
+
+		// 1. 业务编号类字段：code / no / number
 		foreach (var c in table.Columns.Where(c => c.ColumnName != null && (
 				string.Equals(c.ColumnName, "code", StringComparison.OrdinalIgnoreCase)
 				|| c.ColumnName.EndsWith("_code", StringComparison.OrdinalIgnoreCase)
@@ -145,34 +145,34 @@ public class QueryPlanBuilder
 				|| c.ColumnName.IndexOf("code", StringComparison.OrdinalIgnoreCase) >= 0
 				|| c.ColumnName.IndexOf("number", StringComparison.OrdinalIgnoreCase) >= 0
 			)))
-			{
-				yield return c;
-			}
-
-			// 2. 时间类字段
-			foreach (var c in table.Columns.Where(c => !string.IsNullOrWhiteSpace(c.DataType) && (c.DataType.IndexOf("date", StringComparison.OrdinalIgnoreCase) >= 0 || c.DataType.IndexOf("time", StringComparison.OrdinalIgnoreCase) >= 0)))
-			{
-				yield return c;
-			}
-
-			// 3. 主键或 id
-			foreach (var c in table.Columns.Where(c => c.IsPrimaryKey == true || string.Equals(c.ColumnName, "id", StringComparison.OrdinalIgnoreCase)))
-			{
-				yield return c;
-			}
-
-			// 4. 物料/商品/数量类字段
-		foreach (var c in table.Columns.Where(c => c.ColumnName != null && (c.ColumnName.IndexOf("material", StringComparison.OrdinalIgnoreCase) >= 0 || c.ColumnName.IndexOf("item", StringComparison.OrdinalIgnoreCase) >= 0 || c.ColumnName.IndexOf("quantity", StringComparison.OrdinalIgnoreCase) >= 0 || c.ColumnName.IndexOf("amount", StringComparison.OrdinalIgnoreCase) >= 0)))
-			{
-				yield return c;
-			}
-
-			// 5. 兜底：其他非 _by 的字段
-			foreach (var c in table.Columns.Where(c => c.ColumnName != null && !c.ColumnName.EndsWith("_by", StringComparison.OrdinalIgnoreCase)).Take(10))
-			{
-				yield return c;
-			}
+		{
+			yield return c;
 		}
+
+		// 2. 时间类字段
+		foreach (var c in table.Columns.Where(c => !string.IsNullOrWhiteSpace(c.DataType) && (c.DataType.IndexOf("date", StringComparison.OrdinalIgnoreCase) >= 0 || c.DataType.IndexOf("time", StringComparison.OrdinalIgnoreCase) >= 0)))
+		{
+			yield return c;
+		}
+
+		// 3. 主键或 id
+		foreach (var c in table.Columns.Where(c => c.IsPrimaryKey == true || string.Equals(c.ColumnName, "id", StringComparison.OrdinalIgnoreCase)))
+		{
+			yield return c;
+		}
+
+		// 4. 物料/商品/数量类字段
+		foreach (var c in table.Columns.Where(c => c.ColumnName != null && (c.ColumnName.IndexOf("material", StringComparison.OrdinalIgnoreCase) >= 0 || c.ColumnName.IndexOf("item", StringComparison.OrdinalIgnoreCase) >= 0 || c.ColumnName.IndexOf("quantity", StringComparison.OrdinalIgnoreCase) >= 0 || c.ColumnName.IndexOf("amount", StringComparison.OrdinalIgnoreCase) >= 0)))
+		{
+			yield return c;
+		}
+
+		// 5. 兜底：其他非 _by 的字段
+		foreach (var c in table.Columns.Where(c => c.ColumnName != null && !c.ColumnName.EndsWith("_by", StringComparison.OrdinalIgnoreCase)).Take(10))
+		{
+			yield return c;
+		}
+	}
 
 	/// <summary>
 	/// 调试用的查询计划诊断信息。
@@ -1058,7 +1058,7 @@ public class QueryPlanBuilder
 
 		}
 
-		
+
 
 
 
@@ -1943,7 +1943,7 @@ public class QueryPlanBuilder
 						}
 					}
 					catch { }
-					PairBoostDone:;
+				PairBoostDone:;
 
 					var score =
 						matchedColumns * 10.0
@@ -1996,114 +1996,114 @@ public class QueryPlanBuilder
 
 
 
-			// 在选表完成前记录每个候选的评分明细，便于调试
-			try
+		// 在选表完成前记录每个候选的评分明细，便于调试
+		try
+		{
+			foreach (var c in new[] { candidates })
 			{
-				foreach (var c in new[] { candidates })
-				{
-					if (c == null) continue;
-					Console.WriteLine($"SelectBestTable Debug: Table={c.Table?.TableName}, MatchedColumns={c.MatchedColumns}, ColumnScore={c.ColumnScore}, TableScore={c.TableScore}, FinalScore={c.Score}");
-				}
+				if (c == null) continue;
+				Console.WriteLine($"SelectBestTable Debug: Table={c.Table?.TableName}, MatchedColumns={c.MatchedColumns}, ColumnScore={c.ColumnScore}, TableScore={c.TableScore}, FinalScore={c.Score}");
 			}
-			catch
+		}
+		catch
+		{
+			// 忽略日志异常
+		}
+
+		// 应用规则：优先选择有列命中的表；如果有表 matchedColumns>0 的候选，则过滤掉 matchedColumns==0 的表
+		var filteredCandidates =
+			results
+			.Where(x => x.Table != null)
+			.GroupBy(x => x.Table!.Id)
+			.Select(group => new
 			{
-				// 忽略日志异常
-			}
-
-			// 应用规则：优先选择有列命中的表；如果有表 matchedColumns>0 的候选，则过滤掉 matchedColumns==0 的表
-			var filteredCandidates =
-				results
-				.Where(x => x.Table != null)
-				.GroupBy(x => x.Table!.Id)
-				.Select(group => new
-				{
-					Table = group.First().Table!,
-					MatchedColumns = group.Where(x => x.Column != null).Select(x => x.Column!.Id).Distinct().Count(),
-					ColumnScore = group.Where(x => x.Column != null).Select(x => x.Score).DefaultIfEmpty(0).Max(),
-					TableScore = group.Where(x => x.IsTableVector).Select(x => x.Score).DefaultIfEmpty(0).Max(),
-					Results = group.ToList()
-				})
-				.ToList();
-
-			if (filteredCandidates.Any(x => x.MatchedColumns > 0))
-			{
-				filteredCandidates = filteredCandidates.Where(x => x.MatchedColumns > 0).ToList();
-			}
-
-			// 重新计算得分并选择最高
-			var scoredCandidates = filteredCandidates.Select(x =>
-			{
-				var matchedColumns = x.MatchedColumns;
-				var columnScore = x.ColumnScore;
-				var tableScore = x.TableScore;
-
-				double boost = 0.0;
-				try
-				{
-					var tableNameText = NormalizeText(x.Table.TableName);
-					var tableCommentText = NormalizeText(x.Table.TableComment);
-					foreach (var term in businessTerms)
-					{
-						var t = NormalizeText(term);
-						if (string.IsNullOrWhiteSpace(t)) continue;
-						if ((!string.IsNullOrWhiteSpace(tableNameText) && tableNameText.Contains(t, StringComparison.OrdinalIgnoreCase)) ||
-							(!string.IsNullOrWhiteSpace(tableCommentText) && tableCommentText.Contains(t, StringComparison.OrdinalIgnoreCase)))
-						{
-							boost += 50.0;
-							break;
-						}
-					}
-				}
-				catch { }
-
-				// 计算本地列匹配数
-				var localMatchCount = 0;
-				try
-				{
-					if (x.Table.Columns != null)
-					{
-						foreach (var term in businessTerms)
-						{
-							var t = NormalizeText(term);
-							if (string.IsNullOrWhiteSpace(t)) continue;
-							foreach (var col in x.Table.Columns)
-							{
-								try
-								{
-									var colName = NormalizeText(col.ColumnName);
-									var colComment = NormalizeText(col.ColumnComment);
-									if ((!string.IsNullOrWhiteSpace(colName) && colName.Contains(t, StringComparison.OrdinalIgnoreCase)) ||
-										(!string.IsNullOrWhiteSpace(colComment) && colComment.Contains(t, StringComparison.OrdinalIgnoreCase)) ||
-										IsRelatedBusinessText(term, col))
-									{
-										localMatchCount++;
-									}
-								}
-								catch { }
-							}
-						}
-					}
-				}
-				catch { }
-
-				var finalScore = matchedColumns * 10.0 + columnScore * 5.0 + tableScore * 2.0 + boost + localMatchCount * 20.0;
-
-				return new { Table = x.Table, FinalScore = finalScore, MatchedColumns = matchedColumns, ColumnScore = columnScore, TableScore = tableScore, Boost = boost, LocalMatch = localMatchCount };
+				Table = group.First().Table!,
+				MatchedColumns = group.Where(x => x.Column != null).Select(x => x.Column!.Id).Distinct().Count(),
+				ColumnScore = group.Where(x => x.Column != null).Select(x => x.Score).DefaultIfEmpty(0).Max(),
+				TableScore = group.Where(x => x.IsTableVector).Select(x => x.Score).DefaultIfEmpty(0).Max(),
+				Results = group.ToList()
 			})
-			.OrderByDescending(x => x.FinalScore)
-			.ThenByDescending(x => x.MatchedColumns)
 			.ToList();
 
+		if (filteredCandidates.Any(x => x.MatchedColumns > 0))
+		{
+			filteredCandidates = filteredCandidates.Where(x => x.MatchedColumns > 0).ToList();
+		}
+
+		// 重新计算得分并选择最高
+		var scoredCandidates = filteredCandidates.Select(x =>
+		{
+			var matchedColumns = x.MatchedColumns;
+			var columnScore = x.ColumnScore;
+			var tableScore = x.TableScore;
+
+			double boost = 0.0;
 			try
 			{
-				foreach (var c in scoredCandidates)
+				var tableNameText = NormalizeText(x.Table.TableName);
+				var tableCommentText = NormalizeText(x.Table.TableComment);
+				foreach (var term in businessTerms)
 				{
-					Console.WriteLine($"ScoredCandidate: Table={c.Table.TableName}, FinalScore={c.FinalScore}, MatchedColumns={c.MatchedColumns}, ColumnScore={c.ColumnScore}, TableScore={c.TableScore}, Boost={c.Boost}, LocalMatch={c.LocalMatch}");
+					var t = NormalizeText(term);
+					if (string.IsNullOrWhiteSpace(t)) continue;
+					if ((!string.IsNullOrWhiteSpace(tableNameText) && tableNameText.Contains(t, StringComparison.OrdinalIgnoreCase)) ||
+						(!string.IsNullOrWhiteSpace(tableCommentText) && tableCommentText.Contains(t, StringComparison.OrdinalIgnoreCase)))
+					{
+						boost += 50.0;
+						break;
+					}
 				}
 			}
 			catch { }
 
-			return scoredCandidates.FirstOrDefault()?.Table;
+			// 计算本地列匹配数
+			var localMatchCount = 0;
+			try
+			{
+				if (x.Table.Columns != null)
+				{
+					foreach (var term in businessTerms)
+					{
+						var t = NormalizeText(term);
+						if (string.IsNullOrWhiteSpace(t)) continue;
+						foreach (var col in x.Table.Columns)
+						{
+							try
+							{
+								var colName = NormalizeText(col.ColumnName);
+								var colComment = NormalizeText(col.ColumnComment);
+								if ((!string.IsNullOrWhiteSpace(colName) && colName.Contains(t, StringComparison.OrdinalIgnoreCase)) ||
+									(!string.IsNullOrWhiteSpace(colComment) && colComment.Contains(t, StringComparison.OrdinalIgnoreCase)) ||
+									IsRelatedBusinessText(term, col))
+								{
+									localMatchCount++;
+								}
+							}
+							catch { }
+						}
+					}
+				}
+			}
+			catch { }
+
+			var finalScore = matchedColumns * 10.0 + columnScore * 5.0 + tableScore * 2.0 + boost + localMatchCount * 20.0;
+
+			return new { Table = x.Table, FinalScore = finalScore, MatchedColumns = matchedColumns, ColumnScore = columnScore, TableScore = tableScore, Boost = boost, LocalMatch = localMatchCount };
+		})
+		.OrderByDescending(x => x.FinalScore)
+		.ThenByDescending(x => x.MatchedColumns)
+		.ToList();
+
+		try
+		{
+			foreach (var c in scoredCandidates)
+			{
+				Console.WriteLine($"ScoredCandidate: Table={c.Table.TableName}, FinalScore={c.FinalScore}, MatchedColumns={c.MatchedColumns}, ColumnScore={c.ColumnScore}, TableScore={c.TableScore}, Boost={c.Boost}, LocalMatch={c.LocalMatch}");
+			}
+		}
+		catch { }
+
+		return scoredCandidates.FirstOrDefault()?.Table;
 
 	}
 
@@ -2136,22 +2136,22 @@ public class QueryPlanBuilder
 			List<MetadataSemanticSearchResult> results)
 	{
 
-			// 优先处理明确的字段映射：如果 Metric.Field 明确为 id 或者类似主键标识，优先使用主键或 id 字段
-			try
+		// 优先处理明确的字段映射：如果 Metric.Field 明确为 id 或者类似主键标识，优先使用主键或 id 字段
+		try
+		{
+			if (!string.IsNullOrWhiteSpace(metric.Field) && table?.Columns != null)
 			{
-				if (!string.IsNullOrWhiteSpace(metric.Field) && table?.Columns != null)
+				var nf = NormalizeText(metric.Field);
+				if (string.Equals(nf, "id", StringComparison.OrdinalIgnoreCase) || nf.EndsWith("id", StringComparison.OrdinalIgnoreCase))
 				{
-					var nf = NormalizeText(metric.Field);
-					if (string.Equals(nf, "id", StringComparison.OrdinalIgnoreCase) || nf.EndsWith("id", StringComparison.OrdinalIgnoreCase))
-					{
-						var pk = table.Columns.FirstOrDefault(c => c.IsPrimaryKey == true);
-						if (pk != null) return pk;
-						var idCol = table.Columns.FirstOrDefault(c => string.Equals(c.ColumnName, "id", StringComparison.OrdinalIgnoreCase));
-						if (idCol != null) return idCol;
-					}
+					var pk = table.Columns.FirstOrDefault(c => c.IsPrimaryKey == true);
+					if (pk != null) return pk;
+					var idCol = table.Columns.FirstOrDefault(c => string.Equals(c.ColumnName, "id", StringComparison.OrdinalIgnoreCase));
+					if (idCol != null) return idCol;
 				}
 			}
-			catch { }
+		}
+		catch { }
 
 
 		/*
