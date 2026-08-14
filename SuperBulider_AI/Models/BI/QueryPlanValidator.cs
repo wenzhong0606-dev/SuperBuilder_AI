@@ -353,10 +353,83 @@ public class QueryPlanValidator
 				}
 
 				/*
-                 * Detail Ranking 不允许排序聚合。
-                 */
+				 * Detail Ranking：
+				 *
+				 * “数量最多的十条入库凭证”
+				 *
+				 * 是对明细记录进行排序，
+				 * 不是对数量进行聚合。
+				 *
+				 * 因此：
+				 *
+				 * ORDER BY send_quantity DESC
+				 *
+				 * 而不是：
+				 *
+				 * ORDER BY SUM(send_quantity) DESC
+				 */
 				order.Aggregation =
 					QueryAggregation.None;
+
+				/*
+				 * 找到对应 Metric。
+				 *
+				 * 优先使用 MetricName，
+				 * 再使用 Field。
+				 */
+				QueryMetric? metric = null;
+
+				if (!string.IsNullOrWhiteSpace(
+						order.MetricName))
+				{
+					metric =
+						plan.Metrics.FirstOrDefault(
+							m =>
+								string.Equals(
+									m.Name,
+									order.MetricName,
+									StringComparison.OrdinalIgnoreCase)
+								||
+								string.Equals(
+									m.Field,
+									order.MetricName,
+									StringComparison.OrdinalIgnoreCase));
+				}
+
+				metric ??=
+					plan.Metrics.FirstOrDefault(
+						m =>
+							string.Equals(
+								m.Field,
+								order.Field,
+								StringComparison.OrdinalIgnoreCase));
+
+				if (metric != null)
+				{
+					/*
+					 * Detail Ranking 的排序指标
+					 * 必须是原始字段。
+					 */
+					metric.Aggregation = "NONE";
+					metric.IsOrderingMetric = true;
+				}
+
+				/*
+				 * 同步修正 QueryField。
+				 *
+				 * 防止后续 SQL Builder 继续从
+				 * plan.Fields 得到 SUM。
+				 */
+				foreach (var field in plan.Fields)
+				{
+					if (string.Equals(
+							field.ColumnName,
+							order.Field,
+							StringComparison.OrdinalIgnoreCase))
+					{
+						field.Aggregation = "NONE";
+					}
+				}
 			}
 		}
 
