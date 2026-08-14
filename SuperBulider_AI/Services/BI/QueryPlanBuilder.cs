@@ -1059,6 +1059,56 @@ public class QueryPlanBuilder
 				field,
 				metric.Aggregation);
 
+			// ------------------------------------------------------------
+			// V2：同步 QueryMetric
+			// ------------------------------------------------------------
+			var existingMetric =
+				plan.Metrics.FirstOrDefault(x =>
+					string.Equals(
+						x.Field,
+						field.ColumnName,
+						StringComparison.OrdinalIgnoreCase));
+
+			if (existingMetric == null)
+			{
+				plan.Metrics.Add(
+					new QueryMetric
+					{
+						Name = metric.Name ?? string.Empty,
+						Field = field.ColumnName ?? string.Empty,
+						Aggregation = string.IsNullOrWhiteSpace(metric.Aggregation)
+							? "NONE"
+							: metric.Aggregation.Trim().ToUpperInvariant(),
+						Alias = metric.Name,
+						IsOrderingMetric =
+							!string.IsNullOrWhiteSpace(intent.OrderBy)
+							&&
+							(
+								string.Equals(
+									intent.OrderBy,
+									metric.Name,
+									StringComparison.OrdinalIgnoreCase)
+								||
+								string.Equals(
+									intent.OrderBy,
+									metric.Field,
+									StringComparison.OrdinalIgnoreCase)
+							)
+					});
+			}
+			else
+			{
+				existingMetric.Name =
+					string.IsNullOrWhiteSpace(existingMetric.Name)
+						? metric.Name ?? string.Empty
+						: existingMetric.Name;
+
+				existingMetric.Aggregation =
+					string.IsNullOrWhiteSpace(metric.Aggregation)
+						? existingMetric.Aggregation
+						: metric.Aggregation.Trim().ToUpperInvariant();
+			}
+
 		}
 
 
@@ -1224,6 +1274,30 @@ public class QueryPlanBuilder
 				column,
 				"NONE");
 
+
+			// ------------------------------------------------------------
+			// V2：同步 QueryDimension
+			// ------------------------------------------------------------
+			var existingDimension =
+				plan.Dimensions.FirstOrDefault(x =>
+					x.MetadataColumnId == column.Id
+					||
+					string.Equals(
+						x.ColumnName,
+						column.ColumnName,
+						StringComparison.OrdinalIgnoreCase));
+
+			if (existingDimension == null)
+			{
+				plan.Dimensions.Add(
+					new QueryDimension
+					{
+						MetadataColumnId = column.Id,
+						ColumnName = column.ColumnName ?? string.Empty,
+						Alias = dimension,
+						SemanticType = "Dimension"
+					});
+			}
 		}
 
 
@@ -1275,13 +1349,70 @@ public class QueryPlanBuilder
 					orderColumn,
 					"NONE");
 
+				// ------------------------------------------------------------
+				// V2：同步 QueryOrder
+				// ------------------------------------------------------------
+				var orderDirection =
+					string.Equals(
+						intent.OrderDirection,
+						"DESC",
+						StringComparison.OrdinalIgnoreCase)
+						? "DESC"
+						: "ASC";
+
+				var orderingMetric =
+					plan.Metrics.FirstOrDefault(x =>
+						string.Equals(
+							x.Field,
+							orderColumn.ColumnName,
+							StringComparison.OrdinalIgnoreCase));
+
+				var existingOrder =
+					plan.Orders.FirstOrDefault(x =>
+						string.Equals(
+							x.Field,
+							orderColumn.ColumnName,
+							StringComparison.OrdinalIgnoreCase));
+
+				if (existingOrder == null)
+				{
+					plan.Orders.Add(
+						new QueryOrder
+						{
+							MetadataColumnId = orderColumn.Id,
+							Field = orderColumn.ColumnName ?? string.Empty,
+							Direction = orderDirection,
+							IsMetric = orderingMetric != null,
+							MetricName = orderingMetric?.Name,
+							Aggregation =
+								QueryAggregation.None
+						});
+				}
+				else
+				{
+					existingOrder.Direction = orderDirection;
+					existingOrder.MetadataColumnId = orderColumn.Id;
+
+					if (orderingMetric != null)
+					{
+						existingOrder.IsMetric = true;
+						existingOrder.MetricName = orderingMetric.Name;
+					}
+				}
+
 			}
 
 		}
 
 
 
-
+		// ------------------------------------------------------------
+		// V2：同步 Limit
+		// ------------------------------------------------------------
+		if (intent.Limit.HasValue)
+		{
+			plan.Limit = intent.Limit.Value;
+		}
 
 
 		/*
