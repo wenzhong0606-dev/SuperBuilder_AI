@@ -208,12 +208,13 @@ public class SqlQueryBuilder
 		 * ============================================================
 		 */
 
-		var finalSql =
-			sql.ToString();
+		var finalSql = sql.ToString();
 
-		if (plan.Intent?.Limit != null)
+		var limit = ResolveLimit(plan);
+
+		if (limit.HasValue)
 		{
-			if (plan.Intent.Limit.Value <= 0)
+			if (limit.Value <= 0)
 			{
 				throw new InvalidOperationException(
 					"查询Limit必须大于0。");
@@ -222,7 +223,7 @@ public class SqlQueryBuilder
 			finalSql =
 				dialect.ApplyLimit(
 					finalSql,
-					plan.Intent.Limit.Value);
+					limit.Value);
 		}
 
 		/*
@@ -438,46 +439,77 @@ public class SqlQueryBuilder
 
 	/// <summary>
 	/// 构建GROUP BY。
+	///
+	/// V2.0:
+	///
+	/// 优先使用 QueryPlan.Dimensions。
+	///
+	/// Legacy fallback:
+	///
+	/// 当 QueryPlan.Dimensions 为空时，
+	/// 回退到 QueryIntent.Dimensions。
 	/// </summary>
 	private static void BuildGroupBy(
 		StringBuilder sql,
 		QueryPlan plan,
 		ISqlDialect dialect)
 	{
-		if (plan.Intent == null
-			||
-			plan.Intent.Dimensions.Count == 0)
-		{
-			return;
-		}
-
 		var groups =
 			new List<string>();
 
-		foreach (var dimension in plan.Intent.Dimensions)
+		/*
+		 * ============================================================
+		 * V2.0
+		 *
+		 * QueryPlan.Dimensions
+		 * ============================================================
+		 */
+
+		if (plan.Dimensions.Count > 0)
 		{
-			if (string.IsNullOrWhiteSpace(
-				dimension))
+			foreach (var dimension in plan.Dimensions)
 			{
-				continue;
+				if (dimension == null)
+				{
+					continue;
+				}
+
+				if (string.IsNullOrWhiteSpace(
+					dimension.ColumnName))
+				{
+					continue;
+				}
+
+				groups.Add(
+					dialect.EscapeIdentifier(
+						dimension.ColumnName));
 			}
+		}
 
-			/*
-			 * QueryPlanBuilder已经负责将
-			 *
-			 * 用户语言
-			 *
-			 * 映射为Metadata字段。
-			 *
-			 * 因此这里仍然使用Intent中的字段名。
-			 *
-			 * 后续如果需要更加严格，
-			 * 可以将Dimensions也独立建模成QueryField。
-			 */
+		/*
+		 * ============================================================
+		 * Legacy fallback
+		 *
+		 * QueryIntent.Dimensions
+		 * ============================================================
+		 */
 
-			groups.Add(
-				dialect.EscapeIdentifier(
-					dimension));
+		if (groups.Count == 0
+			&&
+			plan.Intent?.Dimensions != null)
+		{
+			foreach (var dimension in plan.Intent.Dimensions)
+			{
+				if (string.IsNullOrWhiteSpace(
+					dimension))
+				{
+					continue;
+				}
+
+				groups.Add(
+					dialect.EscapeIdentifier(
+						dimension));
+			}
 		}
 
 		if (groups.Count == 0)
@@ -491,17 +523,151 @@ public class SqlQueryBuilder
 		sql.Append(
 			string.Join(
 				", ",
-				groups));
+				groups.Distinct(
+					StringComparer.OrdinalIgnoreCase)));
 	}
 
 	/// <summary>
 	/// 构建ORDER BY。
+	///
+	/// V2.0:
+	///
+	/// 优先使用 QueryPlan.Orders。
+	///
+	/// 支持:
+	///
+	/// 1. 普通字段排序
+	/// 2. 指标排序
+	/// 3. 聚合指标排序
+	///
+	/// 例如:
+	///
+	/// quantity DESC
+	///
+	/// SUM(quantity) DESC
+	///
+	/// COUNT(id) DESC
+	///
+	/// Legacy fallback:
+	///
+	/// 当 QueryPlan.Orders 为空时，
+	/// 回退到 QueryIntent.OrderBy。
 	/// </summary>
 	private static void BuildOrderBy(
 		StringBuilder sql,
 		QueryPlan plan,
 		ISqlDialect dialect)
 	{
+		/*
+		 * ============================================================
+		 * V2.0
+		 *
+		 * QueryPlan.Orders
+		 * ============================================================
+		 */
+
+		if (plan.Orders.Count > 0)
+		{
+			var orderExpressions =
+				new List<string>();
+
+			foreach (var order in plan.Orders)
+			{
+				if (order == null)
+				{
+					continue;
+				}
+
+				if (string.IsNullOrWhiteSpace(
+					order.Field))
+				{
+					continue;
+				}
+
+				var direction =
+					NormalizeOrderDirection(
+						order.Direction);
+
+				var field =
+					dialect.EscapeIdentifier(
+						order.Field);
+
+				/*
+				 * ----------------------------------------------------
+				 * 指标排序
+				 *
+				 * 例如：
+				 *
+				 * 数量最多
+				 *
+				 * SUM(quantity) DESC
+				 * ----------------------------------------------------
+				 */
+
+				if (order.IsMetric
+					&&
+					order.Aggregation
+						!= QueryAggregation.None)
+				{
+					var aggregation =
+						NormalizeAggregation(
+							order.Aggregation.ToString());
+
+					if (aggregation != "NONE")
+					{
+						if (aggregation == "COUNT"
+							&&
+							order.Field == "*")
+						{
+							orderExpressions.Add(
+								$"COUNT(*) {direction}");
+						}
+						else
+						{
+							orderExpressions.Add(
+								$"{aggregation}({field}) {direction}");
+						}
+
+						continue;
+					}
+				}
+
+				/*
+				 * ----------------------------------------------------
+				 * 普通字段排序
+				 *
+				 * 例如：
+				 *
+				 * receipt_date DESC
+				 * ----------------------------------------------------
+				 */
+
+				orderExpressions.Add(
+					$"{field} {direction}");
+			}
+
+			if (orderExpressions.Count > 0)
+			{
+				sql.Append(
+					" ORDER BY ");
+
+				sql.Append(
+					string.Join(
+						", ",
+						orderExpressions));
+
+				return;
+			}
+		}
+
+		/*
+		 * ============================================================
+		 * Legacy fallback
+		 *
+		 * QueryIntent.OrderBy
+		 * ============================================================
+		 */
+
 		if (plan.Intent == null
 			||
 			string.IsNullOrWhiteSpace(
@@ -510,10 +676,10 @@ public class SqlQueryBuilder
 			return;
 		}
 
-		var orderBy =
+		var legacyOrderBy =
 			plan.Intent.OrderBy;
 
-		var direction =
+		var legacyDirection =
 			NormalizeOrderDirection(
 				plan.Intent.OrderDirection);
 
@@ -522,13 +688,13 @@ public class SqlQueryBuilder
 
 		sql.Append(
 			dialect.EscapeIdentifier(
-				orderBy));
+				legacyOrderBy));
 
 		sql.Append(
 			" ");
 
 		sql.Append(
-			direction);
+			legacyDirection);
 	}
 
 	/// <summary>
@@ -688,5 +854,25 @@ public class SqlQueryBuilder
 		}
 
 		return value;
+	}
+
+	/// <summary>
+	/// 获取最终Limit。
+	///
+	/// V2.0 优先使用 QueryPlan.Limit。
+	///
+	/// 为兼容旧版 QueryIntent，
+	/// 当 QueryPlan.Limit 没有值时，
+	/// 回退到 QueryIntent.Limit。
+	/// </summary>
+	private static int? ResolveLimit(
+		QueryPlan plan)
+	{
+		if (plan.Limit.HasValue)
+		{
+			return plan.Limit.Value;
+		}
+
+		return plan.Intent?.Limit;
 	}
 }
