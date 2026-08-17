@@ -20,6 +20,9 @@ Phase 2.2.1：Metadata语义模型读取与查询计划语义验证设计
 Phase 2.2.2：QuerySemanticValidator 实现设计
 Phase 2.2.2.1：QueryPlanContextBuilder 设计
 Phase 2.2.2.2：QueryPlanContextBuilder 实现
+Phase 2.2.3：QuerySemanticValidator 实现
+Phase 2.2.3.1：语义验证模型实现
+Phase 2.2.3.2：QuerySemanticValidator 实现
 
         ↓
 
