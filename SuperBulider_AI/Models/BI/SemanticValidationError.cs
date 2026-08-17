@@ -16,6 +16,19 @@
 public class SemanticValidationError
 {
 	/// <summary>
+	/// 错误编码。
+	///
+	/// 用于:
+	///
+	/// AI Repair Loop
+	///
+	/// 精确定位修复策略。
+	/// </summary>
+	public string Code { get; set; }
+		= string.Empty;
+
+
+	/// <summary>
 	/// 错误类型。
 	///
 	/// 示例:

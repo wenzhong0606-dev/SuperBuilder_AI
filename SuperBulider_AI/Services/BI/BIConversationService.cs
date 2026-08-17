@@ -1,4 +1,5 @@
-﻿using SuperBulider_AI.Infrastructure.Database;
+﻿using SuperBulider_AI.Data;
+using SuperBulider_AI.Infrastructure.Database;
 using SuperBulider_AI.Interfaces;
 using SuperBulider_AI.Interfaces.BI;
 using SuperBulider_AI.Interfaces.Database;
@@ -55,6 +56,9 @@ public class BIConversationService
 	private readonly QueryPlanMetadataValidator
 		_queryPlanMetadataValidator;
 
+	private readonly SuperBIContext
+		_superBIContext;
+
 
 	/// <summary>
 	/// Phase 2.2.5
@@ -101,6 +105,7 @@ public class BIConversationService
 		IQueryPlanValidationPipeline validationPipeline,
 		ISqlQueryBuilder sqlQueryBuilder,
 		ISqlDialectResolver sqlDialectResolver,
+		SuperBIContext superBIContext,
 		IQueryExecutionService queryExecutionService,
 		IResultUnderstandingService resultUnderstandingService)
 	{
@@ -138,8 +143,20 @@ public class BIConversationService
 
 		_resultUnderstandingService =
 			resultUnderstandingService;
+
+		_superBIContext =
+			superBIContext;
 	}
 
+
+	public async Task<BIResponse> AskAsync(
+	string question,
+	long tenantId)
+	{
+		return await ExecuteAsync(
+			question,
+			tenantId);
+	}
 
 
 	/// <summary>
@@ -156,7 +173,8 @@ public class BIConversationService
 	/// </summary>
 	public async Task<BIResponse>
 		ExecuteAsync(
-			string question)
+			string question,
+			long tenantId)
 	{
 
 		/*
@@ -221,7 +239,7 @@ public class BIConversationService
 			{
 				Success = false,
 
-				Message =
+				ErrorMessage =
 					ex.Message
 			};
 
@@ -261,10 +279,11 @@ public class BIConversationService
 			{
 				Success = false,
 
-				Message =
+				ErrorMessage =
 					string.Join(
 						"\n",
-						semanticValidation.Errors)
+						semanticValidation.Errors
+							.Select(x => x.Message))
 			};
 		}
 
@@ -277,10 +296,17 @@ public class BIConversationService
          *
          * Phase 1
          */
+		var dataSource =
+			await _superBIContext.DataSources
+				.FirstAsync(
+					x =>
+						x.Id == plan.DataSourceId);
+
+
 		var dialect =
 			_sqlDialectResolver
 				.Resolve(
-					plan.DataSource.DbType);
+					dataSource.DbType);
 
 
 
@@ -314,7 +340,7 @@ public class BIConversationService
          */
 		var answer =
 			await _resultUnderstandingService
-				.UnderstandAsync(
+				.AnalyzeAsync(
 					question,
 					data);
 
