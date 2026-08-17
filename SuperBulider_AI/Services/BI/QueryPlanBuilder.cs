@@ -84,7 +84,11 @@ public partial class QueryPlanBuilder : IQueryPlanBuilder
 			joinInference
 			?? throw new ArgumentNullException(
 				nameof(joinInference));
-		_validator = validator;
+
+		_validator =
+			validator
+			?? throw new ArgumentNullException(
+				nameof(validator));
 	}
 
 	/// <summary>
@@ -1257,8 +1261,14 @@ public partial class QueryPlanBuilder : IQueryPlanBuilder
 
 
 
+		var validationResult =
+			await _validator.ValidateAsync(plan);
 
-		plan = _validator.Validate(plan);
+			if (!validationResult.IsValid)
+			{
+				throw new InvalidOperationException(
+					validationResult.ToErrorMessage());
+			}
 
 		return plan;
 
