@@ -23,6 +23,8 @@ Phase 2.2.2.2：QueryPlanContextBuilder 实现
 Phase 2.2.3：QuerySemanticValidator 实现
 Phase 2.2.3.1：语义验证模型实现
 Phase 2.2.3.2：QuerySemanticValidator 实现
+Phase 2.2.4：验证链集成
+Phase 2.2.5：QueryPlan 自动修复链（AI Repair Loop）
 
         ↓
 
