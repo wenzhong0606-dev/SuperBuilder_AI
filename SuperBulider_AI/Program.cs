@@ -192,6 +192,10 @@ builder.Services
 		IBIConversationService,
 		BIConversationService>();
 
+builder.Services.AddScoped<ISqlDialectResolver, SqlDialectResolver>();
+
+builder.Services.AddScoped<QueryPlanMetadataValidator>();
+
 builder.Services
 	.AddScoped<QuerySemanticValidator>();
 

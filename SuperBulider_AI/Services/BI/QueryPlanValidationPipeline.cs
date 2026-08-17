@@ -68,7 +68,7 @@ public class QueryPlanValidationPipeline :
 	/// 3. 再次验证
 	///
 	/// </summary>
-	public async Task<QuerySemanticValidationResult> ValidateAsync(
+	public async Task<QueryPlanValidationPipelineResult> ValidateAsync(
 		QueryPlan plan,
 		QueryPlanValidationContext context,
 		string question)
@@ -94,7 +94,11 @@ public class QueryPlanValidationPipeline :
 		//
 		if (result.IsValid)
 		{
-			return result;
+			return new QueryPlanValidationPipelineResult
+			{
+				Plan = plan,
+				ValidationResult = result
+			};
 		}
 
 
@@ -133,6 +137,10 @@ public class QueryPlanValidationPipeline :
 
 
 
-		return repairedResult;
+		return new QueryPlanValidationPipelineResult
+		{
+			Plan = repairedPlan,
+			ValidationResult = repairedResult
+		};
 	}
 }

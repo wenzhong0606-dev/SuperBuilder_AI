@@ -271,9 +271,11 @@ public class BIConversationService
 					validationContext,
 					question);
 
+		plan =
+			semanticValidation.Plan;
 
 
-		if (!semanticValidation.IsValid)
+		if (!semanticValidation.ValidationResult.IsValid)
 		{
 			return new BIResponse
 			{
@@ -282,7 +284,7 @@ public class BIConversationService
 				ErrorMessage =
 					string.Join(
 						"\n",
-						semanticValidation.Errors
+						semanticValidation.ValidationResult.Errors
 							.Select(x => x.Message))
 			};
 		}
