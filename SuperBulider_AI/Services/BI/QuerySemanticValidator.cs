@@ -344,15 +344,22 @@ public class QuerySemanticValidator
 	#region Metadata Lookup
 
 
-	private static MetadataColumn? FindColumn(
-		string field,
+	private static MetadataColumn?
+	FindColumn(
+		string? field,
 		QueryPlanValidationContext context)
 	{
-		return context.Columns.Values
+		if (string.IsNullOrWhiteSpace(field))
+		{
+			return null;
+		}
+
+
+		return context.Columns
+			.Values
 			.FirstOrDefault(
 				x =>
-					string.Equals(
-						x.ColumnName,
+					x.ColumnName.Equals(
 						field,
 						StringComparison.OrdinalIgnoreCase));
 	}
