@@ -13,7 +13,13 @@ AI BI 查询核心链路
 Phase 2
 查询计划验证与可靠性
         ← 当前阶段
-
+Phase 2.1.1 QueryPlan基础能力
+Phase 2.1.2 QueryPlan Metadata关系完整性验证 ✅
+Phase 2.2：查询计划语义一致性验证
+Phase 2.2.1：Metadata语义模型读取与查询计划语义验证设计
+Phase 2.2.2：QuerySemanticValidator 实现设计
+Phase 2.2.2.1：QueryPlanContextBuilder 设计
+Phase 2.2.2.2：QueryPlanContextBuilder 实现
 
         ↓
 

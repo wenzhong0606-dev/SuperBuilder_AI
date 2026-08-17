@@ -179,6 +179,11 @@ builder.Services
 
 builder.Services
 	.AddScoped<
+		IQueryPlanContextBuilder,
+		QueryPlanContextBuilder>();
+
+builder.Services
+	.AddScoped<
 		IResultUnderstandingService,
 		ResultUnderstandingService>();
 
