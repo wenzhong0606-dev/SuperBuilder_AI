@@ -13,7 +13,7 @@ namespace SuperBulider_AI.Interfaces.BI;
 public interface IQueryPlanValidationPipeline
 {
 
-	Task<QuerySemanticValidationResult>
+	Task<QueryPlanValidationPipelineResult>
 		ValidateAsync(
 			QueryPlan plan,
 			QueryPlanValidationContext context,

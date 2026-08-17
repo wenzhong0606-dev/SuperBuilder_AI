@@ -297,10 +297,10 @@ public class BIConversationService
          * Phase 1
          */
 		var dataSource =
-			await _superBIContext.DataSources
+			await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions
 				.FirstAsync(
-					x =>
-						x.Id == plan.DataSourceId);
+					_superBIContext.DataSources,
+					x => x.Id == plan.DataSourceId);
 
 
 		var dialect =
@@ -327,7 +327,9 @@ public class BIConversationService
          */
 		var data =
 			await _queryExecutionService
-				.ExecuteAsync(sql);
+				.ExecuteAsync(
+					sql,
+					plan.DataSourceId);
 
 
 
@@ -351,7 +353,7 @@ public class BIConversationService
 			Success = true,
 
 			Answer =
-				answer.Answer,
+				answer,
 
 			Data =
 				data
