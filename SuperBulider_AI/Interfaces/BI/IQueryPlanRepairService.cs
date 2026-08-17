@@ -4,44 +4,32 @@
 namespace SuperBulider_AI.Interfaces.BI;
 
 /// <summary>
-/// QueryPlan自动修复服务接口。
+/// Query计划自动修复服务。
 ///
 /// Phase 2.2.5
 ///
-/// 职责:
+/// 输入:
 ///
-/// 根据 QueryPlan Validation 错误
+/// QueryIntent
+/// ValidationResult
 ///
-/// 自动修复:
+/// 输出:
 ///
-/// - Column引用错误
-/// - Metric字段错误
-/// - Filter字段错误
+/// 修复后的 QueryIntent
 ///
-/// 第一阶段:
+/// 注意:
 ///
-/// Metadata Semantic Repair
-///
-/// 不负责:
-///
-/// - SQL生成
-/// - SQL执行
-/// - Qwen推理
-///
+/// 不直接修改 QueryPlan。
+/// QueryPlan 属于执行模型。
 /// </summary>
 public interface IQueryPlanRepairService
 {
+
 	/// <summary>
-	/// 修复QueryPlan。
+	/// 修复查询意图。
 	/// </summary>
-	/// <param name="request">
-	/// 包含:
-	///
-	/// QueryPlan
-	/// ValidationContext
-	/// ValidationErrors
-	///
-	/// </param>
-	Task<QueryPlanRepairResult> RepairAsync(
-		QueryPlanRepairRequest request);
+	Task<QueryIntent> RepairAsync(
+		QueryIntent intent,
+		QuerySemanticValidationResult validationResult);
+
 }

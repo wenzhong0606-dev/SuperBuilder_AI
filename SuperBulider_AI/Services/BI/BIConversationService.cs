@@ -1,74 +1,51 @@
-﻿using Microsoft.EntityFrameworkCore;
-using SuperBulider_AI.Data;
-using SuperBulider_AI.Infrastructure.Database;
+﻿using SuperBulider_AI.Infrastructure.Database;
+using SuperBulider_AI.Interfaces;
 using SuperBulider_AI.Interfaces.BI;
 using SuperBulider_AI.Interfaces.Database;
+using SuperBulider_AI.Models.AI;
 using SuperBulider_AI.Models.BI;
 
 
 namespace SuperBulider_AI.Services.BI;
 
 /// <summary>
-/// AI BI会话编排服务。
+/// AI BI 对话编排服务。
 ///
-/// 完整流程:
+/// 核心职责:
 ///
 /// 用户问题
 ///     ↓
-/// QueryUnderstanding
+/// Query理解
 ///     ↓
-/// QueryIntent
+/// QueryPlan生成
 ///     ↓
-/// QueryPlan
+/// QueryPlan验证
 ///     ↓
-/// QueryPlan Validation
+/// QueryPlan自动修复
 ///     ↓
 /// SQL生成
 ///     ↓
-/// SQL执行
+/// 数据执行
 ///     ↓
-/// AI结果分析
+/// 结果理解
 ///
-/// Phase 2.2.4:
+/// Phase 1:
+/// AI BI 查询核心链路
 ///
-/// 增加 QueryPlan 验证链。
+/// Phase 2.2.5:
+/// QueryPlan自动修复链（AI Repair Loop）
 /// </summary>
-public class BIConversationService :
+public class BIConversationService
+	:
 	IBIConversationService
 {
+
 	private readonly IQueryUnderstandingService
 		_queryUnderstandingService;
 
 
 	private readonly IQueryPlanBuilder
 		_queryPlanBuilder;
-
-
-	private readonly ISqlQueryBuilder
-		_sqlQueryBuilder;
-
-
-	private readonly IQueryExecutionService
-		_queryExecutionService;
-
-
-	private readonly IResultUnderstandingService
-		_resultUnderstandingService;
-
-
-	private readonly SqlDialectResolver
-		_sqlDialectResolver;
-
-
-	private readonly SuperBIContext
-		_context;
-
-
-	/*
-     * Phase 2.2.4
-     *
-     * QueryPlan Validation Chain
-     */
 
 
 	private readonly IQueryPlanContextBuilder
@@ -79,23 +56,53 @@ public class BIConversationService :
 		_queryPlanMetadataValidator;
 
 
-	private readonly QuerySemanticValidator
-		_querySemanticValidator;
+	/// <summary>
+	/// Phase 2.2.5
+	///
+	/// QueryPlan验证+自动修复Pipeline
+	/// </summary>
+	private readonly IQueryPlanValidationPipeline
+		_validationPipeline;
+
+
+	private readonly ISqlQueryBuilder
+		_sqlQueryBuilder;
+
+
+	/// <summary>
+	/// SQL方言解析器。
+	///
+	/// 根据数据源类型:
+	///
+	/// SQLServer
+	/// MySQL
+	/// PostgreSQL
+	///
+	/// 返回对应Dialect。
+	/// </summary>
+	private readonly ISqlDialectResolver
+		_sqlDialectResolver;
+
+
+	private readonly IQueryExecutionService
+		_queryExecutionService;
+
+
+	private readonly IResultUnderstandingService
+		_resultUnderstandingService;
 
 
 
 	public BIConversationService(
 		IQueryUnderstandingService queryUnderstandingService,
 		IQueryPlanBuilder queryPlanBuilder,
-		ISqlQueryBuilder sqlQueryBuilder,
-		IQueryExecutionService queryExecutionService,
-		IResultUnderstandingService resultUnderstandingService,
-		SqlDialectResolver sqlDialectResolver,
-		SuperBIContext context,
-
 		IQueryPlanContextBuilder queryPlanContextBuilder,
 		QueryPlanMetadataValidator queryPlanMetadataValidator,
-		QuerySemanticValidator querySemanticValidator)
+		IQueryPlanValidationPipeline validationPipeline,
+		ISqlQueryBuilder sqlQueryBuilder,
+		ISqlDialectResolver sqlDialectResolver,
+		IQueryExecutionService queryExecutionService,
+		IResultUnderstandingService resultUnderstandingService)
 	{
 		_queryUnderstandingService =
 			queryUnderstandingService;
@@ -103,26 +110,6 @@ public class BIConversationService :
 
 		_queryPlanBuilder =
 			queryPlanBuilder;
-
-
-		_sqlQueryBuilder =
-			sqlQueryBuilder;
-
-
-		_queryExecutionService =
-			queryExecutionService;
-
-
-		_resultUnderstandingService =
-			resultUnderstandingService;
-
-
-		_sqlDialectResolver =
-			sqlDialectResolver;
-
-
-		_context =
-			context;
 
 
 		_queryPlanContextBuilder =
@@ -133,377 +120,217 @@ public class BIConversationService :
 			queryPlanMetadataValidator;
 
 
-		_querySemanticValidator =
-			querySemanticValidator;
+		_validationPipeline =
+			validationPipeline;
+
+
+		_sqlQueryBuilder =
+			sqlQueryBuilder;
+
+
+		_sqlDialectResolver =
+			sqlDialectResolver;
+
+
+		_queryExecutionService =
+			queryExecutionService;
+
+
+		_resultUnderstandingService =
+			resultUnderstandingService;
 	}
 
 
 
 	/// <summary>
-	/// 执行完整AI BI查询。
+	/// 执行一次 BI 查询。
+	///
+	/// Phase 2.2.5:
+	///
+	/// Validate
+	///     ↓
+	/// Repair
+	///     ↓
+	/// ReValidate
+	///
 	/// </summary>
-	public async Task<BIResponse> AskAsync(
-		string question,
-		long dataSourceId)
+	public async Task<BIResponse>
+		ExecuteAsync(
+			string question)
 	{
-		if (string.IsNullOrWhiteSpace(question))
-		{
-			return new BIResponse
-			{
-				Success = false,
 
-				Question =
-					question ?? string.Empty,
-
-				ErrorMessage =
-					"用户问题不能为空。"
-			};
-		}
+		/*
+         * Step 1
+         *
+         * 用户问题理解
+         */
+		var intent =
+			await _queryUnderstandingService
+				.UnderstandAsync(question);
 
 
+
+		/*
+         * Step 2
+         *
+         * 构建 QueryPlan
+         */
+		var plan =
+			await _queryPlanBuilder
+				.BuildAsync(intent);
+
+
+
+		/*
+         * Step 3
+         *
+         * 构建 QueryPlan Validation Context
+         */
+		var validationContext =
+			await _queryPlanContextBuilder
+				.BuildAsync(plan);
+
+
+
+		/*
+         * Step 4
+         *
+         * Metadata关系完整性验证
+         *
+         * 注意:
+         *
+         * 当前 Validator:
+         *
+         * void Validate()
+         *
+         * 失败通过异常表达。
+         */
 		try
 		{
-			/*
-             * Phase 1
-             *
-             * Question
-             *
-             * ↓
-             *
-             * QueryIntent
-             */
-
-			var intent =
-				await _queryUnderstandingService
-					.UnderstandAsync(question);
-
-
-
-			if (intent == null)
-			{
-				return new BIResponse
-				{
-					Success = false,
-
-					Question = question,
-
-					ErrorMessage =
-						"AI无法理解用户查询意图。"
-				};
-			}
-
-
-
-			/*
-             * Phase 2
-             *
-             * QueryIntent
-             *
-             * ↓
-             *
-             * QueryPlan
-             */
-
-
-			var plan =
-				await _queryPlanBuilder
-					.BuildAsync(intent);
-
-
-
-			if (plan == null)
-			{
-				return new BIResponse
-				{
-					Success = false,
-
-					Question = question,
-
-					ErrorMessage =
-						"无法创建查询执行计划。"
-				};
-			}
-
-
-
-			/*
-             * ====================================================
-             *
-             * Phase 2.2.4
-             *
-             * QueryPlan Validation Chain
-             *
-             * QueryPlan
-             *      ↓
-             * ContextBuilder
-             *      ↓
-             * MetadataValidator
-             *      ↓
-             * SemanticValidator
-             *
-             * ====================================================
-             */
-
-
-			var validationContext =
-				await _queryPlanContextBuilder
-					.BuildAsync(plan);
-
-
 
 			_queryPlanMetadataValidator
 				.Validate(
 					plan,
 					validationContext);
 
-
-
-			var semanticResult =
-				_querySemanticValidator
-					.Validate(
-						plan,
-						validationContext);
-
-
-
-			if (!semanticResult.IsValid)
-			{
-				return new BIResponse
-				{
-					Success = false,
-
-					Question = question,
-
-					ErrorMessage =
-						string.Join(
-							"\n",
-							semanticResult.ErrorItems
-								.Select(
-									x => x.Message))
-				};
-			}
-
-
-
-			/*
-             * Phase 3
-             *
-             * DataSource
-             */
-
-
-			plan.DataSourceId =
-				dataSourceId;
-
-
-
-			var dataSource =
-				await _context.DataSources
-					.AsNoTracking()
-					.FirstOrDefaultAsync(
-						x =>
-							x.Id == dataSourceId);
-
-
-
-			if (dataSource == null)
-			{
-				return new BIResponse
-				{
-					Success = false,
-
-					Question = question,
-
-					ErrorMessage =
-						$"数据源不存在，DataSourceId={dataSourceId}。"
-				};
-			}
-
-
-
-			if (dataSource.Enabled != true)
-			{
-				return new BIResponse
-				{
-					Success = false,
-
-					Question = question,
-
-					ErrorMessage =
-						$"数据源已禁用，DataSourceId={dataSourceId}。"
-				};
-			}
-
-
-
-			if (string.IsNullOrWhiteSpace(dataSource.DbType))
-			{
-				return new BIResponse
-				{
-					Success = false,
-
-					Question = question,
-
-					ErrorMessage =
-						$"数据源未配置数据库类型，DataSourceId={dataSourceId}。"
-				};
-			}
-
-
-
-			/*
-             * Phase 4
-             *
-             * DbType
-             *
-             * ↓
-             *
-             * Dialect
-             */
-
-
-			var dialect =
-				_sqlDialectResolver
-					.Resolve(
-						dataSource.DbType);
-
-
-
-			/*
-             * Phase 5
-             *
-             * QueryPlan
-             *
-             * ↓
-             *
-             * SqlQuery
-             */
-
-
-			var sqlQuery =
-				await _sqlQueryBuilder
-					.BuildAsync(
-						plan,
-						dialect);
-
-
-
-			if (sqlQuery == null)
-			{
-				return new BIResponse
-				{
-					Success = false,
-
-					Question = question,
-
-					ErrorMessage =
-						"SQL查询构建失败。"
-				};
-			}
-
-
-
-			/*
-             * Phase 6
-             *
-             * SQL执行
-             */
-
-
-			var queryResult =
-				await _queryExecutionService
-					.ExecuteAsync(
-						sqlQuery,
-						dataSourceId);
-
-
-
-			if (queryResult == null)
-			{
-				return new BIResponse
-				{
-					Success = false,
-
-					Question = question,
-
-					Sql =
-						sqlQuery.Sql,
-
-					ErrorMessage =
-						"数据库查询没有返回结果。"
-				};
-			}
-
-
-
-			/*
-             * Phase 7
-             *
-             * Result Understanding
-             */
-
-
-			QueryAnswer? answer = null;
-
-
-
-			if (queryResult.Success)
-			{
-				answer =
-					await _resultUnderstandingService
-						.AnalyzeAsync(
-							question,
-							queryResult);
-			}
-
-
-
-			/*
-             * Phase 8
-             *
-             * Response
-             */
-
+		}
+		catch (Exception ex)
+		{
 
 			return new BIResponse
 			{
-				Success =
-					queryResult.Success,
+				Success = false,
 
-
-				Question =
-					question,
-
-
-				Sql =
-					sqlQuery.Sql,
-
-
-				Data =
-					queryResult,
-
-
-				Answer =
-					answer,
-
-
-				ErrorMessage =
-					queryResult.Success
-						? null
-						: queryResult.ErrorMessage
+				Message =
+					ex.Message
 			};
+
 		}
-		catch (Exception ex)
+
+
+
+		/*
+         * Step 5
+         *
+         * QueryPlan语义验证+自动修复
+         *
+         * Phase 2.2.5
+         *
+         * Validate
+         *
+         * ↓
+         *
+         * Repair
+         *
+         * ↓
+         *
+         * ReValidate
+         */
+		var semanticValidation =
+			await _validationPipeline
+				.ValidateAsync(
+					plan,
+					validationContext,
+					question);
+
+
+
+		if (!semanticValidation.IsValid)
 		{
 			return new BIResponse
 			{
 				Success = false,
 
-				Question = question,
-
-				ErrorMessage =
-					ex.Message
+				Message =
+					string.Join(
+						"\n",
+						semanticValidation.Errors)
 			};
 		}
+
+
+
+		/*
+         * Step 6
+         *
+         * SQL生成
+         *
+         * Phase 1
+         */
+		var dialect =
+			_sqlDialectResolver
+				.Resolve(
+					plan.DataSource.DbType);
+
+
+
+		var sql =
+			await _sqlQueryBuilder
+				.BuildAsync(
+					plan,
+					dialect);
+
+
+
+		/*
+         * Step 7
+         *
+         * 执行SQL
+         *
+         * Phase 1
+         */
+		var data =
+			await _queryExecutionService
+				.ExecuteAsync(sql);
+
+
+
+		/*
+         * Step 8
+         *
+         * Result理解
+         *
+         * Phase 1
+         */
+		var answer =
+			await _resultUnderstandingService
+				.UnderstandAsync(
+					question,
+					data);
+
+
+
+		return new BIResponse
+		{
+			Success = true,
+
+			Answer =
+				answer.Answer,
+
+			Data =
+				data
+		};
+
 	}
+
 }

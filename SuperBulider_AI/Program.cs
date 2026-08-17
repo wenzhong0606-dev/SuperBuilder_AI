@@ -192,6 +192,21 @@ builder.Services
 		IBIConversationService,
 		BIConversationService>();
 
+builder.Services
+	.AddScoped<QuerySemanticValidator>();
+
+
+builder.Services
+	.AddScoped<
+		IQueryPlanRepairService,
+		QueryPlanRepairService>();
+
+
+builder.Services
+	.AddScoped<
+		IQueryPlanValidationPipeline,
+		QueryPlanValidationPipeline>();
+
 // -----------------------------
 // 数据库连接与 SQL 执行
 // -----------------------------
