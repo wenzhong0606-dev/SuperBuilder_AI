@@ -38,9 +38,4 @@
     <Folder Include="Services\BI\Planning\Sql\" />
   </ItemGroup>
 
-  <ItemGroup>
-    <None Include="wwwroot\Doc\总体设计方案.html" />
-    <None Include="wwwroot\Doc\解决方案.html" />
-  </ItemGroup>
-
 </Project>
