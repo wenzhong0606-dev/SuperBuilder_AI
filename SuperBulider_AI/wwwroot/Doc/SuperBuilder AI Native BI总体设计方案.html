@@ -1,0 +1,2677 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>
+        SuperBuilder AI Native BI总体设计方案
+    </title>
+
+
+    <style>
+
+        body {
+            font-family: "Microsoft YaHei", Arial, sans-serif;
+            line-height: 1.8;
+            margin: 40px;
+            color: #333;
+        }
+
+
+        h1 {
+            color: #1a365d;
+            border-bottom: 3px solid #1a365d;
+            padding-bottom: 10px;
+        }
+
+
+        h2 {
+            color: #2c5282;
+            margin-top: 40px;
+        }
+
+
+        h3 {
+            color: #2b6cb0;
+        }
+
+
+        .card {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            background: #fafafa;
+        }
+
+
+        .arch {
+            background: #f7fafc;
+            border: 1px solid #cbd5e0;
+            padding: 20px;
+            text-align: center;
+            font-size: 18px;
+        }
+
+
+        .layer {
+            margin: 10px;
+            padding: 15px;
+            border-radius: 6px;
+            background: #edf2f7;
+        }
+
+
+        .done {
+            color: green;
+            font-weight: bold;
+        }
+
+
+        .progress {
+            color: #d69e2e;
+            font-weight: bold;
+        }
+
+
+        .future {
+            color: #718096;
+        }
+
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+
+        th, td {
+            border: 1px solid #ccc;
+            padding: 10px;
+        }
+
+
+        th {
+            background: #edf2f7;
+        }
+
+
+        .code {
+            background: #1a202c;
+            color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            font-family: Consolas, monospace;
+        }
+    </style>
+
+
+</head>
+
+
+<body>
+
+
+    <h1>
+        SuperBuilder AI Native BI总体设计方案
+    </h1>
+
+
+    <div class="card">
+
+        <h2>
+            文档信息
+        </h2>
+
+
+        <table>
+
+            <tr>
+                <td>项目名称</td>
+                <td>SuperBuilder AI Native BI</td>
+            </tr>
+
+
+            <tr>
+                <td>版本</td>
+                <td>v2.0 Architecture Design</td>
+            </tr>
+
+
+            <tr>
+                <td>当前阶段</td>
+                <td>
+                    Phase 2.3 QueryPlan Reliability Enhancement
+                </td>
+            </tr>
+
+
+            <tr>
+                <td>当前完成度</td>
+                <td>
+                    80% ~ 85%
+                </td>
+            </tr>
+
+
+            <tr>
+                <td>文档目标</td>
+                <td>
+                    定义AI Native BI平台总体架构、核心技术路线以及未来演进方向
+                </td>
+            </tr>
+
+
+        </table>
+
+
+    </div>
+
+
+
+    <h2>
+        1. 项目背景
+    </h2>
+
+
+    <p>
+
+        传统商业智能系统（BI）主要依赖人工建设：
+
+    </p>
+
+
+    <div class="code">
+
+        业务人员提出需求
+
+        ↓
+
+        数据分析人员设计指标
+
+        ↓
+
+        开发人员创建SQL
+
+        ↓
+
+        BI人员制作报表
+
+        ↓
+
+        用户查看结果
+
+    </div>
+
+
+    <p>
+
+        这种模式存在：
+
+    </p>
+
+
+    <ul>
+
+        <li>
+            业务响应速度慢
+        </li>
+
+        <li>
+            高度依赖技术人员
+        </li>
+
+        <li>
+            无法应对动态业务问题
+        </li>
+
+        <li>
+            数据价值释放不足
+        </li>
+
+    </ul>
+
+
+
+    <p>
+
+        随着大语言模型（LLM）、知识向量数据库、Agent技术的发展，BI正在从：
+
+    </p>
+
+
+    <div class="arch">
+
+        Dashboard Driven BI
+
+        <br>
+
+        ↓
+
+        <br>
+
+        AI Native Business Intelligence
+
+    </div>
+
+
+
+    <p>
+
+        SuperBuilder AI Native BI的目标，是构建一个能够理解企业业务、自动规划分析路径、自动访问数据并生成商业洞察的智能分析平台。
+
+    </p>
+
+
+
+    <h2>
+        2. AI Native BI核心理念
+    </h2>
+
+
+    <div class="card">
+
+
+        <h3>
+            传统BI模式
+        </h3>
+
+
+        <div class="code">
+
+            用户
+
+            ↓
+
+            固定报表
+
+            ↓
+
+            固定指标
+
+            ↓
+
+            数据库
+
+        </div>
+
+
+    </div>
+
+
+
+    <div class="card">
+
+
+        <h3>
+            SuperBuilder AI Native BI模式
+        </h3>
+
+
+        <div class="code">
+
+
+            用户自然语言问题
+
+            ↓
+
+            AI Business Understanding
+
+            ↓
+
+            Query Planning
+
+            ↓
+
+            Semantic Validation
+
+            ↓
+
+            SQL Generation
+
+            ↓
+
+            Data Execution
+
+            ↓
+
+            Business Insight
+
+
+        </div>
+
+
+    </div>
+
+
+    <h2>
+        3. 平台总体架构
+    </h2>
+
+
+    <div class="arch">
+
+
+        <b>
+            SuperBuilder AI Native BI Architecture
+        </b>
+
+
+        <br><br>
+
+
+        User Interaction Layer
+
+        <br>
+
+        ↓
+
+        <br>
+
+        AI Conversation Layer
+
+        <br>
+
+        ↓
+
+        <br>
+
+        Query Understanding Layer
+
+        <br>
+
+        ↓
+
+        <br>
+
+        QueryPlan Intelligence Layer
+
+        <br>
+
+        ↓
+
+        <br>
+
+        Semantic Validation Layer
+
+        <br>
+
+        ↓
+
+        <br>
+
+        SQL Intelligence Layer
+
+        <br>
+
+        ↓
+
+        <br>
+
+        Data Execution Layer
+
+        <br>
+
+        ↓
+
+        <br>
+
+        Result Understanding Layer
+
+
+    </div>
+
+
+    <h2>
+        4. 核心架构分层设计
+    </h2>
+
+
+    <div class="layer">
+
+        <h3>
+            4.1 AI Conversation Layer
+        </h3>
+
+
+        负责：
+
+        <ul>
+
+            <li>
+                用户自然语言交互
+            </li>
+
+            <li>
+                上下文管理
+            </li>
+
+            <li>
+                BI会话编排
+            </li>
+
+        </ul>
+
+
+        核心服务：
+
+<pre>
+
+BIConversationService
+
+</pre>
+
+
+    </div>
+
+
+    <div class="layer">
+
+        <h3>
+            4.2 Query Understanding Engine
+        </h3>
+
+
+        负责：
+
+        <ul>
+
+            <li>
+                用户意图识别
+            </li>
+
+            <li>
+                指标识别
+            </li>
+
+            <li>
+                过滤条件识别
+            </li>
+
+            <li>
+                分析维度识别
+            </li>
+
+        </ul>
+
+
+        核心模型：
+
+<pre>
+
+QueryIntent
+
+QueryMetric
+
+QueryFilter
+
+</pre>
+
+
+    </div>
+
+
+    <div class="layer">
+
+        <h3>
+            4.3 QueryPlan Intelligence Engine
+        </h3>
+
+
+        <p>
+
+            QueryPlan是SuperBuilder AI Native BI的核心。
+
+        </p>
+
+
+        <p>
+
+            它不是简单SQL参数，而是AI对于业务问题的结构化推理结果。
+
+        </p>
+
+
+        核心模型：
+
+<pre>
+
+QueryPlan
+
+ ├── Metrics
+
+ ├── Dimensions
+
+ ├── Filters
+
+ ├── Tables
+
+ ├── Aggregations
+
+ └── Joins
+
+</pre>
+
+
+    </div>
+
+
+    <div class="layer">
+
+        <h3>
+            4.4 Semantic Validation Engine
+        </h3>
+
+
+        <p>
+
+            用于保证AI生成计划符合企业业务语义。
+
+        </p>
+
+
+        包含：
+
+        <ul>
+
+            <li>
+                QueryPlanContextBuilder
+            </li>
+
+            <li>
+                QuerySemanticValidator
+            </li>
+
+            <li>
+                QueryPlanValidationPipeline
+            </li>
+
+        </ul>
+
+
+    </div>
+
+
+    <!-- Part 1 END -->
+    <!-- Part 2 START -->
+
+
+    <h2>
+        5. QueryPlan详细设计
+    </h2>
+
+
+    <div class="card">
+
+
+        <h3>
+            5.1 QueryPlan定位
+        </h3>
+
+
+        <p>
+
+            QueryPlan是连接：
+
+        </p>
+
+
+        <div class="arch">
+
+            自然语言业务问题
+
+            ↓
+
+            AI语义理解
+
+            ↓
+
+            业务查询规划
+
+            ↓
+
+            SQL生成
+
+        </div>
+
+
+        <p>
+
+            之间的核心中间层。
+
+        </p>
+
+
+        <p>
+
+            它解决的问题：
+
+        </p>
+
+
+        <ul>
+
+            <li>
+                避免LLM直接生成SQL导致的不稳定
+            </li>
+
+            <li>
+                将业务推理过程结构化
+            </li>
+
+            <li>
+                支持验证、修复和解释
+            </li>
+
+            <li>
+                支持未来复杂分析规划
+            </li>
+
+        </ul>
+
+
+    </div>
+
+
+
+    <h3>
+        5.2 QueryPlan结构
+    </h3>
+
+
+    <div class="code">
+
+
+        QueryPlan
+
+
+        {
+
+        Intent
+
+        Metrics
+
+        Dimensions
+
+        Filters
+
+        Tables
+
+        Aggregations
+
+        Joins
+
+        ExecutionStrategy
+
+        }
+
+
+    </div>
+
+
+
+    <table>
+
+
+        <tr>
+
+            <th>
+                对象
+            </th>
+
+            <th>
+                说明
+            </th>
+
+        </tr>
+
+
+        <tr>
+
+            <td>
+                QueryIntent
+            </td>
+
+            <td>
+                用户问题意图，例如销售分析、客户分析、趋势分析
+            </td>
+
+        </tr>
+
+
+        <tr>
+
+            <td>
+                QueryMetric
+            </td>
+
+            <td>
+                业务指标，例如销售额、利润、订单数量
+            </td>
+
+        </tr>
+
+
+        <tr>
+
+            <td>
+                QueryDimension
+            </td>
+
+            <td>
+                分析维度，例如时间、地区、产品
+            </td>
+
+        </tr>
+
+
+        <tr>
+
+            <td>
+                QueryFilter
+            </td>
+
+            <td>
+                过滤条件，例如年份、区域、状态
+            </td>
+
+        </tr>
+
+
+        <tr>
+
+            <td>
+                QueryJoin
+            </td>
+
+            <td>
+                多数据实体关联关系
+            </td>
+
+        </tr>
+
+
+    </table>
+
+
+
+    <h2>
+        6. Metadata Semantic Intelligence Architecture
+    </h2>
+
+
+    <p>
+
+        SuperBuilder AI Native BI不直接理解数据库字段，而是通过Metadata Semantic Layer建立业务理解能力。
+
+    </p>
+
+
+
+    <div class="arch">
+
+
+        Database Schema
+
+        <br>
+
+        ↓
+
+        <br>
+
+        Metadata Scanner
+
+        <br>
+
+        ↓
+
+        <br>
+
+        Semantic Metadata
+
+        <br>
+
+        ↓
+
+        <br>
+
+        Embedding
+
+        <br>
+
+        ↓
+
+        <br>
+
+        Vector Search
+
+        <br>
+
+        ↓
+
+        <br>
+
+        Business Understanding
+
+    </div>
+
+
+
+    <h3>
+        6.1 Metadata扫描层
+    </h3>
+
+
+    <p>
+
+        负责自动读取：
+
+    </p>
+
+
+    <ul>
+
+        <li>
+            数据库表结构
+        </li>
+
+        <li>
+            字段定义
+        </li>
+
+        <li>
+            数据类型
+        </li>
+
+        <li>
+            字段关系
+        </li>
+
+        <li>
+            业务描述
+        </li>
+
+    </ul>
+
+
+
+    <h3>
+        6.2 Semantic Metadata模型
+    </h3>
+
+
+    <div class="code">
+
+
+        MetadataTable
+
+
+        TableName
+
+        BusinessDomain
+
+        SearchText
+
+
+
+        MetadataColumn
+
+
+        ColumnName
+
+        DataType
+
+        BusinessMeaning
+
+        Keywords
+
+        Synonyms
+
+
+    </div>
+
+
+
+    <h3>
+        6.3 Vector Semantic Search
+    </h3>
+
+
+    <p>
+
+        通过Embedding和向量数据库，实现：
+
+    </p>
+
+
+    <div class="code">
+
+
+        用户:
+
+        "去年华东地区销售增长"
+
+
+        ↓
+
+        Vector Search
+
+
+        ↓
+
+        匹配:
+
+
+        Sales Table
+
+        Amount Column
+
+        Region Column
+
+        Date Column
+
+
+    </div>
+
+
+    <p>
+
+        当前支持：
+
+    </p>
+
+
+    <ul>
+
+        <li>
+            Embedding Service
+        </li>
+
+        <li>
+            Qdrant Vector Database
+        </li>
+
+        <li>
+            Semantic Retrieval
+        </li>
+
+    </ul>
+
+
+
+    <h2>
+        7. SQL Intelligence Layer
+    </h2>
+
+
+    <div class="card">
+
+
+        <h3>
+            7.1 SQL生成架构
+        </h3>
+
+
+        <div class="arch">
+
+
+            QueryPlan
+
+            ↓
+
+            SqlQueryBuilder
+
+            ↓
+
+            SqlQuery
+
+            ↓
+
+            Database Execution
+
+
+        </div>
+
+
+    </div>
+
+
+
+    <h3>
+        7.2 Database Dialect Architecture
+    </h3>
+
+
+    <p>
+
+        为了支持企业多数据库环境，系统采用Dialect抽象。
+
+    </p>
+
+
+    <div class="code">
+
+
+        ISqlDialect
+
+
+        |
+
+        |
+
+        +--------------+
+
+        |              |
+
+        SQL Server   MySQL   PostgreSQL
+
+
+    </div>
+
+
+
+    当前支持：
+
+    <table>
+
+        <tr>
+
+            <th>
+                数据库
+            </th>
+
+            <th>
+                状态
+            </th>
+
+        </tr>
+
+
+        <tr>
+
+            <td>
+                SQL Server
+            </td>
+
+            <td class="done">
+                Completed
+            </td>
+
+        </tr>
+
+
+        <tr>
+
+            <td>
+                MySQL
+            </td>
+
+            <td class="done">
+                Completed
+            </td>
+
+        </tr>
+
+
+        <tr>
+
+            <td>
+                PostgreSQL
+            </td>
+
+            <td class="done">
+                Completed
+            </td>
+
+        </tr>
+
+
+    </table>
+
+
+
+    <h3>
+        7.3 当前SQL能力
+    </h3>
+
+
+    <table>
+
+
+        <tr>
+
+            <th>
+                能力
+            </th>
+
+            <th>
+                状态
+            </th>
+
+        </tr>
+
+
+        <tr>
+
+            <td>
+                单表查询生成
+            </td>
+
+            <td class="done">
+                Completed
+            </td>
+
+        </tr>
+
+
+        <tr>
+
+            <td>
+                条件过滤
+            </td>
+
+            <td class="done">
+                Completed
+            </td>
+
+        </tr>
+
+
+        <tr>
+
+            <td>
+                指标聚合
+            </td>
+
+            <td class="done">
+                Completed
+            </td>
+
+        </tr>
+
+
+        <tr>
+
+            <td>
+                多表Join
+            </td>
+
+            <td class="progress">
+                In Progress
+            </td>
+
+        </tr>
+
+
+        <tr>
+
+            <td>
+                复杂分析SQL
+            </td>
+
+            <td class="future">
+                Planned
+            </td>
+
+        </tr>
+
+
+    </table>
+
+
+
+    <h2>
+        8. QueryPlan Reliability Architecture
+    </h2>
+
+
+    <p>
+
+        AI系统最大的挑战不是生成，而是可靠生成。
+
+    </p>
+
+
+    <p>
+
+        因此SuperBuilder设计：
+
+    </p>
+
+
+
+    <div class="arch">
+
+
+        QueryPlan
+
+        ↓
+
+        Validation
+
+        ↓
+
+        Error Detection
+
+        ↓
+
+        Repair Strategy
+
+        ↓
+
+        Rebuild
+
+        ↓
+
+        Validation Again
+
+
+    </div>
+
+
+
+    <h3>
+        8.1 Semantic Validation
+    </h3>
+
+
+    验证：
+
+    <ul>
+
+        <li>
+            指标是否存在
+        </li>
+
+        <li>
+            字段是否匹配业务含义
+        </li>
+
+        <li>
+            过滤条件是否合法
+        </li>
+
+        <li>
+            聚合逻辑是否合理
+        </li>
+
+    </ul>
+
+
+
+    <h3>
+        8.2 QueryPlan Repair Loop
+    </h3>
+
+
+    <div class="code">
+
+
+        Invalid QueryPlan
+
+
+        ↓
+
+
+        Validator
+
+
+        ↓
+
+
+        Repair Intent
+
+
+        ↓
+
+
+        QueryPlan Rebuild
+
+
+        ↓
+
+
+        Validation Success
+
+
+    </div>
+
+
+
+    <p>
+
+        当前状态：
+
+        <span class="done">
+            Completed
+        </span>
+
+    </p>
+
+
+
+    <h2>
+        9. 当前系统实现状态
+    </h2>
+
+
+    <table>
+
+
+        <tr>
+
+            <th>
+                模块
+            </th>
+
+            <th>
+                状态
+            </th>
+
+            <th>
+                说明
+            </th>
+
+        </tr>
+
+
+        <tr>
+
+            <td>
+                Metadata Layer
+            </td>
+
+            <td class="done">
+                Completed
+            </td>
+
+            <td>
+                支持扫描、语义化、向量检索
+            </td>
+
+        </tr>
+
+
+        <tr>
+
+            <td>
+                Query Understanding
+            </td>
+
+            <td class="done">
+                Completed
+            </td>
+
+            <td>
+                支持Intent解析
+            </td>
+
+        </tr>
+
+
+        <tr>
+
+            <td>
+                QueryPlan Engine
+            </td>
+
+            <td class="done">
+                Completed
+            </td>
+
+            <td>
+                支持业务查询规划
+            </td>
+
+        </tr>
+
+
+        <tr>
+
+            <td>
+                Semantic Validation
+            </td>
+
+            <td class="done">
+                Completed
+            </td>
+
+            <td>
+                支持规则验证
+            </td>
+
+        </tr>
+
+
+        <tr>
+
+            <td>
+                Repair Loop
+            </td>
+
+            <td class="done">
+                Completed
+            </td>
+
+            <td>
+                支持自动修复
+            </td>
+
+        </tr>
+
+
+        <tr>
+
+            <td>
+                SQL Builder
+            </td>
+
+            <td class="progress">
+                80%
+            </td>
+
+            <td>
+                单表完成，多表增强中
+            </td>
+
+        </tr>
+
+
+        <tr>
+
+            <td>
+                Execution Engine
+            </td>
+
+            <td class="done">
+                Completed
+            </td>
+
+            <td>
+                Dapper执行链
+            </td>
+
+        </tr>
+
+
+    </table>
+
+
+
+    <h2>
+        10. 当前项目Phase状态
+    </h2>
+
+
+    <div class="arch">
+
+
+        Phase 0
+
+        基础工程架构
+
+        <br>
+
+        ↓
+
+        <br>
+
+
+        Phase 1
+
+        AI BI核心查询能力
+
+        <br>
+
+        ↓
+
+        <br>
+
+
+        Phase 2
+
+        QueryPlan可靠性增强
+
+        <br>
+
+        ↓
+
+        <br>
+
+
+        <b>
+            Phase 2.3 QueryPlan Reliability Enhancement
+
+            (Current)
+
+        </b>
+
+
+    </div>
+
+
+    <!-- Part 2 END -->
+    <!-- Part 3 START -->
+
+
+    <h2>
+        11. AI Agent Evolution Architecture
+    </h2>
+
+
+    <p>
+
+        SuperBuilder AI Native BI未来目标不是停留在智能查询，而是演进为企业级AI Business Analyst Agent。
+
+    </p>
+
+
+    <div class="arch">
+
+
+        Level 1
+
+        AI Query Assistant
+
+
+        <br>
+
+        ↓
+
+        <br>
+
+
+        Level 2
+
+        AI BI Analyst
+
+
+        <br>
+
+        ↓
+
+        <br>
+
+
+        Level 3
+
+        AI Business Agent
+
+
+        <br>
+
+        ↓
+
+        <br>
+
+
+        Level 4
+
+        Autonomous Decision Intelligence
+
+
+    </div>
+
+
+
+    <h3>
+        11.1 Level 1：AI Query Assistant
+    </h3>
+
+
+    <p>
+
+        当前系统已经具备：
+
+    </p>
+
+
+    <ul>
+
+        <li>
+            自然语言查询
+        </li>
+
+        <li>
+            自动生成QueryPlan
+        </li>
+
+        <li>
+            自动生成SQL
+        </li>
+
+        <li>
+            返回业务结果
+        </li>
+
+    </ul>
+
+
+
+    <h3>
+        11.2 Level 2：AI BI Analyst
+    </h3>
+
+
+    <p>
+
+        下一阶段增强：
+
+    </p>
+
+
+    <ul>
+
+        <li>
+            主动分析数据趋势
+        </li>
+
+        <li>
+            发现异常变化
+        </li>
+
+        <li>
+            生成分析报告
+        </li>
+
+        <li>
+            解释业务原因
+        </li>
+
+    </ul>
+
+
+
+    <h3>
+        11.3 Level 3：AI Business Agent
+    </h3>
+
+
+    <p>
+
+        AI不仅回答问题，而是主动完成业务分析任务。
+
+    </p>
+
+
+    <div class="code">
+
+
+        用户：
+
+        "分析本季度销售下降原因"
+
+
+        ↓
+
+
+        AI Agent
+
+
+        ↓
+
+
+        拆解问题
+
+
+        ↓
+
+
+        生成多个QueryPlan
+
+
+        ↓
+
+
+        执行分析
+
+
+        ↓
+
+
+        形成业务结论
+
+
+    </div>
+
+
+
+    <h3>
+        11.4 Level 4：Autonomous Decision Intelligence
+    </h3>
+
+
+    <p>
+
+        最终目标：
+
+    </p>
+
+
+    <div class="code">
+
+
+        发现问题
+
+        ↓
+
+        分析原因
+
+        ↓
+
+        预测趋势
+
+        ↓
+
+        提出行动建议
+
+        ↓
+
+        跟踪结果
+
+
+    </div>
+
+
+
+
+    <h2>
+        12. Phase完整路线规划
+    </h2>
+
+
+
+    <table>
+
+
+        <tr>
+
+            <th>
+                阶段
+            </th>
+
+            <th>
+                目标
+            </th>
+
+            <th>
+                状态
+            </th>
+
+        </tr>
+
+
+
+        <tr>
+
+            <td>
+                Phase 0
+            </td>
+
+            <td>
+                基础工程架构
+            </td>
+
+            <td class="done">
+                Completed
+            </td>
+
+        </tr>
+
+
+        <tr>
+
+            <td>
+                Phase 1
+            </td>
+
+            <td>
+                AI BI核心查询能力
+            </td>
+
+            <td class="done">
+                Completed
+            </td>
+
+        </tr>
+
+
+        <tr>
+
+            <td>
+                Phase 2
+            </td>
+
+            <td>
+                QueryPlan可靠性增强
+            </td>
+
+            <td class="progress">
+                In Progress
+            </td>
+
+        </tr>
+
+
+        <tr>
+
+            <td>
+                Phase 3
+            </td>
+
+            <td>
+                Business Semantic Layer
+            </td>
+
+            <td class="future">
+                Planned
+            </td>
+
+        </tr>
+
+
+        <tr>
+
+            <td>
+                Phase 4
+            </td>
+
+            <td>
+                Enterprise Knowledge Graph
+            </td>
+
+            <td class="future">
+                Planned
+            </td>
+
+        </tr>
+
+
+        <tr>
+
+            <td>
+                Phase 5
+            </td>
+
+            <td>
+                AI Native BI Agent
+            </td>
+
+            <td class="future">
+                Planned
+            </td>
+
+        </tr>
+
+
+        <tr>
+
+            <td>
+                Phase 6
+            </td>
+
+            <td>
+                SuperBuilder Low-Code Integration
+            </td>
+
+            <td class="future">
+                Planned
+            </td>
+
+        </tr>
+
+
+
+    </table>
+
+
+
+
+    <h2>
+        13. Phase 2.3 QueryPlan Reliability Enhancement详细规划
+    </h2>
+
+
+    <div class="card">
+
+
+        <h3>
+            Phase 2.3.1 QueryPlan Graph Engine
+        </h3>
+
+
+        <p>
+
+            目标：
+
+            将当前结构化QueryPlan升级为业务分析图模型。
+
+        </p>
+
+
+
+        <div class="code">
+
+
+            QueryPlan Graph
+
+
+            Table Node
+
+
+            Column Node
+
+
+            Metric Node
+
+
+            Dimension Node
+
+
+            Join Node
+
+
+            Business Rule Edge
+
+
+            Semantic Relationship Edge
+
+
+        </div>
+
+
+
+        <p>
+
+            价值：
+
+        </p>
+
+
+        <ul>
+
+            <li>
+                支持复杂业务分析
+            </li>
+
+            <li>
+                支持多表关联规划
+            </li>
+
+            <li>
+                支持业务知识推理
+            </li>
+
+        </ul>
+
+
+    </div>
+
+
+
+    <div class="card">
+
+
+        <h3>
+            Phase 2.3.2 QueryPlan Explainability
+        </h3>
+
+
+        <p>
+
+            目标：
+
+            让AI解释：
+
+            为什么这样查询。
+
+        </p>
+
+
+        输出：
+
+        </p>
+
+
+        <div class="code">
+
+
+            问题：
+
+            "华东地区销售趋势"
+
+
+            AI解释：
+
+
+            选择销售订单表
+
+            原因：
+
+            包含销售金额字段
+
+            包含订单时间字段
+
+            包含区域字段
+
+
+        </div>
+
+
+    </div>
+
+
+
+    <div class="card">
+
+
+        <h3>
+            Phase 2.3.3 Query Evaluation Framework
+        </h3>
+
+
+        <p>
+
+            建立AI BI质量评估体系。
+
+        </p>
+
+
+        <div class="code">
+
+
+            Question Dataset
+
+
+            ↓
+
+
+            Expected QueryPlan
+
+
+            ↓
+
+
+            Generated SQL
+
+
+            ↓
+
+
+            Execution Result
+
+
+            ↓
+
+
+            Evaluation Score
+
+
+        </div>
+
+
+
+    </div>
+
+
+
+    <div class="card">
+
+
+        <h3>
+            Phase 2.3.4 Advanced SQL Builder
+        </h3>
+
+
+        <p>
+
+            增强SQL智能生成能力。
+
+        </p>
+
+
+        支持：
+
+        <ul>
+
+            <li>
+                多表Join
+            </li>
+
+            <li>
+                复杂聚合
+            </li>
+
+            <li>
+                Group By
+            </li>
+
+            <li>
+                Order By
+            </li>
+
+            <li>
+                Top N分析
+            </li>
+
+            <li>
+                查询优化
+            </li>
+
+        </ul>
+
+
+    </div>
+
+
+
+
+    <h2>
+        14. Phase 3 Business Semantic Layer
+    </h2>
+
+
+    <p>
+
+        Phase 3目标：
+
+        从理解数据库结构，升级为理解企业业务。
+
+    </p>
+
+
+
+    <div class="arch">
+
+
+        Database Schema Understanding
+
+
+        ↓
+
+        Business Semantic Understanding
+
+
+        ↓
+
+        Business Object Intelligence
+
+
+    </div>
+
+
+
+
+    <h3>
+        14.1 Business Entity Model
+    </h3>
+
+
+    <p>
+
+        建立企业核心业务对象：
+
+    </p>
+
+
+    <div class="code">
+
+
+        Customer
+
+
+        Product
+
+
+        Order
+
+
+        Contract
+
+
+        Revenue
+
+
+        Cost
+
+
+        Employee
+
+
+    </div>
+
+
+
+    <h3>
+        14.2 Business Metric Engine
+    </h3>
+
+
+    <p>
+
+        建立统一企业指标体系：
+
+    </p>
+
+
+    <div class="code">
+
+
+        Sales Amount
+
+
+        Growth Rate
+
+
+        Profit Margin
+
+
+        Customer Value
+
+
+        Retention Rate
+
+
+    </div>
+
+
+
+    <h3>
+        14.3 Semantic Knowledge Layer
+    </h3>
+
+
+    <div class="code">
+
+
+        Business Term
+
+
+        ↓
+
+
+        Metric
+
+
+        ↓
+
+
+        Dimension
+
+
+        ↓
+
+
+        Data Source
+
+
+    </div>
+
+
+
+
+    <h2>
+        15. Phase 4 Enterprise Knowledge Graph
+    </h2>
+
+
+    <p>
+
+        目标：
+
+        构建企业知识大脑。
+
+    </p>
+
+
+
+    <div class="arch">
+
+
+        Business Entity
+
+
+        +
+
+        Business Rule
+
+
+        +
+
+        Metric Relationship
+
+
+        +
+
+        Data Relationship
+
+
+        ↓
+
+        Enterprise Knowledge Graph
+
+
+    </div>
+
+
+
+    能力：
+
+    <ul>
+
+        <li>
+            业务关系发现
+        </li>
+
+        <li>
+            指标血缘分析
+        </li>
+
+        <li>
+            智能推荐分析路径
+        </li>
+
+        <li>
+            企业知识沉淀
+        </li>
+
+    </ul>
+
+
+
+
+    <h2>
+        16. Phase 5 AI Native BI Agent
+    </h2>
+
+
+
+    <p>
+
+        目标：
+
+        从AI查询工具升级为AI业务分析专家。
+
+    </p>
+
+
+
+    <div class="code">
+
+
+        AI BI Agent
+
+
+        ├── Query Agent
+
+
+        ├── Analysis Agent
+
+
+        ├── Report Agent
+
+
+        ├── Recommendation Agent
+
+
+        └── Decision Agent
+
+
+    </div>
+
+
+
+    能力：
+
+    <ul>
+
+        <li>
+            自动发现业务问题
+        </li>
+
+        <li>
+            自动生成分析任务
+        </li>
+
+        <li>
+            自动创建报告
+        </li>
+
+        <li>
+            主动提供业务建议
+        </li>
+
+    </ul>
+
+
+
+
+    <h2>
+        17. Phase 6 SuperBuilder AI Native Low-Code Integration
+    </h2>
+
+
+    <p>
+
+        最终与SuperBuilder AI Native Low-Code Platform融合。
+
+    </p>
+
+
+
+    <div class="arch">
+
+
+        AI Native Application Builder
+
+
+        +
+
+        AI Native BI Engine
+
+
+        =
+
+        AI Enterprise Application Platform
+
+
+    </div>
+
+
+
+
+    <h3>
+        17.1 自动生成业务系统
+    </h3>
+
+
+    用户：
+
+    <div class="code">
+
+
+        创建销售分析系统
+
+
+    </div>
+
+
+    AI生成：
+
+    <ul>
+
+        <li>
+            页面
+        </li>
+
+        <li>
+            组件
+        </li>
+
+        <li>
+            数据模型
+        </li>
+
+        <li>
+            BI分析能力
+        </li>
+
+        <li>
+            智能Agent
+        </li>
+
+    </ul>
+
+
+
+
+    <h2>
+        18. 项目最终愿景
+    </h2>
+
+
+    <div class="arch">
+
+
+        SuperBuilder AI Native BI
+
+
+        不是传统BI工具
+
+
+        而是：
+
+
+        企业AI Business Intelligence Agent Platform
+
+
+    </div>
+
+
+
+    <p>
+
+
+        最终目标：
+
+        让企业员工通过自然语言与企业数据、业务知识和智能分析能力直接交互。
+
+
+    </p>
+
+
+
+    <h2>
+        19. 当前总结
+    </h2>
+
+
+
+    <table>
+
+
+        <tr>
+
+            <th>
+                项目能力
+            </th>
+
+            <th>
+                状态
+            </th>
+
+        </tr>
+
+
+        <tr>
+
+            <td>
+                AI查询理解
+            </td>
+
+            <td class="done">
+                Completed
+            </td>
+
+        </tr>
+
+
+        <tr>
+
+            <td>
+                Metadata Semantic Intelligence
+            </td>
+
+            <td class="done">
+                Completed
+            </td>
+
+        </tr>
+
+
+        <tr>
+
+            <td>
+                QueryPlan Engine
+            </td>
+
+            <td class="done">
+                Completed
+            </td>
+
+        </tr>
+
+
+        <tr>
+
+            <td>
+                Semantic Validation
+            </td>
+
+            <td class="done">
+                Completed
+            </td>
+
+        </tr>
+
+
+        <tr>
+
+            <td>
+                Repair Loop
+            </td>
+
+            <td class="done">
+                Completed
+            </td>
+
+        </tr>
+
+
+        <tr>
+
+            <td>
+                Advanced Query Planning
+            </td>
+
+            <td class="progress">
+                Current Development
+            </td>
+
+        </tr>
+
+
+    </table>
+
+
+
+</body>
+
+
+</html>
+
+<!-- Part 3 END -->
