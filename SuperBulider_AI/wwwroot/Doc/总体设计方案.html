@@ -868,23 +868,23 @@
             setTimeout(updateActive, 300);
 
             // ---------- 展开/收起 ----------
-			sidebar.classList.toggle('open');
-            // toggleBtn.addEventListener('click', function (e)
-            // {
-            //     e.stopPropagation();
-            //     const isOpen = sidebar.classList.toggle('open');
-            //     toggleBtn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
-            // });
+			// sidebar.classList.toggle('open');
+            toggleBtn.addEventListener('click', function (e)
+            {
+                e.stopPropagation();
+                const isOpen = sidebar.classList.toggle('open');
+                toggleBtn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+            });
 
-            // // 鼠标移出时自动收起（桌面端）
-            // sidebar.addEventListener('mouseleave', function ()
-            // {
-            //     if (window.innerWidth > 860)
-            //     {
-            //         sidebar.classList.remove('open');
-            //         toggleBtn.setAttribute('aria-expanded', 'false');
-            //     }
-            // });
+            // 鼠标移出时自动收起（桌面端）
+            sidebar.addEventListener('mouseleave', function ()
+            {
+                if (window.innerWidth > 860)
+                {
+                    sidebar.classList.remove('open');
+                    toggleBtn.setAttribute('aria-expanded', 'false');
+                }
+            });
 
             // 点击页面其他区域收起（移动端）
             document.addEventListener('click', function (e)

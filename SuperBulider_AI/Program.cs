@@ -267,6 +267,7 @@ app.UseAuthorization();
 
 app.MapStaticAssets();
 
+
 app.MapControllerRoute(
 		name: "default",
 		pattern:
