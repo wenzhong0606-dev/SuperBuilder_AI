@@ -19,20 +19,16 @@ public sealed class SemanticApplicabilityEvaluator
 {
     private readonly IMetadataSemanticSearchService _semanticSearchService;
 
-    public SemanticApplicabilityEvaluator(
-        IMetadataSemanticSearchService semanticSearchService)
+    public SemanticApplicabilityEvaluator(IMetadataSemanticSearchService semanticSearchService)
     {
         _semanticSearchService = semanticSearchService;
     }
 
-    public async Task<SemanticApplicabilityResult> EvaluateAsync(
-        GoldenQueryCase goldenCase,
-        int topK = 10)
+    public async Task<SemanticApplicabilityResult> EvaluateAsync(GoldenQueryCase goldenCase, int topK = 10)
     {
         ArgumentNullException.ThrowIfNull(goldenCase);
 
         var metric = goldenCase.Expected?.Metrics?.SingleOrDefault();
-
         if (metric is null)
         {
             return new SemanticApplicabilityResult
@@ -45,12 +41,8 @@ public sealed class SemanticApplicabilityEvaluator
             };
         }
 
-        var metricType = metric.Aggregation == QueryAggregation.Count
-            ? "EntityCount"
-            : "ColumnMetric";
-
-        var results = await _semanticSearchService
-            .SearchAsync(goldenCase.Question, topK);
+        var metricType = metric.Aggregation == QueryAggregation.Count ? "EntityCount" : "ColumnMetric";
+        var results = await _semanticSearchService.SearchAsync(goldenCase.Question, topK);
 
         if (results.Count == 0)
         {
@@ -79,28 +71,13 @@ public sealed class SemanticApplicabilityEvaluator
 
         var topSemantic = semanticCandidates.FirstOrDefault();
         var secondSemantic = semanticCandidates.Skip(1).FirstOrDefault();
-
         var scoreGap = topSemantic is not null && secondSemantic is not null
             ? topSemantic.Score - secondSemantic.Score
             : null;
 
         return metricType == "EntityCount"
-            ? EvaluateEntityCount(
-                goldenCase,
-                metric.SemanticText,
-                semanticCandidates,
-                entityCandidates,
-                topSemantic,
-                secondSemantic,
-                scoreGap)
-            : EvaluateColumnMetric(
-                goldenCase,
-                metric.SemanticText,
-                semanticCandidates,
-                entityCandidates,
-                topSemantic,
-                secondSemantic,
-                scoreGap);
+            ? EvaluateEntityCount(goldenCase, metric.SemanticText, semanticCandidates, entityCandidates, topSemantic, secondSemantic, scoreGap)
+            : EvaluateColumnMetric(goldenCase, metric.SemanticText, semanticCandidates, entityCandidates, topSemantic, secondSemantic, scoreGap);
     }
 
     private static SemanticApplicabilityResult EvaluateColumnMetric(
@@ -125,16 +102,17 @@ public sealed class SemanticApplicabilityEvaluator
             };
         }
 
-        var lexicalMatch = ContainsSemanticText(topSemantic, semanticText);
+        var topLexicalMatch = ContainsSemanticText(topSemantic, semanticText);
 
-        // C.2 第一版仅记录竞争证据，不把 ScoreGap 固化为最终业务阈值。
-        var competingCandidates = secondSemantic is not null;
+        // 只有第二候选也具备同一 Golden Semantic 的直接证据时才视为竞争。
+        // 仅仅存在第二个 semantic vector 不能证明 Ambiguous。
+        var competingCandidates = semanticCandidates
+            .Skip(1)
+            .Any(x => ContainsSemanticText(x, semanticText));
 
-        var state = lexicalMatch && !competingCandidates
-            ? "Resolved"
-            : competingCandidates
-                ? "Ambiguous"
-                : "NotResolved";
+        var state = topLexicalMatch
+            ? competingCandidates ? "Ambiguous" : "Resolved"
+            : "NotResolved";
 
         return new SemanticApplicabilityResult
         {
@@ -143,14 +121,14 @@ public sealed class SemanticApplicabilityEvaluator
             MetricSemanticText = semanticText,
             MetricType = "ColumnMetric",
             State = state,
-            Reason = BuildColumnReason(state, lexicalMatch),
+            Reason = BuildColumnReason(state, topLexicalMatch),
             Candidate = ToCandidate(topSemantic),
             Evidence = new SemanticApplicabilityEvidence
             {
                 SemanticCandidateExists = semanticCandidates.Count > 0,
                 EntityCandidateExists = entityCandidates.Count > 0,
                 DirectEntityCountEvidence = false,
-                LexicalMatch = lexicalMatch,
+                LexicalMatch = topLexicalMatch,
                 CompetingCandidates = competingCandidates,
                 TopScore = topSemantic.Score,
                 SecondScore = secondSemantic?.Score,
@@ -181,8 +159,7 @@ public sealed class SemanticApplicabilityEvaluator
             State = directEntityCountEvidence ? "Resolved" : "NotResolved",
             Reason = directEntityCountEvidence
                 ? "Direct EntityCount semantic evidence was found."
-                : "Current Semantic Metadata contains entity/table candidates, " +
-                  "but no direct EntityCount semantic evidence.",
+                : "Current Semantic Metadata contains entity/table candidates, but no direct EntityCount semantic evidence.",
             Candidate = topSemantic is null ? null : ToCandidate(topSemantic),
             Evidence = new SemanticApplicabilityEvidence
             {
@@ -198,9 +175,7 @@ public sealed class SemanticApplicabilityEvaluator
         };
     }
 
-    private static bool ContainsSemanticText(
-        MetadataSemanticSearchResult candidate,
-        string semanticText)
+    private static bool ContainsSemanticText(MetadataSemanticSearchResult candidate, string semanticText)
     {
         if (string.IsNullOrWhiteSpace(semanticText))
         {
@@ -220,8 +195,7 @@ public sealed class SemanticApplicabilityEvaluator
             value.Contains(semanticText, StringComparison.OrdinalIgnoreCase));
     }
 
-    private static SemanticApplicabilityCandidate ToCandidate(
-        MetadataSemanticSearchResult candidate)
+    private static SemanticApplicabilityCandidate ToCandidate(MetadataSemanticSearchResult candidate)
     {
         return new SemanticApplicabilityCandidate
         {
@@ -234,18 +208,13 @@ public sealed class SemanticApplicabilityEvaluator
         };
     }
 
-    private static string BuildColumnReason(
-        string state,
-        bool lexicalMatch)
+    private static string BuildColumnReason(string state, bool lexicalMatch)
     {
         return state switch
         {
-            "Resolved" =>
-                $"Top semantic candidate matches the Golden metric semantics. LexicalMatch={lexicalMatch}.",
-            "Ambiguous" =>
-                "Multiple semantic candidates were returned; C.2 does not use a Score threshold to select one.",
-            _ =>
-                "Top semantic candidate does not provide sufficient evidence for the Golden metric."
+            "Resolved" => $"Top semantic candidate matches the Golden metric semantics. LexicalMatch={lexicalMatch}.",
+            "Ambiguous" => "Multiple semantic candidates contain direct evidence for the Golden metric; C.2 does not use a Score threshold to select one.",
+            _ => "Top semantic candidate does not provide sufficient evidence for the Golden metric."
         };
     }
 }
