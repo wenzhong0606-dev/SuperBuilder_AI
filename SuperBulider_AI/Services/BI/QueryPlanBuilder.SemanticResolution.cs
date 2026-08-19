@@ -18,17 +18,27 @@ public partial class QueryPlanBuilder
         if (binding is null)
             return plan;
 
-        if (string.IsNullOrWhiteSpace(binding.Column))
-            throw new InvalidOperationException("Semantic Resolution 缺少 Metric Column。");
+        if (binding.TableId <= 0)
+            throw new InvalidOperationException("Semantic Resolution 缺少有效的 Metric TableId。");
 
-        if (binding.ColumnId <= 0)
-            throw new InvalidOperationException("Semantic Resolution 缺少有效的 Metric ColumnId。");
+        if (binding.ColumnId <= 0 || string.IsNullOrWhiteSpace(binding.Column))
+            throw new InvalidOperationException("Semantic Resolution 缺少有效的 Metric Column Binding。");
+
+        if (!plan.Tables.Any(table => table.MetadataTableId == binding.TableId))
+        {
+            throw new InvalidOperationException(
+                $"QueryPlan Semantic Binding Drift：期望 TableId={binding.TableId}，但 Runtime QueryPlan 未绑定该表。");
+        }
+
+        var matchedMetric = false;
+        var matchedField = false;
 
         foreach (var metric in plan.Metrics)
         {
             if (!MatchesMetric(metric, binding.SemanticText))
                 continue;
 
+            matchedMetric = true;
             var previousField = metric.Field;
             metric.Field = binding.Column;
 
@@ -40,9 +50,22 @@ public partial class QueryPlanBuilder
 
             foreach (var field in matchingFields)
             {
+                matchedField = true;
                 field.MetadataColumnId = binding.ColumnId;
                 field.ColumnName = binding.Column;
             }
+        }
+
+        if (!matchedMetric)
+        {
+            throw new InvalidOperationException(
+                $"QueryPlan Semantic Binding Drift：未找到与已解析 Metric“{binding.SemanticText}”对应的 Runtime Metric。");
+        }
+
+        if (!matchedField)
+        {
+            throw new InvalidOperationException(
+                $"QueryPlan Semantic Binding Drift：Runtime QueryPlan 未找到 Metric Field Binding，期望 ColumnId={binding.ColumnId}。");
         }
 
         return plan;
