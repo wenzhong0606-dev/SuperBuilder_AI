@@ -166,9 +166,7 @@ public sealed class SemanticApplicabilityEvaluator
     private static bool ContainsSemanticText(MetadataSemanticSearchResult candidate, string semanticText)
     {
         if (string.IsNullOrWhiteSpace(semanticText))
-        {
             return false;
-        }
 
         var values = new[]
         {
@@ -201,13 +199,15 @@ public sealed class SemanticApplicabilityEvaluator
         var table = candidate.Table?.TableName;
         var column = candidate.Column?.ColumnName;
 
-        if (string.IsNullOrWhiteSpace(table) || string.IsNullOrWhiteSpace(column))
-        {
+        if (candidate.Table is null || candidate.Column is null
+            || string.IsNullOrWhiteSpace(table)
+            || string.IsNullOrWhiteSpace(column))
             return null;
-        }
 
         return new SemanticApplicabilityResolution
         {
+            TableId = candidate.Table.Id,
+            ColumnId = candidate.Column.Id,
             Table = table,
             Column = column,
             BusinessMeaning = candidate.Semantic?.BusinessMeaning,
