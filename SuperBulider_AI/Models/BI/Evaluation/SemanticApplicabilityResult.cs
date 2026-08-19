@@ -9,15 +9,10 @@ namespace SuperBulider_AI.Models.BI.Evaluation;
 public sealed class SemanticApplicabilityResult
 {
     public string CaseId { get; init; } = string.Empty;
-
     public string Question { get; init; } = string.Empty;
-
     public string MetricSemanticText { get; init; } = string.Empty;
-
     public string MetricType { get; init; } = string.Empty;
-
     public string State { get; init; } = string.Empty;
-
     public string? Reason { get; init; }
 
     /// <summary>
@@ -39,12 +34,11 @@ public sealed class SemanticApplicabilityResult
 /// </summary>
 public sealed class SemanticApplicabilityResolution
 {
+    public long TableId { get; init; }
+    public long ColumnId { get; init; }
     public string? Table { get; init; }
-
     public string? Column { get; init; }
-
     public string? BusinessMeaning { get; init; }
-
     public double? Score { get; init; }
 }
 
@@ -54,15 +48,10 @@ public sealed class SemanticApplicabilityResolution
 public sealed class SemanticApplicabilityCandidate
 {
     public string? VectorType { get; init; }
-
     public string? VectorId { get; init; }
-
     public double Score { get; init; }
-
     public string? Table { get; init; }
-
     public string? Column { get; init; }
-
     public string? BusinessMeaning { get; init; }
 }
 
@@ -73,18 +62,11 @@ public sealed class SemanticApplicabilityCandidate
 public sealed class SemanticApplicabilityEvidence
 {
     public bool SemanticCandidateExists { get; init; }
-
     public bool EntityCandidateExists { get; init; }
-
     public bool DirectEntityCountEvidence { get; init; }
-
     public bool LexicalMatch { get; init; }
-
     public bool CompetingCandidates { get; init; }
-
     public double? TopScore { get; init; }
-
     public double? SecondScore { get; init; }
-
     public double? ScoreGap { get; init; }
 }
