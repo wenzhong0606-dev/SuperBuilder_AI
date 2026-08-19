@@ -3,8 +3,8 @@ namespace SuperBulider_AI.Models.BI.Evaluation;
 /// <summary>
 /// Phase 2.6.3.5-C.2 Semantic Applicability Evaluation Result。
 ///
-/// 仅描述当前 Golden Case 在运行时 Metadata + Semantic Search
-/// 环境中的语义适用性，不负责 Repair，也不修改 QueryPlan。
+/// 描述当前 Golden Case 在运行时 Metadata + Semantic Search 环境中的语义适用性。
+/// 当 State=Resolved 时，Resolution 是允许 QueryPlanBuilder 消费的稳定物理绑定。
 /// </summary>
 public sealed class SemanticApplicabilityResult
 {
@@ -21,12 +21,31 @@ public sealed class SemanticApplicabilityResult
     public string? Reason { get; init; }
 
     /// <summary>
-    /// Semantic Search 返回的最高相关候选。
-    /// 注意：SearchCandidate 不等同于 Applicability Candidate。
+    /// Semantic Search 返回的最高相关候选，仅作为检索证据。
     /// </summary>
     public SemanticApplicabilityCandidate? SearchCandidate { get; init; }
 
+    /// <summary>
+    /// 已通过 Applicability 判断、允许进入 QueryPlan 构造的物理绑定。
+    /// 只有 State=Resolved 时才应非空。
+    /// </summary>
+    public SemanticApplicabilityResolution? Resolution { get; init; }
+
     public SemanticApplicabilityEvidence Evidence { get; init; } = new();
+}
+
+/// <summary>
+/// 已解析的语义到物理 Metadata 字段绑定。
+/// </summary>
+public sealed class SemanticApplicabilityResolution
+{
+    public string? Table { get; init; }
+
+    public string? Column { get; init; }
+
+    public string? BusinessMeaning { get; init; }
+
+    public double? Score { get; init; }
 }
 
 /// <summary>
