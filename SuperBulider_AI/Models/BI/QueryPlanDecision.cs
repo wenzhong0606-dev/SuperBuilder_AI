@@ -31,4 +31,9 @@ public sealed class QueryPlanDecision
 	/// Decision Gate 给出的主要原因。
 	/// </summary>
 	public string? Reason { get; set; }
+
+	/// <summary>
+	/// Decision Gate 完整决策轨迹。
+	/// </summary>
+	public QueryPlanDecisionTrace Trace { get; set; } = new();
 }
