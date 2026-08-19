@@ -11,6 +11,10 @@ public sealed class QueryPlanSemanticResolution
 
 public sealed class QueryPlanMetricResolution
 {
+    public long TableId { get; init; }
+
+    public long ColumnId { get; init; }
+
     public string SemanticText { get; init; } = string.Empty;
 
     public string Table { get; init; } = string.Empty;
