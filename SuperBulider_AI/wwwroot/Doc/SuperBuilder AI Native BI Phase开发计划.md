@@ -3222,13 +3222,4 @@ AI Native Enterprise Application Platform
 | v2.0 | 历史版本       | QueryPlan Reliability阶段规划                                                          |
 | v2.1 | 2026-08-19 | 根据master实际源码重新校准Phase结构，修正Phase 2.3.4定义冲突，正式建立Phase 2.4 Confidence & Decision Gate |
 
----
-
-# 当前唯一开发基线
-
-> **Phase 2.3 QueryPlan Repair Reliability 已冻结**
-
-> **下一阶段：Phase 2.4 QueryPlan Confidence & Decision Gate**
-
-> **Phase 3 暂不启动**
 
