@@ -1,11 +1,12 @@
-using SuperBuilder_AI.Models.BI.Evaluation;
 using SuperBuilder_AI.Models.BI;
+using SuperBuilder_AI.Models.BI.Evaluation;
 
 namespace SuperBuilder_AI.Services.BI.Evaluation;
 
 /// <summary>
-/// Phase 2.6.3.5-C.4 QueryPlan Evaluator。
-/// 第一版只比较 Golden Contract 已明确表达的业务约束。
+/// Phase 2.4-D.2 QueryPlan Evaluator。
+/// 第一版比较 Golden Contract 已明确表达的业务约束，并增加 Runtime QueryPlan
+/// 的物理绑定一致性检查。
 /// Golden 为 null 的字段表示“不断言”，而不是要求 Runtime 为 null。
 /// </summary>
 public sealed class QueryPlanEvaluator
@@ -23,16 +24,23 @@ public sealed class QueryPlanEvaluator
         var dimensions = EvaluateDimensions(expected, runtime);
         var filters = EvaluateFilters(expected, runtime);
         var shape = EvaluateShape(expected, runtime);
+        var bindingConsistency = EvaluateBindingConsistency(expected, runtime);
 
         return new QueryPlanEvaluationResult
         {
             CaseId = caseId,
-            Passed = intent.Passed && metrics.Passed && dimensions.Passed && filters.Passed && shape.Passed,
+            Passed = intent.Passed
+                      && metrics.Passed
+                      && dimensions.Passed
+                      && filters.Passed
+                      && shape.Passed
+                      && bindingConsistency.Passed,
             Intent = intent,
             Metrics = metrics,
             Dimensions = dimensions,
             Filters = filters,
-            QueryShape = shape
+            QueryShape = shape,
+            BindingConsistency = bindingConsistency
         };
     }
 
@@ -141,6 +149,60 @@ public sealed class QueryPlanEvaluator
         }
 
         return Pass("Query Shape 匹配。");
+    }
+
+    /// <summary>
+    /// 验证 Runtime QueryPlan 自身的物理绑定是否自洽。
+    /// 该检查不猜业务语义，也不把 Golden 缺失的字段强行变成断言。
+    /// </summary>
+    private static QueryPlanEvaluationSectionResult EvaluateBindingConsistency(
+        GoldenQueryExpectation expected,
+        QueryPlan runtime)
+    {
+        var tables = runtime.Tables ?? new List<QueryTable>();
+        var joins = runtime.Joins ?? new List<QueryJoin>();
+
+        if (runtime.DataSourceId > 0
+            && tables.Any(table => table.DataSourceId > 0 && table.DataSourceId != runtime.DataSourceId))
+        {
+            return Fail("Binding 一致性失败：QueryPlan.Tables 存在与 QueryPlan.DataSourceId 不一致的数据源。");
+        }
+
+        var duplicateTableIds = tables
+            .Where(table => table.MetadataTableId > 0)
+            .GroupBy(table => table.MetadataTableId)
+            .Where(group => group.Count() > 1)
+            .Select(group => group.Key)
+            .ToList();
+
+        if (duplicateTableIds.Count > 0)
+        {
+            return Fail(
+                $"Binding 一致性失败：存在重复 MetadataTableId：{string.Join(", ", duplicateTableIds)}。");
+        }
+
+        foreach (var join in joins)
+        {
+            if (!tables.Any(table => table.MetadataTableId == join.LeftTableId)
+                || !tables.Any(table => table.MetadataTableId == join.RightTableId))
+            {
+                return Fail(
+                    $"Binding 一致性失败：Join 引用了 QueryPlan.Tables 中不存在的表，LeftTableId={join.LeftTableId}，RightTableId={join.RightTableId}。");
+            }
+        }
+
+        if (expected.Tables is not null && tables.Count != expected.Tables.Count)
+        {
+            return Fail($"Binding 一致性失败：Golden Tables={expected.Tables.Count}，Runtime Tables={tables.Count}。");
+        }
+
+        if (expected.Joins is not null && joins.Count != expected.Joins.Count)
+        {
+            return Fail($"Binding 一致性失败：Golden Joins={expected.Joins.Count}，Runtime Joins={joins.Count}。");
+        }
+
+        return Pass(
+            $"Binding 一致性通过：DataSource={runtime.DataSourceId}，Tables={tables.Count}，Joins={joins.Count}，无重复表且所有 Join 均引用已绑定表。");
     }
 
     private static QueryPlanEvaluationSectionResult Pass(string reason) => new() { Passed = true, Reason = reason };
