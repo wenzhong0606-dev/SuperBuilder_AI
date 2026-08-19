@@ -137,8 +137,6 @@ public sealed class SemanticApplicabilityEvaluator
         MetadataSemanticSearchResult? secondSemantic,
         double? scoreGap)
     {
-        const bool directEntityCountEvidence = false;
-
         return new SemanticApplicabilityResult
         {
             CaseId = goldenCase.Id,
@@ -153,7 +151,7 @@ public sealed class SemanticApplicabilityEvaluator
             {
                 SemanticCandidateExists = semanticCandidates.Count > 0,
                 EntityCandidateExists = entityCandidates.Count > 0,
-                DirectEntityCountEvidence = directEntityCountEvidence,
+                DirectEntityCountEvidence = false,
                 LexicalMatch = false,
                 CompetingCandidates = false,
                 TopScore = topSemantic?.Score,
@@ -207,6 +205,7 @@ public sealed class SemanticApplicabilityEvaluator
         return new SemanticApplicabilityResolution
         {
             TableId = candidate.Table.Id,
+            DataSourceId = candidate.Table.DataSourceId,
             ColumnId = candidate.Column.Id,
             Table = table,
             Column = column,
