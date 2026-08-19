@@ -20,13 +20,17 @@ public sealed class SemanticApplicabilityResult
 
     public string? Reason { get; init; }
 
-    public SemanticApplicabilityCandidate? Candidate { get; init; }
+    /// <summary>
+    /// Semantic Search 返回的最高相关候选。
+    /// 注意：SearchCandidate 不等同于 Applicability Candidate。
+    /// </summary>
+    public SemanticApplicabilityCandidate? SearchCandidate { get; init; }
 
     public SemanticApplicabilityEvidence Evidence { get; init; } = new();
 }
 
 /// <summary>
-/// Semantic Applicability 当前主要候选。
+/// Semantic Search 当前最高相关候选。
 /// </summary>
 public sealed class SemanticApplicabilityCandidate
 {
