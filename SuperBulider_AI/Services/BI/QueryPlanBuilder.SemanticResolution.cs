@@ -32,11 +32,9 @@ public partial class QueryPlanBuilder
         if (binding is null)
             return;
 
-        ValidateResolutionTable(plan, binding.TableId, "Metric");
         ValidateResolutionColumn(binding.ColumnId, binding.Column, "Metric");
 
         var matchedMetric = false;
-        var matchedField = false;
 
         foreach (var metric in plan.Metrics)
         {
@@ -44,29 +42,16 @@ public partial class QueryPlanBuilder
                 continue;
 
             matchedMetric = true;
-            var previousField = metric.Field;
             metric.Field = binding.Column;
 
-            foreach (var field in plan.Fields.Where(field =>
-                         string.Equals(field.ColumnName, previousField, StringComparison.OrdinalIgnoreCase)
-                         || field.MetadataColumnId == binding.ColumnId))
-            {
-                matchedField = true;
-                field.MetadataColumnId = binding.ColumnId;
-                field.ColumnName = binding.Column;
-            }
+            EnsureResolutionTable(plan, binding.TableId, binding.DataSourceId, binding.Table, "Metric");
+            EnsureResolutionField(plan, binding.ColumnId, binding.Column, metric.GetAggregation().ToString());
         }
 
         if (!matchedMetric)
         {
             throw new InvalidOperationException(
                 $"QueryPlan Semantic Binding Drift：未找到与已解析 Metric“{binding.SemanticText}”对应的 Runtime Metric。");
-        }
-
-        if (!matchedField)
-        {
-            throw new InvalidOperationException(
-                $"QueryPlan Semantic Binding Drift：Runtime QueryPlan 未找到 Metric Field Binding，期望 ColumnId={binding.ColumnId}。");
         }
     }
 
@@ -86,9 +71,8 @@ public partial class QueryPlanBuilder
         for (var i = 0; i < bindings.Count; i++)
         {
             var binding = bindings[i];
-            ValidateResolutionTable(plan, binding.TableId, $"Filter[{i}]");
             ValidateResolutionColumn(binding.ColumnId, binding.Column, $"Filter[{i}]");
-
+            EnsureResolutionTable(plan, binding.TableId, binding.DataSourceId, binding.Table, $"Filter[{i}]");
             plan.Filters[i].Field = binding.Column;
         }
     }
@@ -109,8 +93,8 @@ public partial class QueryPlanBuilder
         for (var i = 0; i < bindings.Count; i++)
         {
             var binding = bindings[i];
-            ValidateResolutionTable(plan, binding.TableId, $"Dimension[{i}]");
             ValidateResolutionColumn(binding.ColumnId, binding.Column, $"Dimension[{i}]");
+            EnsureResolutionTable(plan, binding.TableId, binding.DataSourceId, binding.Table, $"Dimension[{i}]");
 
             plan.Dimensions[i].MetadataColumnId = binding.ColumnId;
             plan.Dimensions[i].ColumnName = binding.Column;
@@ -133,30 +117,77 @@ public partial class QueryPlanBuilder
         for (var i = 0; i < bindings.Count; i++)
         {
             var binding = bindings[i];
-            ValidateResolutionTable(plan, binding.TableId, $"Order[{i}]");
             ValidateResolutionColumn(binding.ColumnId, binding.Column, $"Order[{i}]");
+            EnsureResolutionTable(plan, binding.TableId, binding.DataSourceId, binding.Table, $"Order[{i}]");
 
             plan.Orders[i].MetadataColumnId = binding.ColumnId;
             plan.Orders[i].Field = binding.Column;
         }
     }
 
-    private static void ValidateResolutionTable(
+    /// <summary>
+    /// Resolution 是语义层已经确认的物理绑定。
+    /// Runtime QueryPlan 如果尚未包含该表，则补入该解析表，而不是再次猜测或错误阻断。
+    /// 如果已存在同名 TableId，则验证数据源一致性。
+    /// </summary>
+    private static void EnsureResolutionTable(
         QueryPlan plan,
         long tableId,
+        long dataSourceId,
+        string tableName,
         string bindingType)
     {
-        if (tableId <= 0)
+        if (tableId <= 0 || dataSourceId <= 0 || string.IsNullOrWhiteSpace(tableName))
         {
             throw new InvalidOperationException(
-                $"Semantic Resolution 缺少有效的 {bindingType} TableId。");
+                $"Semantic Resolution 缺少有效的 {bindingType} Table Binding。");
         }
 
-        if (!plan.Tables.Any(table => table.MetadataTableId == tableId))
+        var existing = plan.Tables.FirstOrDefault(table => table.MetadataTableId == tableId);
+        if (existing is not null)
         {
-            throw new InvalidOperationException(
-                $"QueryPlan Semantic Binding Drift：{bindingType} 期望 TableId={tableId}，但 Runtime QueryPlan 未绑定该表。");
+            if (existing.DataSourceId != dataSourceId)
+            {
+                throw new InvalidOperationException(
+                    $"QueryPlan Semantic Binding Drift：{bindingType} TableId={tableId} 的 DataSourceId 不一致，Resolution={dataSourceId}，Runtime={existing.DataSourceId}。");
+            }
+
+            return;
         }
+
+        plan.Tables.Add(new QueryTable
+        {
+            MetadataTableId = tableId,
+            DataSourceId = dataSourceId,
+            TableName = tableName
+        });
+    }
+
+    private static void EnsureResolutionField(
+        QueryPlan plan,
+        long columnId,
+        string columnName,
+        string aggregation)
+    {
+        var existing = plan.Fields.FirstOrDefault(field => field.MetadataColumnId == columnId);
+        if (existing is not null)
+        {
+            existing.ColumnName = columnName;
+            if (string.IsNullOrWhiteSpace(existing.Aggregation)
+                || existing.Aggregation.Equals("NONE", StringComparison.OrdinalIgnoreCase))
+            {
+                existing.Aggregation = aggregation;
+            }
+
+            return;
+        }
+
+        plan.Fields.Add(new QueryField
+        {
+            MetadataColumnId = columnId,
+            ColumnName = columnName,
+            Aggregation = aggregation
+        });
     }
 
     private static void ValidateResolutionColumn(
