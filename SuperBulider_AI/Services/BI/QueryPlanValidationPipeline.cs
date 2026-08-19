@@ -8,7 +8,7 @@ namespace SuperBulider_AI.Services.BI;
 /// <summary>
 /// QueryPlan 验证与自动修复流水线。
 ///
-/// Phase 2.3.3
+/// Phase 2.3.4
 ///
 /// 核心闭环：
 ///
@@ -31,14 +31,16 @@ namespace SuperBulider_AI.Services.BI;
 /// ↓                       ↓
 /// Return              Continue Repair
 ///
-/// 本阶段增加：
+/// Phase 2.3.4 增加：
 ///
 /// 1. QueryPlan Progress Detection
 /// 2. Repair History
-/// 3. Stall Detection
-/// 4. Duplicate Plan Detection
-/// 5. Validation Fingerprint Detection
-/// 6. Repair Attempt Control
+/// 3. Repair Trace
+/// 4. Stall Detection
+/// 5. Duplicate Plan Detection
+/// 6. Validation Fingerprint Detection
+/// 7. Repair Attempt Control
+/// 8. Repair Explainability
 ///
 /// Repair 仍然直接修改当前 QueryPlan。
 ///
@@ -66,10 +68,14 @@ public class QueryPlanValidationPipeline :
 
 
 	/// <summary>
-	/// 如果连续出现相同 Plan Fingerprint，
-	/// 说明 Repair 没有产生新的 Plan。
+	/// 如果 QueryPlan Fingerprint 再次出现，
+	/// 说明 Repair Loop 可能进入循环。
 	///
-	/// 此时立即停止，避免无意义 Retry。
+	/// 例如：
+	///
+	/// A → B → A
+	///
+	/// 此时立即停止。
 	/// </summary>
 	private const int MaxRepeatedPlanFingerprint = 1;
 
@@ -94,15 +100,17 @@ public class QueryPlanValidationPipeline :
 	/// <summary>
 	/// 执行 QueryPlan Validation + Repair Loop。
 	///
-	/// Phase 2.3.3：
+	/// Phase 2.3.4：
 	///
 	/// 1. Initial Validation
 	/// 2. Repair
 	/// 3. Detect Plan Progress
-	/// 4. Re-Validation
-	/// 5. Detect Validation Progress
-	/// 6. Continue / Stall / Pass
-	/// 7. Max Retry Control
+	/// 4. Detect Duplicate Plan
+	/// 5. Re-Validation
+	/// 6. Detect Validation Progress
+	/// 7. Continue / Stall / Pass
+	/// 8. Max Retry Control
+	/// 9. Generate Repair Trace
 	/// </summary>
 	public async Task<QueryPlanValidationPipelineResult>
 		ValidateAsync(
@@ -117,33 +125,46 @@ public class QueryPlanValidationPipeline :
 		question ??= string.Empty;
 
 
+		//
+		// 当前正在处理的 QueryPlan
+		//
 		var currentPlan = plan;
 
 
 		//
-		// Repair History
+		// =========================================================
+		// Repair Trace
+		// =========================================================
 		//
-		// 当前阶段暂存在 Pipeline 内部。
+		// Repair Trace 不参与 Repair 决策。
 		//
-		// 后续 Phase 可以将其提升为：
+		// 它只负责：
 		//
-		// QueryPlanRepairHistory
+		// 1. Explainability
+		// 2. Debugging
+		// 3. Observability
+		// 4. 后续 AI Feedback
 		//
-		var repairHistory =
-			new List<RepairHistoryEntry>();
+		var repairTrace =
+			new QueryPlanRepairTrace
+			{
+				Status =
+					QueryPlanRepairTraceStatus.NotRequired
+			};
 
 
+		//
+		// =========================================================
+		// Plan Fingerprint History
+		// =========================================================
 		//
 		// 用于检测：
 		//
-		// Plan A
-		//   ↓
-		// Plan B
-		//   ↓
-		// Plan B
+		// A → B → A
 		//
-		// 第二次出现相同 Fingerprint
-		// 即认为进入 Stall。
+		// 或：
+		//
+		// A → B → B
 		//
 		var planFingerprintHistory =
 			new Dictionary<string, int>(
@@ -151,7 +172,9 @@ public class QueryPlanValidationPipeline :
 
 
 		//
+		// =========================================================
 		// Initial Validation
+		// =========================================================
 		//
 		var currentValidationResult =
 			_validator.Validate(
@@ -160,22 +183,41 @@ public class QueryPlanValidationPipeline :
 
 
 		//
-		// 第一次 Validation 已经通过
+		// =========================================================
+		// Initial Validation PASS
+		// =========================================================
 		//
 		if (currentValidationResult.IsValid)
 		{
+			repairTrace.Success = true;
+
+			repairTrace.Status =
+				QueryPlanRepairTraceStatus.NotRequired;
+
+			repairTrace.TotalAttempts = 0;
+
+			repairTrace.ChangedPlanCount = 0;
+
+			repairTrace.StopReason =
+				"Initial QueryPlan validation passed.";
+
 			return new QueryPlanValidationPipelineResult
 			{
 				Plan = currentPlan,
 
 				ValidationResult =
-					currentValidationResult
+					currentValidationResult,
+
+				RepairTrace =
+					repairTrace
 			};
 		}
 
 
 		//
-		// 记录初始 Plan Fingerprint
+		// =========================================================
+		// Initial Plan Fingerprint
+		// =========================================================
 		//
 		var initialFingerprint =
 			CreatePlanFingerprint(
@@ -186,7 +228,9 @@ public class QueryPlanValidationPipeline :
 
 
 		//
+		// =========================================================
 		// QueryPlan Repair Loop
+		// =========================================================
 		//
 		for (
 			var attempt = 1;
@@ -202,7 +246,9 @@ public class QueryPlanValidationPipeline :
 
 
 			//
-			// 构造 Repair Request
+			// =====================================================
+			// Repair Request
+			// =====================================================
 			//
 			var repairRequest =
 				new QueryPlanRepairRequest
@@ -225,7 +271,9 @@ public class QueryPlanValidationPipeline :
 
 
 			//
-			// 执行 Repair
+			// =====================================================
+			// Execute Repair
+			// =====================================================
 			//
 			var repairResult =
 				await _repairService
@@ -234,15 +282,17 @@ public class QueryPlanValidationPipeline :
 
 
 			//
-			// Repair History
+			// =====================================================
+			// Create Repair Trace Entry
+			// =====================================================
 			//
 			var repairEntry =
-				new RepairHistoryEntry
+				new QueryPlanRepairTraceEntry
 				{
 					Attempt =
 						attempt,
 
-					ValidationFingerprint =
+					BeforeValidationFingerprint =
 						validationFingerprint,
 
 					RepairSuccess =
@@ -253,46 +303,71 @@ public class QueryPlanValidationPipeline :
 							.ToList(),
 
 					FailureReason =
-						repairResult.FailureReason
+						repairResult.FailureReason,
+
+					Explanation =
+						repairResult.Explanation
 				};
 
 
-			repairHistory.Add(
+			repairTrace.History.Add(
 				repairEntry);
 
 
+			repairTrace.TotalAttempts =
+				attempt;
+
+
 			//
-			// Repair 没有成功
+			// =====================================================
+			// Repair Failed
+			// =====================================================
 			//
 			if (!repairResult.Success
 				||
 				repairResult.RepairedPlan == null)
 			{
-				//
-				// Stall：
-				//
-				// 当前 Validation 失败
-				// 且 Repair 无法产生新的 Plan。
-				//
+				repairTrace.Success = false;
+
+				repairTrace.Status =
+					QueryPlanRepairTraceStatus.Failed;
+
+				repairTrace.StopReason =
+					repairResult.FailureReason
+					??
+					"QueryPlan repair failed.";
+
+				repairTrace.ChangedPlanCount =
+					repairTrace.History.Count(
+						x => x.PlanChanged);
+
+
 				return new QueryPlanValidationPipelineResult
 				{
 					Plan = currentPlan,
 
 					ValidationResult =
-						currentValidationResult
+						currentValidationResult,
+
+					RepairTrace =
+						repairTrace
 				};
 			}
 
 
 			//
-			// Repair 后 Plan
+			// =====================================================
+			// Repaired QueryPlan
+			// =====================================================
 			//
 			var repairedPlan =
 				repairResult.RepairedPlan;
 
 
 			//
-			// Progress Detection
+			// =====================================================
+			// Plan Progress Detection
+			// =====================================================
 			//
 			var beforeFingerprint =
 				CreatePlanFingerprint(
@@ -304,7 +379,7 @@ public class QueryPlanValidationPipeline :
 
 
 			//
-			// 判断 Plan 是否真正发生变化
+			// 判断 Repair 是否真正修改了 QueryPlan。
 			//
 			var planChanged =
 				!string.Equals(
@@ -328,20 +403,36 @@ public class QueryPlanValidationPipeline :
 			// Stall Detection #1
 			// =====================================================
 			//
-			// Repair 返回成功，
-			// 但是 Plan 完全没有变化。
+			// RepairService 返回 Success，
+			// 但是 QueryPlan 实际没有任何变化。
 			//
 			if (!planChanged)
 			{
 				repairEntry.StallReason =
 					"Repair reported success but QueryPlan fingerprint did not change.";
 
+				repairTrace.Success = false;
+
+				repairTrace.Status =
+					QueryPlanRepairTraceStatus.Stalled;
+
+				repairTrace.StopReason =
+					repairEntry.StallReason;
+
+				repairTrace.ChangedPlanCount =
+					repairTrace.History.Count(
+						x => x.PlanChanged);
+
+
 				return new QueryPlanValidationPipelineResult
 				{
 					Plan = currentPlan,
 
 					ValidationResult =
-						currentValidationResult
+						currentValidationResult,
+
+					RepairTrace =
+						repairTrace
 				};
 			}
 
@@ -351,14 +442,12 @@ public class QueryPlanValidationPipeline :
 			// Duplicate Plan Detection
 			// =====================================================
 			//
-			// 即使当前 Plan 与上一轮不同，
-			// 也可能回到了之前出现过的 Plan。
-			//
-			// 例如：
+			// 检测：
 			//
 			// A → B → A
 			//
-			// 这种情况说明 Repair Loop 出现循环。
+			// 如果回到了之前已经出现过的 QueryPlan，
+			// 说明 Repair Loop 发生循环。
 			//
 			if (planFingerprintHistory.TryGetValue(
 					afterFingerprint,
@@ -373,15 +462,40 @@ public class QueryPlanValidationPipeline :
 				repairEntry.StallReason =
 					"QueryPlan fingerprint repeated; repair loop detected.";
 
+
 				if (occurrence >
 					MaxRepeatedPlanFingerprint)
 				{
+					repairTrace.Success = false;
+
+					repairTrace.Status =
+						QueryPlanRepairTraceStatus.LoopDetected;
+
+					repairTrace.StopReason =
+						repairEntry.StallReason;
+
+					repairTrace.ChangedPlanCount =
+						repairTrace.History.Count(
+							x => x.PlanChanged);
+
+
+					//
+					// 注意：
+					//
+					// 返回当前检测到循环的 repairedPlan。
+					//
+					// 这样调用方能够看到最后一次 Repair
+					// 产生的 QueryPlan。
+					//
 					return new QueryPlanValidationPipelineResult
 					{
 						Plan = repairedPlan,
 
 						ValidationResult =
-							currentValidationResult
+							currentValidationResult,
+
+						RepairTrace =
+							repairTrace
 					};
 				}
 			}
@@ -393,14 +507,18 @@ public class QueryPlanValidationPipeline :
 
 
 			//
+			// =====================================================
 			// 使用 Repair 后的 QueryPlan
+			// =====================================================
 			//
 			currentPlan =
 				repairedPlan;
 
 
 			//
+			// =====================================================
 			// Re-Validation
+			// =====================================================
 			//
 			currentValidationResult =
 				_validator.Validate(
@@ -418,12 +536,33 @@ public class QueryPlanValidationPipeline :
 				repairEntry.ValidationPassed =
 					true;
 
+
+				repairTrace.Success =
+					true;
+
+
+				repairTrace.Status =
+					QueryPlanRepairTraceStatus.Repaired;
+
+
+				repairTrace.ChangedPlanCount =
+					repairTrace.History.Count(
+						x => x.PlanChanged);
+
+
+				repairTrace.StopReason =
+					"QueryPlan repaired and validation passed.";
+
+
 				return new QueryPlanValidationPipelineResult
 				{
 					Plan = currentPlan,
 
 					ValidationResult =
-						currentValidationResult
+						currentValidationResult,
+
+					RepairTrace =
+						repairTrace
 				};
 			}
 
@@ -433,19 +572,35 @@ public class QueryPlanValidationPipeline :
 			// Validation Progress Detection
 			// =====================================================
 			//
+			// 注意：
+			//
+			// 不能简单使用：
+			//
+			// ErrorCount 下降 = Progress
+			//
+			// 因为可能出现：
+			//
+			// Error A
+			//     ↓
+			// Error B
+			//
+			// 数量相同，
+			// 但是语义问题已经发生变化。
+			//
 			var currentErrorCount =
-				currentValidationResult.ErrorItems.Count();
+				currentValidationResult
+					.ErrorItems
+					.Count();
 
-		
+
+			repairEntry.ValidationErrorCount =
+				currentErrorCount;
 
 
 			//
-			// 当前阶段不单纯依赖 ErrorCount 判断进展。
-			//
-			// 真正可靠的判断依据是：
-			//
-			// 1. Plan Fingerprint 是否变化
-			// 2. Validation Fingerprint 是否变化
+			// =====================================================
+			// New Validation Fingerprint
+			// =====================================================
 			//
 			var newValidationFingerprint =
 				CreateValidationFingerprint(
@@ -457,9 +612,15 @@ public class QueryPlanValidationPipeline :
 
 
 			//
-			// 如果 Validation Fingerprint 与本轮之前完全一致，
-			// 说明虽然 Plan 发生了变化，
-			// 但 Validation 状态没有发生任何变化。
+			// =====================================================
+			// Stall Detection #2
+			// =====================================================
+			//
+			// QueryPlan 发生了变化，
+			// 但是 ValidationResult 完全没有变化。
+			//
+			// 说明当前 Repair 对 Validation
+			// 没有产生任何实际效果。
 			//
 			if (string.Equals(
 					validationFingerprint,
@@ -469,46 +630,45 @@ public class QueryPlanValidationPipeline :
 				repairEntry.StallReason =
 					"QueryPlan changed, but ValidationResult remained unchanged.";
 
+				repairTrace.Success = false;
+
+				repairTrace.Status =
+					QueryPlanRepairTraceStatus.Stalled;
+
+				repairTrace.StopReason =
+					repairEntry.StallReason;
+
+				repairTrace.ChangedPlanCount =
+					repairTrace.History.Count(
+						x => x.PlanChanged);
+
+
 				return new QueryPlanValidationPipelineResult
 				{
 					Plan = currentPlan,
 
 					ValidationResult =
-						currentValidationResult
+						currentValidationResult,
+
+					RepairTrace =
+						repairTrace
 				};
 			}
 
 
 			//
-			// 如果错误数量没有下降，
-			// 不立即停止。
+			// =====================================================
+			// Continue Repair Loop
+			// =====================================================
 			//
-			// 原因：
+			// 当前 Repair 已经：
 			//
-			// 一个 Repair 可能：
+			// 1. 修改了 QueryPlan
+			// 2. Validation 状态发生变化
 			//
-			// Error A → Error B
+			// 因此说明产生了实际进展。
 			//
-			// 数量相同，
-			// 但实际上已经产生语义进展。
-			//
-			// 所以只记录，不作为 Stall 的唯一依据。
-			//
-			repairEntry.ValidationErrorCount =
-				currentErrorCount;
-
-
-			//
-			// 如果还有错误：
-			//
-			// 下一轮继续：
-			//
-			// Validation
-			//      ↓
-			// Repair
-			//      ↓
-			// Validation
-			//
+			// 下一轮继续。
 		}
 
 
@@ -517,17 +677,34 @@ public class QueryPlanValidationPipeline :
 		// Max Repair Attempts
 		// =========================================================
 		//
-		// 达到最大自动修复次数。
+		// 达到最大 Repair 次数，
+		// 仍然没有通过 Validation。
 		//
-		// 返回最后一次 Repair 后的 Plan
-		// 和最终 ValidationResult。
-		//
+		repairTrace.Success = false;
+
+		repairTrace.Status =
+			QueryPlanRepairTraceStatus.MaxAttemptsReached;
+
+		repairTrace.TotalAttempts =
+			MaxRepairAttempts;
+
+		repairTrace.ChangedPlanCount =
+			repairTrace.History.Count(
+				x => x.PlanChanged);
+
+		repairTrace.StopReason =
+			$"Maximum repair attempts reached: {MaxRepairAttempts}.";
+
+
 		return new QueryPlanValidationPipelineResult
 		{
 			Plan = currentPlan,
 
 			ValidationResult =
-				currentValidationResult
+				currentValidationResult,
+
+			RepairTrace =
+				repairTrace
 		};
 	}
 
@@ -558,7 +735,9 @@ public class QueryPlanValidationPipeline :
 
 
 		//
+		// =========================================================
 		// Intent
+		// =========================================================
 		//
 		if (plan.Intent != null)
 		{
@@ -573,7 +752,9 @@ public class QueryPlanValidationPipeline :
 
 
 		//
+		// =========================================================
 		// Tables
+		// =========================================================
 		//
 		foreach (
 			var table in plan.Tables
@@ -581,6 +762,22 @@ public class QueryPlanValidationPipeline :
 					x => x.TableName,
 					StringComparer.OrdinalIgnoreCase))
 		{
+			//
+			// QueryTable 当前真实字段：
+			//
+			// MetadataTableId
+			// DataSourceId
+			// TableName
+			// TableComment
+			//
+			Append(
+				builder,
+				table.MetadataTableId.ToString());
+
+			Append(
+				builder,
+				table.DataSourceId.ToString());
+
 			Append(
 				builder,
 				table.TableName);
@@ -592,7 +789,9 @@ public class QueryPlanValidationPipeline :
 
 
 		//
+		// =========================================================
 		// Metrics
+		// =========================================================
 		//
 		foreach (
 			var metric in plan.Metrics
@@ -619,7 +818,9 @@ public class QueryPlanValidationPipeline :
 
 
 		//
+		// =========================================================
 		// Dimensions
+		// =========================================================
 		//
 		foreach (
 			var dimension in plan.Dimensions
@@ -638,7 +839,9 @@ public class QueryPlanValidationPipeline :
 
 
 		//
+		// =========================================================
 		// Fields
+		// =========================================================
 		//
 		foreach (
 			var field in plan.Fields
@@ -661,7 +864,9 @@ public class QueryPlanValidationPipeline :
 
 
 		//
+		// =========================================================
 		// Filters
+		// =========================================================
 		//
 		foreach (
 			var filter in plan.Filters
@@ -697,7 +902,7 @@ public class QueryPlanValidationPipeline :
 	///
 	/// 用于判断：
 	///
-	/// Plan 虽然发生变化，
+	/// QueryPlan 虽然发生变化，
 	/// 但 Validation 状态是否仍然完全相同。
 	/// </summary>
 	private static string CreateValidationFingerprint(
@@ -759,11 +964,11 @@ public class QueryPlanValidationPipeline :
 
 
 	// =============================================================
-	// Hash
+	// SHA-256
 	// =============================================================
 
 	/// <summary>
-	/// SHA256 Fingerprint。
+	/// 计算 SHA-256 Fingerprint。
 	/// </summary>
 	private static string ComputeHash(
 		string value)
@@ -782,9 +987,14 @@ public class QueryPlanValidationPipeline :
 
 
 	// =============================================================
-	// Helpers
+	// Fingerprint Append
 	// =============================================================
 
+	/// <summary>
+	/// 向 Fingerprint Builder 添加字段。
+	///
+	/// 使用 Unit Separator 避免字段拼接产生歧义。
+	/// </summary>
 	private static void Append(
 		StringBuilder builder,
 		string? value)
@@ -792,101 +1002,7 @@ public class QueryPlanValidationPipeline :
 		builder
 			.Append(
 				value ?? string.Empty)
-			.Append('\u001F');
-	}
-
-
-	// =============================================================
-	// Internal Repair History
-	// =============================================================
-
-	/// <summary>
-	/// Pipeline 内部 Repair History。
-	///
-	/// 当前阶段不直接暴露到
-	/// QueryPlanValidationPipelineResult。
-	///
-	/// 用于：
-	///
-	/// - Progress Detection
-	/// - Stall Detection
-	/// - Loop Detection
-	/// - Debugging
-	///
-	/// 后续 Phase 可以提升为正式 Domain Model。
-	/// </summary>
-	private sealed class RepairHistoryEntry
-	{
-		public int Attempt
-		{
-			get;
-			init;
-		}
-
-		public string ValidationFingerprint
-		{
-			get;
-			init;
-		} = string.Empty;
-
-		public string BeforePlanFingerprint
-		{
-			get;
-			set;
-		} = string.Empty;
-
-		public string AfterPlanFingerprint
-		{
-			get;
-			set;
-		} = string.Empty;
-
-		public string AfterValidationFingerprint
-		{
-			get;
-			set;
-		} = string.Empty;
-
-		public bool RepairSuccess
-		{
-			get;
-			init;
-		}
-
-		public bool PlanChanged
-		{
-			get;
-			set;
-		}
-
-		public bool ValidationPassed
-		{
-			get;
-			set;
-		}
-
-		public int ValidationErrorCount
-		{
-			get;
-			set;
-		}
-
-		public List<string> RepairActions
-		{
-			get;
-			init;
-		} = new();
-
-		public string? FailureReason
-		{
-			get;
-			init;
-		}
-
-		public string? StallReason
-		{
-			get;
-			set;
-		}
+			.Append(
+				'\u001F');
 	}
 }

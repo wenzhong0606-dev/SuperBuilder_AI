@@ -1,23 +1,39 @@
 ﻿namespace SuperBulider_AI.Models.BI;
 
 /// <summary>
-/// QueryPlan验证流水线结果。
+/// QueryPlan Validation Pipeline 最终结果。
 ///
-/// Phase 2.2.5
+/// Phase 2.3.4
 ///
-/// 返回:
+/// Pipeline 不仅返回最终 QueryPlan 和 ValidationResult，
+/// 同时返回完整的 RepairTrace。
 ///
-/// 修复后的QueryPlan
+/// 结构：
 ///
-/// +
-///
-/// 最终ValidationResult
+/// QueryPlanValidationPipelineResult
+///     │
+///     ├── Plan
+///     │
+///     ├── ValidationResult
+///     │
+///     └── RepairTrace
+///           │
+///           ├── Status
+///           ├── TotalAttempts
+///           ├── ChangedPlanCount
+///           ├── StopReason
+///           └── History
 /// </summary>
 public class QueryPlanValidationPipelineResult
 {
-
 	/// <summary>
-	/// 最终QueryPlan
+	/// Pipeline 最终产生的 QueryPlan。
+	///
+	/// 如果初始 Validation 已经通过，
+	/// 则为原始 QueryPlan。
+	///
+	/// 如果经过 Repair，
+	/// 则为最后一次 Repair 后的 QueryPlan。
 	/// </summary>
 	public QueryPlan Plan
 	{
@@ -26,9 +42,13 @@ public class QueryPlanValidationPipelineResult
 	} = null!;
 
 
-
 	/// <summary>
-	/// 最终验证结果
+	/// Pipeline 最终 ValidationResult。
+	///
+	/// 注意：
+	///
+	/// 如果 Pipeline 因 Stall / Failed / MaxAttempts
+	/// 停止，则这里可能仍然是 Invalid。
 	/// </summary>
 	public QuerySemanticValidationResult ValidationResult
 	{
@@ -36,4 +56,15 @@ public class QueryPlanValidationPipelineResult
 		set;
 	} = null!;
 
+
+	/// <summary>
+	/// QueryPlan Repair Trace。
+	///
+	/// 包含整个 Repair Loop 的结构化执行历史。
+	/// </summary>
+	public QueryPlanRepairTrace RepairTrace
+	{
+		get;
+		set;
+	} = new();
 }

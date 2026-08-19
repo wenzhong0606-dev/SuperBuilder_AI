@@ -14,8 +14,8 @@ v2.0
 
 当前开发阶段：
 
-> Phase 2.3.3
-Repair Loop Robustness 
+> Phase 2.3.4
+QueryPlan Repair Trace
 
 
 当前系统完成度：
