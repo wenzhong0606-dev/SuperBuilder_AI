@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using SuperBulider_AI.Interfaces;
+using SuperBulider_AI.Interfaces.BI;
 using SuperBulider_AI.Models.BI;
 using SuperBulider_AI.Models.BI.Evaluation;
 using SuperBulider_AI.Services.BI.Evaluation;
@@ -9,7 +10,7 @@ namespace SuperBulider_AI.Controllers;
 /// <summary>
 /// Phase 2.6 Evaluation Dataset 诊断入口。
 /// 用于验证 Golden Dataset Contract、源码资产加载、运行时 Semantic 检索诊断、
-/// Semantic Applicability 与 QueryPlan Evaluation Gate，不执行 Repair。
+/// Semantic Applicability、QueryPlan Evaluation Gate 与真实 QueryPlan Evaluation，不执行 Repair。
 /// </summary>
 [ApiController]
 [Route("evaluation/diagnostics")]
@@ -20,19 +21,28 @@ public sealed class EvaluationDiagnosticsController : ControllerBase
     private readonly IMetadataSemanticSearchService _metadataSemanticSearchService;
     private readonly SemanticApplicabilityEvaluator _semanticApplicabilityEvaluator;
     private readonly QueryPlanEvaluationGate _queryPlanEvaluationGate;
+    private readonly IQueryUnderstandingService _queryUnderstandingService;
+    private readonly IQueryPlanBuilder _queryPlanBuilder;
+    private readonly QueryPlanEvaluator _queryPlanEvaluator;
 
     public EvaluationDiagnosticsController(
         GoldenQueryDatasetSerializer serializer,
         IWebHostEnvironment environment,
         IMetadataSemanticSearchService metadataSemanticSearchService,
         SemanticApplicabilityEvaluator semanticApplicabilityEvaluator,
-        QueryPlanEvaluationGate queryPlanEvaluationGate)
+        QueryPlanEvaluationGate queryPlanEvaluationGate,
+        IQueryUnderstandingService queryUnderstandingService,
+        IQueryPlanBuilder queryPlanBuilder,
+        QueryPlanEvaluator queryPlanEvaluator)
     {
         _serializer = serializer;
         _environment = environment;
         _metadataSemanticSearchService = metadataSemanticSearchService;
         _semanticApplicabilityEvaluator = semanticApplicabilityEvaluator;
         _queryPlanEvaluationGate = queryPlanEvaluationGate;
+        _queryUnderstandingService = queryUnderstandingService;
+        _queryPlanBuilder = queryPlanBuilder;
+        _queryPlanEvaluator = queryPlanEvaluator;
     }
 
     [HttpGet("golden-dataset")]
@@ -42,12 +52,7 @@ public sealed class EvaluationDiagnosticsController : ControllerBase
 
         if (!System.IO.File.Exists(path))
         {
-            return NotFound(new
-            {
-                passed = false,
-                message = "Golden Dataset asset was not found.",
-                path
-            });
+            return NotFound(new { passed = false, message = "Golden Dataset asset was not found.", path });
         }
 
         var sourceJson = System.IO.File.ReadAllText(path);
@@ -55,7 +60,6 @@ public sealed class EvaluationDiagnosticsController : ControllerBase
 
         var gq001 = dataset.Cases.SingleOrDefault(x => x.Id == "GQ-001");
         var gq002 = dataset.Cases.SingleOrDefault(x => x.Id == "GQ-002");
-
         var gq001Metric = gq001?.Expected?.Metrics?.SingleOrDefault();
         var gq002Metric = gq002?.Expected?.Metrics?.SingleOrDefault();
 
@@ -94,31 +98,21 @@ public sealed class EvaluationDiagnosticsController : ControllerBase
                 x.Question,
                 metric = x.Expected.Metrics?.SingleOrDefault()?.SemanticText,
                 aggregation = x.Expected.Metrics?.SingleOrDefault()?.Aggregation.ToString(),
-                dimensionsState = x.Expected.Dimensions is null
-                    ? "null"
-                    : x.Expected.Dimensions.Count == 0 ? "empty" : "values",
-                filtersState = x.Expected.Filters is null
-                    ? "null"
-                    : x.Expected.Filters.Count == 0 ? "empty" : "values"
+                dimensionsState = x.Expected.Dimensions is null ? "null" : x.Expected.Dimensions.Count == 0 ? "empty" : "values",
+                filtersState = x.Expected.Filters is null ? "null" : x.Expected.Filters.Count == 0 ? "empty" : "values"
             }),
             sourcePath = path
         });
     }
 
     [HttpGet("semantic")]
-    public async Task<ActionResult<object>> Semantic(
-        [FromQuery] string question,
-        [FromQuery] int topK = 10)
+    public async Task<ActionResult<object>> Semantic([FromQuery] string question, [FromQuery] int topK = 10)
     {
         if (string.IsNullOrWhiteSpace(question))
-        {
             return BadRequest(new { passed = false, message = "question is required." });
-        }
 
         if (topK < 1 || topK > 100)
-        {
             return BadRequest(new { passed = false, message = "topK must be between 1 and 100." });
-        }
 
         var results = await _metadataSemanticSearchService.SearchAsync(question, topK);
 
@@ -144,43 +138,20 @@ public sealed class EvaluationDiagnosticsController : ControllerBase
     }
 
     [HttpGet("applicability")]
-    public async Task<ActionResult<object>> Applicability(
-        [FromQuery] string caseId,
-        [FromQuery] int topK = 10)
+    public async Task<ActionResult<object>> Applicability([FromQuery] string caseId, [FromQuery] int topK = 10)
     {
         if (string.IsNullOrWhiteSpace(caseId))
-        {
             return BadRequest(new { passed = false, message = "caseId is required." });
-        }
 
         if (topK < 1 || topK > 100)
-        {
             return BadRequest(new { passed = false, message = "topK must be between 1 and 100." });
-        }
 
-        var path = Path.Combine(_environment.ContentRootPath, "Evaluation", "Golden", "query-plan-golden-v1.json");
-
-        if (!System.IO.File.Exists(path))
-        {
-            return NotFound(new { passed = false, message = "Golden Dataset asset was not found.", path });
-        }
-
-        var dataset = _serializer.Deserialize(System.IO.File.ReadAllText(path));
-        var goldenCase = dataset.Cases.SingleOrDefault(x =>
-            string.Equals(x.Id, caseId, StringComparison.OrdinalIgnoreCase));
-
+        var goldenCase = LoadGoldenCase(caseId);
         if (goldenCase is null)
-        {
             return NotFound(new { passed = false, message = $"Golden Case '{caseId}' was not found." });
-        }
 
         var result = await _semanticApplicabilityEvaluator.EvaluateAsync(goldenCase, topK);
-
-        return Ok(new
-        {
-            passed = result.State == "Resolved",
-            result
-        });
+        return Ok(new { passed = result.State == "Resolved", result });
     }
 
     /// <summary>
@@ -188,43 +159,106 @@ public sealed class EvaluationDiagnosticsController : ControllerBase
     /// 先执行 C.2 Applicability，再由 Gate 决定 PASS / BLOCK / REVIEW。
     /// </summary>
     [HttpGet("query-plan-gate")]
-    public async Task<ActionResult<object>> QueryPlanGate(
-        [FromQuery] string caseId,
-        [FromQuery] int topK = 10)
+    public async Task<ActionResult<object>> QueryPlanGate([FromQuery] string caseId, [FromQuery] int topK = 10)
     {
         if (string.IsNullOrWhiteSpace(caseId))
-        {
             return BadRequest(new { passed = false, message = "caseId is required." });
-        }
 
         if (topK < 1 || topK > 100)
-        {
             return BadRequest(new { passed = false, message = "topK must be between 1 and 100." });
-        }
 
-        var path = Path.Combine(_environment.ContentRootPath, "Evaluation", "Golden", "query-plan-golden-v1.json");
-        if (!System.IO.File.Exists(path))
-        {
-            return NotFound(new { passed = false, message = "Golden Dataset asset was not found.", path });
-        }
-
-        var dataset = _serializer.Deserialize(System.IO.File.ReadAllText(path));
-        var goldenCase = dataset.Cases.SingleOrDefault(x =>
-            string.Equals(x.Id, caseId, StringComparison.OrdinalIgnoreCase));
-
+        var goldenCase = LoadGoldenCase(caseId);
         if (goldenCase is null)
-        {
             return NotFound(new { passed = false, message = $"Golden Case '{caseId}' was not found." });
-        }
 
         var applicability = await _semanticApplicabilityEvaluator.EvaluateAsync(goldenCase, topK);
         var decision = _queryPlanEvaluationGate.Evaluate(applicability);
 
+        return Ok(new { passed = decision.Decision == "PASS", decision, applicability });
+    }
+
+    /// <summary>
+    /// Phase 2.6.4：使用真实 QueryUnderstandingService + QueryPlanBuilder 生成 Runtime QueryPlan，
+    /// 再交给 QueryPlanEvaluator 与 Golden Contract 比较。
+    /// 不执行 SQL、不执行 Repair、不修改 Metadata 或 Qdrant。
+    /// </summary>
+    [HttpGet("query-plan-evaluation")]
+    public async Task<ActionResult<object>> QueryPlanEvaluation(
+        [FromQuery] string caseId,
+        [FromQuery] int topK = 10)
+    {
+        if (string.IsNullOrWhiteSpace(caseId))
+            return BadRequest(new { passed = false, message = "caseId is required." });
+
+        if (topK < 1 || topK > 100)
+            return BadRequest(new { passed = false, message = "topK must be between 1 and 100." });
+
+        var goldenCase = LoadGoldenCase(caseId);
+        if (goldenCase is null)
+            return NotFound(new { passed = false, message = $"Golden Case '{caseId}' was not found." });
+
+        var applicability = await _semanticApplicabilityEvaluator.EvaluateAsync(goldenCase, topK);
+        var decision = _queryPlanEvaluationGate.Evaluate(applicability);
+
+        if (decision.Blocking)
+        {
+            return Ok(new
+            {
+                passed = false,
+                stage = "SemanticApplicabilityGate",
+                decision,
+                applicability
+            });
+        }
+
+        var intent = await _queryUnderstandingService.UnderstandAsync(goldenCase.Question);
+        var runtimePlan = await _queryPlanBuilder.BuildAsync(intent);
+        var evaluation = _queryPlanEvaluator.Evaluate(goldenCase.Id, goldenCase.Expected, runtimePlan);
+
         return Ok(new
         {
-            passed = decision.Decision == "PASS",
-            decision,
-            applicability
+            passed = evaluation.Passed,
+            stage = "QueryPlanEvaluation",
+            caseId = goldenCase.Id,
+            question = goldenCase.Question,
+            applicability,
+            gate = decision,
+            intent = new
+            {
+                intent.OriginalQuestion,
+                intent.IntentType,
+                metrics = intent.Metrics.Select(x => new
+                {
+                    x.Name,
+                    x.Field,
+                    aggregation = x.GetAggregation().ToString(),
+                    x.SemanticType
+                }),
+                dimensions = intent.Dimensions,
+                filters = intent.Filters.Count
+            },
+            runtimePlan = new
+            {
+                intentType = runtimePlan.Intent?.IntentType.ToString(),
+                metrics = runtimePlan.Metrics.Select(x => new
+                {
+                    x.Name,
+                    x.Field,
+                    aggregation = x.GetAggregation().ToString(),
+                    x.SemanticType
+                }),
+                dimensions = runtimePlan.Dimensions.Count,
+                filters = runtimePlan.Filters.Count,
+                tables = runtimePlan.Tables.Count,
+                joins = runtimePlan.Joins.Count,
+                isAggregate = runtimePlan.IsAggregate,
+                distinct = runtimePlan.Distinct,
+                limit = runtimePlan.Limit,
+                isRanking = runtimePlan.IsRanking,
+                isDetailRanking = runtimePlan.IsDetailRanking,
+                isAggregateRanking = runtimePlan.IsAggregateRanking
+            },
+            evaluation
         });
     }
 
@@ -243,12 +277,7 @@ public sealed class EvaluationDiagnosticsController : ControllerBase
               "expected": {
                 "intentType": "Aggregate",
                 "dimensions": [],
-                "metrics": [
-                  {
-                    "semanticText": "入库数量",
-                    "aggregation": "sum"
-                  }
-                ]
+                "metrics": [{ "semanticText": "入库数量", "aggregation": "sum" }],
               },
               "version": "1.0",
               "enabled": true
@@ -270,12 +299,8 @@ public sealed class EvaluationDiagnosticsController : ControllerBase
                      && expected.Metrics[0].SemanticText == "入库数量"
                      && expected.Dimensions is { Count: 0 }
                      && !serializedJson.Contains("businessKey", StringComparison.OrdinalIgnoreCase),
-            metricsState = expected?.Metrics is null
-                ? "null"
-                : expected.Metrics.Count == 0 ? "empty" : "values",
-            dimensionsState = expected?.Dimensions is null
-                ? "null"
-                : expected.Dimensions.Count == 0 ? "empty" : "values",
+            metricsState = expected?.Metrics is null ? "null" : expected.Metrics.Count == 0 ? "empty" : "values",
+            dimensionsState = expected?.Dimensions is null ? "null" : expected.Dimensions.Count == 0 ? "empty" : "values",
             aggregation = expected?.Metrics?.FirstOrDefault()?.Aggregation.ToString(),
             semanticText = expected?.Metrics?.FirstOrDefault()?.SemanticText,
             containsBusinessKey = serializedJson.Contains("businessKey", StringComparison.OrdinalIgnoreCase),
@@ -287,35 +312,11 @@ public sealed class EvaluationDiagnosticsController : ControllerBase
     public ActionResult<object> ThreeState()
     {
         const string missingJson = """
-        {
-          "version": "1.0",
-          "dataset": "query-plan-golden",
-          "cases": [
-            {
-              "id": "STATE-NULL",
-              "name": "Missing Collection",
-              "question": "验证缺失集合",
-              "expected": {}
-            }
-          ]
-        }
+        { "version": "1.0", "dataset": "query-plan-golden", "cases": [{ "id": "STATE-NULL", "name": "Missing Collection", "question": "验证缺失集合", "expected": {} }] }
         """;
 
         const string emptyJson = """
-        {
-          "version": "1.0",
-          "dataset": "query-plan-golden",
-          "cases": [
-            {
-              "id": "STATE-EMPTY",
-              "name": "Empty Collection",
-              "question": "验证空集合",
-              "expected": {
-                "metrics": []
-              }
-            }
-          ]
-        }
+        { "version": "1.0", "dataset": "query-plan-golden", "cases": [{ "id": "STATE-EMPTY", "name": "Empty Collection", "question": "验证空集合", "expected": { "metrics": [] } }] }
         """;
 
         var missing = _serializer.Deserialize(missingJson).Cases.Single().Expected;
@@ -327,5 +328,15 @@ public sealed class EvaluationDiagnosticsController : ControllerBase
             emptyMetricsIsNotNull = empty.Metrics is not null,
             emptyMetricsCount = empty.Metrics?.Count
         });
+    }
+
+    private GoldenQueryCase? LoadGoldenCase(string caseId)
+    {
+        var path = Path.Combine(_environment.ContentRootPath, "Evaluation", "Golden", "query-plan-golden-v1.json");
+        if (!System.IO.File.Exists(path))
+            return null;
+
+        var dataset = _serializer.Deserialize(System.IO.File.ReadAllText(path));
+        return dataset.Cases.SingleOrDefault(x => string.Equals(x.Id, caseId, StringComparison.OrdinalIgnoreCase));
     }
 }
