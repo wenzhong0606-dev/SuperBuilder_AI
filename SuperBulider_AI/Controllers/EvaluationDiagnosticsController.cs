@@ -8,8 +8,8 @@ namespace SuperBulider_AI.Controllers;
 
 /// <summary>
 /// Phase 2.6 Evaluation Dataset 诊断入口。
-/// 仅用于验证 Golden Dataset Contract、源码资产加载与运行时 Semantic 检索诊断，
-/// 不执行 QueryPlan Evaluation。
+/// 用于验证 Golden Dataset Contract、源码资产加载、运行时 Semantic 检索诊断
+/// 与 Semantic Applicability，不执行 QueryPlan Evaluation。
 /// </summary>
 [ApiController]
 [Route("evaluation/diagnostics")]
@@ -18,25 +18,24 @@ public sealed class EvaluationDiagnosticsController : ControllerBase
     private readonly GoldenQueryDatasetSerializer _serializer;
     private readonly IWebHostEnvironment _environment;
     private readonly IMetadataSemanticSearchService _metadataSemanticSearchService;
+    private readonly SemanticApplicabilityEvaluator _semanticApplicabilityEvaluator;
 
     public EvaluationDiagnosticsController(
         GoldenQueryDatasetSerializer serializer,
         IWebHostEnvironment environment,
-        IMetadataSemanticSearchService metadataSemanticSearchService)
+        IMetadataSemanticSearchService metadataSemanticSearchService,
+        SemanticApplicabilityEvaluator semanticApplicabilityEvaluator)
     {
         _serializer = serializer;
         _environment = environment;
         _metadataSemanticSearchService = metadataSemanticSearchService;
+        _semanticApplicabilityEvaluator = semanticApplicabilityEvaluator;
     }
 
     [HttpGet("golden-dataset")]
     public ActionResult<object> GoldenDataset()
     {
-        var path = Path.Combine(
-            _environment.ContentRootPath,
-            "Evaluation",
-            "Golden",
-            "query-plan-golden-v1.json");
+        var path = Path.Combine(_environment.ContentRootPath, "Evaluation", "Golden", "query-plan-golden-v1.json");
 
         if (!System.IO.File.Exists(path))
         {
@@ -131,8 +130,7 @@ public sealed class EvaluationDiagnosticsController : ControllerBase
             });
         }
 
-        var results = await _metadataSemanticSearchService
-            .SearchAsync(question, topK);
+        var results = await _metadataSemanticSearchService.SearchAsync(question, topK);
 
         return Ok(new
         {
@@ -152,6 +150,68 @@ public sealed class EvaluationDiagnosticsController : ControllerBase
                 column = x.Column?.ColumnName,
                 dataType = x.Column?.DataType
             })
+        });
+    }
+
+    /// <summary>
+    /// Phase 2.6.3.5-C.2 Semantic Applicability。
+    /// 根据 Golden Case 的 Metric 语义分析当前运行时 Metadata 候选。
+    /// 不修改 Metadata、QueryPlan 或 SQL，也不执行 Repair。
+    /// </summary>
+    [HttpGet("applicability")]
+    public async Task<ActionResult<object>> Applicability(
+        [FromQuery] string caseId,
+        [FromQuery] int topK = 10)
+    {
+        if (string.IsNullOrWhiteSpace(caseId))
+        {
+            return BadRequest(new
+            {
+                passed = false,
+                message = "caseId is required."
+            });
+        }
+
+        if (topK < 1 || topK > 100)
+        {
+            return BadRequest(new
+            {
+                passed = false,
+                message = "topK must be between 1 and 100."
+            });
+        }
+
+        var path = Path.Combine(_environment.ContentRootPath, "Evaluation", "Golden", "query-plan-golden-v1.json");
+
+        if (!System.IO.File.Exists(path))
+        {
+            return NotFound(new
+            {
+                passed = false,
+                message = "Golden Dataset asset was not found.",
+                path
+            });
+        }
+
+        var dataset = _serializer.Deserialize(System.IO.File.ReadAllText(path));
+        var goldenCase = dataset.Cases.SingleOrDefault(x =>
+            string.Equals(x.Id, caseId, StringComparison.OrdinalIgnoreCase));
+
+        if (goldenCase is null)
+        {
+            return NotFound(new
+            {
+                passed = false,
+                message = $"Golden Case '{caseId}' was not found."
+            });
+        }
+
+        var result = await _semanticApplicabilityEvaluator.EvaluateAsync(goldenCase, topK);
+
+        return Ok(new
+        {
+            passed = result.State == "Resolved",
+            result
         });
     }
 
@@ -187,7 +247,6 @@ public sealed class EvaluationDiagnosticsController : ControllerBase
         var dataset = _serializer.Deserialize(sourceJson);
         var caseItem = dataset.Cases.Single();
         var expected = caseItem.Expected;
-
         var serializedJson = _serializer.Serialize(dataset);
 
         return Ok(new
