@@ -14,33 +14,7 @@ public class GoldenQueryCase
 
     public string Question { get; set; } = string.Empty;
 
-    public string? ExpectedIntentType { get; set; }
-
-    public long? ExpectedDataSourceId { get; set; }
-
-    public List<GoldenMetricExpectation> ExpectedMetrics { get; set; } = new();
-
-    public List<GoldenDimensionExpectation> ExpectedDimensions { get; set; } = new();
-
-    public List<GoldenFilterExpectation> ExpectedFilters { get; set; } = new();
-
-    public List<GoldenTableExpectation> ExpectedTables { get; set; } = new();
-
-    public List<GoldenJoinExpectation> ExpectedJoins { get; set; } = new();
-
-    public List<GoldenOrderExpectation> ExpectedOrders { get; set; } = new();
-
-    public bool? ExpectedIsAggregate { get; set; }
-
-    public bool? ExpectedDistinct { get; set; }
-
-    public int? ExpectedLimit { get; set; }
-
-    public bool? ExpectedIsRanking { get; set; }
-
-    public bool? ExpectedIsDetailRanking { get; set; }
-
-    public bool? ExpectedIsAggregateRanking { get; set; }
+    public GoldenQueryExpectation Expected { get; set; } = new();
 
     public string? Difficulty { get; set; }
 
