@@ -1,65 +1,108 @@
-﻿namespace SuperBulider_AI.Models.BI;
+﻿using SuperBulider_AI.Models.AI;
+
+namespace SuperBulider_AI.Models.BI;
 
 /// <summary>
-/// QueryPlan自动修复结果。
+/// QueryPlan 修复结果。
 ///
-/// Phase 2.2.5
+/// Phase 2.3.1
 ///
-/// 表示:
+/// QueryPlan Repair Loop 输出模型。
 ///
-/// Repair是否成功
+/// 负责返回:
 ///
-/// 以及修复后的QueryPlan。
+/// 1. 是否修复成功
+/// 2. 修复后的 QueryPlan
+/// 3. 修复动作记录
+///
+/// 流程:
+///
+/// QueryPlanRepairRequest
+///
+///        ↓
+///
+/// QueryPlanRepairService
+///
+///        ↓
+///
+/// QueryPlanRepairResult
+///
+///        ↓
+///
+/// QueryPlanValidationPipeline
+///
+///        ↓
+///
+/// Re-Validate
+///
 /// </summary>
 public class QueryPlanRepairResult
 {
 	/// <summary>
-	/// 是否修复成功。
+	/// 是否成功完成修复。
+	///
+	/// true:
+	///     RepairedPlan 可继续进入验证。
+	///
+	/// false:
+	///     当前问题无法自动修复。
 	/// </summary>
-	public bool Success
-	{
-		get;
-		set;
-	}
-
+	public bool Success { get; set; }
 
 
 	/// <summary>
-	/// 修复后的QueryPlan。
+	/// 修复后的 QueryPlan。
 	///
-	/// 成功时返回。
+	/// Repair成功后:
+	///
+	/// Validation
+	///        ↓
+	/// Repair
+	///        ↓
+	/// New QueryPlan
+	///
+	/// Pipeline 会使用该Plan重新验证。
 	/// </summary>
-	public QueryPlan? Plan
-	{
-		get;
-		set;
-	}
-
+	public QueryPlan? RepairedPlan { get; set; }
 
 
 	/// <summary>
-	/// 修复说明。
+	/// 修复动作记录。
 	///
-	/// 用于日志、
-	/// AI解释。
+	/// 用于:
+	///
+	/// 1. 调试
+	/// 2. AI解释
+	/// 3. 后续学习
+	///
+	/// 示例:
+	///
+	/// [
+	///   "Replace field Amount with NetAmount",
+	///   "Change table SalesOrderDetail to SalesOrder"
+	/// ]
+	///
 	/// </summary>
-	public string?
-		Reason
-	{
-		get;
-		set;
-	}
-
+	public List<string> RepairActions { get; set; }
+		= new();
 
 
 	/// <summary>
-	/// 修复次数。
+	/// 修复失败原因。
 	///
-	/// 防止无限循环。
+	/// 当 Success=false 时使用。
+	///
+	/// 示例:
+	///
+	/// "No matching metadata field found"
 	/// </summary>
-	public int RepairCount
-	{
-		get;
-		set;
-	}
+	public string? FailureReason { get; set; }
+
+
+	/// <summary>
+	/// 修复前后的差异说明。
+	///
+	/// 用于日志和可观测性。
+	/// </summary>
+	public string? Explanation { get; set; }
 }

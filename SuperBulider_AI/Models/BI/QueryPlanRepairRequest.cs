@@ -1,83 +1,102 @@
-﻿using SuperBulider_AI.Models.Metadata;
-
+﻿using SuperBulider_AI.Models.AI;
 
 namespace SuperBulider_AI.Models.BI;
 
 /// <summary>
-/// QueryPlan自动修复请求。
+/// QueryPlan 修复请求上下文。
 ///
-/// Phase 2.2.5
+/// Phase 2.3.1
 ///
-/// 用于:
+/// 用于 QueryPlan Repair Loop。
 ///
-/// QueryPlan验证失败后
-/// 将:
+/// 包含:
+///
+/// 1. 当前失败的 QueryPlan
+/// 2. 语义验证结果
+/// 3. 验证上下文
+/// 4. 用户原始问题
+/// 5. 当前修复次数
+///
+/// 流程:
 ///
 /// QueryPlan
-/// Validation Error
-/// Metadata Context
-///
-/// 提交给Repair Service。
+///      |
+///      v
+/// QuerySemanticValidationResult
+///      |
+///      v
+/// QueryPlanRepairRequest
+///      |
+///      v
+/// QueryPlanRepairService
+///      |
+///      v
+/// QueryPlanRepairResult
 ///
 /// </summary>
 public class QueryPlanRepairRequest
 {
 	/// <summary>
-	/// 当前查询计划。
+	/// 当前需要修复的查询计划。
 	///
-	/// 可能包含错误字段、
-	/// 错误Metric、
-	/// 错误Filter。
+	/// Repair必须基于当前Plan进行修改，
+	/// 而不是重新猜测用户意图。
 	/// </summary>
-	public QueryPlan Plan
-	{
-		get;
-		set;
-	} = null!;
+	public QueryPlan QueryPlan { get; set; } = default!;
 
+
+	/// <summary>
+	/// QueryPlan语义验证结果。
+	///
+	/// 包含:
+	/// - 缺失字段
+	/// - 不匹配Metric
+	/// - 无效Filter
+	/// - 表关系错误
+	///
+	/// Repair根据该结果决定修复策略。
+	/// </summary>
+	public QuerySemanticValidationResult ValidationResult { get; set; } = default!;
 
 
 	/// <summary>
 	/// QueryPlan验证上下文。
 	///
-	/// 包含:
+	/// 提供:
+	/// - Metadata信息
+	/// - 当前查询上下文
+	/// - 数据源信息
 	///
-	/// MetadataTable
-	/// MetadataColumn
-	/// MetadataSemantic
-	///
+	/// 用于辅助Repair决策。
 	/// </summary>
-	public QueryPlanValidationContext Context
-	{
-		get;
-		set;
-	} = null!;
-
+	public QueryPlanValidationContext? ValidationContext { get; set; }
 
 
 	/// <summary>
-	/// 验证产生的问题。
+	/// 用户原始问题。
 	///
-	/// 来源:
+	/// 示例:
 	///
-	/// QuerySemanticValidator
+	/// "查询2025年销售额"
+	///
+	/// Repair时用于保持用户语义一致。
 	/// </summary>
-	public List<SemanticValidationError> Errors
-	{
-		get;
-		set;
-	} = new();
-
+	public string OriginalQuestion { get; set; } = string.Empty;
 
 
 	/// <summary>
-	/// 原始用户问题。
+	/// 当前Repair次数。
 	///
-	/// 提供给AI Repair使用。
+	/// 防止:
+	///
+	/// Validation
+	///    |
+	/// Repair
+	///    |
+	/// Validation
+	///    |
+	/// 无限循环
+	///
 	/// </summary>
-	public string Question
-	{
-		get;
-		set;
-	} = string.Empty;
+	public int RetryCount { get; set; }
 }
