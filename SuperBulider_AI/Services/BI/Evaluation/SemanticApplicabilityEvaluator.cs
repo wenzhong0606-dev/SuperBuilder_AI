@@ -71,8 +71,8 @@ public sealed class SemanticApplicabilityEvaluator
 
         var topSemantic = semanticCandidates.FirstOrDefault();
         var secondSemantic = semanticCandidates.Skip(1).FirstOrDefault();
-        var scoreGap = topSemantic is not null && secondSemantic is not null
-            ? topSemantic.Score - secondSemantic.Score
+        double? scoreGap = topSemantic is not null && secondSemantic is not null
+            ? (double?)(topSemantic.Score - secondSemantic.Score)
             : null;
 
         return metricType == "EntityCount"
