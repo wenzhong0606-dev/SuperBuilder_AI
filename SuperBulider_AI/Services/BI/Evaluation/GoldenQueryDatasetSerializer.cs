@@ -32,7 +32,9 @@ public sealed class GoldenQueryDatasetSerializer
         {
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
             WriteIndented = true,
-            Converters =
+			DefaultIgnoreCondition =
+		        JsonIgnoreCondition.WhenWritingNull,
+			Converters =
             {
                 new JsonStringEnumConverter(JsonNamingPolicy.CamelCase)
             }
