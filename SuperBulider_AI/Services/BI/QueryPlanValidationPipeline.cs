@@ -1,44 +1,73 @@
 ﻿using SuperBulider_AI.Interfaces.BI;
 using SuperBulider_AI.Models.BI;
 
-
 namespace SuperBulider_AI.Services.BI;
 
 /// <summary>
-/// QueryPlan验证流水线。
+/// QueryPlan 验证与自动修复流水线。
 ///
-/// Phase 2.2.5
+/// Phase 2.3.1
 ///
-/// 职责:
+/// 核心闭环：
 ///
 /// QueryPlan
 ///      ↓
 /// Semantic Validation
 ///      ↓
+/// ValidationResult
+///      ↓
+/// QueryPlan Repair
+///      ↓
+/// Re-Validation
+///      ↓
+/// ┌───────────────┐
+/// │               │
+/// PASS            FAIL
+/// │               │
+/// ↓               ↓
+/// Return      Retry Repair
+///
+/// 注意：
+///
+/// Repair 直接修改当前 QueryPlan。
+///
+/// 不再：
+///
+/// Validation
+///      ↓
 /// Repair QueryIntent
 ///      ↓
-/// Rebuild QueryPlan
+/// QueryPlanBuilder
 ///      ↓
-/// ReValidate
+/// Rebuild QueryPlan
 ///
-/// 注意:
-///
-/// Repair 不直接修改 QueryPlan。
-///
-/// AI 修复的是 QueryIntent。
-///
-/// QueryPlan 永远由 QueryPlanBuilder生成。
+/// QueryPlanBuilder 只负责第一次生成 QueryPlan，
+/// 不参与 QueryPlan Repair Loop。
 /// </summary>
 public class QueryPlanValidationPipeline :
 	IQueryPlanValidationPipeline
 {
-
 	private readonly QuerySemanticValidator _validator;
 
 	private readonly IQueryPlanRepairService _repairService;
 
-	private readonly IQueryPlanBuilder _queryPlanBuilder;
 
+	/// <summary>
+	/// 最大自动修复次数。
+	///
+	/// 防止：
+	///
+	/// Validation
+	///      ↓
+	/// Repair
+	///      ↓
+	/// Validation
+	///      ↓
+	/// Repair
+	///      ↓
+	/// 无限循环
+	/// </summary>
+	private const int MaxRepairAttempts = 3;
 
 
 	/// <summary>
@@ -46,101 +75,193 @@ public class QueryPlanValidationPipeline :
 	/// </summary>
 	public QueryPlanValidationPipeline(
 		QuerySemanticValidator validator,
-		IQueryPlanRepairService repairService,
-		IQueryPlanBuilder queryPlanBuilder)
+		IQueryPlanRepairService repairService)
 	{
 		_validator = validator;
 
 		_repairService = repairService;
-
-		_queryPlanBuilder = queryPlanBuilder;
 	}
 
 
-
 	/// <summary>
-	/// 执行 QueryPlan 验证。
+	/// 执行 QueryPlan Validation + Repair Loop。
 	///
-	/// 如果验证失败:
+	/// 流程：
 	///
-	/// 1. AI Repair QueryIntent
-	/// 2. 重新生成 QueryPlan
-	/// 3. 再次验证
+	/// 1. 第一次 Validation
 	///
+	/// 2. 如果通过
+	///    → 直接返回
+	///
+	/// 3. 如果失败
+	///    → 构造 QueryPlanRepairRequest
+	///
+	/// 4. QueryPlanRepairService
+	///    → 直接修改 QueryPlan
+	///
+	/// 5. Re-Validation
+	///
+	/// 6. 如果仍失败
+	///    → 继续 Repair
+	///
+	/// 7. 达到 MaxRepairAttempts
+	///    → 返回最终失败结果
 	/// </summary>
-	public async Task<QueryPlanValidationPipelineResult> ValidateAsync(
-		QueryPlan plan,
-		QueryPlanValidationContext context,
-		string question)
+	public async Task<QueryPlanValidationPipelineResult>
+		ValidateAsync(
+			QueryPlan plan,
+			QueryPlanValidationContext context,
+			string question)
 	{
 		ArgumentNullException.ThrowIfNull(plan);
 
 		ArgumentNullException.ThrowIfNull(context);
 
+		question ??= string.Empty;
+
+
+		var currentPlan = plan;
+
+
+		QuerySemanticValidationResult
+			currentValidationResult =
+				_validator.Validate(
+					currentPlan,
+					context);
 
 
 		//
-		// 第一次验证
+		// 第一次 Validation 已经通过
 		//
-		var result =
-			_validator.Validate(
-				plan,
-				context);
-
-
-
-		//
-		// 验证通过
-		//
-		if (result.IsValid)
+		if (currentValidationResult.IsValid)
 		{
 			return new QueryPlanValidationPipelineResult
 			{
-				Plan = plan,
-				ValidationResult = result
+				Plan = currentPlan,
+
+				ValidationResult =
+					currentValidationResult
 			};
 		}
 
 
+		//
+		// QueryPlan Repair Loop
+		//
+		for (
+			var attempt = 1;
+			attempt <= MaxRepairAttempts;
+			attempt++)
+		{
+			//
+			// 构造 Repair Request
+			//
+			var repairRequest =
+				new QueryPlanRepairRequest
+				{
+					QueryPlan =
+						currentPlan,
+
+					ValidationResult =
+						currentValidationResult,
+
+					ValidationContext =
+						context,
+
+					OriginalQuestion =
+						question,
+
+					RetryCount =
+						attempt
+				};
+
+
+			//
+			// 执行 QueryPlan Repair
+			//
+			var repairResult =
+				await _repairService
+					.RepairAsync(
+						repairRequest);
+
+
+			//
+			// Repair 没有成功
+			//
+			if (!repairResult.Success
+				||
+				repairResult.RepairedPlan == null)
+			{
+				//
+				// 当前 Plan 没有可继续修复的方案。
+				//
+				return new QueryPlanValidationPipelineResult
+				{
+					Plan = currentPlan,
+
+					ValidationResult =
+						currentValidationResult
+				};
+			}
+
+
+			//
+			// 使用 Repair 后的 QueryPlan
+			//
+			currentPlan =
+				repairResult.RepairedPlan;
+
+
+			//
+			// 重新 Validation
+			//
+			currentValidationResult =
+				_validator.Validate(
+					currentPlan,
+					context);
+
+
+			//
+			// Repair 后验证通过
+			//
+			if (currentValidationResult.IsValid)
+			{
+				return new QueryPlanValidationPipelineResult
+				{
+					Plan = currentPlan,
+
+					ValidationResult =
+						currentValidationResult
+				};
+			}
+
+
+			//
+			// 如果还失败：
+			//
+			// 下一轮继续：
+			//
+			// Validation
+			//      ↓
+			// Repair
+			//      ↓
+			// Validation
+			//
+		}
+
 
 		//
-		// Phase 2.2.5
+		// 达到最大 Repair 次数。
 		//
-		// Repair QueryIntent
+		// 返回最后一次 Repair 后的 Plan
+		// 以及最终 ValidationResult。
 		//
-		var repairedIntent =
-			await _repairService
-				.RepairAsync(
-					plan.Intent,
-					result);
-
-
-
-		//
-		// 根据新的 Intent
-		// 重新生成 QueryPlan
-		//
-		var repairedPlan =
-			await _queryPlanBuilder
-				.BuildAsync(
-					repairedIntent);
-
-
-
-		//
-		// 第二次验证
-		//
-		var repairedResult =
-			_validator.Validate(
-				repairedPlan,
-				context);
-
-
-
 		return new QueryPlanValidationPipelineResult
 		{
-			Plan = repairedPlan,
-			ValidationResult = repairedResult
+			Plan = currentPlan,
+
+			ValidationResult =
+				currentValidationResult
 		};
 	}
 }
