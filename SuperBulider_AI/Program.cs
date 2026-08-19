@@ -210,6 +210,22 @@ builder.Services
 	.AddScoped<
 		IQueryPlanValidationPipeline,
 		QueryPlanValidationPipeline>();
+// -----------------------------
+// Phase 2.4
+// QueryPlan Confidence
+// -----------------------------
+
+builder.Services
+	.AddScoped<
+		IQueryPlanConfidenceService,
+		QueryPlanConfidenceService>();
+
+builder.Services
+	.AddScoped<
+		IQueryPlanDecisionGate,
+		QueryPlanDecisionGate>();
+
+
 
 // -----------------------------
 // 数据库连接与 SQL 执行
