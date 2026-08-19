@@ -11,6 +11,7 @@
         "metrics": [
           {
             "semanticText": "入库数量",
+            "field": "quantity",
             "aggregation": "sum"
           }
         ],
