@@ -2,7 +2,6 @@ namespace SuperBuilder_AI.Models.BI.Evaluation;
 
 /// <summary>
 /// Phase 2.6.3.5-C.2 Semantic Applicability Evaluation Result。
-///
 /// 描述当前 Golden Case 在运行时 Metadata + Semantic Search 环境中的语义适用性。
 /// 当 State=Resolved 时，Resolution 是允许 QueryPlanBuilder 消费的稳定物理绑定。
 /// </summary>
@@ -35,6 +34,7 @@ public sealed class SemanticApplicabilityResult
 public sealed class SemanticApplicabilityResolution
 {
     public long TableId { get; init; }
+    public long DataSourceId { get; init; }
     public long ColumnId { get; init; }
     public string? Table { get; init; }
     public string? Column { get; init; }
