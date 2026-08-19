@@ -7,13 +7,6 @@ namespace SuperBulider_AI.Services.BI.Evaluation;
 
 /// <summary>
 /// Phase 2.6.3.5-C.2 Semantic Applicability Evaluator。
-///
-/// 职责：
-/// 1. 根据 Golden Metric 判断 Metric Type。
-/// 2. 分析当前运行时 Metadata Semantic Search 候选。
-/// 3. 输出结构化 Applicability Evidence。
-///
-/// 不负责 Metadata 修复、QueryPlan 修改、SQL Builder 或最终 Confidence 评分。
 /// </summary>
 public sealed class SemanticApplicabilityEvaluator
 {
@@ -103,9 +96,6 @@ public sealed class SemanticApplicabilityEvaluator
         }
 
         var topLexicalMatch = ContainsSemanticText(topSemantic, semanticText);
-
-        // 只有第二候选也具备同一 Golden Semantic 的直接证据时才视为竞争。
-        // 仅仅存在第二个 semantic vector 不能证明 Ambiguous。
         var competingCandidates = semanticCandidates
             .Skip(1)
             .Any(x => ContainsSemanticText(x, semanticText));
@@ -122,7 +112,7 @@ public sealed class SemanticApplicabilityEvaluator
             MetricType = "ColumnMetric",
             State = state,
             Reason = BuildColumnReason(state, topLexicalMatch),
-            Candidate = ToCandidate(topSemantic),
+            SearchCandidate = ToCandidate(topSemantic),
             Evidence = new SemanticApplicabilityEvidence
             {
                 SemanticCandidateExists = semanticCandidates.Count > 0,
@@ -146,8 +136,8 @@ public sealed class SemanticApplicabilityEvaluator
         MetadataSemanticSearchResult? secondSemantic,
         double? scoreGap)
     {
-        // 当前 MetadataSemanticSearchResult 只有 table / column / semantic 三类向量。
-        // 即使发现实体表，也不能仅凭表存在认定 COUNT(entity) 已被语义解析。
+        // 当前 Semantic Metadata 没有直接的 EntityCount 语义资产。
+        // 找到实体/表候选不等于已经解析出 COUNT(entity)。
         const bool directEntityCountEvidence = false;
 
         return new SemanticApplicabilityResult
@@ -156,18 +146,17 @@ public sealed class SemanticApplicabilityEvaluator
             Question = goldenCase.Question,
             MetricSemanticText = semanticText,
             MetricType = "EntityCount",
-            State = directEntityCountEvidence ? "Resolved" : "NotResolved",
-            Reason = directEntityCountEvidence
-                ? "Direct EntityCount semantic evidence was found."
-                : "Current Semantic Metadata contains entity/table candidates, but no direct EntityCount semantic evidence.",
-            Candidate = topSemantic is null ? null : ToCandidate(topSemantic),
+            State = "NotResolved",
+            Reason = "Current Semantic Metadata contains entity/table candidates, but no direct EntityCount semantic evidence.",
+            SearchCandidate = topSemantic is null ? null : ToCandidate(topSemantic),
             Evidence = new SemanticApplicabilityEvidence
             {
                 SemanticCandidateExists = semanticCandidates.Count > 0,
                 EntityCandidateExists = entityCandidates.Count > 0,
                 DirectEntityCountEvidence = directEntityCountEvidence,
                 LexicalMatch = false,
-                CompetingCandidates = secondSemantic is not null,
+                // EntityCount 当前没有可证明的同类型竞争候选，因此不把第二搜索结果当成竞争。
+                CompetingCandidates = false,
                 TopScore = topSemantic?.Score,
                 SecondScore = secondSemantic?.Score,
                 ScoreGap = scoreGap
