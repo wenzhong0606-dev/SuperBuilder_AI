@@ -8,20 +8,15 @@ namespace SuperBuilder_AI.Models.BI;
 public sealed class QueryPlanSemanticResolution
 {
     public QueryPlanMetricResolution? Metric { get; init; }
-
-    public IReadOnlyList<QueryPlanFilterResolution> Filters { get; init; }
-        = Array.Empty<QueryPlanFilterResolution>();
-
-    public IReadOnlyList<QueryPlanDimensionResolution> Dimensions { get; init; }
-        = Array.Empty<QueryPlanDimensionResolution>();
-
-    public IReadOnlyList<QueryPlanOrderResolution> Orders { get; init; }
-        = Array.Empty<QueryPlanOrderResolution>();
+    public IReadOnlyList<QueryPlanFilterResolution> Filters { get; init; } = Array.Empty<QueryPlanFilterResolution>();
+    public IReadOnlyList<QueryPlanDimensionResolution> Dimensions { get; init; } = Array.Empty<QueryPlanDimensionResolution>();
+    public IReadOnlyList<QueryPlanOrderResolution> Orders { get; init; } = Array.Empty<QueryPlanOrderResolution>();
 }
 
 public sealed class QueryPlanMetricResolution
 {
     public long TableId { get; init; }
+    public long DataSourceId { get; init; }
     public long ColumnId { get; init; }
     public string SemanticText { get; init; } = string.Empty;
     public string Table { get; init; } = string.Empty;
@@ -33,6 +28,7 @@ public sealed class QueryPlanMetricResolution
 public sealed class QueryPlanFilterResolution
 {
     public long TableId { get; init; }
+    public long DataSourceId { get; init; }
     public long ColumnId { get; init; }
     public string SemanticText { get; init; } = string.Empty;
     public string Table { get; init; } = string.Empty;
@@ -44,6 +40,7 @@ public sealed class QueryPlanFilterResolution
 public sealed class QueryPlanDimensionResolution
 {
     public long TableId { get; init; }
+    public long DataSourceId { get; init; }
     public long ColumnId { get; init; }
     public string SemanticText { get; init; } = string.Empty;
     public string Table { get; init; } = string.Empty;
@@ -55,6 +52,7 @@ public sealed class QueryPlanDimensionResolution
 public sealed class QueryPlanOrderResolution
 {
     public long TableId { get; init; }
+    public long DataSourceId { get; init; }
     public long ColumnId { get; init; }
     public string SemanticText { get; init; } = string.Empty;
     public string Table { get; init; } = string.Empty;
