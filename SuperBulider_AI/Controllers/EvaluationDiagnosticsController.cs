@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using SuperBulider_AI.Interfaces;
 using SuperBulider_AI.Models.BI;
 using SuperBulider_AI.Models.BI.Evaluation;
 using SuperBulider_AI.Services.BI.Evaluation;
@@ -7,7 +8,8 @@ namespace SuperBulider_AI.Controllers;
 
 /// <summary>
 /// Phase 2.6 Evaluation Dataset 诊断入口。
-/// 仅用于验证 Golden Dataset Contract 与源码资产加载，不执行 QueryPlan Evaluation。
+/// 仅用于验证 Golden Dataset Contract、源码资产加载与运行时 Semantic 检索诊断，
+/// 不执行 QueryPlan Evaluation。
 /// </summary>
 [ApiController]
 [Route("evaluation/diagnostics")]
@@ -15,13 +17,16 @@ public sealed class EvaluationDiagnosticsController : ControllerBase
 {
     private readonly GoldenQueryDatasetSerializer _serializer;
     private readonly IWebHostEnvironment _environment;
+    private readonly IMetadataSemanticSearchService _metadataSemanticSearchService;
 
     public EvaluationDiagnosticsController(
         GoldenQueryDatasetSerializer serializer,
-        IWebHostEnvironment environment)
+        IWebHostEnvironment environment,
+        IMetadataSemanticSearchService metadataSemanticSearchService)
     {
         _serializer = serializer;
         _environment = environment;
+        _metadataSemanticSearchService = metadataSemanticSearchService;
     }
 
     [HttpGet("golden-dataset")]
@@ -95,6 +100,58 @@ public sealed class EvaluationDiagnosticsController : ControllerBase
                     : x.Expected.Filters.Count == 0 ? "empty" : "values"
             }),
             sourcePath = path
+        });
+    }
+
+    /// <summary>
+    /// Phase 2.6.3.5-C.1 Semantic Diagnostic。
+    /// 仅观察当前运行时 Metadata + Qdrant 的真实语义检索结果，
+    /// 不进行 RESOLVED / NOT_FOUND / AMBIGUOUS 判定，也不设置 Score 阈值。
+    /// </summary>
+    [HttpGet("semantic")]
+    public async Task<ActionResult<object>> Semantic(
+        [FromQuery] string question,
+        [FromQuery] int topK = 10)
+    {
+        if (string.IsNullOrWhiteSpace(question))
+        {
+            return BadRequest(new
+            {
+                passed = false,
+                message = "question is required."
+            });
+        }
+
+        if (topK < 1 || topK > 100)
+        {
+            return BadRequest(new
+            {
+                passed = false,
+                message = "topK must be between 1 and 100."
+            });
+        }
+
+        var results = await _metadataSemanticSearchService
+            .SearchAsync(question, topK);
+
+        return Ok(new
+        {
+            question,
+            topK,
+            count = results.Count,
+            results = results.Select(x => new
+            {
+                x.VectorType,
+                x.VectorId,
+                x.Score,
+                businessMeaning = x.Semantic?.BusinessMeaning,
+                keywords = x.Semantic?.Keywords,
+                synonyms = x.Semantic?.Synonyms,
+                exampleQuestions = x.Semantic?.ExampleQuestions,
+                table = x.Table?.TableName,
+                column = x.Column?.ColumnName,
+                dataType = x.Column?.DataType
+            })
         });
     }
 
