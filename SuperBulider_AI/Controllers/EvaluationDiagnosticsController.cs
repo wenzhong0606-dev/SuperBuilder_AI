@@ -37,7 +37,7 @@ public sealed class EvaluationDiagnosticsController : ControllerBase
                 "dimensions": [],
                 "metrics": [
                   {
-                    "businessKey": "1.dbo.SalesOrder.Amount",
+                    "semanticText": "销售金额",
                     "aggregation": "sum"
                   }
                 ]
@@ -60,7 +60,9 @@ public sealed class EvaluationDiagnosticsController : ControllerBase
             passed = expected is not null
                      && expected.Metrics is { Count: 1 }
                      && expected.Metrics[0].Aggregation == QueryAggregation.Sum
-                     && expected.Dimensions is { Count: 0 },
+                     && expected.Metrics[0].SemanticText == "销售金额"
+                     && expected.Dimensions is { Count: 0 }
+                     && !serializedJson.Contains("businessKey", StringComparison.OrdinalIgnoreCase),
             metricsState = expected?.Metrics is null
                 ? "null"
                 : expected.Metrics.Count == 0 ? "empty" : "values",
@@ -68,6 +70,8 @@ public sealed class EvaluationDiagnosticsController : ControllerBase
                 ? "null"
                 : expected.Dimensions.Count == 0 ? "empty" : "values",
             aggregation = expected?.Metrics?.FirstOrDefault()?.Aggregation.ToString(),
+            semanticText = expected?.Metrics?.FirstOrDefault()?.SemanticText,
+            containsBusinessKey = serializedJson.Contains("businessKey", StringComparison.OrdinalIgnoreCase),
             serializedJson
         });
     }
