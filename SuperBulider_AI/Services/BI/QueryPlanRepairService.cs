@@ -7,19 +7,19 @@ namespace SuperBulider_AI.Services.BI;
 /// <summary>
 /// QueryPlan 自动修复服务。
 ///
-/// Phase 2.3.1
+/// Phase 2.3.2
 ///
-/// 负责：
+/// 核心职责：
 ///
 /// QueryPlan
 ///      ↓
-/// Semantic Validation
+/// ValidationResult
 ///      ↓
-/// Metadata Semantic Context
+/// Semantic Candidate Ranking
+///      ↓
+/// Confidence Gate
 ///      ↓
 /// Repair QueryPlan
-///      ↓
-/// Re-Validation
 ///
 /// 本服务不负责：
 ///
@@ -28,11 +28,40 @@ namespace SuperBulider_AI.Services.BI;
 /// 3. MetadataSemanticSearch
 /// 4. QueryPlan 重新构建
 ///
-/// Repair 的目标是直接修改当前 QueryPlan。
+/// Repair 直接修改当前 QueryPlan。
+///
+/// Candidate Ranking 完全基于：
+///
+/// - OriginalQuestion
+/// - QueryPlan Context
+/// - Validation Error
+/// - MetadataColumn
+/// - MetadataSemantic
+///
+/// 不包含任何行业业务词典。
 /// </summary>
 public class QueryPlanRepairService :
 	IQueryPlanRepairService
 {
+	/*
+     * Candidate Ranking 安全阈值。
+     *
+     * Score:
+     *     0.0 ~ 1.0
+     *
+     * Top Candidate 必须：
+     *
+     * 1. 达到最低置信度
+     * 2. 明显领先第二候选
+     *
+     * 否则不自动修复。
+     */
+
+	private const double MinimumConfidence = 0.60;
+
+	private const double MinimumScoreGap = 0.10;
+
+
 	/// <summary>
 	/// QueryPlan 自动修复。
 	/// </summary>
@@ -79,6 +108,7 @@ public class QueryPlanRepairService :
 				RepairError(
 					plan,
 					context,
+					request.OriginalQuestion,
 					error,
 					actions);
 
@@ -92,7 +122,7 @@ public class QueryPlanRepairService :
 		{
 			return Task.FromResult(
 				Failed(
-					"当前 QueryPlan 没有找到可以基于 Metadata Context 自动修复的问题。"));
+					"当前 QueryPlan 没有找到满足置信度要求的 Metadata Semantic 修复候选。"));
 		}
 
 		return Task.FromResult(
@@ -116,6 +146,7 @@ public class QueryPlanRepairService :
 	private static bool RepairError(
 		QueryPlan plan,
 		QueryPlanValidationContext context,
+		string? originalQuestion,
 		SemanticValidationError error,
 		List<string> actions)
 	{
@@ -128,11 +159,8 @@ public class QueryPlanRepairService :
 		/*
          * 优先使用 Code。
          *
-         * Code 是 Validation → Repair Loop
-         * 的稳定机器可读标识。
-         *
-         * 如果旧 Validator 尚未设置 Code，
-         * 则退回使用 Type。
+         * 如果 Validator 尚未设置 Code，
+         * 则兼容使用 Type。
          */
 
 		if (!string.IsNullOrWhiteSpace(code))
@@ -140,6 +168,7 @@ public class QueryPlanRepairService :
 			if (RepairByCode(
 					plan,
 					context,
+					originalQuestion,
 					error,
 					code,
 					actions))
@@ -153,6 +182,7 @@ public class QueryPlanRepairService :
 			return RepairByType(
 				plan,
 				context,
+				originalQuestion,
 				error,
 				type,
 				actions);
@@ -168,6 +198,7 @@ public class QueryPlanRepairService :
 	private static bool RepairByCode(
 		QueryPlan plan,
 		QueryPlanValidationContext context,
+		string? originalQuestion,
 		SemanticValidationError error,
 		string code,
 		List<string> actions)
@@ -181,6 +212,7 @@ public class QueryPlanRepairService :
 				return RepairMetricField(
 					plan,
 					context,
+					originalQuestion,
 					error,
 					actions);
 
@@ -192,6 +224,7 @@ public class QueryPlanRepairService :
 				return RepairFilterField(
 					plan,
 					context,
+					originalQuestion,
 					error,
 					actions);
 
@@ -203,6 +236,7 @@ public class QueryPlanRepairService :
 				return RepairDimensionField(
 					plan,
 					context,
+					originalQuestion,
 					error,
 					actions);
 
@@ -233,6 +267,7 @@ public class QueryPlanRepairService :
 				return RepairDateFilter(
 					plan,
 					context,
+					originalQuestion,
 					error,
 					actions);
 
@@ -246,12 +281,11 @@ public class QueryPlanRepairService :
 
 	/// <summary>
 	/// 根据旧版 Validation Type 修复。
-	///
-	/// 用于兼容现有 Validator。
 	/// </summary>
 	private static bool RepairByType(
 		QueryPlan plan,
 		QueryPlanValidationContext context,
+		string? originalQuestion,
 		SemanticValidationError error,
 		string type,
 		List<string> actions)
@@ -267,6 +301,7 @@ public class QueryPlanRepairService :
 			return RepairMetricField(
 				plan,
 				context,
+				originalQuestion,
 				error,
 				actions);
 		}
@@ -282,6 +317,7 @@ public class QueryPlanRepairService :
 			return RepairFilterField(
 				plan,
 				context,
+				originalQuestion,
 				error,
 				actions);
 		}
@@ -297,6 +333,7 @@ public class QueryPlanRepairService :
 			return RepairDimensionField(
 				plan,
 				context,
+				originalQuestion,
 				error,
 				actions);
 		}
@@ -338,6 +375,7 @@ public class QueryPlanRepairService :
 			return RepairDateFilter(
 				plan,
 				context,
+				originalQuestion,
 				error,
 				actions);
 		}
@@ -352,11 +390,11 @@ public class QueryPlanRepairService :
 	private static bool RepairMetricField(
 		QueryPlan plan,
 		QueryPlanValidationContext context,
+		string? originalQuestion,
 		SemanticValidationError error,
 		List<string> actions)
 	{
-		if (string.IsNullOrWhiteSpace(
-				error.Field))
+		if (string.IsNullOrWhiteSpace(error.Field))
 		{
 			return false;
 		}
@@ -380,6 +418,8 @@ public class QueryPlanRepairService :
 			var candidate =
 				FindBestCandidate(
 					error.Field,
+					originalQuestion,
+					plan,
 					context,
 					column =>
 						IsMetricCandidate(
@@ -393,7 +433,7 @@ public class QueryPlanRepairService :
 
 			if (string.Equals(
 					metric.Field,
-					candidate.ColumnName,
+					candidate.Column.ColumnName,
 					StringComparison.OrdinalIgnoreCase))
 			{
 				continue;
@@ -403,10 +443,11 @@ public class QueryPlanRepairService :
 				metric.Field;
 
 			metric.Field =
-				candidate.ColumnName!;
+				candidate.Column.ColumnName!;
 
 			actions.Add(
-				$"Metric '{metric.Name}' 字段由 '{oldField}' 修复为 '{candidate.ColumnName}'。");
+				$"Metric '{metric.Name}' 字段由 '{oldField}' 修复为 '{candidate.Column.ColumnName}'。" +
+				$" CandidateScore={candidate.TotalScore:F3}。");
 
 			return true;
 		}
@@ -421,11 +462,11 @@ public class QueryPlanRepairService :
 	private static bool RepairFilterField(
 		QueryPlan plan,
 		QueryPlanValidationContext context,
+		string? originalQuestion,
 		SemanticValidationError error,
 		List<string> actions)
 	{
-		if (string.IsNullOrWhiteSpace(
-				error.Field))
+		if (string.IsNullOrWhiteSpace(error.Field))
 		{
 			return false;
 		}
@@ -447,6 +488,8 @@ public class QueryPlanRepairService :
 		var candidate =
 			FindBestCandidate(
 				error.Field,
+				originalQuestion,
+				plan,
 				context,
 				IsFilterCandidate);
 
@@ -462,7 +505,7 @@ public class QueryPlanRepairService :
 		{
 			if (string.Equals(
 					filter.Field,
-					candidate.ColumnName,
+					candidate.Column.ColumnName,
 					StringComparison.OrdinalIgnoreCase))
 			{
 				continue;
@@ -472,10 +515,11 @@ public class QueryPlanRepairService :
 				filter.Field;
 
 			filter.Field =
-				candidate.ColumnName!;
+				candidate.Column.ColumnName!;
 
 			actions.Add(
-				$"Filter 字段由 '{oldField}' 修复为 '{candidate.ColumnName}'。");
+				$"Filter 字段由 '{oldField}' 修复为 '{candidate.Column.ColumnName}'。" +
+				$" CandidateScore={candidate.TotalScore:F3}。");
 
 			repaired = true;
 		}
@@ -490,11 +534,11 @@ public class QueryPlanRepairService :
 	private static bool RepairDimensionField(
 		QueryPlan plan,
 		QueryPlanValidationContext context,
+		string? originalQuestion,
 		SemanticValidationError error,
 		List<string> actions)
 	{
-		if (string.IsNullOrWhiteSpace(
-				error.Field))
+		if (string.IsNullOrWhiteSpace(error.Field))
 		{
 			return false;
 		}
@@ -518,11 +562,12 @@ public class QueryPlanRepairService :
 			var candidate =
 				FindBestCandidate(
 					error.Field,
+					originalQuestion,
+					plan,
 					context,
 					column =>
 						IsDimensionCandidate(
-							column,
-							dimension.SemanticType));
+							column));
 
 			if (candidate == null)
 			{
@@ -531,7 +576,7 @@ public class QueryPlanRepairService :
 
 			if (string.Equals(
 					dimension.ColumnName,
-					candidate.ColumnName,
+					candidate.Column.ColumnName,
 					StringComparison.OrdinalIgnoreCase))
 			{
 				continue;
@@ -541,21 +586,14 @@ public class QueryPlanRepairService :
 				dimension.ColumnName;
 
 			dimension.ColumnName =
-				candidate.ColumnName!;
+				candidate.Column.ColumnName!;
 
 			dimension.MetadataColumnId =
-				candidate.Id;
-
-			if (string.IsNullOrWhiteSpace(
-					dimension.SemanticType))
-			{
-				dimension.SemanticType =
-					ResolveSemanticType(
-						candidate);
-			}
+				candidate.Column.Id;
 
 			actions.Add(
-				$"Dimension 字段由 '{oldField}' 修复为 '{candidate.ColumnName}'。");
+				$"Dimension 字段由 '{oldField}' 修复为 '{candidate.Column.ColumnName}'。" +
+				$" CandidateScore={candidate.TotalScore:F3}。");
 
 			return true;
 		}
@@ -565,7 +603,11 @@ public class QueryPlanRepairService :
 
 
 	/// <summary>
-	/// 修复 Metric 聚合方式。
+	/// 修复 Metric 聚合。
+	///
+	/// 这里不根据行业业务词判断。
+	///
+	/// 优先依据 Metadata DataType。
 	/// </summary>
 	private static bool RepairMetricAggregation(
 		QueryPlan plan,
@@ -573,8 +615,7 @@ public class QueryPlanRepairService :
 		SemanticValidationError error,
 		List<string> actions)
 	{
-		if (string.IsNullOrWhiteSpace(
-				error.Field))
+		if (string.IsNullOrWhiteSpace(error.Field))
 		{
 			return false;
 		}
@@ -629,7 +670,7 @@ public class QueryPlanRepairService :
 
 
 	/// <summary>
-	/// 修复普通 QueryField 聚合方式。
+	/// 修复普通 QueryField 聚合。
 	/// </summary>
 	private static bool RepairFieldAggregation(
 		QueryPlan plan,
@@ -637,8 +678,7 @@ public class QueryPlanRepairService :
 		SemanticValidationError error,
 		List<string> actions)
 	{
-		if (string.IsNullOrWhiteSpace(
-				error.Field))
+		if (string.IsNullOrWhiteSpace(error.Field))
 		{
 			return false;
 		}
@@ -694,15 +734,21 @@ public class QueryPlanRepairService :
 
 	/// <summary>
 	/// 修复日期 Filter。
+	///
+	/// 注意：
+	///
+	/// 不使用“日期”“时间”等业务词。
+	///
+	/// 只根据 Metadata DataType 判断。
 	/// </summary>
 	private static bool RepairDateFilter(
 		QueryPlan plan,
 		QueryPlanValidationContext context,
+		string? originalQuestion,
 		SemanticValidationError error,
 		List<string> actions)
 	{
-		if (string.IsNullOrWhiteSpace(
-				error.Field))
+		if (string.IsNullOrWhiteSpace(error.Field))
 		{
 			return false;
 		}
@@ -724,6 +770,8 @@ public class QueryPlanRepairService :
 		var candidate =
 			FindBestCandidate(
 				error.Field,
+				originalQuestion,
+				plan,
 				context,
 				IsDateCandidate);
 
@@ -739,7 +787,7 @@ public class QueryPlanRepairService :
 		{
 			if (string.Equals(
 					filter.Field,
-					candidate.ColumnName,
+					candidate.Column.ColumnName,
 					StringComparison.OrdinalIgnoreCase))
 			{
 				continue;
@@ -749,10 +797,11 @@ public class QueryPlanRepairService :
 				filter.Field;
 
 			filter.Field =
-				candidate.ColumnName!;
+				candidate.Column.ColumnName!;
 
 			actions.Add(
-				$"日期 Filter 字段由 '{oldField}' 修复为 '{candidate.ColumnName}'。");
+				$"日期 Filter 字段由 '{oldField}' 修复为 '{candidate.Column.ColumnName}'。" +
+				$" CandidateScore={candidate.TotalScore:F3}。");
 
 			repaired = true;
 		}
@@ -763,14 +812,6 @@ public class QueryPlanRepairService :
 
 	/// <summary>
 	/// 在当前 ValidationContext 中寻找 MetadataColumn。
-	///
-	/// 优先：
-	///
-	/// MetadataColumnId
-	/// ↓
-	/// TableColumns
-	/// ↓
-	/// ColumnName
 	/// </summary>
 	private static MetadataColumn? FindMetadataColumn(
 		SemanticValidationError error,
@@ -821,17 +862,77 @@ public class QueryPlanRepairService :
 	}
 
 
+	// ============================================================
+	// Candidate Ranking
+	// ============================================================
+
 	/// <summary>
-	/// 基于 Metadata Semantic 找到最佳候选字段。
+	/// Candidate 评分结果。
 	/// </summary>
-	private static MetadataColumn? FindBestCandidate(
+	private sealed class CandidateScore
+	{
+		public MetadataColumn Column { get; init; } = null!;
+
+		public double NameScore { get; init; }
+
+		public double CommentScore { get; init; }
+
+		public double BusinessMeaningScore { get; init; }
+
+		public double KeywordScore { get; init; }
+
+		public double SynonymScore { get; init; }
+
+		public double ExampleQuestionScore { get; init; }
+
+		public double SearchTextScore { get; init; }
+
+		public double QuestionScore { get; init; }
+
+		public double ContextScore { get; init; }
+
+		public double TotalScore { get; init; }
+	}
+
+
+	/// <summary>
+	/// 查找最佳 Metadata Candidate。
+	///
+	/// 排序依据：
+	///
+	/// 1. Field Name
+	/// 2. Comment
+	/// 3. BusinessMeaning
+	/// 4. Keywords
+	/// 5. Synonyms
+	/// 6. ExampleQuestions
+	/// 7. SearchText
+	/// 8. OriginalQuestion
+	/// 9. QueryPlan Context
+	///
+	/// 最终执行 Confidence Gate。
+	/// </summary>
+	private static CandidateScore? FindBestCandidate(
 		string field,
+		string? originalQuestion,
+		QueryPlan plan,
 		QueryPlanValidationContext context,
 		Func<MetadataColumn, bool> predicate)
 	{
 		var candidates =
 			context.Columns.Values
 				.Where(predicate)
+				.Select(
+					column =>
+						ScoreCandidate(
+							field,
+							originalQuestion,
+							plan,
+							column))
+				.OrderByDescending(
+					x => x.TotalScore)
+				.ThenBy(
+					x => x.Column.Id)
 				.ToList();
 
 		if (candidates.Count == 0)
@@ -839,120 +940,307 @@ public class QueryPlanRepairService :
 			return null;
 		}
 
-		var normalizedField =
-			Normalize(field);
+		var best =
+			candidates[0];
 
-		return candidates
-			.Select(
-				column =>
-					new
-					{
-						Column = column,
+		var second =
+			candidates.Count > 1
+				? candidates[1]
+				: null;
 
-						Score =
-							CalculateSemanticScore(
-								normalizedField,
-								column)
-					})
-			.Where(
-				x => x.Score > 0)
-			.OrderByDescending(
-				x => x.Score)
-			.ThenBy(
-				x => x.Column.Id)
-			.Select(
-				x => x.Column)
-			.FirstOrDefault();
-	}
-
-
-	/// <summary>
-	/// Metadata Semantic 综合评分。
-	/// </summary>
-	private static int CalculateSemanticScore(
-		string field,
-		MetadataColumn column)
-	{
-		var score = 0;
-
-		score +=
-			ScoreText(
-				field,
-				column.ColumnName,
-				100);
-
-		score +=
-			ScoreText(
-				field,
-				column.ColumnComment,
-				60);
-
-		score +=
-			ScoreSemantic(
-				field,
-				column.Semantic,
-				80);
-
-		score +=
-			ScoreText(
-				field,
-				column.SearchText,
-				40);
-
-		return score;
-	}
-
-
-	/// <summary>
-	/// MetadataSemantic 评分。
-	/// </summary>
-	private static int ScoreSemantic(
-		string field,
-		MetadataSemantic? semantic,
-		int weight)
-	{
-		if (semantic == null)
+		/*
+         * Confidence Gate #1
+         *
+         * 最佳候选本身必须达到最低置信度。
+         */
+		if (best.TotalScore < MinimumConfidence)
 		{
-			return 0;
+			return null;
 		}
 
-		var score = 0;
+		/*
+         * Confidence Gate #2
+         *
+         * 如果存在第二候选，
+         * 最佳候选必须明显领先。
+         */
+		if (second != null
+			&&
+			best.TotalScore - second.TotalScore
+				< MinimumScoreGap)
+		{
+			return null;
+		}
 
-		score +=
-			ScoreText(
-				field,
-				semantic.BusinessMeaning,
-				weight);
-
-		score +=
-			ScoreText(
-				field,
-				semantic.Keywords,
-				weight / 2);
-
-		score +=
-			ScoreText(
-				field,
-				semantic.Synonyms,
-				weight);
-
-		score +=
-			ScoreText(
-				field,
-				semantic.ExampleQuestions,
-				weight / 2);
-
-		return score;
+		return best;
 	}
 
 
 	/// <summary>
-	/// 文本匹配评分。
+	/// 对 Metadata Candidate 进行多维评分。
 	/// </summary>
-	private static int ScoreText(
-		string source,
-		string? target,
-		int weight)
+	private static CandidateScore ScoreCandidate(
+		string field,
+		string? originalQuestion,
+		QueryPlan plan,
+		MetadataColumn column)
+	{
+		var candidateSemanticText =
+			BuildCandidateSemanticText(
+				column);
+
+		var repairContext =
+			BuildRepairContext(
+				field,
+				originalQuestion,
+				plan);
+
+		var nameScore =
+			CalculateTextSimilarity(
+				field,
+				column.ColumnName);
+
+		var commentScore =
+			CalculateTextSimilarity(
+				repairContext,
+				column.ColumnComment);
+
+		var businessMeaningScore =
+			CalculateTextSimilarity(
+				repairContext,
+				column.Semantic?.BusinessMeaning);
+
+		var keywordScore =
+			CalculateTextSimilarity(
+				repairContext,
+				column.Semantic?.Keywords);
+
+		var synonymScore =
+			CalculateTextSimilarity(
+				repairContext,
+				column.Semantic?.Synonyms);
+
+		var exampleQuestionScore =
+			CalculateTextSimilarity(
+				originalQuestion,
+				column.Semantic?.ExampleQuestions);
+
+		var searchTextScore =
+			CalculateTextSimilarity(
+				repairContext,
+				column.SearchText);
+
+		var questionScore =
+			CalculateTextSimilarity(
+				originalQuestion,
+				candidateSemanticText);
+
+		var contextScore =
+			CalculateTextSimilarity(
+				repairContext,
+				candidateSemanticText);
+
+		/*
+         * 通用算法权重。
+         *
+         * 不包含任何业务领域知识。
+         */
+		var total =
+			nameScore * 0.10
+			+
+			commentScore * 0.10
+			+
+			businessMeaningScore * 0.20
+			+
+			keywordScore * 0.15
+			+
+			synonymScore * 0.15
+			+
+			exampleQuestionScore * 0.10
+			+
+			searchTextScore * 0.05
+			+
+			questionScore * 0.10
+			+
+			contextScore * 0.05;
+
+		return new CandidateScore
+		{
+			Column = column,
+
+			NameScore = nameScore,
+
+			CommentScore = commentScore,
+
+			BusinessMeaningScore =
+				businessMeaningScore,
+
+			KeywordScore =
+				keywordScore,
+
+			SynonymScore =
+				synonymScore,
+
+			ExampleQuestionScore =
+				exampleQuestionScore,
+
+			SearchTextScore =
+				searchTextScore,
+
+			QuestionScore =
+				questionScore,
+
+			ContextScore =
+				contextScore,
+
+			TotalScore =
+				total
+		};
+	}
+
+
+	/// <summary>
+	/// 构造 Repair Semantic Context。
+	///
+	/// 不添加任何业务词。
+	/// </summary>
+	private static string BuildRepairContext(
+		string? field,
+		string? originalQuestion,
+		QueryPlan plan)
+	{
+		var parts =
+			new List<string>();
+
+		AddText(parts, field);
+
+		AddText(
+			parts,
+			originalQuestion);
+
+		if (plan.Intent != null)
+		{
+			AddText(
+				parts,
+				plan.Intent.OriginalQuestion);
+
+			AddText(
+				parts,
+				plan.Intent.IntentType);
+		}
+
+		foreach (var metric in plan.Metrics)
+		{
+			AddText(
+				parts,
+				metric.Name);
+
+			AddText(
+				parts,
+				metric.Field);
+
+			AddText(
+				parts,
+				metric.SemanticType);
+		}
+
+		foreach (var dimension in plan.Dimensions)
+		{
+			AddText(
+				parts,
+				dimension.ColumnName);
+
+			AddText(
+				parts,
+				dimension.SemanticType);
+		}
+
+		foreach (var queryField in plan.Fields)
+		{
+			AddText(
+				parts,
+				queryField.ColumnName);
+
+			AddText(
+				parts,
+				queryField.DataType);
+		}
+
+		foreach (var filter in plan.Filters)
+		{
+			AddText(
+				parts,
+				filter.Field);
+
+			AddText(
+				parts,
+				filter.Operator);
+
+			AddText(
+				parts,
+				filter.Value);
+		}
+
+		return string.Join(
+			" ",
+			parts);
+	}
+
+
+	/// <summary>
+	/// 构造 Metadata Semantic Document。
+	/// </summary>
+	private static string BuildCandidateSemanticText(
+		MetadataColumn column)
+	{
+		var parts =
+			new List<string>();
+
+		AddText(
+			parts,
+			column.ColumnName);
+
+		AddText(
+			parts,
+			column.ColumnComment);
+
+		AddText(
+			parts,
+			column.SearchText);
+
+		if (column.Semantic != null)
+		{
+			AddText(
+				parts,
+				column.Semantic.BusinessMeaning);
+
+			AddText(
+				parts,
+				column.Semantic.Keywords);
+
+			AddText(
+				parts,
+				column.Semantic.Synonyms);
+
+			AddText(
+				parts,
+				column.Semantic.ExampleQuestions);
+		}
+
+		return string.Join(
+			" ",
+			parts);
+	}
+
+
+	/// <summary>
+	/// 通用文本相似度。
+	///
+	/// 不使用行业词典。
+	/// </summary>
+	private static double CalculateTextSimilarity(
+		string? source,
+		string? target)
 	{
 		if (string.IsNullOrWhiteSpace(source)
 			||
@@ -967,18 +1255,30 @@ public class QueryPlanRepairService :
 		var normalizedTarget =
 			Normalize(target);
 
-		if (normalizedTarget.Contains(
-				normalizedSource,
-				StringComparison.OrdinalIgnoreCase))
+		if (normalizedSource.Length == 0
+			||
+			normalizedTarget.Length == 0)
 		{
-			return weight;
+			return 0;
 		}
 
-		if (normalizedSource.Contains(
+		if (string.Equals(
+				normalizedSource,
 				normalizedTarget,
 				StringComparison.OrdinalIgnoreCase))
 		{
-			return weight / 2;
+			return 1.0;
+		}
+
+		if (normalizedTarget.Contains(
+				normalizedSource,
+				StringComparison.OrdinalIgnoreCase)
+			||
+			normalizedSource.Contains(
+				normalizedTarget,
+				StringComparison.OrdinalIgnoreCase))
+		{
+			return 0.85;
 		}
 
 		var sourceTokens =
@@ -994,24 +1294,49 @@ public class QueryPlanRepairService :
 			return 0;
 		}
 
-		var matched =
-			sourceTokens.Count(
-				targetTokens.Contains);
+		var intersection =
+			sourceTokens
+				.Intersect(
+					targetTokens,
+					StringComparer.OrdinalIgnoreCase)
+				.Count();
 
-		if (matched == 0)
+		if (intersection == 0)
+		{
+			return 0;
+		}
+
+		var union =
+			sourceTokens
+				.Union(
+					targetTokens,
+					StringComparer.OrdinalIgnoreCase)
+				.Count();
+
+		if (union == 0)
 		{
 			return 0;
 		}
 
 		return
-			weight *
-			matched /
-			sourceTokens.Count;
+			(double)intersection /
+			union;
 	}
 
 
+	// ============================================================
+	// Candidate Compatibility
+	// ============================================================
+
 	/// <summary>
-	/// Metric 候选字段判断。
+	/// Metric Candidate。
+	///
+	/// 不使用行业业务词。
+	///
+	/// 只使用：
+	///
+	/// - DataType
+	/// - QueryPlan SemanticType
 	/// </summary>
 	private static bool IsMetricCandidate(
 		MetadataColumn column,
@@ -1023,27 +1348,23 @@ public class QueryPlanRepairService :
 			return false;
 		}
 
-		if (IsDateColumn(column)
-			&&
-			!string.Equals(
+		/*
+         * 日期类型通常不作为普通 Metric Candidate。
+         *
+         * 如果 QueryPlan 明确表达为 Date，
+         * 则允许。
+         */
+		if (IsDateColumn(column))
+		{
+			return string.Equals(
 				semanticType,
 				"DATE",
-				StringComparison.OrdinalIgnoreCase))
-		{
-			return false;
-		}
-
-		if (string.Equals(
-				semanticType,
-				"Quantity",
 				StringComparison.OrdinalIgnoreCase)
-			||
-			string.Equals(
-				semanticType,
-				"Amount",
-				StringComparison.OrdinalIgnoreCase))
-		{
-			return LooksNumeric(column);
+				||
+				string.Equals(
+					semanticType,
+					"TIME",
+					StringComparison.OrdinalIgnoreCase);
 		}
 
 		return true;
@@ -1051,7 +1372,9 @@ public class QueryPlanRepairService :
 
 
 	/// <summary>
-	/// Filter 候选字段。
+	/// Filter Candidate。
+	///
+	/// Filter 可以作用于任意 MetadataColumn。
 	/// </summary>
 	private static bool IsFilterCandidate(
 		MetadataColumn column)
@@ -1062,65 +1385,58 @@ public class QueryPlanRepairService :
 
 
 	/// <summary>
-	/// Dimension 候选字段。
+	/// Dimension Candidate。
+	///
+	/// 不根据行业词判断。
+	///
+	/// 只排除明显不适合作为 Dimension 的日期/数值约束，
+	/// 其余交给 Semantic Ranking。
 	/// </summary>
 	private static bool IsDimensionCandidate(
-		MetadataColumn column,
-		string? semanticType)
+		MetadataColumn column)
 	{
-		if (string.IsNullOrWhiteSpace(
-				column.ColumnName))
-		{
-			return false;
-		}
-
-		if (IsNumeric(column)
-			&&
-			!string.Equals(
-				semanticType,
-				"Quantity",
-				StringComparison.OrdinalIgnoreCase))
-		{
-			return false;
-		}
-
-		return true;
+		return !string.IsNullOrWhiteSpace(
+			column.ColumnName);
 	}
 
 
 	/// <summary>
-	/// Date 候选字段。
+	/// Date Candidate。
+	///
+	/// 唯一判断依据：
+	///
+	/// Metadata DataType。
 	/// </summary>
 	private static bool IsDateCandidate(
 		MetadataColumn column)
 	{
-		if (IsDateColumn(column))
-		{
-			return true;
-		}
-
-		var semanticText =
-			$"{column.Semantic?.BusinessMeaning} " +
-			$"{column.Semantic?.Keywords} " +
-			$"{column.Semantic?.Synonyms}";
-
-		return ContainsBusinessWord(
-			semanticText,
-			"日期",
-			"时间",
-			"年月",
-			"date",
-			"time");
+		return IsDateColumn(
+			column);
 	}
 
 
+	// ============================================================
+	// Aggregation
+	// ============================================================
+
 	/// <summary>
-	/// 根据 Metadata 类型选择安全聚合方式。
+	/// 根据 Metadata DataType 和已有 QueryPlan SemanticType
+	/// 选择相对安全的聚合方式。
+	///
+	/// 不使用行业业务词。
 	/// </summary>
 	private static string ResolveSafeAggregation(
 		MetadataColumn column,
 		string? semanticType)
 	{
+		/*
+         * 如果 QueryPlan 已经具有系统标准 SemanticType，
+         * 优先使用它。
+         *
+         * 这些是现有 QueryMetric 模型的标准语义类型，
+         * 不是行业业务词典。
+         */
+
 		if (string.Equals(
 				semanticType,
 				"Count",
@@ -1131,70 +1447,37 @@ public class QueryPlanRepairService :
 
 		if (string.Equals(
 				semanticType,
-				"Amount",
-				StringComparison.OrdinalIgnoreCase)
-			||
-			string.Equals(
-				semanticType,
-				"Quantity",
+				"Ratio",
 				StringComparison.OrdinalIgnoreCase))
 		{
-			return "SUM";
+			return "AVG";
 		}
 
+		/*
+         * 数值字段：
+         *
+         * 默认使用 SUM。
+         *
+         * 这是 DataType 层面的通用行为，
+         * 不是业务领域规则。
+         */
 		if (LooksNumeric(column))
 		{
 			return "SUM";
 		}
 
+		/*
+         * 非数值字段：
+         *
+         * 默认 COUNT。
+         */
 		return "COUNT";
 	}
 
 
-	/// <summary>
-	/// 推导 Dimension SemanticType。
-	/// </summary>
-	private static string ResolveSemanticType(
-		MetadataColumn column)
-	{
-		var text =
-			$"{column.Semantic?.BusinessMeaning} " +
-			$"{column.Semantic?.Keywords} " +
-			$"{column.Semantic?.Synonyms}";
-
-		if (ContainsBusinessWord(
-				text,
-				"日期",
-				"时间",
-				"年月",
-				"date",
-				"time"))
-		{
-			return "Time";
-		}
-
-		if (ContainsBusinessWord(
-				text,
-				"分类",
-				"类别",
-				"category"))
-		{
-			return "Category";
-		}
-
-		if (ContainsBusinessWord(
-				text,
-				"客户",
-				"供应商",
-				"物料",
-				"entity"))
-		{
-			return "Entity";
-		}
-
-		return "Dimension";
-	}
-
+	// ============================================================
+	// Metadata Helpers
+	// ============================================================
 
 	private static bool LooksNumeric(
 		MetadataColumn column)
@@ -1219,13 +1502,6 @@ public class QueryPlanRepairService :
 	}
 
 
-	private static bool IsNumeric(
-		MetadataColumn column)
-	{
-		return LooksNumeric(column);
-	}
-
-
 	private static bool IsDateColumn(
 		MetadataColumn column)
 	{
@@ -1241,22 +1517,9 @@ public class QueryPlanRepairService :
 	}
 
 
-	private static bool ContainsBusinessWord(
-		string text,
-		params string[] words)
-	{
-		if (string.IsNullOrWhiteSpace(text))
-		{
-			return false;
-		}
-
-		return words.Any(
-			word =>
-				text.Contains(
-					word,
-					StringComparison.OrdinalIgnoreCase));
-	}
-
+	// ============================================================
+	// Text Helpers
+	// ============================================================
 
 	private static string Normalize(
 		string? value)
@@ -1275,6 +1538,17 @@ public class QueryPlanRepairService :
 	}
 
 
+	/// <summary>
+	/// 通用 Tokenizer。
+	///
+	/// 英文/数字：
+	///     连续字符作为 Token。
+	///
+	/// 中文：
+	///     使用 1/2/3-gram。
+	///
+	/// 不包含任何业务词典。
+	/// </summary>
 	private static HashSet<string> Tokenize(
 		string? value)
 	{
@@ -1287,18 +1561,116 @@ public class QueryPlanRepairService :
 			return result;
 		}
 
-		foreach (var ch in Normalize(value))
+		var normalized =
+			Normalize(value);
+
+		if (normalized.Length == 0)
 		{
-			if (char.IsLetterOrDigit(ch))
+			return result;
+		}
+
+		var buffer =
+			new System.Text.StringBuilder();
+
+		foreach (var ch in normalized)
+		{
+			if (char.IsLetterOrDigit(ch)
+				&&
+				!IsChinese(ch))
+			{
+				buffer.Append(ch);
+
+				continue;
+			}
+
+			if (buffer.Length > 0)
+			{
+				result.Add(
+					buffer.ToString());
+
+				buffer.Clear();
+			}
+
+			if (IsChinese(ch))
 			{
 				result.Add(
 					ch.ToString());
 			}
 		}
 
+		if (buffer.Length > 0)
+		{
+			result.Add(
+				buffer.ToString());
+		}
+
+		/*
+         * 中文 n-gram。
+         */
+		for (var i = 0;
+			 i < normalized.Length;
+			 i++)
+		{
+			if (!IsChinese(
+					normalized[i]))
+			{
+				continue;
+			}
+
+			if (i + 1 < normalized.Length
+				&&
+				IsChinese(
+					normalized[i + 1]))
+			{
+				result.Add(
+					normalized.Substring(
+						i,
+						2));
+			}
+
+			if (i + 2 < normalized.Length
+				&&
+				IsChinese(
+					normalized[i + 1])
+				&&
+				IsChinese(
+					normalized[i + 2]))
+			{
+				result.Add(
+					normalized.Substring(
+						i,
+						3));
+			}
+		}
+
 		return result;
 	}
 
+
+	private static bool IsChinese(
+		char value)
+	{
+		return value >= '\u4E00'
+			&&
+			value <= '\u9FFF';
+	}
+
+
+	private static void AddText(
+		List<string> parts,
+		string? value)
+	{
+		if (!string.IsNullOrWhiteSpace(value))
+		{
+			parts.Add(
+				value.Trim());
+		}
+	}
+
+
+	// ============================================================
+	// Validation Helpers
+	// ============================================================
 
 	private static string NormalizeCode(
 		string? value)
