@@ -225,7 +225,15 @@ builder.Services
 		IQueryPlanDecisionGate,
 		QueryPlanDecisionGate>();
 
+// -----------------------------
+// Phase 2.5
+// QueryPlan Explainability
+// -----------------------------
 
+builder.Services
+	.AddScoped<
+		IQueryPlanExplainabilityService,
+		QueryPlanExplainabilityService>();
 
 // -----------------------------
 // 数据库连接与 SQL 执行

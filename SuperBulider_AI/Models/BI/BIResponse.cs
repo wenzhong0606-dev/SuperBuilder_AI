@@ -1,30 +1,12 @@
 ﻿namespace SuperBulider_AI.Models.BI;
 
 /// <summary>
-/// AI BI完整响应结果。
-///
-/// 用于承载一次完整自然语言BI查询的最终结果。
-///
-/// 流程:
-///
-/// 用户问题
-///     ↓
-/// QueryIntent
-///     ↓
-/// QueryPlan
-///     ↓
-/// SqlQuery
-///     ↓
-/// QueryResult
-///     ↓
-/// QueryAnswer
-///
-/// 最终统一返回。
+/// BI 对话响应。
 /// </summary>
-public class BIResponse
+public sealed class BIResponse
 {
 	/// <summary>
-	/// 是否执行成功。
+	/// 是否成功。
 	/// </summary>
 	public bool Success
 	{
@@ -35,16 +17,14 @@ public class BIResponse
 	/// <summary>
 	/// 用户原始问题。
 	/// </summary>
-	public string Question
+	public string? Question
 	{
 		get;
 		set;
 	}
-	=
-	string.Empty;
 
 	/// <summary>
-	/// AI生成的SQL。
+	/// 最终生成的 SQL。
 	/// </summary>
 	public string? Sql
 	{
@@ -53,7 +33,7 @@ public class BIResponse
 	}
 
 	/// <summary>
-	/// SQL查询返回的数据。
+	/// 查询返回的数据。
 	/// </summary>
 	public QueryResult? Data
 	{
@@ -62,7 +42,7 @@ public class BIResponse
 	}
 
 	/// <summary>
-	/// AI对查询结果的自然语言分析。
+	/// AI 对查询结果的自然语言回答。
 	/// </summary>
 	public QueryAnswer? Answer
 	{
@@ -71,9 +51,29 @@ public class BIResponse
 	}
 
 	/// <summary>
-	/// 查询过程中发生的错误信息。
+	/// 错误信息。
 	/// </summary>
 	public string? ErrorMessage
+	{
+		get;
+		set;
+	}
+
+	/// <summary>
+	/// QueryPlan Explainability。
+	///
+	/// 包含：
+	/// - QueryPlan
+	/// - Validation
+	/// - RepairTrace
+	/// - Confidence
+	/// - Decision
+	/// - Explanation Summary
+	///
+	/// 即使 QueryPlan 最终被 Decision Gate 拒绝，
+	/// Explanation 仍然可以返回给上层进行诊断和解释。
+	/// </summary>
+	public QueryPlanExplanation? Explanation
 	{
 		get;
 		set;
