@@ -65,7 +65,7 @@ public sealed class SemanticApplicabilityEvaluator
         var topSemantic = semanticCandidates.FirstOrDefault();
         var secondSemantic = semanticCandidates.Skip(1).FirstOrDefault();
         double? scoreGap = topSemantic is not null && secondSemantic is not null
-            ? (double?)(topSemantic.Score - secondSemantic.Score)
+            ? topSemantic.Score - secondSemantic.Score
             : null;
 
         return metricType == "EntityCount"
@@ -113,6 +113,7 @@ public sealed class SemanticApplicabilityEvaluator
             State = state,
             Reason = BuildColumnReason(state, topLexicalMatch),
             SearchCandidate = ToCandidate(topSemantic),
+            Resolution = state == "Resolved" ? ToResolution(topSemantic) : null,
             Evidence = new SemanticApplicabilityEvidence
             {
                 SemanticCandidateExists = semanticCandidates.Count > 0,
@@ -136,8 +137,6 @@ public sealed class SemanticApplicabilityEvaluator
         MetadataSemanticSearchResult? secondSemantic,
         double? scoreGap)
     {
-        // 当前 Semantic Metadata 没有直接的 EntityCount 语义资产。
-        // 找到实体/表候选不等于已经解析出 COUNT(entity)。
         const bool directEntityCountEvidence = false;
 
         return new SemanticApplicabilityResult
@@ -149,13 +148,13 @@ public sealed class SemanticApplicabilityEvaluator
             State = "NotResolved",
             Reason = "Current Semantic Metadata contains entity/table candidates, but no direct EntityCount semantic evidence.",
             SearchCandidate = topSemantic is null ? null : ToCandidate(topSemantic),
+            Resolution = null,
             Evidence = new SemanticApplicabilityEvidence
             {
                 SemanticCandidateExists = semanticCandidates.Count > 0,
                 EntityCandidateExists = entityCandidates.Count > 0,
                 DirectEntityCountEvidence = directEntityCountEvidence,
                 LexicalMatch = false,
-                // EntityCount 当前没有可证明的同类型竞争候选，因此不把第二搜索结果当成竞争。
                 CompetingCandidates = false,
                 TopScore = topSemantic?.Score,
                 SecondScore = secondSemantic?.Score,
@@ -194,6 +193,25 @@ public sealed class SemanticApplicabilityEvaluator
             Table = candidate.Table?.TableName,
             Column = candidate.Column?.ColumnName,
             BusinessMeaning = candidate.Semantic?.BusinessMeaning
+        };
+    }
+
+    private static SemanticApplicabilityResolution? ToResolution(MetadataSemanticSearchResult candidate)
+    {
+        var table = candidate.Table?.TableName;
+        var column = candidate.Column?.ColumnName;
+
+        if (string.IsNullOrWhiteSpace(table) || string.IsNullOrWhiteSpace(column))
+        {
+            return null;
+        }
+
+        return new SemanticApplicabilityResolution
+        {
+            Table = table,
+            Column = column,
+            BusinessMeaning = candidate.Semantic?.BusinessMeaning,
+            Score = candidate.Score
         };
     }
 
