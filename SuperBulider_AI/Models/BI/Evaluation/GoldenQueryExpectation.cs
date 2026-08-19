@@ -2,8 +2,9 @@ namespace SuperBulider_AI.Models.BI.Evaluation;
 
 /// <summary>
 /// Golden Query Case 的期望查询语义。
-/// 未提供的集合/属性表示该维度不参与本 Case 的评价；
-/// 显式提供空集合则表示该维度必须为空。
+///
+/// 对可选标量属性：null 表示不参与本 Case 的评价。
+/// 对可选集合：null 表示不参与评价；空集合表示必须为空；非空集合表示必须匹配。
 /// </summary>
 public class GoldenQueryExpectation
 {
@@ -11,17 +12,17 @@ public class GoldenQueryExpectation
 
     public long? DataSourceId { get; set; }
 
-    public List<GoldenMetricExpectation> Metrics { get; set; } = new();
+    public List<GoldenMetricExpectation>? Metrics { get; set; }
 
-    public List<GoldenDimensionExpectation> Dimensions { get; set; } = new();
+    public List<GoldenDimensionExpectation>? Dimensions { get; set; }
 
-    public List<GoldenFilterExpectation> Filters { get; set; } = new();
+    public List<GoldenFilterExpectation>? Filters { get; set; }
 
-    public List<GoldenTableExpectation> Tables { get; set; } = new();
+    public List<GoldenTableExpectation>? Tables { get; set; }
 
-    public List<GoldenJoinExpectation> Joins { get; set; } = new();
+    public List<GoldenJoinExpectation>? Joins { get; set; }
 
-    public List<GoldenOrderExpectation> Orders { get; set; } = new();
+    public List<GoldenOrderExpectation>? Orders { get; set; }
 
     public bool? IsAggregate { get; set; }
 
