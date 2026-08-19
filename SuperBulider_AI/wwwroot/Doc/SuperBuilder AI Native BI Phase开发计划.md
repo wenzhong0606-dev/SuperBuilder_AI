@@ -14,7 +14,8 @@ v2.0
 
 当前开发阶段：
 
-> Phase 2.3.2 — Semantic Candidate Ranking
+> Phase 2.3.3
+Repair Loop Robustness 
 
 
 当前系统完成度：
