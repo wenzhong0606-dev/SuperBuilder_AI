@@ -17,12 +17,54 @@ public partial class QueryPlanBuilder
         if (resolution is null)
             return plan;
 
+        NormalizeToResolvedTables(plan, resolution);
+
         ApplyMetricResolution(plan, resolution.Metric);
         ApplyFilterResolutions(plan, resolution.Filters);
         ApplyDimensionResolutions(plan, resolution.Dimensions);
         ApplyOrderResolutions(plan, resolution.Orders);
 
         return plan;
+    }
+
+    /// <summary>
+    /// Resolution 已经确认了本次查询需要的物理表。
+    /// Builder 原始流程中的 JoinInference 属于候选推断，不能在已有稳定 Resolution 时
+    /// 把未经语义绑定确认的表继续带入最终 QueryPlan。
+    ///
+    /// 当前阶段规则：
+    /// 1. 收集 Metric / Filter / Dimension / Order 已确认的 TableId。
+    /// 2. 删除未被 Resolution 引用的推测性 Table。
+    /// 3. 删除任一端不在已确认 Table 集合中的推测性 Join。
+    /// 4. 不主动创建 Join；合法多表 Join 应由后续 Join Resolution 明确提供。
+    /// </summary>
+    private static void NormalizeToResolvedTables(
+        QueryPlan plan,
+        QueryPlanSemanticResolution resolution)
+    {
+        var resolvedTableIds = new HashSet<long>();
+
+        if (resolution.Metric is not null)
+            resolvedTableIds.Add(resolution.Metric.TableId);
+
+        foreach (var binding in resolution.Filters)
+            resolvedTableIds.Add(binding.TableId);
+
+        foreach (var binding in resolution.Dimensions)
+            resolvedTableIds.Add(binding.TableId);
+
+        foreach (var binding in resolution.Orders)
+            resolvedTableIds.Add(binding.TableId);
+
+        if (resolvedTableIds.Count == 0)
+            return;
+
+        plan.Joins.RemoveAll(join =>
+            !resolvedTableIds.Contains(join.LeftTableId)
+            || !resolvedTableIds.Contains(join.RightTableId));
+
+        plan.Tables.RemoveAll(table =>
+            !resolvedTableIds.Contains(table.MetadataTableId));
     }
 
     private static void ApplyMetricResolution(
