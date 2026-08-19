@@ -6,18 +6,96 @@ using SuperBulider_AI.Services.BI.Evaluation;
 namespace SuperBulider_AI.Controllers;
 
 /// <summary>
-/// Phase 2.6 Evaluation Dataset 序列化诊断入口。
-/// 仅用于验证 Golden Dataset Contract，不执行 QueryPlan Evaluation。
+/// Phase 2.6 Evaluation Dataset 诊断入口。
+/// 仅用于验证 Golden Dataset Contract 与源码资产加载，不执行 QueryPlan Evaluation。
 /// </summary>
 [ApiController]
 [Route("evaluation/diagnostics")]
 public sealed class EvaluationDiagnosticsController : ControllerBase
 {
     private readonly GoldenQueryDatasetSerializer _serializer;
+    private readonly IWebHostEnvironment _environment;
 
-    public EvaluationDiagnosticsController(GoldenQueryDatasetSerializer serializer)
+    public EvaluationDiagnosticsController(
+        GoldenQueryDatasetSerializer serializer,
+        IWebHostEnvironment environment)
     {
         _serializer = serializer;
+        _environment = environment;
+    }
+
+    [HttpGet("golden-dataset")]
+    public ActionResult<object> GoldenDataset()
+    {
+        var path = Path.Combine(
+            _environment.ContentRootPath,
+            "Evaluation",
+            "Golden",
+            "query-plan-golden-v1.json");
+
+        if (!System.IO.File.Exists(path))
+        {
+            return NotFound(new
+            {
+                passed = false,
+                message = "Golden Dataset asset was not found.",
+                path
+            });
+        }
+
+        var sourceJson = System.IO.File.ReadAllText(path);
+        var dataset = _serializer.Deserialize(sourceJson);
+
+        var gq001 = dataset.Cases.SingleOrDefault(x => x.Id == "GQ-001");
+        var gq002 = dataset.Cases.SingleOrDefault(x => x.Id == "GQ-002");
+
+        var gq001Metric = gq001?.Expected?.Metrics?.SingleOrDefault();
+        var gq002Metric = gq002?.Expected?.Metrics?.SingleOrDefault();
+
+        var passed = dataset.Version == "1.0"
+                     && dataset.Dataset == "query-plan-golden"
+                     && dataset.Cases.Count == 2
+                     && gq001 is not null
+                     && gq002 is not null
+                     && gq001Metric?.SemanticText == "入库数量"
+                     && gq001Metric.Aggregation == QueryAggregation.Sum
+                     && gq002Metric?.SemanticText == "入库单数量"
+                     && gq002Metric.Aggregation == QueryAggregation.Count
+                     && gq001.Expected.Dimensions is { Count: 0 }
+                     && gq002.Expected.Dimensions is { Count: 0 }
+                     && gq001.Expected.Filters is null
+                     && gq002.Expected.Filters is null
+                     && gq001.Expected.Tables is null
+                     && gq002.Expected.Tables is null
+                     && gq001.Expected.Joins is null
+                     && gq002.Expected.Joins is null
+                     && gq001.Expected.Orders is null
+                     && gq002.Expected.Orders is null
+                     && gq001.Expected.IsAggregate == true
+                     && gq002.Expected.IsAggregate == true;
+
+        return Ok(new
+        {
+            passed,
+            dataset = dataset.Dataset,
+            version = dataset.Version,
+            caseCount = dataset.Cases.Count,
+            cases = dataset.Cases.Select(x => new
+            {
+                x.Id,
+                x.Name,
+                x.Question,
+                metric = x.Expected.Metrics?.SingleOrDefault()?.SemanticText,
+                aggregation = x.Expected.Metrics?.SingleOrDefault()?.Aggregation.ToString(),
+                dimensionsState = x.Expected.Dimensions is null
+                    ? "null"
+                    : x.Expected.Dimensions.Count == 0 ? "empty" : "values",
+                filtersState = x.Expected.Filters is null
+                    ? "null"
+                    : x.Expected.Filters.Count == 0 ? "empty" : "values"
+            }),
+            sourcePath = path
+        });
     }
 
     [HttpGet("serialization-roundtrip")]
@@ -37,7 +115,7 @@ public sealed class EvaluationDiagnosticsController : ControllerBase
                 "dimensions": [],
                 "metrics": [
                   {
-                    "semanticText": "销售金额",
+                    "semanticText": "入库数量",
                     "aggregation": "sum"
                   }
                 ]
@@ -60,7 +138,7 @@ public sealed class EvaluationDiagnosticsController : ControllerBase
             passed = expected is not null
                      && expected.Metrics is { Count: 1 }
                      && expected.Metrics[0].Aggregation == QueryAggregation.Sum
-                     && expected.Metrics[0].SemanticText == "销售金额"
+                     && expected.Metrics[0].SemanticText == "入库数量"
                      && expected.Dimensions is { Count: 0 }
                      && !serializedJson.Contains("businessKey", StringComparison.OrdinalIgnoreCase),
             metricsState = expected?.Metrics is null
