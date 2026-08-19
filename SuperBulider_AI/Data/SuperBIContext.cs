@@ -1,9 +1,9 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using SuperBulider_AI.Models.Metadata;
-using SuperBulider_AI.Models.Organization;
+using SuperBuilder_AI.Models.Metadata;
+using SuperBuilder_AI.Models.Organization;
 
 
-namespace SuperBulider_AI.Data;
+namespace SuperBuilder_AI.Data;
 
 /// <summary>
 /// SuperBI数据库上下文

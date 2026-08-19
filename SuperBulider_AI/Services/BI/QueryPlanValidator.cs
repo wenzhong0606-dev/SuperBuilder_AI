@@ -1,9 +1,9 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using SuperBulider_AI.Data;
-using SuperBulider_AI.Models.BI;
-using SuperBulider_AI.Models.Metadata;
+using SuperBuilder_AI.Data;
+using SuperBuilder_AI.Models.BI;
+using SuperBuilder_AI.Models.Metadata;
 
-namespace SuperBulider_AI.Services.BI;
+namespace SuperBuilder_AI.Services.BI;
 
 /// <summary>
 /// 查询计划验证服务。

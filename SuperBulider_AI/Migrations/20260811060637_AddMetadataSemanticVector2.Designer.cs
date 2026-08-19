@@ -5,11 +5,11 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
-using SuperBulider_AI.Data;
+using SuperBuilder_AI.Data;
 
 #nullable disable
 
-namespace SuperBulider_AI.Migrations
+namespace SuperBuilder_AI.Migrations
 {
     [DbContext(typeof(SuperBIContext))]
     [Migration("20260811060637_AddMetadataSemanticVector2")]
@@ -25,7 +25,7 @@ namespace SuperBulider_AI.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
-            modelBuilder.Entity("SuperBulider_AI.Models.Metadata.DataSource", b =>
+            modelBuilder.Entity("SuperBuilder_AI.Models.Metadata.DataSource", b =>
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
@@ -68,7 +68,7 @@ namespace SuperBulider_AI.Migrations
                         });
                 });
 
-            modelBuilder.Entity("SuperBulider_AI.Models.Metadata.MetadataColumn", b =>
+            modelBuilder.Entity("SuperBuilder_AI.Models.Metadata.MetadataColumn", b =>
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
@@ -127,7 +127,7 @@ namespace SuperBulider_AI.Migrations
                         });
                 });
 
-            modelBuilder.Entity("SuperBulider_AI.Models.Metadata.MetadataLearningRecord", b =>
+            modelBuilder.Entity("SuperBuilder_AI.Models.Metadata.MetadataLearningRecord", b =>
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
@@ -168,7 +168,7 @@ namespace SuperBulider_AI.Migrations
                         });
                 });
 
-            modelBuilder.Entity("SuperBulider_AI.Models.Metadata.MetadataSemantic", b =>
+            modelBuilder.Entity("SuperBuilder_AI.Models.Metadata.MetadataSemantic", b =>
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
@@ -233,7 +233,7 @@ namespace SuperBulider_AI.Migrations
                         });
                 });
 
-            modelBuilder.Entity("SuperBulider_AI.Models.Metadata.MetadataTable", b =>
+            modelBuilder.Entity("SuperBuilder_AI.Models.Metadata.MetadataTable", b =>
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
@@ -290,7 +290,7 @@ namespace SuperBulider_AI.Migrations
                         });
                 });
 
-            modelBuilder.Entity("SuperBulider_AI.Models.Organization.Tenant", b =>
+            modelBuilder.Entity("SuperBuilder_AI.Models.Organization.Tenant", b =>
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
@@ -327,36 +327,36 @@ namespace SuperBulider_AI.Migrations
                         });
                 });
 
-            modelBuilder.Entity("SuperBulider_AI.Models.Metadata.DataSource", b =>
+            modelBuilder.Entity("SuperBuilder_AI.Models.Metadata.DataSource", b =>
                 {
-                    b.HasOne("SuperBulider_AI.Models.Organization.Tenant", "Tenant")
+                    b.HasOne("SuperBuilder_AI.Models.Organization.Tenant", "Tenant")
                         .WithMany("DataSources")
                         .HasForeignKey("TenantId");
 
                     b.Navigation("Tenant");
                 });
 
-            modelBuilder.Entity("SuperBulider_AI.Models.Metadata.MetadataColumn", b =>
+            modelBuilder.Entity("SuperBuilder_AI.Models.Metadata.MetadataColumn", b =>
                 {
-                    b.HasOne("SuperBulider_AI.Models.Metadata.MetadataTable", "MetadataTable")
+                    b.HasOne("SuperBuilder_AI.Models.Metadata.MetadataTable", "MetadataTable")
                         .WithMany("Columns")
                         .HasForeignKey("MetadataTableId");
 
                     b.Navigation("MetadataTable");
                 });
 
-            modelBuilder.Entity("SuperBulider_AI.Models.Metadata.MetadataSemantic", b =>
+            modelBuilder.Entity("SuperBuilder_AI.Models.Metadata.MetadataSemantic", b =>
                 {
-                    b.HasOne("SuperBulider_AI.Models.Metadata.MetadataColumn", "MetadataColumn")
+                    b.HasOne("SuperBuilder_AI.Models.Metadata.MetadataColumn", "MetadataColumn")
                         .WithOne("Semantic")
-                        .HasForeignKey("SuperBulider_AI.Models.Metadata.MetadataSemantic", "MetadataColumnId");
+                        .HasForeignKey("SuperBuilder_AI.Models.Metadata.MetadataSemantic", "MetadataColumnId");
 
                     b.Navigation("MetadataColumn");
                 });
 
-            modelBuilder.Entity("SuperBulider_AI.Models.Metadata.MetadataTable", b =>
+            modelBuilder.Entity("SuperBuilder_AI.Models.Metadata.MetadataTable", b =>
                 {
-                    b.HasOne("SuperBulider_AI.Models.Metadata.DataSource", "DataSource")
+                    b.HasOne("SuperBuilder_AI.Models.Metadata.DataSource", "DataSource")
                         .WithMany("Tables")
                         .HasForeignKey("DataSourceId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -365,22 +365,22 @@ namespace SuperBulider_AI.Migrations
                     b.Navigation("DataSource");
                 });
 
-            modelBuilder.Entity("SuperBulider_AI.Models.Metadata.DataSource", b =>
+            modelBuilder.Entity("SuperBuilder_AI.Models.Metadata.DataSource", b =>
                 {
                     b.Navigation("Tables");
                 });
 
-            modelBuilder.Entity("SuperBulider_AI.Models.Metadata.MetadataColumn", b =>
+            modelBuilder.Entity("SuperBuilder_AI.Models.Metadata.MetadataColumn", b =>
                 {
                     b.Navigation("Semantic");
                 });
 
-            modelBuilder.Entity("SuperBulider_AI.Models.Metadata.MetadataTable", b =>
+            modelBuilder.Entity("SuperBuilder_AI.Models.Metadata.MetadataTable", b =>
                 {
                     b.Navigation("Columns");
                 });
 
-            modelBuilder.Entity("SuperBulider_AI.Models.Organization.Tenant", b =>
+            modelBuilder.Entity("SuperBuilder_AI.Models.Organization.Tenant", b =>
                 {
                     b.Navigation("DataSources");
                 });

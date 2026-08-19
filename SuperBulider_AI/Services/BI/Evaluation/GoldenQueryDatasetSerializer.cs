@@ -1,8 +1,8 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using SuperBulider_AI.Models.BI.Evaluation;
+using SuperBuilder_AI.Models.BI.Evaluation;
 
-namespace SuperBulider_AI.Services.BI.Evaluation;
+namespace SuperBuilder_AI.Services.BI.Evaluation;
 
 /// <summary>
 /// Golden Dataset JSON 序列化与反序列化边界。

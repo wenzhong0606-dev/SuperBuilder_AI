@@ -3,11 +3,11 @@ using Microsoft.Data.SqlClient;
 using MySqlConnector;
 using Npgsql;
 using Microsoft.EntityFrameworkCore;
-using SuperBulider_AI.Data;
-using SuperBulider_AI.Interfaces.Database;
+using SuperBuilder_AI.Data;
+using SuperBuilder_AI.Interfaces.Database;
 
 
-namespace SuperBulider_AI.Services.Database;
+namespace SuperBuilder_AI.Services.Database;
 
 /// <summary>
 /// 数据源连接工厂。

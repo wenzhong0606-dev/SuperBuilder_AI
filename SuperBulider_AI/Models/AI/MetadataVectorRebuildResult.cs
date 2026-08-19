@@ -1,4 +1,4 @@
-﻿namespace SuperBulider_AI.Models.AI;
+﻿namespace SuperBuilder_AI.Models.AI;
 
 /// <summary>
 /// Metadata 全量向量重建结果。

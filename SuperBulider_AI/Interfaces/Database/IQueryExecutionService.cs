@@ -1,7 +1,7 @@
-﻿using SuperBulider_AI.Models.BI;
+﻿using SuperBuilder_AI.Models.BI;
 
 
-namespace SuperBulider_AI.Interfaces.Database;
+namespace SuperBuilder_AI.Interfaces.Database;
 
 /// <summary>
 /// 查询执行服务。

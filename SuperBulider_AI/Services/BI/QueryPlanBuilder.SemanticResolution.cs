@@ -1,6 +1,6 @@
-using SuperBulider_AI.Models.BI;
+using SuperBuilder_AI.Models.BI;
 
-namespace SuperBulider_AI.Services.BI;
+namespace SuperBuilder_AI.Services.BI;
 
 public partial class QueryPlanBuilder
 {

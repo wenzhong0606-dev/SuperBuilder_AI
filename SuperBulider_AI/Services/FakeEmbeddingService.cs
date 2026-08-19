@@ -1,8 +1,8 @@
 ﻿using System.Security.Cryptography;
 using System.Text;
-using SuperBulider_AI.Interfaces;
+using SuperBuilder_AI.Interfaces;
 
-namespace SuperBulider_AI.Services;
+namespace SuperBuilder_AI.Services;
 
 /// <summary>
 /// 测试 Embedding 服务。

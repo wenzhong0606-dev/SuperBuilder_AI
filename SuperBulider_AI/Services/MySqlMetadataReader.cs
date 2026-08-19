@@ -1,9 +1,9 @@
 ﻿using Dapper;
 using MySqlConnector;
-using SuperBulider_AI.Interfaces;
-using SuperBulider_AI.Models.DTO;
+using SuperBuilder_AI.Interfaces;
+using SuperBuilder_AI.Models.DTO;
 
-namespace SuperBulider_AI.Services;
+namespace SuperBuilder_AI.Services;
 
 /// <summary>
 /// MySQL 元数据读取器。

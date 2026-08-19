@@ -1,7 +1,7 @@
-﻿using SuperBulider_AI.Models.Metadata;
+﻿using SuperBuilder_AI.Models.Metadata;
 
 
-namespace SuperBulider_AI.Interfaces;
+namespace SuperBuilder_AI.Interfaces;
 
 /// <summary>
 /// Metadata字段语义生成服务接口。

@@ -1,6 +1,6 @@
-﻿using SuperBulider_AI.Models.AI;
+﻿using SuperBuilder_AI.Models.AI;
 
-namespace SuperBulider_AI.Interfaces;
+namespace SuperBuilder_AI.Interfaces;
 
 /// <summary>
 /// Metadata 向量索引生命周期管理服务。

@@ -1,12 +1,12 @@
-﻿using SuperBulider_AI.Data;
-using SuperBulider_AI.Infrastructure.Database;
-using SuperBulider_AI.Interfaces;
-using SuperBulider_AI.Interfaces.BI;
-using SuperBulider_AI.Interfaces.Database;
-using SuperBulider_AI.Models.AI;
-using SuperBulider_AI.Models.BI;
+﻿using SuperBuilder_AI.Data;
+using SuperBuilder_AI.Infrastructure.Database;
+using SuperBuilder_AI.Interfaces;
+using SuperBuilder_AI.Interfaces.BI;
+using SuperBuilder_AI.Interfaces.Database;
+using SuperBuilder_AI.Models.AI;
+using SuperBuilder_AI.Models.BI;
 
-namespace SuperBulider_AI.Services.BI;
+namespace SuperBuilder_AI.Services.BI;
 
 /// <summary>
 /// AI BI 对话编排服务。

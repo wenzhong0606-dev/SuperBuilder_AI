@@ -1,16 +1,16 @@
 ﻿using Google.Protobuf.Compiler;
 using Microsoft.AspNetCore.Mvc;
-using SuperBulider_AI.Infrastructure.Database;
-using SuperBulider_AI.Interfaces;
-using SuperBulider_AI.Interfaces.BI;
-using SuperBulider_AI.Interfaces.Database;
-using SuperBulider_AI.Models.BI;
-using SuperBulider_AI.Services.BI;
+using SuperBuilder_AI.Infrastructure.Database;
+using SuperBuilder_AI.Interfaces;
+using SuperBuilder_AI.Interfaces.BI;
+using SuperBuilder_AI.Interfaces.Database;
+using SuperBuilder_AI.Models.BI;
+using SuperBuilder_AI.Services.BI;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
 
-namespace SuperBulider_AI.Controllers;
+namespace SuperBuilder_AI.Controllers;
 
 
 /// <summary>

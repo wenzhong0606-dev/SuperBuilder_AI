@@ -1,6 +1,6 @@
-﻿using SuperBulider_AI.Interfaces;
+﻿using SuperBuilder_AI.Interfaces;
 
-namespace SuperBulider_AI.Services;
+namespace SuperBuilder_AI.Services;
 
 /// <summary>
 /// Metadata搜索文本生成器

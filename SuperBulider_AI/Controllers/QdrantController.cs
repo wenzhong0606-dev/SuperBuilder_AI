@@ -1,8 +1,8 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-using SuperBulider_AI.Interfaces;
+using SuperBuilder_AI.Interfaces;
 
 
-namespace SuperBulider_AI.Controllers;
+namespace SuperBuilder_AI.Controllers;
 
 
 public class QdrantController

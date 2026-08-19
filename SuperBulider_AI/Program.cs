@@ -1,15 +1,15 @@
 using Microsoft.EntityFrameworkCore;
-using SuperBulider_AI.Services.BI.Evaluation;
-using SuperBulider_AI.Configuration;
-using SuperBulider_AI.Data;
-using SuperBulider_AI.Infrastructure.Database;
-using SuperBulider_AI.Interfaces;
-using SuperBulider_AI.Interfaces.BI;
-using SuperBulider_AI.Interfaces.Database;
-using SuperBulider_AI.Services;
-using SuperBulider_AI.Services.BI;
-using SuperBulider_AI.Services.BI.Planning;
-using SuperBulider_AI.Services.Database;
+using SuperBuilder_AI.Services.BI.Evaluation;
+using SuperBuilder_AI.Configuration;
+using SuperBuilder_AI.Data;
+using SuperBuilder_AI.Infrastructure.Database;
+using SuperBuilder_AI.Interfaces;
+using SuperBuilder_AI.Interfaces.BI;
+using SuperBuilder_AI.Interfaces.Database;
+using SuperBuilder_AI.Services;
+using SuperBuilder_AI.Services.BI;
+using SuperBuilder_AI.Services.BI.Planning;
+using SuperBuilder_AI.Services.Database;
 
 // Program: 应用启动项
 //

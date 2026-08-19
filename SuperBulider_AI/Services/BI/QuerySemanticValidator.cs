@@ -1,8 +1,8 @@
-﻿using SuperBulider_AI.Models.BI;
-using SuperBulider_AI.Models.Metadata;
+﻿using SuperBuilder_AI.Models.BI;
+using SuperBuilder_AI.Models.Metadata;
 
 
-namespace SuperBulider_AI.Services.BI;
+namespace SuperBuilder_AI.Services.BI;
 
 /// <summary>
 /// QueryPlan业务语义验证器。

@@ -1,4 +1,4 @@
-namespace SuperBulider_AI.Models
+namespace SuperBuilder_AI.Models
 {
 	public class ErrorViewModel
 	{

@@ -1,4 +1,4 @@
-﻿namespace SuperBulider_AI.Models.AI;
+﻿namespace SuperBuilder_AI.Models.AI;
 
 /// <summary>
 /// AI生成SQL上下文

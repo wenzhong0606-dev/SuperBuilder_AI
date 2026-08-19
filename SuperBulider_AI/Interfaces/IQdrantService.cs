@@ -1,6 +1,6 @@
-﻿using SuperBulider_AI.Models.AI;
+﻿using SuperBuilder_AI.Models.AI;
 
-namespace SuperBulider_AI.Interfaces;
+namespace SuperBuilder_AI.Interfaces;
 
 /// <summary>
 /// Qdrant 向量存储接口。

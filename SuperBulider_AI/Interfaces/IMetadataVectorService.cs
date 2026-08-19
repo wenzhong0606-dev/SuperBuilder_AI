@@ -1,8 +1,8 @@
-﻿using SuperBulider_AI.Models.AI;
-using SuperBulider_AI.Models.Metadata;
+﻿using SuperBuilder_AI.Models.AI;
+using SuperBuilder_AI.Models.Metadata;
 
 
-namespace SuperBulider_AI.Interfaces;
+namespace SuperBuilder_AI.Interfaces;
 
 /// <summary>
 /// Metadata向量索引服务

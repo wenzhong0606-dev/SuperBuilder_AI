@@ -1,4 +1,4 @@
-namespace SuperBulider_AI.Models.BI.Evaluation;
+namespace SuperBuilder_AI.Models.BI.Evaluation;
 
 /// <summary>
 /// Golden Dimension 的数据库无关语义期望。

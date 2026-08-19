@@ -2,10 +2,10 @@
 using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Options;
-using SuperBulider_AI.Configuration;
-using SuperBulider_AI.Interfaces;
+using SuperBuilder_AI.Configuration;
+using SuperBuilder_AI.Interfaces;
 
-namespace SuperBulider_AI.Services;
+namespace SuperBuilder_AI.Services;
 
 /// <summary>
 /// Qwen Embedding 服务。

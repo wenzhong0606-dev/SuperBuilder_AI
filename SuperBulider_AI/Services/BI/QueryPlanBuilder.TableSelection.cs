@@ -1,11 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using SuperBulider_AI.Models.AI;
-using SuperBulider_AI.Models.BI;
-using SuperBulider_AI.Models.Metadata;
+using SuperBuilder_AI.Models.AI;
+using SuperBuilder_AI.Models.BI;
+using SuperBuilder_AI.Models.Metadata;
 
-namespace SuperBulider_AI.Services.BI;
+namespace SuperBuilder_AI.Services.BI;
 
 public partial class QueryPlanBuilder
 {

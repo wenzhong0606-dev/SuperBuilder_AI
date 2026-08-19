@@ -1,4 +1,4 @@
-﻿namespace SuperBulider_AI.Interfaces;
+﻿namespace SuperBuilder_AI.Interfaces;
 
 /// <summary>
 /// 文本向量化服务。

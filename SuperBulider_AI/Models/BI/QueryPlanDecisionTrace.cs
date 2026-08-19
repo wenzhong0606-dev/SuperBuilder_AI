@@ -1,4 +1,4 @@
-﻿namespace SuperBulider_AI.Models.BI;
+﻿namespace SuperBuilder_AI.Models.BI;
 
 /// <summary>
 /// QueryPlan Decision Gate 的完整决策轨迹。

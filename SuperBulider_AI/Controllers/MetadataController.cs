@@ -1,9 +1,9 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-using SuperBulider_AI.Interfaces;
-using SuperBulider_AI.Services;
+using SuperBuilder_AI.Interfaces;
+using SuperBuilder_AI.Services;
 
 
-namespace SuperBulider_AI.Controllers;
+namespace SuperBuilder_AI.Controllers;
 
 /// <summary>
 /// 元数据控制器，提供元数据扫描相关的管理接口。

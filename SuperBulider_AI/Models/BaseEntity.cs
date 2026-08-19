@@ -1,4 +1,4 @@
-﻿namespace SuperBulider_AI.Models;
+﻿namespace SuperBuilder_AI.Models;
 
 /// <summary>
 /// 基础实体

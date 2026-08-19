@@ -1,4 +1,4 @@
-﻿namespace SuperBulider_AI.Models.BI;
+﻿namespace SuperBuilder_AI.Models.BI;
 
 /// <summary>
 /// Query 修复动作。

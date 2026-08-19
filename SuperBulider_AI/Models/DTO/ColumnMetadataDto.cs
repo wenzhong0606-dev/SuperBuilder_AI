@@ -1,4 +1,4 @@
-﻿namespace SuperBulider_AI.Models.DTO;
+﻿namespace SuperBuilder_AI.Models.DTO;
 
 /// <summary>
 /// 字段信息

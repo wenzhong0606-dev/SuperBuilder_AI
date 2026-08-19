@@ -1,4 +1,4 @@
-﻿namespace SuperBulider_AI.Models.AI;
+﻿namespace SuperBuilder_AI.Models.AI;
 
 /// <summary>
 /// Metadata字段语义批量生成结果。
