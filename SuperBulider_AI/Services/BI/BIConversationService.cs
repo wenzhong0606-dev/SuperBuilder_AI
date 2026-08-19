@@ -27,6 +27,8 @@ namespace SuperBulider_AI.Services.BI;
 ///     ↓
 /// QueryPlan Decision Gate
 ///     ↓
+/// QueryPlan Explainability
+///     ↓
 /// SQL生成
 ///     ↓
 /// 数据执行
@@ -41,6 +43,9 @@ namespace SuperBulider_AI.Services.BI;
 ///
 /// Phase 2.4:
 /// QueryPlan Confidence & Decision Gate
+///
+/// Phase 2.5:
+/// QueryPlan Explainability
 /// </summary>
 public class BIConversationService
 	: IBIConversationService
@@ -84,6 +89,24 @@ public class BIConversationService
 	private readonly IQueryPlanDecisionGate
 		_queryPlanDecisionGate;
 
+	/// <summary>
+	/// Phase 2.5
+	///
+	/// QueryPlan Explainability。
+	///
+	/// 负责聚合：
+	///
+	/// QueryPlan
+	/// Validation
+	/// RepairTrace
+	/// Confidence
+	/// Decision
+	///
+	/// 本服务不重新计算上述结果。
+	/// </summary>
+	private readonly IQueryPlanExplainabilityService
+		_queryPlanExplainabilityService;
+
 	private readonly ISqlQueryBuilder
 		_sqlQueryBuilder;
 
@@ -116,6 +139,7 @@ public class BIConversationService
 		IQueryPlanValidationPipeline validationPipeline,
 		IQueryPlanConfidenceService queryPlanConfidenceService,
 		IQueryPlanDecisionGate queryPlanDecisionGate,
+		IQueryPlanExplainabilityService queryPlanExplainabilityService,
 		ISqlQueryBuilder sqlQueryBuilder,
 		ISqlDialectResolver sqlDialectResolver,
 		SuperBIContext superBIContext,
@@ -142,6 +166,9 @@ public class BIConversationService
 
 		_queryPlanDecisionGate =
 			queryPlanDecisionGate;
+
+		_queryPlanExplainabilityService =
+			queryPlanExplainabilityService;
 
 		_sqlQueryBuilder =
 			sqlQueryBuilder;
@@ -186,6 +213,10 @@ public class BIConversationService
 	/// Confidence
 	///     ↓
 	/// Decision Gate
+	///
+	/// Phase 2.5:
+	///
+	/// Explainability
 	///     ↓
 	/// SQL Builder
 	/// </summary>
@@ -236,6 +267,16 @@ public class BIConversationService
          * void Validate()
          *
          * 失败通过异常表达。
+         *
+         * 此阶段尚未进入 QueryPlan Semantic
+         * Validation Pipeline，因此没有：
+         *
+         * ValidationResult
+         * RepairTrace
+         * Confidence
+         * Decision
+         *
+         * 所以不能生成虚假的 Explainability。
          */
 		try
 		{
@@ -291,14 +332,34 @@ public class BIConversationService
          *
          * Validation 最终失败。
          *
-         * Phase 2.4:
+         * Phase 2.5:
          *
-         * Confidence / Decision Gate
+         * 此时虽然还没有 Confidence / Decision，
+         * 但是已经拥有：
          *
-         * 必须位于 Validation Pipeline 之后。
+         * QueryPlan
+         * ValidationResult
+         * RepairTrace
+         *
+         * 因此可以生成部分 Explainability。
+         *
+         * 不允许伪造：
+         *
+         * Confidence
+         * Decision
          */
 		if (!semanticValidation.ValidationResult.IsValid)
 		{
+			var validationExplanation =
+				_queryPlanExplainabilityService
+					.Explain(
+						question,
+						plan,
+						semanticValidation.ValidationResult,
+						semanticValidation.RepairTrace,
+						null,
+						null);
+
 			return new BIResponse
 			{
 				Success = false,
@@ -309,7 +370,10 @@ public class BIConversationService
 					string.Join(
 						"\n",
 						semanticValidation.ValidationResult.Errors
-							.Select(x => x.Message))
+							.Select(x => x.Message)),
+
+				Explanation =
+					validationExplanation
 			};
 		}
 
@@ -364,6 +428,35 @@ public class BIConversationService
 
 
 		/*
+         * Step 5.3.1
+         *
+         * Phase 2.5
+         *
+         * QueryPlan Explainability。
+         *
+         * 此时所有核心 Pipeline 结果均已经存在：
+         *
+         * QueryPlan
+         * ValidationResult
+         * RepairTrace
+         * Confidence
+         * Decision
+         *
+         * Explainability 只负责聚合，
+         * 不重新计算任何结果。
+         */
+		var explanation =
+			_queryPlanExplainabilityService
+				.Explain(
+					question,
+					plan,
+					semanticValidation.ValidationResult,
+					semanticValidation.RepairTrace,
+					confidence,
+					decision);
+
+
+		/*
          * Step 5.4
          *
          * Decision Gate 阻断。
@@ -371,6 +464,11 @@ public class BIConversationService
          * 注意：
          *
          * 此处不能继续 SQL Builder。
+         *
+         * Phase 2.5:
+         *
+         * 即使被 Decision Gate 拒绝，
+         * 也必须保留完整 Explainability。
          */
 		if (!decision.ShouldExecute)
 		{
@@ -383,7 +481,10 @@ public class BIConversationService
 				ErrorMessage =
 					decision.Reason
 					??
-					"QueryPlan 未通过 Decision Gate，禁止进入 SQL Builder。"
+					"QueryPlan 未通过 Decision Gate，禁止进入 SQL Builder。",
+
+				Explanation =
+					explanation
 			};
 		}
 
@@ -449,6 +550,16 @@ public class BIConversationService
 					data);
 
 
+		/*
+         * Step 9
+         *
+         * BI最终响应
+         *
+         * Phase 2.5:
+         *
+         * 将 QueryPlan Explainability
+         * 一并返回给上层。
+         */
 		return new BIResponse
 		{
 			Success = true,
@@ -462,7 +573,10 @@ public class BIConversationService
 				answer,
 
 			Data =
-				data
+				data,
+
+			Explanation =
+				explanation
 		};
 	}
 }
