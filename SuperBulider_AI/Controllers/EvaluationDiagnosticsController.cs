@@ -8,8 +8,8 @@ namespace SuperBulider_AI.Controllers;
 
 /// <summary>
 /// Phase 2.6 Evaluation Dataset 诊断入口。
-/// 用于验证 Golden Dataset Contract、源码资产加载、运行时 Semantic 检索诊断
-/// 与 Semantic Applicability，不执行 QueryPlan Evaluation。
+/// 用于验证 Golden Dataset Contract、源码资产加载、运行时 Semantic 检索诊断、
+/// Semantic Applicability 与 QueryPlan Evaluation Gate，不执行 Repair。
 /// </summary>
 [ApiController]
 [Route("evaluation/diagnostics")]
@@ -19,17 +19,20 @@ public sealed class EvaluationDiagnosticsController : ControllerBase
     private readonly IWebHostEnvironment _environment;
     private readonly IMetadataSemanticSearchService _metadataSemanticSearchService;
     private readonly SemanticApplicabilityEvaluator _semanticApplicabilityEvaluator;
+    private readonly QueryPlanEvaluationGate _queryPlanEvaluationGate;
 
     public EvaluationDiagnosticsController(
         GoldenQueryDatasetSerializer serializer,
         IWebHostEnvironment environment,
         IMetadataSemanticSearchService metadataSemanticSearchService,
-        SemanticApplicabilityEvaluator semanticApplicabilityEvaluator)
+        SemanticApplicabilityEvaluator semanticApplicabilityEvaluator,
+        QueryPlanEvaluationGate queryPlanEvaluationGate)
     {
         _serializer = serializer;
         _environment = environment;
         _metadataSemanticSearchService = metadataSemanticSearchService;
         _semanticApplicabilityEvaluator = semanticApplicabilityEvaluator;
+        _queryPlanEvaluationGate = queryPlanEvaluationGate;
     }
 
     [HttpGet("golden-dataset")]
@@ -102,11 +105,6 @@ public sealed class EvaluationDiagnosticsController : ControllerBase
         });
     }
 
-    /// <summary>
-    /// Phase 2.6.3.5-C.1 Semantic Diagnostic。
-    /// 仅观察当前运行时 Metadata + Qdrant 的真实语义检索结果，
-    /// 不进行 RESOLVED / NOT_FOUND / AMBIGUOUS 判定，也不设置 Score 阈值。
-    /// </summary>
     [HttpGet("semantic")]
     public async Task<ActionResult<object>> Semantic(
         [FromQuery] string question,
@@ -114,20 +112,12 @@ public sealed class EvaluationDiagnosticsController : ControllerBase
     {
         if (string.IsNullOrWhiteSpace(question))
         {
-            return BadRequest(new
-            {
-                passed = false,
-                message = "question is required."
-            });
+            return BadRequest(new { passed = false, message = "question is required." });
         }
 
         if (topK < 1 || topK > 100)
         {
-            return BadRequest(new
-            {
-                passed = false,
-                message = "topK must be between 1 and 100."
-            });
+            return BadRequest(new { passed = false, message = "topK must be between 1 and 100." });
         }
 
         var results = await _metadataSemanticSearchService.SearchAsync(question, topK);
@@ -153,11 +143,6 @@ public sealed class EvaluationDiagnosticsController : ControllerBase
         });
     }
 
-    /// <summary>
-    /// Phase 2.6.3.5-C.2 Semantic Applicability。
-    /// 根据 Golden Case 的 Metric 语义分析当前运行时 Metadata 候选。
-    /// 不修改 Metadata、QueryPlan 或 SQL，也不执行 Repair。
-    /// </summary>
     [HttpGet("applicability")]
     public async Task<ActionResult<object>> Applicability(
         [FromQuery] string caseId,
@@ -165,32 +150,19 @@ public sealed class EvaluationDiagnosticsController : ControllerBase
     {
         if (string.IsNullOrWhiteSpace(caseId))
         {
-            return BadRequest(new
-            {
-                passed = false,
-                message = "caseId is required."
-            });
+            return BadRequest(new { passed = false, message = "caseId is required." });
         }
 
         if (topK < 1 || topK > 100)
         {
-            return BadRequest(new
-            {
-                passed = false,
-                message = "topK must be between 1 and 100."
-            });
+            return BadRequest(new { passed = false, message = "topK must be between 1 and 100." });
         }
 
         var path = Path.Combine(_environment.ContentRootPath, "Evaluation", "Golden", "query-plan-golden-v1.json");
 
         if (!System.IO.File.Exists(path))
         {
-            return NotFound(new
-            {
-                passed = false,
-                message = "Golden Dataset asset was not found.",
-                path
-            });
+            return NotFound(new { passed = false, message = "Golden Dataset asset was not found.", path });
         }
 
         var dataset = _serializer.Deserialize(System.IO.File.ReadAllText(path));
@@ -199,11 +171,7 @@ public sealed class EvaluationDiagnosticsController : ControllerBase
 
         if (goldenCase is null)
         {
-            return NotFound(new
-            {
-                passed = false,
-                message = $"Golden Case '{caseId}' was not found."
-            });
+            return NotFound(new { passed = false, message = $"Golden Case '{caseId}' was not found." });
         }
 
         var result = await _semanticApplicabilityEvaluator.EvaluateAsync(goldenCase, topK);
@@ -212,6 +180,51 @@ public sealed class EvaluationDiagnosticsController : ControllerBase
         {
             passed = result.State == "Resolved",
             result
+        });
+    }
+
+    /// <summary>
+    /// Phase 2.6.3.5-C.3 QueryPlan Evaluation Gate。
+    /// 先执行 C.2 Applicability，再由 Gate 决定 PASS / BLOCK / REVIEW。
+    /// </summary>
+    [HttpGet("query-plan-gate")]
+    public async Task<ActionResult<object>> QueryPlanGate(
+        [FromQuery] string caseId,
+        [FromQuery] int topK = 10)
+    {
+        if (string.IsNullOrWhiteSpace(caseId))
+        {
+            return BadRequest(new { passed = false, message = "caseId is required." });
+        }
+
+        if (topK < 1 || topK > 100)
+        {
+            return BadRequest(new { passed = false, message = "topK must be between 1 and 100." });
+        }
+
+        var path = Path.Combine(_environment.ContentRootPath, "Evaluation", "Golden", "query-plan-golden-v1.json");
+        if (!System.IO.File.Exists(path))
+        {
+            return NotFound(new { passed = false, message = "Golden Dataset asset was not found.", path });
+        }
+
+        var dataset = _serializer.Deserialize(System.IO.File.ReadAllText(path));
+        var goldenCase = dataset.Cases.SingleOrDefault(x =>
+            string.Equals(x.Id, caseId, StringComparison.OrdinalIgnoreCase));
+
+        if (goldenCase is null)
+        {
+            return NotFound(new { passed = false, message = $"Golden Case '{caseId}' was not found." });
+        }
+
+        var applicability = await _semanticApplicabilityEvaluator.EvaluateAsync(goldenCase, topK);
+        var decision = _queryPlanEvaluationGate.Evaluate(applicability);
+
+        return Ok(new
+        {
+            passed = decision.Decision == "PASS",
+            decision,
+            applicability
         });
     }
 
