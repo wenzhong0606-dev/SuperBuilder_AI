@@ -11,7 +11,7 @@
     <Content Include="Document\result.txt" />
     <Content Include="Document\Semantic.csv" />
     <Content Include="Document\table.csv" />
-    <Content Include="Evaluation\Golden\query-plan-golden-v1.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Update="Evaluation\Golden\query-plan-golden-v1.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>
