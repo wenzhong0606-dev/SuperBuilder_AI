@@ -7,6 +7,7 @@ using SuperBulider_AI.Interfaces.BI;
 using SuperBulider_AI.Interfaces.Database;
 using SuperBulider_AI.Services;
 using SuperBulider_AI.Services.BI;
+using SuperBulider_AI.Services.BI.Evaluation;
 using SuperBulider_AI.Services.BI.Planning;
 using SuperBulider_AI.Services.Database;
 
@@ -234,6 +235,14 @@ builder.Services
 	.AddScoped<
 		IQueryPlanExplainabilityService,
 		QueryPlanExplainabilityService>();
+
+// -----------------------------
+// Phase 2.6
+// Query Evaluation Framework
+// -----------------------------
+
+builder.Services
+	.AddScoped<GoldenQueryDatasetSerializer>();
 
 // -----------------------------
 // 数据库连接与 SQL 执行
