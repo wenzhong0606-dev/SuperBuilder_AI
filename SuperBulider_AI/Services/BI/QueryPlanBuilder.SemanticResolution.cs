@@ -29,19 +29,16 @@ public partial class QueryPlanBuilder
             if (!MatchesMetric(metric, binding.SemanticText))
                 continue;
 
+            var previousField = metric.Field;
             metric.Field = binding.Column;
-        }
 
-        foreach (var field in plan.Fields)
-        {
-            if (field.MetadataColumnId == binding.ColumnId)
-            {
-                field.ColumnName = binding.Column;
-                continue;
-            }
+            var matchingFields = plan.Fields
+                .Where(field =>
+                    string.Equals(field.ColumnName, previousField, StringComparison.OrdinalIgnoreCase)
+                    || field.MetadataColumnId == binding.ColumnId)
+                .ToList();
 
-            if (plan.Metrics.Any(metric =>
-                    string.Equals(metric.Field, field.ColumnName, StringComparison.OrdinalIgnoreCase)))
+            foreach (var field in matchingFields)
             {
                 field.MetadataColumnId = binding.ColumnId;
                 field.ColumnName = binding.Column;
