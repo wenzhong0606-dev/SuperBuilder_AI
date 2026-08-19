@@ -1392,7 +1392,7 @@ J[Repair Stopped]
 
 状态：
 
-> 🚧 下一开发阶段
+> ✅ 已完成 / 已冻结
 
 ## 12.1 阶段目标
 
@@ -3132,19 +3132,9 @@ LOW
 
 # 24.9 当前开发基线
 
-正式基线：
-
-```text
-Phase 2.3
-QueryPlan Repair Reliability
-```
-
-下一开发目标：
-
-```text
-Phase 2.4
-QueryPlan Confidence & Decision Gate
-```
+当前完成阶段：Phase 2.4
+当前冻结阶段：Phase 2.4
+下一开发阶段：Phase 2.5 Explainability
 
 ---
 

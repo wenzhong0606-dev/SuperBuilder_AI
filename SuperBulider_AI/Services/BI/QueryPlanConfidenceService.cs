@@ -197,7 +197,7 @@ public sealed class QueryPlanConfidenceService
 
 		var repairFailed =
 			trace.Status ==
-				QueryPlanRepairTraceStatus.Failed;
+			QueryPlanRepairTraceStatus.Failed;
 
 		var maxRepairAttemptsReached =
 			trace.Status ==
@@ -266,6 +266,27 @@ public sealed class QueryPlanConfidenceService
 
 		evidence.RepairStatus =
 			trace.Status;
+
+
+		// =========================================================
+		// 4.1 Repair Progress Evidence
+		// =========================================================
+		//
+		// RepairProgressScore 必须从真实 RepairTrace 计算。
+		//
+		// 不允许：
+		//
+		// CalculateRepairProgressScore(evidence)
+		//
+		// 因为 Evidence 是计算结果容器，而不是 RepairTrace。
+		//
+
+		evidence.RepairProgressScore =
+			CalculateRepairProgressScore(
+				trace);
+
+		evidence.RepairProgressAvailable =
+			trace.TotalAttempts > 0;
 
 
 		// =========================================================
@@ -633,12 +654,14 @@ public sealed class QueryPlanConfidenceService
 
 		evidence.ValidationErrorCount =
 			validation?.ErrorItems.Count()
-			?? 0;
+			??
+			0;
 
 
 		evidence.ValidationWarningCount =
 			validation?.WarningItems.Count()
-			?? 0;
+			??
+			0;
 
 
 		// ---------------------------------------------------------
@@ -669,6 +692,21 @@ public sealed class QueryPlanConfidenceService
 
 		evidence.RepairStatus =
 			trace.Status;
+
+
+		// ---------------------------------------------------------
+		// Repair Progress
+		// ---------------------------------------------------------
+		//
+		// 这里直接使用真实 RepairTrace。
+		//
+
+		evidence.RepairProgressScore =
+			CalculateRepairProgressScore(
+				trace);
+
+		evidence.RepairProgressAvailable =
+			trace.TotalAttempts > 0;
 
 
 		return evidence;
@@ -959,6 +997,139 @@ public sealed class QueryPlanConfidenceService
 
 
 	// =============================================================
+	// Repair Progress
+	// =============================================================
+
+	/// <summary>
+	/// 计算 Repair Progress Score。
+	///
+	/// RepairProgress 用于衡量：
+	///
+	/// Repair Pipeline
+	/// 是否真正推动 QueryPlan 向稳定状态收敛。
+	///
+	/// 计算来源必须是 QueryPlanRepairTrace，
+	/// 而不是 QueryPlanConfidenceEvidence。
+	///
+	/// 规则：
+	///
+	/// NotRequired：
+	///     1.00
+	///
+	/// 没有 Repair Attempt：
+	///     1.00
+	///
+	/// Stalled：
+	///     0.00
+	///
+	/// LoopDetected：
+	///     0.00
+	///
+	/// Failed：
+	///     0.00
+	///
+	/// MaxAttemptsReached：
+	///     0.00
+	///
+	/// Repaired：
+	///     ChangedPlanCount / TotalAttempts
+	///
+	/// 最终限制在 0~1。
+	/// </summary>
+	private static double CalculateRepairProgressScore(
+		QueryPlanRepairTrace trace)
+	{
+		ArgumentNullException.ThrowIfNull(
+			trace);
+
+
+		// ---------------------------------------------------------
+		// Repair 不需要执行
+		// ---------------------------------------------------------
+
+		if (trace.Status ==
+			QueryPlanRepairTraceStatus.NotRequired)
+		{
+			return 1.00;
+		}
+
+
+		// ---------------------------------------------------------
+		// 没有 Repair Attempt
+		// ---------------------------------------------------------
+
+		if (trace.TotalAttempts <= 0)
+		{
+			return 1.00;
+		}
+
+
+		// ---------------------------------------------------------
+		// Repair Stall
+		// ---------------------------------------------------------
+
+		if (trace.Status ==
+			QueryPlanRepairTraceStatus.Stalled)
+		{
+			return 0.00;
+		}
+
+
+		// ---------------------------------------------------------
+		// Repair Loop
+		// ---------------------------------------------------------
+
+		if (trace.Status ==
+			QueryPlanRepairTraceStatus.LoopDetected)
+		{
+			return 0.00;
+		}
+
+
+		// ---------------------------------------------------------
+		// Repair Failed
+		// ---------------------------------------------------------
+
+		if (trace.Status ==
+			QueryPlanRepairTraceStatus.Failed)
+		{
+			return 0.00;
+		}
+
+
+		// ---------------------------------------------------------
+		// Maximum Attempts
+		// ---------------------------------------------------------
+
+		if (trace.Status ==
+			QueryPlanRepairTraceStatus.MaxAttemptsReached)
+		{
+			return 0.00;
+		}
+
+
+		// ---------------------------------------------------------
+		// Repair Progress
+		// ---------------------------------------------------------
+
+		if (trace.ChangedPlanCount <= 0)
+		{
+			return 0.00;
+		}
+
+
+		var progress =
+			(double)trace.ChangedPlanCount
+			/
+			trace.TotalAttempts;
+
+
+		return ClampScore(
+			progress);
+	}
+
+
+	// =============================================================
 	// Confidence Level
 	// =============================================================
 
@@ -1114,6 +1285,18 @@ public sealed class QueryPlanConfidenceService
 
 		reasons.Add(
 			$"Changed Plan Count = {evidence.ChangedPlanCount}.");
+
+
+		if (evidence.RepairProgressAvailable)
+		{
+			reasons.Add(
+				$"Repair Progress Score = {evidence.RepairProgressScore:F3}.");
+		}
+		else
+		{
+			reasons.Add(
+				"Repair Progress Evidence 不可用。");
+		}
 
 
 		if (evidence.CandidateRankingScore > 0)

@@ -28,6 +28,20 @@ namespace SuperBulider_AI.Services.BI;
 ///
 /// 它只负责根据已经计算完成的 Confidence
 /// 决定 QueryPlan 是否可以进入下一阶段。
+///
+/// Phase 2.4 Completion Patch：
+///
+/// 在原有 Decision 基础上增加：
+///
+/// QueryPlanDecisionTrace
+///
+/// 用于记录 Decision Gate 为什么做出：
+///
+/// Proceed
+/// Confirm
+/// Reject
+///
+/// 的完整决策证据。
 /// </summary>
 public sealed class QueryPlanDecisionGate
 	: IQueryPlanDecisionGate
@@ -49,6 +63,18 @@ public sealed class QueryPlanDecisionGate
 
 	/// <summary>
 	/// 根据 QueryPlan Confidence 生成最终 Decision。
+	///
+	/// Decision Flow：
+	///
+	/// Confidence
+	///     ↓
+	/// Hard Safety Check
+	///     ↓
+	/// High / Medium / Low
+	///     ↓
+	/// QueryPlanDecision
+	///     ↓
+	/// QueryPlanDecisionTrace
 	/// </summary>
 	public QueryPlanDecision Evaluate(
 		QueryPlanConfidence confidence)
@@ -66,8 +92,9 @@ public sealed class QueryPlanDecisionGate
 
 		if (HasHardBlockingCondition(confidence))
 		{
-			return CreateRejectDecision(
-				confidence);
+			return AttachTrace(
+				CreateRejectDecision(
+					confidence));
 		}
 
 
@@ -83,8 +110,9 @@ public sealed class QueryPlanDecisionGate
 
 			case QueryPlanConfidenceLevel.High:
 
-				return EvaluateHighConfidence(
-					confidence);
+				return AttachTrace(
+					EvaluateHighConfidence(
+						confidence));
 
 
 			// -----------------------------------------------------
@@ -93,8 +121,9 @@ public sealed class QueryPlanDecisionGate
 
 			case QueryPlanConfidenceLevel.Medium:
 
-				return EvaluateMediumConfidence(
-					confidence);
+				return AttachTrace(
+					EvaluateMediumConfidence(
+						confidence));
 
 
 			// -----------------------------------------------------
@@ -103,8 +132,9 @@ public sealed class QueryPlanDecisionGate
 
 			case QueryPlanConfidenceLevel.Low:
 
-				return CreateRejectDecision(
-					confidence);
+				return AttachTrace(
+					CreateRejectDecision(
+						confidence));
 
 
 			// -----------------------------------------------------
@@ -113,23 +143,24 @@ public sealed class QueryPlanDecisionGate
 
 			default:
 
-				return new QueryPlanDecision
-				{
-					Decision =
-						QueryPlanDecisionType.Reject,
+				return AttachTrace(
+					new QueryPlanDecision
+					{
+						Decision =
+							QueryPlanDecisionType.Reject,
 
-					Confidence =
-						confidence,
+						Confidence =
+							confidence,
 
-					ShouldExecute =
-						false,
+						ShouldExecute =
+							false,
 
-					RequiresConfirmation =
-						false,
+						RequiresConfirmation =
+							false,
 
-					Reason =
-						"QueryPlan Confidence Level 无法识别，拒绝进入 SQL Builder。"
-				};
+						Reason =
+							"QueryPlan Confidence Level 无法识别，拒绝进入 SQL Builder。"
+					});
 		}
 	}
 
@@ -276,6 +307,16 @@ public sealed class QueryPlanDecisionGate
 
 	/// <summary>
 	/// 检查是否存在绝对阻断条件。
+	///
+	/// Hard Blocking 优先级高于 Confidence Level。
+	///
+	/// 即：
+	///
+	/// High Confidence
+	/// +
+	/// Hard Blocking
+	/// =
+	/// Reject
 	/// </summary>
 	private static bool HasHardBlockingCondition(
 		QueryPlanConfidence confidence)
@@ -425,5 +466,147 @@ public sealed class QueryPlanDecisionGate
 			$"{confidence.Level}，" +
 			$"Score = {confidence.Score:F3}，" +
 			"不足以进入 SQL Builder。";
+	}
+
+
+	// =============================================================
+	// Decision Trace
+	// =============================================================
+
+	/// <summary>
+	/// 将 Decision Gate 的最终结果转换为完整的 Decision Trace。
+	///
+	/// 注意：
+	///
+	/// QueryPlanDecision
+	///     = 最终决策结果
+	///
+	/// QueryPlanDecisionTrace
+	///     = 决策依据与安全证据
+	///
+	/// 两者职责不同。
+	/// </summary>
+	private static QueryPlanDecision
+		AttachTrace(
+			QueryPlanDecision decision)
+	{
+		ArgumentNullException.ThrowIfNull(
+			decision);
+
+		ArgumentNullException.ThrowIfNull(
+			decision.Confidence);
+
+
+		var confidence =
+			decision.Confidence;
+
+		ArgumentNullException.ThrowIfNull(
+			confidence.Evidence);
+
+
+		var evidence =
+			confidence.Evidence;
+
+
+		decision.Trace =
+			new QueryPlanDecisionTrace
+			{
+				// -------------------------------------------------
+				// Confidence
+				// -------------------------------------------------
+
+				ConfidenceScore =
+					confidence.Score,
+
+				ConfidenceLevel =
+					confidence.Level,
+
+
+				// -------------------------------------------------
+				// Decision
+				// -------------------------------------------------
+
+				Decision =
+					decision.Decision,
+
+				ShouldExecute =
+					decision.ShouldExecute,
+
+				RequiresConfirmation =
+					decision.RequiresConfirmation,
+
+
+				// -------------------------------------------------
+				// Threshold
+				// -------------------------------------------------
+
+				HighThreshold =
+					HighConfidenceThreshold,
+
+				MediumThreshold =
+					MediumConfidenceThreshold,
+
+
+				// -------------------------------------------------
+				// Validation
+				// -------------------------------------------------
+
+				ValidationErrorCount =
+					evidence.ValidationErrorCount,
+
+
+				// -------------------------------------------------
+				// Repair
+				// -------------------------------------------------
+
+				RepairCount =
+					evidence.RepairCount,
+
+				RepairProgressScore =
+					evidence.RepairProgressScore,
+
+				RepairStalled =
+					evidence.RepairStalled,
+
+				RepairLoopDetected =
+					evidence.RepairLoopDetected,
+
+				RepairFailed =
+					evidence.RepairFailed,
+
+				MaxRepairAttemptsReached =
+					evidence.MaxRepairAttemptsReached,
+
+				RepairStatus =
+					evidence.RepairStatus,
+
+
+				// -------------------------------------------------
+				// Decision Reason
+				// -------------------------------------------------
+
+				Reason =
+					decision.Reason,
+
+
+				// -------------------------------------------------
+				// Blocking Reasons
+				// -------------------------------------------------
+
+				BlockingReasons =
+					confidence.BlockingReasons
+						.ToList(),
+
+
+				// -------------------------------------------------
+				// Timestamp
+				// -------------------------------------------------
+
+				EvaluatedAt =
+					DateTimeOffset.UtcNow
+			};
+
+
+		return decision;
 	}
 }
