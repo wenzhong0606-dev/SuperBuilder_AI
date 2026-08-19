@@ -1,7 +1,7 @@
 using SuperBulider_AI.Models.BI;
 using SuperBulider_AI.Models.BI.Evaluation;
 
-namespace SuperBulider_AI.Services.BI.Evaluation;
+namespace SuperBulder_AI.Services.BI.Evaluation;
 
 /// <summary>
 /// Phase 2.6.3.5-C.4 QueryPlan Evaluator。
@@ -12,7 +12,7 @@ public sealed class QueryPlanEvaluator
 {
     public QueryPlanEvaluationResult Evaluate(
         string caseId,
-        GoldenQueryExpected expected,
+        GoldenQueryExpectation expected,
         QueryPlan runtime)
     {
         ArgumentNullException.ThrowIfNull(expected);
@@ -41,7 +41,7 @@ public sealed class QueryPlanEvaluator
     }
 
     private static QueryPlanEvaluationSectionResult EvaluateIntent(
-        GoldenQueryExpected expected,
+        GoldenQueryExpectation expected,
         QueryPlan runtime)
     {
         if (string.IsNullOrWhiteSpace(expected.IntentType))
@@ -54,7 +54,7 @@ public sealed class QueryPlanEvaluator
     }
 
     private static QueryPlanEvaluationSectionResult EvaluateMetrics(
-        GoldenQueryExpected expected,
+        GoldenQueryExpectation expected,
         QueryPlan runtime)
     {
         if (expected.Metrics is null)
@@ -76,8 +76,7 @@ public sealed class QueryPlanEvaluator
                 return Fail($"第 {i + 1} 个 Metric 语义不匹配：期望“{golden.SemanticText}”。");
             }
 
-            if (!string.IsNullOrWhiteSpace(golden.Aggregation)
-                && !string.Equals(metric.GetAggregation().ToString(), golden.Aggregation, StringComparison.OrdinalIgnoreCase))
+            if (metric.GetAggregation() != golden.Aggregation)
             {
                 return Fail($"第 {i + 1} 个 Metric 聚合不匹配：期望 {golden.Aggregation}，实际 {metric.GetAggregation()}。");
             }
@@ -94,7 +93,7 @@ public sealed class QueryPlanEvaluator
     }
 
     private static QueryPlanEvaluationSectionResult EvaluateDimensions(
-        GoldenQueryExpected expected,
+        GoldenQueryExpectation expected,
         QueryPlan runtime)
     {
         if (expected.Dimensions is null)
@@ -107,7 +106,7 @@ public sealed class QueryPlanEvaluator
     }
 
     private static QueryPlanEvaluationSectionResult EvaluateFilters(
-        GoldenQueryExpected expected,
+        GoldenQueryExpectation expected,
         QueryPlan runtime)
     {
         if (expected.Filters is null)
@@ -120,7 +119,7 @@ public sealed class QueryPlanEvaluator
     }
 
     private static QueryPlanEvaluationSectionResult EvaluateShape(
-        GoldenQueryExpected expected,
+        GoldenQueryExpectation expected,
         QueryPlan runtime)
     {
         if (expected.IsAggregate.HasValue && runtime.IsAggregate != expected.IsAggregate.Value)
@@ -131,6 +130,15 @@ public sealed class QueryPlanEvaluator
 
         if (expected.Limit.HasValue && runtime.Limit != expected.Limit.Value)
             return Fail($"Limit 不匹配：期望 {expected.Limit.Value}，实际 {runtime.Limit}。");
+
+        if (expected.IsRanking.HasValue && runtime.IsRanking != expected.IsRanking.Value)
+            return Fail($"IsRanking 不匹配：期望 {expected.IsRanking.Value}，实际 {runtime.IsRanking}。");
+
+        if (expected.IsDetailRanking.HasValue && runtime.IsDetailRanking != expected.IsDetailRanking.Value)
+            return Fail($"IsDetailRanking 不匹配：期望 {expected.IsDetailRanking.Value}，实际 {runtime.IsDetailRanking}。");
+
+        if (expected.IsAggregateRanking.HasValue && runtime.IsAggregateRanking != expected.IsAggregateRanking.Value)
+            return Fail($"IsAggregateRanking 不匹配：期望 {expected.IsAggregateRanking.Value}，实际 {runtime.IsAggregateRanking}。");
 
         if (expected.Orders is not null)
         {
@@ -144,6 +152,13 @@ public sealed class QueryPlanEvaluator
             var actual = runtime.Joins ?? new List<QueryJoin>();
             if (actual.Count != expected.Joins.Count)
                 return Fail($"Joins 数量不匹配：期望 {expected.Joins.Count}，实际 {actual.Count}。");
+        }
+
+        if (expected.Tables is not null)
+        {
+            var actual = runtime.Tables ?? new List<QueryTable>();
+            if (actual.Count != expected.Tables.Count)
+                return Fail($"Tables 数量不匹配：期望 {expected.Tables.Count}，实际 {actual.Count}。");
         }
 
         return Pass("Query Shape 匹配。");
