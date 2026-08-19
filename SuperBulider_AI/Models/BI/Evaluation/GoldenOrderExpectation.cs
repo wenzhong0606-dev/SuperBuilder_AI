@@ -3,14 +3,14 @@ using SuperBulider_AI.Models.BI;
 namespace SuperBulider_AI.Models.BI.Evaluation;
 
 /// <summary>
-/// Golden Order 的语义期望。
+/// Golden Order 的数据库无关语义期望。
 /// </summary>
 public class GoldenOrderExpectation
 {
     /// <summary>
-    /// 非指标排序时使用的 MetadataColumn.BusinessKey。
+    /// 非指标排序时使用的业务语义描述。
     /// </summary>
-    public string? BusinessKey { get; set; }
+    public string? SemanticText { get; set; }
 
     /// <summary>
     /// 是否按照指标排序。
@@ -18,9 +18,9 @@ public class GoldenOrderExpectation
     public bool IsMetric { get; set; }
 
     /// <summary>
-    /// 指标字段的 MetadataColumn.BusinessKey。
+    /// 指标排序时使用的业务语义描述。
     /// </summary>
-    public string? MetricBusinessKey { get; set; }
+    public string? MetricSemanticText { get; set; }
 
     /// <summary>
     /// 指标排序使用的聚合方式。
