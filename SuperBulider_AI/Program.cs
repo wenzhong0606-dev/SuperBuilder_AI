@@ -126,6 +126,7 @@ builder.Services.AddScoped<IQueryPlanExplainabilityService, QueryPlanExplainabil
 // -----------------------------
 builder.Services.AddScoped<GoldenQueryDatasetSerializer>();
 builder.Services.AddScoped<SemanticApplicabilityEvaluator>();
+builder.Services.AddScoped<QueryPlanEvaluationGate>();
 
 // -----------------------------
 // 数据库连接与 SQL 执行
