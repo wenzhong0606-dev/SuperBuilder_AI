@@ -14,7 +14,7 @@ v2.0
 
 当前开发阶段：
 
-> Phase 2.3 查询计划可靠性增强
+> Phase 2.3.2 — Semantic Candidate Ranking
 
 
 当前系统完成度：
