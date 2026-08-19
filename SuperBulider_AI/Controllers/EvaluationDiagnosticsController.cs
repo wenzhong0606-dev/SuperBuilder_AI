@@ -51,9 +51,7 @@ public sealed class EvaluationDiagnosticsController : ControllerBase
         var path = Path.Combine(_environment.ContentRootPath, "Evaluation", "Golden", "query-plan-golden-v1.json");
 
         if (!System.IO.File.Exists(path))
-        {
             return NotFound(new { passed = false, message = "Golden Dataset asset was not found.", path });
-        }
 
         var sourceJson = System.IO.File.ReadAllText(path);
         var dataset = _serializer.Deserialize(sourceJson);
@@ -69,6 +67,7 @@ public sealed class EvaluationDiagnosticsController : ControllerBase
                      && gq001 is not null
                      && gq002 is not null
                      && gq001Metric?.SemanticText == "入库数量"
+                     && gq001Metric.Field == "quantity"
                      && gq001Metric.Aggregation == QueryAggregation.Sum
                      && gq002Metric?.SemanticText == "入库单数量"
                      && gq002Metric.Aggregation == QueryAggregation.Count
@@ -97,6 +96,7 @@ public sealed class EvaluationDiagnosticsController : ControllerBase
                 x.Name,
                 x.Question,
                 metric = x.Expected.Metrics?.SingleOrDefault()?.SemanticText,
+                field = x.Expected.Metrics?.SingleOrDefault()?.Field,
                 aggregation = x.Expected.Metrics?.SingleOrDefault()?.Aggregation.ToString(),
                 dimensionsState = x.Expected.Dimensions is null ? "null" : x.Expected.Dimensions.Count == 0 ? "empty" : "values",
                 filtersState = x.Expected.Filters is null ? "null" : x.Expected.Filters.Count == 0 ? "empty" : "values"
@@ -110,12 +110,10 @@ public sealed class EvaluationDiagnosticsController : ControllerBase
     {
         if (string.IsNullOrWhiteSpace(question))
             return BadRequest(new { passed = false, message = "question is required." });
-
         if (topK < 1 || topK > 100)
             return BadRequest(new { passed = false, message = "topK must be between 1 and 100." });
 
         var results = await _metadataSemanticSearchService.SearchAsync(question, topK);
-
         return Ok(new
         {
             question,
@@ -142,7 +140,6 @@ public sealed class EvaluationDiagnosticsController : ControllerBase
     {
         if (string.IsNullOrWhiteSpace(caseId))
             return BadRequest(new { passed = false, message = "caseId is required." });
-
         if (topK < 1 || topK > 100)
             return BadRequest(new { passed = false, message = "topK must be between 1 and 100." });
 
@@ -156,14 +153,12 @@ public sealed class EvaluationDiagnosticsController : ControllerBase
 
     /// <summary>
     /// Phase 2.6.3.5-C.3 QueryPlan Evaluation Gate。
-    /// 先执行 C.2 Applicability，再由 Gate 决定 PASS / BLOCK / REVIEW。
     /// </summary>
     [HttpGet("query-plan-gate")]
     public async Task<ActionResult<object>> QueryPlanGate([FromQuery] string caseId, [FromQuery] int topK = 10)
     {
         if (string.IsNullOrWhiteSpace(caseId))
             return BadRequest(new { passed = false, message = "caseId is required." });
-
         if (topK < 1 || topK > 100)
             return BadRequest(new { passed = false, message = "topK must be between 1 and 100." });
 
@@ -173,23 +168,18 @@ public sealed class EvaluationDiagnosticsController : ControllerBase
 
         var applicability = await _semanticApplicabilityEvaluator.EvaluateAsync(goldenCase, topK);
         var decision = _queryPlanEvaluationGate.Evaluate(applicability);
-
         return Ok(new { passed = decision.Decision == "PASS", decision, applicability });
     }
 
     /// <summary>
-    /// Phase 2.6.4：使用真实 QueryUnderstandingService + QueryPlanBuilder 生成 Runtime QueryPlan，
+    /// 使用真实 QueryUnderstandingService + QueryPlanBuilder 生成 Runtime QueryPlan，
     /// 再交给 QueryPlanEvaluator 与 Golden Contract 比较。
-    /// 不执行 SQL、不执行 Repair、不修改 Metadata 或 Qdrant。
     /// </summary>
     [HttpGet("query-plan-evaluation")]
-    public async Task<ActionResult<object>> QueryPlanEvaluation(
-        [FromQuery] string caseId,
-        [FromQuery] int topK = 10)
+    public async Task<ActionResult<object>> QueryPlanEvaluation([FromQuery] string caseId, [FromQuery] int topK = 10)
     {
         if (string.IsNullOrWhiteSpace(caseId))
             return BadRequest(new { passed = false, message = "caseId is required." });
-
         if (topK < 1 || topK > 100)
             return BadRequest(new { passed = false, message = "topK must be between 1 and 100." });
 
@@ -212,7 +202,27 @@ public sealed class EvaluationDiagnosticsController : ControllerBase
         }
 
         var intent = await _queryUnderstandingService.UnderstandAsync(goldenCase.Question);
-        var runtimePlan = await _queryPlanBuilder.BuildAsync(intent);
+
+        QueryPlanSemanticResolution? resolution = null;
+        if (applicability.Resolution is not null)
+        {
+            var resolved = applicability.Resolution;
+            resolution = new QueryPlanSemanticResolution
+            {
+                Metric = new QueryPlanMetricResolution
+                {
+                    TableId = resolved.TableId,
+                    ColumnId = resolved.ColumnId,
+                    SemanticText = applicability.MetricSemanticText,
+                    Table = resolved.Table ?? string.Empty,
+                    Column = resolved.Column ?? string.Empty,
+                    BusinessMeaning = resolved.BusinessMeaning,
+                    Score = resolved.Score
+                }
+            };
+        }
+
+        var runtimePlan = await _queryPlanBuilder.BuildAsync(intent, resolution);
         var evaluation = _queryPlanEvaluator.Evaluate(goldenCase.Id, goldenCase.Expected, runtimePlan);
 
         return Ok(new
@@ -277,7 +287,7 @@ public sealed class EvaluationDiagnosticsController : ControllerBase
               "expected": {
                 "intentType": "Aggregate",
                 "dimensions": [],
-                "metrics": [{ "semanticText": "入库数量", "aggregation": "sum" }],
+                "metrics": [{ "semanticText": "入库数量", "aggregation": "sum" }]
               },
               "version": "1.0",
               "enabled": true
