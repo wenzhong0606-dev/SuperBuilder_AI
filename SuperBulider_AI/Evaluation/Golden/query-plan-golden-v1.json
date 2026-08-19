@@ -1,0 +1,62 @@
+{
+  "version": "1.0",
+  "dataset": "query-plan-golden",
+  "cases": [
+    {
+      "id": "GQ-001",
+      "name": "Single Metric SUM",
+      "question": "查询入库数量",
+      "expected": {
+        "intentType": "Aggregate",
+        "metrics": [
+          {
+            "semanticText": "入库数量",
+            "aggregation": "sum"
+          }
+        ],
+        "dimensions": [],
+        "filters": null,
+        "tables": null,
+        "joins": null,
+        "orders": null,
+        "isAggregate": true
+      },
+      "difficulty": "easy",
+      "tags": [
+        "aggregate",
+        "single-metric",
+        "sum"
+      ],
+      "version": "1.0",
+      "enabled": true
+    },
+    {
+      "id": "GQ-002",
+      "name": "Single Metric COUNT",
+      "question": "查询入库单数量",
+      "expected": {
+        "intentType": "Aggregate",
+        "metrics": [
+          {
+            "semanticText": "入库单数量",
+            "aggregation": "count"
+          }
+        ],
+        "dimensions": [],
+        "filters": null,
+        "tables": null,
+        "joins": null,
+        "orders": null,
+        "isAggregate": true
+      },
+      "difficulty": "easy",
+      "tags": [
+        "aggregate",
+        "single-metric",
+        "count"
+      ],
+      "version": "1.0",
+      "enabled": true
+    }
+  ]
+}
