@@ -27,11 +27,7 @@ public sealed class QueryPlanEvaluator
         return new QueryPlanEvaluationResult
         {
             CaseId = caseId,
-            Passed = intent.Passed
-                      && metrics.Passed
-                      && dimensions.Passed
-                      && filters.Passed
-                      && shape.Passed,
+            Passed = intent.Passed && metrics.Passed && dimensions.Passed && filters.Passed && shape.Passed,
             Intent = intent,
             Metrics = metrics,
             Dimensions = dimensions,
@@ -40,9 +36,7 @@ public sealed class QueryPlanEvaluator
         };
     }
 
-    private static QueryPlanEvaluationSectionResult EvaluateIntent(
-        GoldenQueryExpectation expected,
-        QueryPlan runtime)
+    private static QueryPlanEvaluationSectionResult EvaluateIntent(GoldenQueryExpectation expected, QueryPlan runtime)
     {
         if (string.IsNullOrWhiteSpace(expected.IntentType))
             return Pass("Golden 未指定 IntentType，不进行断言。");
@@ -53,15 +47,12 @@ public sealed class QueryPlanEvaluator
             : Fail($"期望 IntentType={expected.IntentType}，实际为 {actual ?? "null"}。");
     }
 
-    private static QueryPlanEvaluationSectionResult EvaluateMetrics(
-        GoldenQueryExpectation expected,
-        QueryPlan runtime)
+    private static QueryPlanEvaluationSectionResult EvaluateMetrics(GoldenQueryExpectation expected, QueryPlan runtime)
     {
         if (expected.Metrics is null)
             return Pass("Golden 未指定 Metrics，不进行断言。");
 
         var actual = runtime.Metrics ?? new List<QueryMetric>();
-
         if (actual.Count != expected.Metrics.Count)
             return Fail($"Metric 数量不匹配：期望 {expected.Metrics.Count}，实际 {actual.Count}。");
 
@@ -70,16 +61,15 @@ public sealed class QueryPlanEvaluator
             var golden = expected.Metrics[i];
             var metric = actual[i];
 
-            if (!string.IsNullOrWhiteSpace(golden.SemanticText)
-                && !MatchesSemantic(metric, golden.SemanticText))
-            {
+            if (!string.IsNullOrWhiteSpace(golden.SemanticText) && !MatchesSemantic(metric, golden.SemanticText))
                 return Fail($"第 {i + 1} 个 Metric 语义不匹配：期望“{golden.SemanticText}”。");
-            }
+
+            if (!string.IsNullOrWhiteSpace(golden.Field)
+                && !string.Equals(metric.Field, golden.Field, StringComparison.OrdinalIgnoreCase))
+                return Fail($"第 {i + 1} 个 Metric 字段不匹配：期望 {golden.Field}，实际 {metric.Field ?? "null"}。");
 
             if (metric.GetAggregation() != golden.Aggregation)
-            {
                 return Fail($"第 {i + 1} 个 Metric 聚合不匹配：期望 {golden.Aggregation}，实际 {metric.GetAggregation()}。");
-            }
         }
 
         return Pass("Metrics 匹配。");
@@ -92,9 +82,7 @@ public sealed class QueryPlanEvaluator
                || string.Equals(metric.SemanticType, semanticText, StringComparison.OrdinalIgnoreCase);
     }
 
-    private static QueryPlanEvaluationSectionResult EvaluateDimensions(
-        GoldenQueryExpectation expected,
-        QueryPlan runtime)
+    private static QueryPlanEvaluationSectionResult EvaluateDimensions(GoldenQueryExpectation expected, QueryPlan runtime)
     {
         if (expected.Dimensions is null)
             return Pass("Golden 未指定 Dimensions，不进行断言。");
@@ -105,9 +93,7 @@ public sealed class QueryPlanEvaluator
             : Fail($"Dimensions 数量不匹配：期望 {expected.Dimensions.Count}，实际 {actual.Count}。");
     }
 
-    private static QueryPlanEvaluationSectionResult EvaluateFilters(
-        GoldenQueryExpectation expected,
-        QueryPlan runtime)
+    private static QueryPlanEvaluationSectionResult EvaluateFilters(GoldenQueryExpectation expected, QueryPlan runtime)
     {
         if (expected.Filters is null)
             return Pass("Golden 未指定 Filters，不进行断言。");
@@ -118,25 +104,18 @@ public sealed class QueryPlanEvaluator
             : Fail($"Filters 数量不匹配：期望 {expected.Filters.Count}，实际 {actual.Count}。");
     }
 
-    private static QueryPlanEvaluationSectionResult EvaluateShape(
-        GoldenQueryExpectation expected,
-        QueryPlan runtime)
+    private static QueryPlanEvaluationSectionResult EvaluateShape(GoldenQueryExpectation expected, QueryPlan runtime)
     {
         if (expected.IsAggregate.HasValue && runtime.IsAggregate != expected.IsAggregate.Value)
             return Fail($"IsAggregate 不匹配：期望 {expected.IsAggregate.Value}，实际 {runtime.IsAggregate}。");
-
         if (expected.Distinct.HasValue && runtime.Distinct != expected.Distinct.Value)
             return Fail($"Distinct 不匹配：期望 {expected.Distinct.Value}，实际 {runtime.Distinct}。");
-
         if (expected.Limit.HasValue && runtime.Limit != expected.Limit.Value)
             return Fail($"Limit 不匹配：期望 {expected.Limit.Value}，实际 {runtime.Limit}。");
-
         if (expected.IsRanking.HasValue && runtime.IsRanking != expected.IsRanking.Value)
             return Fail($"IsRanking 不匹配：期望 {expected.IsRanking.Value}，实际 {runtime.IsRanking}。");
-
         if (expected.IsDetailRanking.HasValue && runtime.IsDetailRanking != expected.IsDetailRanking.Value)
             return Fail($"IsDetailRanking 不匹配：期望 {expected.IsDetailRanking.Value}，实际 {runtime.IsDetailRanking}。");
-
         if (expected.IsAggregateRanking.HasValue && runtime.IsAggregateRanking != expected.IsAggregateRanking.Value)
             return Fail($"IsAggregateRanking 不匹配：期望 {expected.IsAggregateRanking.Value}，实际 {runtime.IsAggregateRanking}。");
 
@@ -164,15 +143,7 @@ public sealed class QueryPlanEvaluator
         return Pass("Query Shape 匹配。");
     }
 
-    private static QueryPlanEvaluationSectionResult Pass(string reason) => new()
-    {
-        Passed = true,
-        Reason = reason
-    };
+    private static QueryPlanEvaluationSectionResult Pass(string reason) => new() { Passed = true, Reason = reason };
 
-    private static QueryPlanEvaluationSectionResult Fail(string reason) => new()
-    {
-        Passed = false,
-        Reason = reason
-    };
+    private static QueryPlanEvaluationSectionResult Fail(string reason) => new() { Passed = false, Reason = reason };
 }
