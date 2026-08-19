@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace SuperBulider_AI.Migrations
+namespace SuperBuilder_AI.Migrations
 {
     /// <inheritdoc />
     public partial class CreateDB : Migration

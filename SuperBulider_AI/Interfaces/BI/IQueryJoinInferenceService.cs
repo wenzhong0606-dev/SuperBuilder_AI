@@ -1,7 +1,7 @@
-﻿using SuperBulider_AI.Models.AI;
-using SuperBulider_AI.Models.BI;
+﻿using SuperBuilder_AI.Models.AI;
+using SuperBuilder_AI.Models.BI;
 
-namespace SuperBulider_AI.Interfaces.BI;
+namespace SuperBuilder_AI.Interfaces.BI;
 
 /// <summary>
 /// 动态JOIN推断服务。

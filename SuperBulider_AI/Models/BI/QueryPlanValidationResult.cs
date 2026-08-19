@@ -1,6 +1,6 @@
 ﻿using System.Text;
 
-namespace SuperBulider_AI.Models.BI;
+namespace SuperBuilder_AI.Models.BI;
 
 /// <summary>
 /// 查询计划验证结果。

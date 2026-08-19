@@ -1,9 +1,9 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using SuperBulider_AI.Data;
-using SuperBulider_AI.Interfaces;
-using SuperBulider_AI.Models.AI;
+using SuperBuilder_AI.Data;
+using SuperBuilder_AI.Interfaces;
+using SuperBuilder_AI.Models.AI;
 
-namespace SuperBulider_AI.Services;
+namespace SuperBuilder_AI.Services;
 
 /// <summary>
 /// Metadata Vector Index 生命周期管理服务。

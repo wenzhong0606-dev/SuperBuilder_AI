@@ -1,6 +1,6 @@
-using SuperBulider_AI.Models.BI;
+using SuperBuilder_AI.Models.BI;
 
-namespace SuperBulider_AI.Models.BI.Evaluation;
+namespace SuperBuilder_AI.Models.BI.Evaluation;
 
 /// <summary>
 /// Golden Metric 的数据库无关语义期望。

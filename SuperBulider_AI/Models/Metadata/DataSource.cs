@@ -1,7 +1,7 @@
-﻿using SuperBulider_AI.Models;
-using SuperBulider_AI.Models.Organization;
+﻿using SuperBuilder_AI.Models;
+using SuperBuilder_AI.Models.Organization;
 
-namespace SuperBulider_AI.Models.Metadata;
+namespace SuperBuilder_AI.Models.Metadata;
 
 
 /// <summary>

@@ -1,6 +1,6 @@
-﻿using SuperBulider_AI.Models.AI;
+﻿using SuperBuilder_AI.Models.AI;
 
-namespace SuperBulider_AI.Models.BI;
+namespace SuperBuilder_AI.Models.BI;
 
 /// <summary>
 /// QueryPlan 修复结果。

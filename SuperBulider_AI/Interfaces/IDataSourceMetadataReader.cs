@@ -1,7 +1,7 @@
-﻿using SuperBulider_AI.Models.DTO;
+﻿using SuperBuilder_AI.Models.DTO;
 
 
-namespace SuperBulider_AI.Interfaces;
+namespace SuperBuilder_AI.Interfaces;
 
 /// <summary>
 /// 数据源元数据读取器接口。

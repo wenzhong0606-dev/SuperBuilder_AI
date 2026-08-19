@@ -1,4 +1,4 @@
-﻿namespace SuperBulider_AI.Models.BI;
+﻿namespace SuperBuilder_AI.Models.BI;
 
 /// <summary>
 /// QueryPlan 置信度评估结果。

@@ -1,6 +1,6 @@
-using SuperBulider_AI.Models.BI.Evaluation;
+using SuperBuilder_AI.Models.BI.Evaluation;
 
-namespace SuperBulider_AI.Services.BI.Evaluation;
+namespace SuperBuilder_AI.Services.BI.Evaluation;
 
 /// <summary>
 /// Phase 2.6.3.5-C.3 QueryPlan Evaluation Gate。

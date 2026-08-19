@@ -1,7 +1,7 @@
 ﻿using System.Collections.Generic;
 
 
-namespace SuperBulider_AI.Models.AI;
+namespace SuperBuilder_AI.Models.AI;
 
 /// <summary>
 /// Metadata向量索引结果

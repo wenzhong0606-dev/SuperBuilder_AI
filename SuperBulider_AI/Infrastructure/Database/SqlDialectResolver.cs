@@ -1,7 +1,7 @@
-﻿using SuperBulider_AI.Interfaces.Database;
+﻿using SuperBuilder_AI.Interfaces.Database;
 
 
-namespace SuperBulider_AI.Infrastructure.Database;
+namespace SuperBuilder_AI.Infrastructure.Database;
 
 /// <summary>
 /// SQL方言解析器。

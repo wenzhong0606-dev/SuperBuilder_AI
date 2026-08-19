@@ -1,8 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
-using SuperBulider_AI.Models;
+using SuperBuilder_AI.Models;
 using System.Diagnostics;
 
-namespace SuperBulider_AI.Controllers
+namespace SuperBuilder_AI.Controllers
 {
 	public class HomeController : Controller
 	{

@@ -1,4 +1,4 @@
-namespace SuperBulider_AI.Models.BI.Evaluation;
+namespace SuperBuilder_AI.Models.BI.Evaluation;
 
 /// <summary>
 /// Query Evaluation Framework 的 Golden Dataset 根模型。

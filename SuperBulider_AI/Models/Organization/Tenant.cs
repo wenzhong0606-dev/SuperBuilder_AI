@@ -1,7 +1,7 @@
-﻿using SuperBulider_AI.Models.Metadata;
+﻿using SuperBuilder_AI.Models.Metadata;
 using System.Data.Common;
 
-namespace SuperBulider_AI.Models.Organization;
+namespace SuperBuilder_AI.Models.Organization;
 
 /// <summary>
 /// 租户实体，表示系统中的租户信息。

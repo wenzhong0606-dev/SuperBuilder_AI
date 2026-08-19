@@ -1,10 +1,10 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using SuperBulider_AI.Data;
-using SuperBulider_AI.Interfaces;
-using SuperBulider_AI.Models.Metadata;
+using SuperBuilder_AI.Data;
+using SuperBuilder_AI.Interfaces;
+using SuperBuilder_AI.Models.Metadata;
 
 
-namespace SuperBulider_AI.Services;
+namespace SuperBuilder_AI.Services;
 
 
 public class MetadataSearchService

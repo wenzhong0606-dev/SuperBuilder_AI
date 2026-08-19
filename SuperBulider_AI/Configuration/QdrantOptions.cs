@@ -1,4 +1,4 @@
-﻿namespace SuperBulider_AI.Configuration;
+﻿namespace SuperBuilder_AI.Configuration;
 
 /// <summary>
 /// Qdrant配置

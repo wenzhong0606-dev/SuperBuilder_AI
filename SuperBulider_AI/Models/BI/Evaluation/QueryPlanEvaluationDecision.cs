@@ -1,4 +1,4 @@
-namespace SuperBulider_AI.Models.BI.Evaluation;
+namespace SuperBuilder_AI.Models.BI.Evaluation;
 
 /// <summary>
 /// Phase 2.6.3.5-C.3 QueryPlan Evaluation Gate 决策。

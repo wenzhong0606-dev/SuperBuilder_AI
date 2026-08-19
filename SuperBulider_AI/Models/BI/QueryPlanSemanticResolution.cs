@@ -1,4 +1,4 @@
-namespace SuperBulider_AI.Models.BI;
+namespace SuperBuilder_AI.Models.BI;
 
 /// <summary>
 /// Phase 2.4：Semantic Applicability 到 QueryPlan 的最小绑定契约。

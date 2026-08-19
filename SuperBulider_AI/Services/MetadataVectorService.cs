@@ -1,10 +1,10 @@
 using System.Security.Cryptography;
 using System.Text;
-using SuperBulider_AI.Interfaces;
-using SuperBulider_AI.Models.AI;
-using SuperBulider_AI.Models.Metadata;
+using SuperBuilder_AI.Interfaces;
+using SuperBuilder_AI.Models.AI;
+using SuperBuilder_AI.Models.Metadata;
 
-namespace SuperBulider_AI.Services;
+namespace SuperBuilder_AI.Services;
 
 /// <summary>
 /// Metadata 向量服务。

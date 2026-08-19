@@ -1,7 +1,7 @@
 ﻿using System.Text.RegularExpressions;
-using SuperBulider_AI.Models.BI;
+using SuperBuilder_AI.Models.BI;
 
-namespace SuperBulider_AI.Services.BI.Planning;
+namespace SuperBuilder_AI.Services.BI.Planning;
 
 /// <summary>
 /// QueryIntent 确定性规范化器。

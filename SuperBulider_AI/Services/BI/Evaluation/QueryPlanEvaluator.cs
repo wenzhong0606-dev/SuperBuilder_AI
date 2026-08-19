@@ -1,7 +1,7 @@
-using SuperBulider_AI.Models.BI.Evaluation;
-using SuperBulider_AI.Models.BI;
+using SuperBuilder_AI.Models.BI.Evaluation;
+using SuperBuilder_AI.Models.BI;
 
-namespace SuperBulider_AI.Services.BI.Evaluation;
+namespace SuperBuilder_AI.Services.BI.Evaluation;
 
 /// <summary>
 /// Phase 2.6.3.5-C.4 QueryPlan Evaluator。

@@ -1,4 +1,4 @@
-namespace SuperBulider_AI.Models.BI.Evaluation;
+namespace SuperBuilder_AI.Models.BI.Evaluation;
 
 /// <summary>
 /// Golden Query Case 的数据库无关期望查询语义。

@@ -1,6 +1,6 @@
-﻿using SuperBulider_AI.Models;
+﻿using SuperBuilder_AI.Models;
 
-namespace SuperBulider_AI.Models.Metadata;
+namespace SuperBuilder_AI.Models.Metadata;
 
 /// <summary>
 /// 表示数据表的元数据信息。

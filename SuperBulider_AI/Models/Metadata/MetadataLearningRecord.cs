@@ -1,6 +1,6 @@
-﻿using SuperBulider_AI.Models;
+﻿using SuperBuilder_AI.Models;
 
-namespace SuperBulider_AI.Models.Metadata;
+namespace SuperBuilder_AI.Models.Metadata;
 
 /// <summary>
 /// 表示一条元数据学习记录，用于记录与元数据列相关的问题、回答是否正确以及用户反馈。

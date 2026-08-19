@@ -1,4 +1,4 @@
-﻿namespace SuperBulider_AI.Infrastructure.Database;
+﻿namespace SuperBuilder_AI.Infrastructure.Database;
 
 /// <summary>
 /// SQL Server数据库方言。

@@ -1,4 +1,4 @@
-﻿namespace SuperBulider_AI.Models.Metadata;
+﻿namespace SuperBuilder_AI.Models.Metadata;
 
 /// <summary>
 /// Metadata检索结果

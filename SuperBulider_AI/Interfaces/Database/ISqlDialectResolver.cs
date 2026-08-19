@@ -1,7 +1,7 @@
-﻿using SuperBulider_AI.Infrastructure.Database;
+﻿using SuperBuilder_AI.Infrastructure.Database;
 
 
-namespace SuperBulider_AI.Interfaces.Database;
+namespace SuperBuilder_AI.Interfaces.Database;
 
 
 public interface ISqlDialectResolver
