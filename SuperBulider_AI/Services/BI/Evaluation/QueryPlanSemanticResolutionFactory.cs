@@ -5,7 +5,6 @@ namespace SuperBuilder_AI.Services.BI.Evaluation;
 
 /// <summary>
 /// 将 Semantic Applicability 的稳定物理绑定转换为 QueryPlanBuilder 使用的绑定契约。
-/// 当前阶段先正式接通 Metric；其它类型待对应 Applicability Resolution 产生后接入。
 /// </summary>
 public static class QueryPlanSemanticResolutionFactory
 {
@@ -28,12 +27,13 @@ public static class QueryPlanSemanticResolutionFactory
         var resolution = applicability.Resolution;
 
         if (resolution.TableId <= 0
+            || resolution.DataSourceId <= 0
             || resolution.ColumnId <= 0
             || string.IsNullOrWhiteSpace(resolution.Table)
             || string.IsNullOrWhiteSpace(resolution.Column))
         {
             throw new InvalidOperationException(
-                "Semantic Applicability Resolution 不完整：TableId、ColumnId、Table、Column 均必须有效。");
+                "Semantic Applicability Resolution 不完整：TableId、DataSourceId、ColumnId、Table、Column 均必须有效。");
         }
 
         return new QueryPlanSemanticResolution
@@ -41,6 +41,7 @@ public static class QueryPlanSemanticResolutionFactory
             Metric = new QueryPlanMetricResolution
             {
                 TableId = resolution.TableId,
+                DataSourceId = resolution.DataSourceId,
                 ColumnId = resolution.ColumnId,
                 SemanticText = applicability.MetricSemanticText,
                 Table = resolution.Table,
