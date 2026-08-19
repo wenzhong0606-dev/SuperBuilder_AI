@@ -1,4 +1,4 @@
-namespace SuperBulder_AI.Models.BI.Evaluation;
+namespace SuperBulider_AI.Models.BI.Evaluation;
 
 /// <summary>
 /// Phase 2.6.3.5-C.4 QueryPlan Evaluation 结果。
