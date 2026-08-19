@@ -2,12 +2,13 @@
 
 > 文档版本：v2.2  
 > 文档性质：项目正式开发基线  
-> 当前源码基线：GitHub `master`  
-> 当前开发阶段：Phase 2.5  
-> 最近完成阶段：Phase 2.4  
-> Phase 2.3：COMPLETE / FROZEN  
-> Phase 2.4：COMPLETE / FROZEN  
-> 下一阶段：Phase 2.5 — QueryPlan Explainability
+> 当前源码基线：GitHub `master`
+> 当前开发阶段：Phase 2.6
+> 最近完成阶段：Phase 2.5
+> Phase 2.3：COMPLETE / FROZEN
+> Phase 2.4：COMPLETE / FROZEN
+> Phase 2.5：COMPLETE / FROZEN
+> 下一阶段：Phase 2.6 — Query Evaluation Framework
 >
 > 本文档不是单纯的架构设计文档。
 >
@@ -885,7 +886,7 @@
 >
 > # 2.5.4 状态
 >
-> # NEXT
+> # COMPLETE / FROZEN
 >
 > 当前开始 Phase 2.5 前，Phase 2.4 必须保持冻结。
 >
