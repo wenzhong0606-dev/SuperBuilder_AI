@@ -1,9 +1,7 @@
+using SuperBuilder_AI.Models.BI;
+
 namespace SuperBuilder_AI.Models.BI.Evaluation;
 
-/// <summary>
-/// Phase 2.6 C.10.1 QueryPlan dimension scoring result.
-/// Golden Contract 与 Runtime QueryPlan 解耦，只记录评估结论、分项评分与证据。
-/// </summary>
 public sealed class QueryPlanEvaluationResult
 {
     public string CaseId { get; init; } = string.Empty;
@@ -19,6 +17,8 @@ public sealed class QueryPlanEvaluationResult
     public QueryPlanEvaluationSectionResult Joins { get; init; } = new();
     public QueryPlanEvaluationSectionResult QueryShape { get; init; } = new();
     public QueryPlanEvaluationSectionResult BindingConsistency { get; init; } = new();
+    public IReadOnlyList<GoldenMetricExpectation>? MetricExpectations { get; init; }
+    public IReadOnlyList<QueryMetric>? ActualMetrics { get; init; }
 }
 
 public enum QueryPlanEvaluationDecision
@@ -40,5 +40,7 @@ public sealed class QueryPlanEvaluationDimensionScore
 public sealed class QueryPlanEvaluationSectionResult
 {
     public bool Passed { get; init; }
+    public double Score { get; init; }
     public string Reason { get; init; } = string.Empty;
+    public object? Details { get; init; }
 }
