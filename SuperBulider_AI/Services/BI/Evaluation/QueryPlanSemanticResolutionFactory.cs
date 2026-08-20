@@ -36,6 +36,20 @@ public static class QueryPlanSemanticResolutionFactory
                 "Semantic Applicability Resolution 不完整：TableId、DataSourceId、ColumnId、Table、Column 均必须有效。");
         }
 
+        var filters = applicability.FilterResolutions
+            .Select(filter => new QueryPlanFilterResolution
+            {
+                TableId = filter.TableId,
+                DataSourceId = filter.DataSourceId,
+                ColumnId = filter.ColumnId,
+                SemanticText = filter.SemanticText,
+                Table = filter.Table ?? string.Empty,
+                Column = filter.Column ?? string.Empty,
+                BusinessMeaning = filter.BusinessMeaning,
+                Score = filter.Score
+            })
+            .ToList();
+
         return new QueryPlanSemanticResolution
         {
             Metric = new QueryPlanMetricResolution
@@ -48,7 +62,8 @@ public static class QueryPlanSemanticResolutionFactory
                 Column = resolution.Column,
                 BusinessMeaning = resolution.BusinessMeaning,
                 Score = resolution.Score
-            }
+            },
+            Filters = filters
         };
     }
 }
