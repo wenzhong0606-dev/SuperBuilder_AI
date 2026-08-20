@@ -13,6 +13,7 @@ public sealed class QueryPlanEvaluationResult
     public QueryPlanEvaluationSectionResult Dimensions { get; init; } = new();
     public QueryPlanEvaluationSectionResult Filters { get; init; } = new();
     public QueryPlanEvaluationSectionResult Tables { get; init; } = new();
+    public QueryPlanEvaluationSectionResult Joins { get; init; } = new();
     public QueryPlanEvaluationSectionResult QueryShape { get; init; } = new();
     public QueryPlanEvaluationSectionResult BindingConsistency { get; init; } = new();
 }
