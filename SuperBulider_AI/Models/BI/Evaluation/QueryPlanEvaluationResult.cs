@@ -1,11 +1,10 @@
-
 namespace SuperBuilder_AI.Models.BI.Evaluation;
 
 public sealed class QueryPlanEvaluationResult
 {
     public string CaseId { get; init; } = string.Empty;
     public bool Passed { get; init; }
-    public QueryPlanEvaluationDecision Decision { get; init; } = QueryPlanEvaluationDecision.Fail;
+    public QueryPlanEvaluationOutcome Decision { get; init; } = QueryPlanEvaluationOutcome.Fail;
     public double OverallScore { get; init; }
     public IReadOnlyList<QueryPlanEvaluationDimensionScore> DimensionScores { get; init; } = Array.Empty<QueryPlanEvaluationDimensionScore>();
     public QueryPlanEvaluationSectionResult Intent { get; init; } = new();
@@ -20,7 +19,11 @@ public sealed class QueryPlanEvaluationResult
     public IReadOnlyList<QueryMetric>? ActualMetrics { get; init; }
 }
 
-public enum QueryPlanEvaluationDecision
+/// <summary>
+/// QueryPlan Evaluation 本身的评分结果。
+/// 与 QueryPlanEvaluationGateDecision（前置语义 Gate 决策）严格区分。
+/// </summary>
+public enum QueryPlanEvaluationOutcome
 {
     Fail,
     Partial,
