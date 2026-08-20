@@ -1,10 +1,10 @@
 namespace SuperBuilder_AI.Models.BI.Evaluation;
 
 /// <summary>
-/// Phase 2.6.3.5-C.3 QueryPlan Evaluation Gate 决策。
+/// Phase 2.6.3.5-C.3 QueryPlan Evaluation Gate 决策结果。
 /// 仅根据前置 Evaluation Evidence 决定是否允许继续进入 QueryPlan Evaluation。
 /// </summary>
-public sealed class QueryPlanEvaluationDecision
+public sealed class QueryPlanEvaluationGateDecision
 {
     public string CaseId { get; init; } = string.Empty;
 
