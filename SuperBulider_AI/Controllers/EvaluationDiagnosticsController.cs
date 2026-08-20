@@ -21,6 +21,7 @@ public sealed class EvaluationDiagnosticsController : ControllerBase
     private readonly QueryPlanEvaluator _queryPlanEvaluator;
     private readonly GoldenDatasetRunner _goldenDatasetRunner;
     private readonly GoldenDatasetRegressionEvaluator _goldenDatasetRegressionEvaluator;
+    private readonly GoldenDatasetCoverageAnalyzer _goldenDatasetCoverageAnalyzer;
 
     public EvaluationDiagnosticsController(
         GoldenQueryDatasetSerializer serializer,
@@ -32,7 +33,8 @@ public sealed class EvaluationDiagnosticsController : ControllerBase
         IQueryPlanBuilder queryPlanBuilder,
         QueryPlanEvaluator queryPlanEvaluator,
         GoldenDatasetRunner goldenDatasetRunner,
-        GoldenDatasetRegressionEvaluator goldenDatasetRegressionEvaluator)
+        GoldenDatasetRegressionEvaluator goldenDatasetRegressionEvaluator,
+        GoldenDatasetCoverageAnalyzer goldenDatasetCoverageAnalyzer)
     {
         _serializer = serializer;
         _environment = environment;
@@ -44,6 +46,7 @@ public sealed class EvaluationDiagnosticsController : ControllerBase
         _queryPlanEvaluator = queryPlanEvaluator;
         _goldenDatasetRunner = goldenDatasetRunner;
         _goldenDatasetRegressionEvaluator = goldenDatasetRegressionEvaluator;
+        _goldenDatasetCoverageAnalyzer = goldenDatasetCoverageAnalyzer;
     }
 
     [HttpGet("golden-dataset")]
@@ -69,6 +72,25 @@ public sealed class EvaluationDiagnosticsController : ControllerBase
             cases = cases.Select(x => new { x.Id, x.Name, x.Question, x.Difficulty, x.Enabled, x.Version, category = GetCategory(x), metric = x.Expected?.Metrics?.SingleOrDefault()?.SemanticText, aggregation = x.Expected?.Metrics?.SingleOrDefault()?.Aggregation.ToString(), dimensionsState = State(x.Expected?.Dimensions), filtersState = State(x.Expected?.Filters), tablesState = State(x.Expected?.Tables), joinsState = State(x.Expected?.Joins) }),
             sourcePath = path
         });
+    }
+
+    [HttpGet("golden-dataset-coverage")]
+    public ActionResult<GoldenDatasetCoverageScorecard> GoldenDatasetCoverage()
+    {
+        var path = GoldenPath();
+        if (!System.IO.File.Exists(path)) return NotFound(new { passed = false, message = "Golden Dataset asset was not found.", path });
+        var dataset = _serializer.Deserialize(System.IO.File.ReadAllText(path));
+        var scorecard = _goldenDatasetCoverageAnalyzer.Analyze(dataset);
+        return Ok(scorecard);
+    }
+
+    [HttpGet("golden-dataset-coverage-cases")]
+    public ActionResult<IReadOnlyList<GoldenDatasetCoverageCase>> GoldenDatasetCoverageCases()
+    {
+        var path = GoldenPath();
+        if (!System.IO.File.Exists(path)) return NotFound(new { passed = false, message = "Golden Dataset asset was not found.", path });
+        var dataset = _serializer.Deserialize(System.IO.File.ReadAllText(path));
+        return Ok(_goldenDatasetCoverageAnalyzer.AnalyzeCases(dataset));
     }
 
     [HttpGet("golden-dataset-run")]
