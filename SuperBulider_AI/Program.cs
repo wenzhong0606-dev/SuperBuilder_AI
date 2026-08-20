@@ -49,6 +49,7 @@ builder.Services.AddScoped<SemanticApplicabilityEvaluator>();
 builder.Services.AddScoped<QueryPlanEvaluationGate>();
 builder.Services.AddScoped<QueryPlanEvaluator>();
 builder.Services.AddScoped<GoldenDatasetRunner>();
+builder.Services.AddScoped<GoldenDatasetRegressionEvaluator>();
 builder.Services.AddScoped<IDataSourceConnectionFactory, DataSourceConnectionFactory>();
 builder.Services.AddScoped<ISqlQueryBuilder, SqlQueryBuilder>();
 builder.Services.AddScoped<IQueryExecutionService, QueryExecutionService>();
