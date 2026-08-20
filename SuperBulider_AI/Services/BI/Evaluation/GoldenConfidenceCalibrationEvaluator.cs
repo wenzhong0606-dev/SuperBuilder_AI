@@ -74,11 +74,11 @@ public sealed class GoldenConfidenceCalibrationEvaluator
 
     private static GoldenConfidenceCalibrationCase ToCase(QueryPlanEvaluationConfidenceResult result)
     {
-        var decision = result.Decision.Decision.ToString();
+        var decision = result.Decision.Decision;
         var agreement = result.Evaluation.Passed
-            ? IsDecision(result.Decision.Decision, QueryPlanDecisionType.Proceed)
-            : IsDecision(result.Decision.Decision, QueryPlanDecisionType.Confirm)
-              || IsDecision(result.Decision.Decision, QueryPlanDecisionType.Reject);
+            ? IsDecision(decision, QueryPlanDecisionType.Proceed)
+            : IsDecision(decision, QueryPlanDecisionType.Confirm)
+              || IsDecision(decision, QueryPlanDecisionType.Reject);
 
         return new GoldenConfidenceCalibrationCase
         {
@@ -86,7 +86,7 @@ public sealed class GoldenConfidenceCalibrationEvaluator
             ConfidenceLevel = result.Confidence.Level.ToString(),
             ConfidenceScore = result.Confidence.Score,
             EvaluationPassed = result.Evaluation.Passed,
-            Decision = decision,
+            Decision = decision.ToString(),
             Agreement = agreement
         };
     }
