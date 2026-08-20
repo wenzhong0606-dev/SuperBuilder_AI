@@ -9,8 +9,7 @@ namespace SuperBuilder_AI.Controllers;
 
 /// <summary>
 /// Phase 2.4-E QueryPlan Confidence 诊断入口。
-/// 使用 Semantic Resolution 已确认的物理绑定构造确定性的 Runtime QueryPlan，
-/// 避免 Confidence 校准被 Qwen 或 QueryPlanBuilder 的二次 Metadata 推断干扰。
+/// 使用 Semantic Resolution 已确认的物理绑定构造确定性的 Runtime QueryPlan。
 /// </summary>
 [ApiController]
 [Route("evaluation/diagnostics")]
@@ -78,18 +77,11 @@ public sealed class QueryPlanConfidenceDiagnosticsController : ControllerBase
 
         cancellationToken.ThrowIfCancellationRequested();
 
-        // Confidence 校准必须可重复：直接使用 Semantic Resolution 已确认的物理绑定。
-        // 这里不再次调用 Qwen，也不调用 QueryPlanBuilder.BuildAsync(intent)，避免重新进行
-        // Metadata 搜索导致 Runtime Plan 与已确认 Resolution 发生二次推断漂移。
         var intent = BuildIntentFromGoldenCase(goldenCase);
         var resolution = QueryPlanSemanticResolutionFactory.From(applicability);
         var runtimePlan = BuildRuntimePlanFromResolution(intent, resolution);
 
-        var evaluation = _queryPlanEvaluator.Evaluate(
-            goldenCase.Id,
-            goldenCase.Expected,
-            runtimePlan);
-
+        var evaluation = _queryPlanEvaluator.Evaluate(goldenCase.Id, goldenCase.Expected, runtimePlan);
         var validationContext = await _queryPlanContextBuilder.BuildAsync(runtimePlan);
         var validationResult = await _queryPlanValidationPipeline
             .ValidateAsync(runtimePlan, validationContext, goldenCase.Question);
@@ -119,6 +111,7 @@ public sealed class QueryPlanConfidenceDiagnosticsController : ControllerBase
                 metrics = runtimePlan.Metrics,
                 dimensions = runtimePlan.Dimensions.Count,
                 filters = runtimePlan.Filters.Count,
+                orders = runtimePlan.Orders.Count,
                 tables = runtimePlan.Tables.Count,
                 joins = runtimePlan.Joins.Count,
                 fields = runtimePlan.Fields.Count,
@@ -149,9 +142,7 @@ public sealed class QueryPlanConfidenceDiagnosticsController : ControllerBase
         });
     }
 
-    private static QueryPlan BuildRuntimePlanFromResolution(
-        QueryIntent intent,
-        QueryPlanSemanticResolution resolution)
+    private static QueryPlan BuildRuntimePlanFromResolution(QueryIntent intent, QueryPlanSemanticResolution resolution)
     {
         var plan = new QueryPlan
         {
@@ -161,18 +152,13 @@ public sealed class QueryPlanConfidenceDiagnosticsController : ControllerBase
                 ?? resolution.Dimensions.FirstOrDefault()?.DataSourceId
                 ?? resolution.Orders.FirstOrDefault()?.DataSourceId
                 ?? 0,
-            IsAggregate = string.Equals(
-                intent.IntentType,
-                "Aggregate",
-                StringComparison.OrdinalIgnoreCase),
+            IsAggregate = intent.IsAggregate,
             Distinct = false,
-            Limit = null,
-            IsRanking = false,
+            Limit = intent.Limit,
+            IsRanking = intent.IsRanking,
             IsDetailRanking = false,
             IsAggregateRanking = false
         };
-
-        var bindings = new List<QueryPlanColumnBinding>();
 
         if (resolution.Metric is not null)
         {
@@ -193,22 +179,16 @@ public sealed class QueryPlanConfidenceDiagnosticsController : ControllerBase
             {
                 MetadataColumnId = resolution.Metric.ColumnId,
                 ColumnName = resolution.Metric.Column,
-                Aggregation = metric.GetAggregation().ToString()
+                Aggregation = metric.Aggregation
             });
 
-            plan.Tables.Add(new QueryTable
-            {
-                MetadataTableId = resolution.Metric.TableId,
-                DataSourceId = resolution.Metric.DataSourceId,
-                TableName = resolution.Metric.Table
-            });
+            EnsureTable(plan, resolution.Metric.TableId, resolution.Metric.DataSourceId, resolution.Metric.Table);
         }
 
         foreach (var binding in resolution.Filters)
         {
             EnsureTable(plan, binding.TableId, binding.DataSourceId, binding.Table);
-            var filter = intent.Filters.FirstOrDefault(x =>
-                string.Equals(x.Field, binding.Column, StringComparison.OrdinalIgnoreCase));
+            var filter = intent.Filters.FirstOrDefault(x => string.Equals(x.Field, binding.Column, StringComparison.OrdinalIgnoreCase));
             if (filter is not null)
                 filter.Field = binding.Column;
 
@@ -223,13 +203,15 @@ public sealed class QueryPlanConfidenceDiagnosticsController : ControllerBase
         foreach (var binding in resolution.Dimensions)
         {
             EnsureTable(plan, binding.TableId, binding.DataSourceId, binding.Table);
-            var dimension = intent.Dimensions.FirstOrDefault(x =>
-                string.Equals(x.ColumnName, binding.Column, StringComparison.OrdinalIgnoreCase));
-            if (dimension is not null)
+            var index = intent.Dimensions.FindIndex(x => string.Equals(x, binding.Column, StringComparison.OrdinalIgnoreCase));
+            if (index >= 0)
+                intent.Dimensions[index] = binding.Column;
+
+            plan.Dimensions.Add(new QueryDimension
             {
-                dimension.MetadataColumnId = binding.ColumnId;
-                dimension.ColumnName = binding.Column;
-            }
+                MetadataColumnId = binding.ColumnId,
+                ColumnName = binding.Column
+            });
 
             plan.Fields.Add(new QueryField
             {
@@ -242,13 +224,15 @@ public sealed class QueryPlanConfidenceDiagnosticsController : ControllerBase
         foreach (var binding in resolution.Orders)
         {
             EnsureTable(plan, binding.TableId, binding.DataSourceId, binding.Table);
-            var order = intent.Orders.FirstOrDefault(x =>
-                string.Equals(x.Field, binding.Column, StringComparison.OrdinalIgnoreCase));
-            if (order is not null)
+            if (string.Equals(intent.OrderBy, binding.Column, StringComparison.OrdinalIgnoreCase))
+                intent.OrderBy = binding.Column;
+
+            plan.Orders.Add(new QueryOrder
             {
-                order.MetadataColumnId = binding.ColumnId;
-                order.Field = binding.Column;
-            }
+                MetadataColumnId = binding.ColumnId,
+                Field = binding.Column,
+                Direction = intent.OrderDirection ?? "ASC"
+            });
 
             plan.Fields.Add(new QueryField
             {
@@ -261,11 +245,7 @@ public sealed class QueryPlanConfidenceDiagnosticsController : ControllerBase
         return plan;
     }
 
-    private static void EnsureTable(
-        QueryPlan plan,
-        long tableId,
-        long dataSourceId,
-        string tableName)
+    private static void EnsureTable(QueryPlan plan, long tableId, long dataSourceId, string tableName)
     {
         if (plan.Tables.Any(x => x.MetadataTableId == tableId))
             return;
@@ -291,8 +271,7 @@ public sealed class QueryPlanConfidenceDiagnosticsController : ControllerBase
             IntentType = intentType
         };
 
-        if (expectedJson.TryGetProperty("metrics", out var metricsElement) &&
-            metricsElement.ValueKind == JsonValueKind.Array)
+        if (expectedJson.TryGetProperty("metrics", out var metricsElement) && metricsElement.ValueKind == JsonValueKind.Array)
         {
             foreach (var metricElement in metricsElement.EnumerateArray())
             {
@@ -318,19 +297,11 @@ public sealed class QueryPlanConfidenceDiagnosticsController : ControllerBase
 
     private GoldenQueryCase? LoadGoldenCase(string caseId)
     {
-        var path = Path.Combine(
-            _environment.ContentRootPath,
-            "Evaluation",
-            "Golden",
-            "query-plan-golden-v1.json");
-
+        var path = Path.Combine(_environment.ContentRootPath, "Evaluation", "Golden", "query-plan-golden-v1.json");
         if (!System.IO.File.Exists(path))
             return null;
 
         var dataset = _serializer.Deserialize(System.IO.File.ReadAllText(path));
-        return dataset.Cases.SingleOrDefault(x =>
-            string.Equals(x.Id, caseId, StringComparison.OrdinalIgnoreCase));
+        return dataset.Cases.SingleOrDefault(x => string.Equals(x.Id, caseId, StringComparison.OrdinalIgnoreCase));
     }
-
-    private sealed record QueryPlanColumnBinding;
 }
