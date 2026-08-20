@@ -16,6 +16,8 @@ namespace SuperBuilder_AI.Services.BI.Evaluation;
 /// </summary>
 public sealed class QueryPlanEvaluationConfidenceService
 {
+    private const double EvaluationPassConfidenceBoost = 0.10;
+
     private readonly QueryPlanEvaluator _queryPlanEvaluator;
     private readonly QueryPlanEvaluationConfidenceEvidenceAdapter _evidenceAdapter;
     private readonly IQueryPlanConfidenceService _confidenceService;
@@ -75,6 +77,49 @@ public sealed class QueryPlanEvaluationConfidenceService
             semanticEvidence);
 
         // =========================================================
+        // Phase 2.6 C.13 — Evaluation-aware Confidence
+        // =========================================================
+        //
+        // QueryPlan Confidence 原本只使用 Semantic / Binding /
+        // Validation / Repair Evidence。对于 Golden Runtime，
+        // QueryPlan Evaluation 是已经针对 Golden Expected 做过的
+        // 结构化验证，因此在 Evaluation 完整通过时应成为正向证据。
+        //
+        // 这里采用固定、可解释的 +0.10 Boost，而不是直接绕过
+        // Decision Gate：
+        //
+        // Base Confidence 0.72
+        //     + Evaluation Pass 0.10
+        //     = High Confidence 0.82
+        //
+        // Evaluation 失败绝不加分；后续 C.14 Hard Blocking 仍然
+        // 会把 Evaluation Failure 注入 BlockingReasons。
+        //
+        // 只有 Evaluation、Semantic Evidence、Validation、Repair
+        // 都处于安全状态时才允许获得该 Boost。
+        if (CanUseEvaluationPassAsConfidenceEvidence(
+                evaluation,
+                semanticEvidence,
+                validationResult))
+        {
+            confidence.Score = Math.Min(
+                1.0,
+                confidence.Score + EvaluationPassConfidenceBoost);
+
+            confidence.Level = DetermineConfidenceLevel(confidence.Score);
+            confidence.CanProceed =
+                confidence.Score >= 0.80
+                && confidence.Evidence.ValidationErrorCount == 0
+                && !confidence.Evidence.RepairStalled
+                && !confidence.Evidence.RepairLoopDetected
+                && !confidence.Evidence.RepairFailed
+                && !confidence.Evidence.MaxRepairAttemptsReached;
+
+            confidence.Reasons.Add(
+                $"QueryPlan Evaluation 通过，作为 Evaluation-aware Confidence 正向证据，Confidence Boost = {EvaluationPassConfidenceBoost:F2}。");
+        }
+
+        // =========================================================
         // Phase 2.6 C.14 — Evaluation Decision Gate
         // =========================================================
         //
@@ -130,6 +175,44 @@ public sealed class QueryPlanEvaluationConfidenceService
             Decision = decision,
             Passed = passed
         };
+    }
+
+    private static bool CanUseEvaluationPassAsConfidenceEvidence(
+        QueryPlanEvaluationResult evaluation,
+        QueryPlanSemanticEvidenceResult? semanticEvidence,
+        QueryPlanValidationPipelineResult validationResult)
+    {
+        if (!evaluation.Passed)
+            return false;
+
+        if (semanticEvidence is not null && !semanticEvidence.Passed)
+            return false;
+
+        var validation = validationResult.ValidationResult;
+        if (validation.ErrorItems.Any())
+            return false;
+
+        var trace = validationResult.RepairTrace;
+        if (trace.Status is QueryPlanRepairTraceStatus.Stalled
+            or QueryPlanRepairTraceStatus.LoopDetected
+            or QueryPlanRepairTraceStatus.Failed
+            or QueryPlanRepairTraceStatus.MaxAttemptsReached)
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    private static QueryPlanConfidenceLevel DetermineConfidenceLevel(double score)
+    {
+        if (score >= 0.80)
+            return QueryPlanConfidenceLevel.High;
+
+        if (score >= 0.60)
+            return QueryPlanConfidenceLevel.Medium;
+
+        return QueryPlanConfidenceLevel.Low;
     }
 
     private static void AddBlockingReason(
