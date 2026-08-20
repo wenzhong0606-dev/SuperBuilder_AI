@@ -175,6 +175,7 @@ public sealed class GoldenDatasetRunner
                 cancellationToken);
 
             var passed = evaluationConfidence.Passed;
+            var diagnostics = BuildValidationDiagnostics(validationPipelineResult);
             var caseResult = new GoldenCaseRunResult
             {
                 CaseId = goldenCase.Id,
@@ -191,7 +192,8 @@ public sealed class GoldenDatasetRunner
                 QueryPlanEvaluationPassed = evaluationConfidence.Evaluation.Passed,
                 ConfidenceDecision = evaluationConfidence.Decision.Decision.ToString(),
                 ConfidenceLevel = evaluationConfidence.Confidence.Level.ToString(),
-                ConfidenceScore = evaluationConfidence.Confidence.Score
+                ConfidenceScore = evaluationConfidence.Confidence.Score,
+                ValidationDiagnostics = diagnostics
             };
 
             return (caseResult, evaluationConfidence);
@@ -212,6 +214,29 @@ public sealed class GoldenDatasetRunner
                 QueryPlanEvaluationPassed = false
             }, null);
         }
+    }
+
+    private static GoldenValidationDiagnostics BuildValidationDiagnostics(
+        QueryPlanValidationPipelineResult pipelineResult)
+    {
+        var validation = pipelineResult.ValidationResult;
+        var errors = validation.ErrorItems.ToList();
+        var warnings = validation.WarningItems.ToList();
+        var trace = pipelineResult.RepairTrace;
+
+        return new GoldenValidationDiagnostics
+        {
+            ValidationPassed = validation.IsValid,
+            ErrorCount = errors.Count,
+            WarningCount = warnings.Count,
+            Errors = errors,
+            Warnings = warnings,
+            RepairTrace = trace,
+            RepairStatus = trace.Status.ToString(),
+            RepairAttempts = trace.TotalAttempts,
+            ChangedPlanCount = trace.ChangedPlanCount,
+            RepairStopReason = trace.StopReason
+        };
     }
 
     private static GoldenCaseRunResult ExpectedApplicabilityOutcome(
