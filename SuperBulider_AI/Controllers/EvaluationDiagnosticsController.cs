@@ -23,6 +23,7 @@ public sealed class EvaluationDiagnosticsController : ControllerBase
     private readonly GoldenDatasetRegressionEvaluator _goldenDatasetRegressionEvaluator;
     private readonly GoldenDatasetCoverageAnalyzer _goldenDatasetCoverageAnalyzer;
     private readonly GoldenDatasetQualityGate _goldenDatasetQualityGate;
+    private readonly GoldenBaselineReleaseService _goldenBaselineReleaseService;
 
     public EvaluationDiagnosticsController(
         GoldenQueryDatasetSerializer serializer,
@@ -36,7 +37,8 @@ public sealed class EvaluationDiagnosticsController : ControllerBase
         GoldenDatasetRunner goldenDatasetRunner,
         GoldenDatasetRegressionEvaluator goldenDatasetRegressionEvaluator,
         GoldenDatasetCoverageAnalyzer goldenDatasetCoverageAnalyzer,
-        GoldenDatasetQualityGate goldenDatasetQualityGate)
+        GoldenDatasetQualityGate goldenDatasetQualityGate,
+        GoldenBaselineReleaseService goldenBaselineReleaseService)
     {
         _serializer = serializer;
         _environment = environment;
@@ -50,6 +52,7 @@ public sealed class EvaluationDiagnosticsController : ControllerBase
         _goldenDatasetRegressionEvaluator = goldenDatasetRegressionEvaluator;
         _goldenDatasetCoverageAnalyzer = goldenDatasetCoverageAnalyzer;
         _goldenDatasetQualityGate = goldenDatasetQualityGate;
+        _goldenBaselineReleaseService = goldenBaselineReleaseService;
     }
 
     [HttpGet("golden-dataset")]
@@ -89,8 +92,7 @@ public sealed class EvaluationDiagnosticsController : ControllerBase
         var path = GoldenPath();
         if (!System.IO.File.Exists(path)) return NotFound(new { passed = false, message = "Golden Dataset asset was not found.", path });
         var dataset = _serializer.Deserialize(System.IO.File.ReadAllText(path));
-        var scorecard = _goldenDatasetQualityGate.Evaluate(dataset);
-        return Ok(scorecard);
+        return Ok(_goldenDatasetQualityGate.Evaluate(dataset));
     }
 
     [HttpGet("golden-dataset-release-gate")]
@@ -103,6 +105,15 @@ public sealed class EvaluationDiagnosticsController : ControllerBase
         var coverage = _goldenDatasetCoverageAnalyzer.Analyze(dataset);
         var passed = quality.Passed && coverage.EnabledCases > 0 && coverage.MissingDimensions.Count == 0;
         return Ok(new { passed, decision = passed ? "RELEASE" : "BLOCK", quality, coverage });
+    }
+
+    [HttpGet("golden-baseline-release")]
+    public ActionResult<GoldenBaselineReleaseScorecard> GoldenBaselineRelease()
+    {
+        var path = GoldenPath();
+        if (!System.IO.File.Exists(path)) return NotFound(new { passed = false, message = "Golden Dataset asset was not found.", path });
+        var dataset = _serializer.Deserialize(System.IO.File.ReadAllText(path));
+        return Ok(_goldenBaselineReleaseService.Evaluate(dataset));
     }
 
     [HttpGet("golden-dataset-run")]
