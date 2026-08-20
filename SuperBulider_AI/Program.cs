@@ -54,6 +54,7 @@ builder.Services.AddScoped<GoldenConfidenceCalibrationEvaluator>();
 builder.Services.AddScoped<GoldenConfidenceCalibrationRunner>();
 builder.Services.AddScoped<GoldenDatasetCoverageAnalyzer>();
 builder.Services.AddScoped<GoldenDatasetQualityGate>();
+builder.Services.AddScoped<GoldenBaselineReleaseService>();
 builder.Services.AddScoped<GoldenDatasetRunner>();
 builder.Services.AddScoped<GoldenDatasetRegressionEvaluator>();
 builder.Services.AddScoped<IDataSourceConnectionFactory, DataSourceConnectionFactory>();
