@@ -13,7 +13,34 @@ public partial class QueryPlanBuilder
         QueryIntent intent,
         QueryPlanSemanticResolution? resolution)
     {
-        var plan = await BuildAsync(intent);
+        QueryPlan plan;
+
+        if (resolution is not null
+            && resolution.Dimensions.Count > 0
+            && resolution.Metric is not null
+            && resolution.Dimensions.Any(x => x.TableId > 0 && x.TableId != resolution.Metric.TableId))
+        {
+            // Semantic Applicability 已经确认 Dimension 属于不同物理表时，
+            // 不应让原始单表 ResolveColumn 再次尝试把 Dimension 映射到主表。
+            // 原始 BuildAsync(intent) 的 Dimension 解析只适用于单表候选；
+            // 跨表 Dimension 的最终物理绑定由 Resolution 负责。
+            // 因此暂时移除 Dimension，仅完成 Metric / Filter / 主表 / 基础 Join 构建，
+            // 随后由 ApplyDimensionResolutions 与 ApplyResolvedJoinInference 补齐已确认绑定。
+            var originalDimensions = intent.Dimensions;
+            try
+            {
+                intent.Dimensions = new List<string>();
+                plan = await BuildAsync(intent);
+            }
+            finally
+            {
+                intent.Dimensions = originalDimensions;
+            }
+        }
+        else
+        {
+            plan = await BuildAsync(intent);
+        }
 
         if (resolution is null)
             return plan;
