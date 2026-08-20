@@ -50,6 +50,20 @@ public static class QueryPlanSemanticResolutionFactory
             })
             .ToList();
 
+        var dimensions = applicability.DimensionResolutions
+            .Select(dimension => new QueryPlanDimensionResolution
+            {
+                TableId = dimension.TableId,
+                DataSourceId = dimension.DataSourceId,
+                ColumnId = dimension.ColumnId,
+                SemanticText = dimension.SemanticText,
+                Table = dimension.Table ?? string.Empty,
+                Column = dimension.Column ?? string.Empty,
+                BusinessMeaning = dimension.BusinessMeaning,
+                Score = dimension.Score
+            })
+            .ToList();
+
         return new QueryPlanSemanticResolution
         {
             Metric = new QueryPlanMetricResolution
@@ -63,7 +77,8 @@ public static class QueryPlanSemanticResolutionFactory
                 BusinessMeaning = resolution.BusinessMeaning,
                 Score = resolution.Score
             },
-            Filters = filters
+            Filters = filters,
+            Dimensions = dimensions
         };
     }
 }
