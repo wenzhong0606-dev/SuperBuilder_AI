@@ -23,6 +23,12 @@ public sealed class SemanticApplicabilityResult
     public IReadOnlyList<SemanticApplicabilityFilterResolution> FilterResolutions { get; init; }
         = Array.Empty<SemanticApplicabilityFilterResolution>();
 
+    /// <summary>
+    /// Golden 明确要求多表 Join 时，Dimension 必须有稳定的物理语义绑定。
+    /// </summary>
+    public IReadOnlyList<SemanticApplicabilityDimensionResolution> DimensionResolutions { get; init; }
+        = Array.Empty<SemanticApplicabilityDimensionResolution>();
+
     public SemanticApplicabilityEvidence Evidence { get; init; } = new();
 }
 
@@ -38,6 +44,18 @@ public sealed class SemanticApplicabilityResolution
 }
 
 public sealed class SemanticApplicabilityFilterResolution
+{
+    public long TableId { get; init; }
+    public long DataSourceId { get; init; }
+    public long ColumnId { get; init; }
+    public string SemanticText { get; init; } = string.Empty;
+    public string? Table { get; init; }
+    public string? Column { get; init; }
+    public string? BusinessMeaning { get; init; }
+    public double? Score { get; init; }
+}
+
+public sealed class SemanticApplicabilityDimensionResolution
 {
     public long TableId { get; init; }
     public long DataSourceId { get; init; }
