@@ -22,6 +22,7 @@ public sealed class EvaluationDiagnosticsController : ControllerBase
     private readonly GoldenDatasetRunner _goldenDatasetRunner;
     private readonly GoldenDatasetRegressionEvaluator _goldenDatasetRegressionEvaluator;
     private readonly GoldenDatasetCoverageAnalyzer _goldenDatasetCoverageAnalyzer;
+    private readonly GoldenDatasetQualityGate _goldenDatasetQualityGate;
 
     public EvaluationDiagnosticsController(
         GoldenQueryDatasetSerializer serializer,
@@ -34,7 +35,8 @@ public sealed class EvaluationDiagnosticsController : ControllerBase
         QueryPlanEvaluator queryPlanEvaluator,
         GoldenDatasetRunner goldenDatasetRunner,
         GoldenDatasetRegressionEvaluator goldenDatasetRegressionEvaluator,
-        GoldenDatasetCoverageAnalyzer goldenDatasetCoverageAnalyzer)
+        GoldenDatasetCoverageAnalyzer goldenDatasetCoverageAnalyzer,
+        GoldenDatasetQualityGate goldenDatasetQualityGate)
     {
         _serializer = serializer;
         _environment = environment;
@@ -47,6 +49,7 @@ public sealed class EvaluationDiagnosticsController : ControllerBase
         _goldenDatasetRunner = goldenDatasetRunner;
         _goldenDatasetRegressionEvaluator = goldenDatasetRegressionEvaluator;
         _goldenDatasetCoverageAnalyzer = goldenDatasetCoverageAnalyzer;
+        _goldenDatasetQualityGate = goldenDatasetQualityGate;
     }
 
     [HttpGet("golden-dataset")]
@@ -59,19 +62,7 @@ public sealed class EvaluationDiagnosticsController : ControllerBase
         var duplicateIds = cases.Where(x => !string.IsNullOrWhiteSpace(x.Id)).GroupBy(x => x.Id, StringComparer.OrdinalIgnoreCase).Where(g => g.Count() > 1).Select(g => g.Key).ToList();
         var enabledCases = cases.Where(x => x.Enabled).ToList();
         var invalidCases = cases.Where(IsInvalidCase).Select(x => x.Id).ToList();
-        return Ok(new
-        {
-            passed = !string.IsNullOrWhiteSpace(dataset.Version) && dataset.Dataset == "query-plan-golden" && cases.Count > 0 && duplicateIds.Count == 0 && invalidCases.Count == 0 && enabledCases.Count > 0,
-            dataset = dataset.Dataset,
-            version = dataset.Version,
-            caseCount = cases.Count,
-            enabledCaseCount = enabledCases.Count,
-            categoryCounts = new { positive = enabledCases.Count(IsPositiveCase), negative = enabledCases.Count(IsNegativeCase), ambiguous = enabledCases.Count(IsAmbiguousCase), unresolved = enabledCases.Count(IsUnresolvedCase) },
-            duplicateIds,
-            invalidCases,
-            cases = cases.Select(x => new { x.Id, x.Name, x.Question, x.Difficulty, x.Enabled, x.Version, category = GetCategory(x), metric = x.Expected?.Metrics?.SingleOrDefault()?.SemanticText, aggregation = x.Expected?.Metrics?.SingleOrDefault()?.Aggregation.ToString(), dimensionsState = State(x.Expected?.Dimensions), filtersState = State(x.Expected?.Filters), tablesState = State(x.Expected?.Tables), joinsState = State(x.Expected?.Joins) }),
-            sourcePath = path
-        });
+        return Ok(new { passed = !string.IsNullOrWhiteSpace(dataset.Version) && dataset.Dataset == "query-plan-golden" && cases.Count > 0 && duplicateIds.Count == 0 && invalidCases.Count == 0 && enabledCases.Count > 0, dataset = dataset.Dataset, version = dataset.Version, caseCount = cases.Count, enabledCaseCount = enabledCases.Count, categoryCounts = new { positive = enabledCases.Count(IsPositiveCase), negative = enabledCases.Count(IsNegativeCase), ambiguous = enabledCases.Count(IsAmbiguousCase), unresolved = enabledCases.Count(IsUnresolvedCase) }, duplicateIds, invalidCases, cases = cases.Select(x => new { x.Id, x.Name, x.Question, x.Difficulty, x.Enabled, x.Version, category = GetCategory(x), metric = x.Expected?.Metrics?.SingleOrDefault()?.SemanticText, aggregation = x.Expected?.Metrics?.SingleOrDefault()?.Aggregation.ToString(), dimensionsState = State(x.Expected?.Dimensions), filtersState = State(x.Expected?.Filters), tablesState = State(x.Expected?.Tables), joinsState = State(x.Expected?.Joins) }), sourcePath = path });
     }
 
     [HttpGet("golden-dataset-coverage")]
@@ -80,8 +71,7 @@ public sealed class EvaluationDiagnosticsController : ControllerBase
         var path = GoldenPath();
         if (!System.IO.File.Exists(path)) return NotFound(new { passed = false, message = "Golden Dataset asset was not found.", path });
         var dataset = _serializer.Deserialize(System.IO.File.ReadAllText(path));
-        var scorecard = _goldenDatasetCoverageAnalyzer.Analyze(dataset);
-        return Ok(scorecard);
+        return Ok(_goldenDatasetCoverageAnalyzer.Analyze(dataset));
     }
 
     [HttpGet("golden-dataset-coverage-cases")]
@@ -93,14 +83,35 @@ public sealed class EvaluationDiagnosticsController : ControllerBase
         return Ok(_goldenDatasetCoverageAnalyzer.AnalyzeCases(dataset));
     }
 
+    [HttpGet("golden-dataset-quality")]
+    public ActionResult<GoldenDatasetQualityScorecard> GoldenDatasetQuality()
+    {
+        var path = GoldenPath();
+        if (!System.IO.File.Exists(path)) return NotFound(new { passed = false, message = "Golden Dataset asset was not found.", path });
+        var dataset = _serializer.Deserialize(System.IO.File.ReadAllText(path));
+        var scorecard = _goldenDatasetQualityGate.Evaluate(dataset);
+        return Ok(scorecard);
+    }
+
+    [HttpGet("golden-dataset-release-gate")]
+    public ActionResult<object> GoldenDatasetReleaseGate()
+    {
+        var path = GoldenPath();
+        if (!System.IO.File.Exists(path)) return NotFound(new { passed = false, message = "Golden Dataset asset was not found.", path });
+        var dataset = _serializer.Deserialize(System.IO.File.ReadAllText(path));
+        var quality = _goldenDatasetQualityGate.Evaluate(dataset);
+        var coverage = _goldenDatasetCoverageAnalyzer.Analyze(dataset);
+        var passed = quality.Passed && coverage.EnabledCases > 0 && coverage.MissingDimensions.Count == 0;
+        return Ok(new { passed, decision = passed ? "RELEASE" : "BLOCK", quality, coverage });
+    }
+
     [HttpGet("golden-dataset-run")]
     public async Task<ActionResult<GoldenDatasetRunResult>> GoldenDatasetRun([FromQuery] int topK = 10, CancellationToken cancellationToken = default)
     {
         if (topK < 1 || topK > 100) return BadRequest(new { passed = false, message = "topK must be between 1 and 100." });
         var path = GoldenPath();
         if (!System.IO.File.Exists(path)) return NotFound(new { passed = false, message = "Golden Dataset asset was not found.", path });
-        var result = await _goldenDatasetRunner.RunAsync(await System.IO.File.ReadAllTextAsync(path, cancellationToken), topK, cancellationToken);
-        return Ok(result);
+        return Ok(await _goldenDatasetRunner.RunAsync(await System.IO.File.ReadAllTextAsync(path, cancellationToken), topK, cancellationToken));
     }
 
     [HttpGet("golden-regression")]
