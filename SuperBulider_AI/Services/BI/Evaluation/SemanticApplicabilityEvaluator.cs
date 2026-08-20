@@ -7,6 +7,7 @@ namespace SuperBuilder_AI.Services.BI.Evaluation;
 
 /// <summary>
 /// Phase 2.6.3.5-C.2 Semantic Applicability Evaluator。
+/// Semantic Applicability 不只负责 Metric，还负责在 Golden 明确要求时解析 Filter / Dimension 的稳定物理绑定。
 /// </summary>
 public sealed class SemanticApplicabilityEvaluator
 {
@@ -81,30 +82,39 @@ public sealed class SemanticApplicabilityEvaluator
             return metricApplicability;
 
         var filters = goldenCase.Expected?.Filters;
-        if (filters is null || filters.Count == 0)
-            return metricApplicability;
-
-        var filterResolutions = new List<SemanticApplicabilityFilterResolution>(filters.Count);
-        foreach (var filter in filters)
+        var filterResolutions = new List<SemanticApplicabilityFilterResolution>();
+        if (filters is not null)
         {
-            var filterResolution = await ResolveFilterAsync(filter, topK);
-            if (filterResolution is null)
+            foreach (var filter in filters)
             {
-                return new SemanticApplicabilityResult
+                var filterResolution = await ResolveFilterAsync(filter, topK);
+                if (filterResolution is null)
                 {
-                    CaseId = metricApplicability.CaseId,
-                    Question = metricApplicability.Question,
-                    MetricSemanticText = metricApplicability.MetricSemanticText,
-                    MetricType = metricApplicability.MetricType,
-                    State = "NotResolved",
-                    Reason = $"Filter 语义“{filter.SemanticText}”无法解析为稳定的 Metadata 物理绑定。",
-                    SearchCandidate = metricApplicability.SearchCandidate,
-                    Resolution = metricApplicability.Resolution,
-                    Evidence = metricApplicability.Evidence
-                };
-            }
+                    return CopyWithFailure(
+                        metricApplicability,
+                        $"Filter 语义“{filter.SemanticText}”无法解析为稳定的 Metadata 物理绑定。");
+                }
 
-            filterResolutions.Add(filterResolution);
+                filterResolutions.Add(filterResolution);
+            }
+        }
+
+        var dimensions = goldenCase.Expected?.Dimensions;
+        var dimensionResolutions = new List<SemanticApplicabilityDimensionResolution>();
+        if (dimensions is not null)
+        {
+            foreach (var dimension in dimensions)
+            {
+                var dimensionResolution = await ResolveDimensionAsync(dimension, topK);
+                if (dimensionResolution is null)
+                {
+                    return CopyWithFailure(
+                        metricApplicability,
+                        $"Dimension 语义“{dimension.SemanticText}”无法解析为稳定的 Metadata 物理绑定。");
+                }
+
+                dimensionResolutions.Add(dimensionResolution);
+            }
         }
 
         return new SemanticApplicabilityResult
@@ -118,6 +128,7 @@ public sealed class SemanticApplicabilityEvaluator
             SearchCandidate = metricApplicability.SearchCandidate,
             Resolution = metricApplicability.Resolution,
             FilterResolutions = filterResolutions,
+            DimensionResolutions = dimensionResolutions,
             Evidence = metricApplicability.Evidence
         };
     }
@@ -151,6 +162,57 @@ public sealed class SemanticApplicabilityEvaluator
             Column = candidate.Column.ColumnName,
             BusinessMeaning = candidate.Semantic?.BusinessMeaning,
             Score = candidate.Score
+        };
+    }
+
+    private async Task<SemanticApplicabilityDimensionResolution?> ResolveDimensionAsync(
+        GoldenDimensionExpectation dimension,
+        int topK)
+    {
+        if (string.IsNullOrWhiteSpace(dimension.SemanticText))
+            return null;
+
+        var results = await _semanticSearchService.SearchAsync(dimension.SemanticText, topK);
+        var candidates = results
+            .Where(x => x.IsSemanticVector && x.Table is not null && x.Column is not null)
+            .GroupBy(GetCandidateBindingKey, StringComparer.OrdinalIgnoreCase)
+            .Select(g => g.OrderByDescending(x => x.Score).First())
+            .OrderByDescending(x => x.Score)
+            .ToList();
+
+        // Dimension 必须绑定到真实 Column，不能仅凭 Table 语义通过。
+        var candidate = candidates.FirstOrDefault(x => ContainsSemanticText(x, dimension.SemanticText));
+        if (candidate?.Table is null || candidate.Column is null)
+            return null;
+
+        return new SemanticApplicabilityDimensionResolution
+        {
+            TableId = candidate.Table.Id,
+            DataSourceId = candidate.Table.DataSourceId,
+            ColumnId = candidate.Column.Id,
+            SemanticText = dimension.SemanticText,
+            Table = candidate.Table.TableName,
+            Column = candidate.Column.ColumnName,
+            BusinessMeaning = candidate.Semantic?.BusinessMeaning,
+            Score = candidate.Score
+        };
+    }
+
+    private static SemanticApplicabilityResult CopyWithFailure(
+        SemanticApplicabilityResult source,
+        string reason)
+    {
+        return new SemanticApplicabilityResult
+        {
+            CaseId = source.CaseId,
+            Question = source.Question,
+            MetricSemanticText = source.MetricSemanticText,
+            MetricType = source.MetricType,
+            State = "NotResolved",
+            Reason = reason,
+            SearchCandidate = source.SearchCandidate,
+            Resolution = source.Resolution,
+            Evidence = source.Evidence
         };
     }
 
@@ -246,10 +308,7 @@ public sealed class SemanticApplicabilityEvaluator
 
         var competingCandidates = semanticCandidates
             .Skip(1)
-            .Any(x =>
-                x.Table is not null
-                && x.Column is not null
-                && ContainsSemanticText(x, semanticText));
+            .Any(x => x.Table is not null && x.Column is not null && ContainsSemanticText(x, semanticText));
 
         var state = directEvidence
             ? competingCandidates ? "Ambiguous" : "Resolved"
@@ -315,10 +374,7 @@ public sealed class SemanticApplicabilityEvaluator
 
     private static string GetCandidateBindingKey(MetadataSemanticSearchResult candidate)
     {
-        return string.Join("|",
-            candidate.Table?.Id ?? 0,
-            candidate.Column?.Id ?? 0,
-            candidate.Semantic?.Id ?? 0);
+        return string.Join("|", candidate.Table?.Id ?? 0, candidate.Column?.Id ?? 0, candidate.Semantic?.Id ?? 0);
     }
 
     private static SemanticApplicabilityCandidate ToCandidate(MetadataSemanticSearchResult candidate)
@@ -338,10 +394,7 @@ public sealed class SemanticApplicabilityEvaluator
     {
         var table = candidate.Table?.TableName;
         var column = candidate.Column?.ColumnName;
-
-        if (candidate.Table is null || candidate.Column is null
-            || string.IsNullOrWhiteSpace(table)
-            || string.IsNullOrWhiteSpace(column))
+        if (candidate.Table is null || candidate.Column is null || string.IsNullOrWhiteSpace(table) || string.IsNullOrWhiteSpace(column))
             return null;
 
         return new SemanticApplicabilityResolution
