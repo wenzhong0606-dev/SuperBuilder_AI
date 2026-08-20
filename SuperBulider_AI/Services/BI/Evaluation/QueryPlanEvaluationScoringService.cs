@@ -2,10 +2,6 @@ using SuperBuilder_AI.Models.BI.Evaluation;
 
 namespace SuperBuilder_AI.Services.BI.Evaluation;
 
-/// <summary>
-/// Phase 2.6 C.10.1 converts existing evaluator sections into a weighted scorecard.
-/// This is intentionally separate from QueryPlanEvaluator so the existing boolean gate remains backward compatible.
-/// </summary>
 public sealed class QueryPlanEvaluationScoringService
 {
     private static readonly IReadOnlyDictionary<string, double> DefaultWeights =
@@ -21,14 +17,34 @@ public sealed class QueryPlanEvaluationScoringService
             ["BindingConsistency"] = 0.05
         };
 
+    private readonly QueryPlanMetricScoringService _metricScoringService;
+
+    public QueryPlanEvaluationScoringService(QueryPlanMetricScoringService metricScoringService)
+    {
+        _metricScoringService = metricScoringService;
+    }
+
     public QueryPlanEvaluationResult Score(QueryPlanEvaluationResult evaluation)
     {
         ArgumentNullException.ThrowIfNull(evaluation);
 
+        var metricScore = evaluation.Metrics;
+        if (evaluation.MetricExpectations is not null || evaluation.ActualMetrics is not null)
+        {
+            var detailed = _metricScoringService.Evaluate(evaluation.MetricExpectations, evaluation.ActualMetrics);
+            metricScore = new QueryPlanEvaluationSectionResult
+            {
+                Passed = detailed.Passed,
+                Score = detailed.Score,
+                Reason = detailed.Reason,
+                Details = detailed.Items
+            };
+        }
+
         var sections = new[]
         {
             (Name: "Intent", Result: evaluation.Intent),
-            (Name: "Metrics", Result: evaluation.Metrics),
+            (Name: "Metrics", Result: metricScore),
             (Name: "Dimensions", Result: evaluation.Dimensions),
             (Name: "Filters", Result: evaluation.Filters),
             (Name: "Tables", Result: evaluation.Tables),
@@ -41,17 +57,15 @@ public sealed class QueryPlanEvaluationScoringService
         {
             Dimension = x.Name,
             Weight = DefaultWeights[x.Name],
-            Score = x.Result.Passed ? 1d : 0d,
+            Score = Math.Clamp(x.Result.Score, 0d, 1d),
             Passed = x.Result.Passed,
             Reason = x.Result.Reason
         }).ToList();
 
         var overall = scores.Sum(x => x.Weight * x.Score);
-        var decision = overall >= 0.90
-            ? QueryPlanEvaluationDecision.Pass
-            : overall >= 0.60
-                ? QueryPlanEvaluationDecision.Partial
-                : QueryPlanEvaluationDecision.Fail;
+        var decision = overall >= 0.90 ? QueryPlanEvaluationDecision.Pass
+            : overall >= 0.60 ? QueryPlanEvaluationDecision.Partial
+            : QueryPlanEvaluationDecision.Fail;
 
         return new QueryPlanEvaluationResult
         {
@@ -61,13 +75,15 @@ public sealed class QueryPlanEvaluationScoringService
             OverallScore = Math.Round(overall * 100d, 2),
             DimensionScores = scores,
             Intent = evaluation.Intent,
-            Metrics = evaluation.Metrics,
+            Metrics = metricScore,
             Dimensions = evaluation.Dimensions,
             Filters = evaluation.Filters,
             Tables = evaluation.Tables,
             Joins = evaluation.Joins,
             QueryShape = evaluation.QueryShape,
-            BindingConsistency = evaluation.BindingConsistency
+            BindingConsistency = evaluation.BindingConsistency,
+            MetricExpectations = evaluation.MetricExpectations,
+            ActualMetrics = evaluation.ActualMetrics
         };
     }
 }
