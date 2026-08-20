@@ -23,6 +23,7 @@ public sealed class QueryPlanConfidenceDiagnosticsController : ControllerBase
     private readonly IQueryPlanContextBuilder _queryPlanContextBuilder;
     private readonly IQueryPlanValidationPipeline _queryPlanValidationPipeline;
     private readonly IQueryPlanConfidenceService _queryPlanConfidenceService;
+    private readonly IQueryPlanDecisionGate _queryPlanDecisionGate;
 
     public QueryPlanConfidenceDiagnosticsController(
         GoldenQueryDatasetSerializer serializer,
@@ -32,7 +33,8 @@ public sealed class QueryPlanConfidenceDiagnosticsController : ControllerBase
         QueryPlanEvaluator queryPlanEvaluator,
         IQueryPlanContextBuilder queryPlanContextBuilder,
         IQueryPlanValidationPipeline queryPlanValidationPipeline,
-        IQueryPlanConfidenceService queryPlanConfidenceService)
+        IQueryPlanConfidenceService queryPlanConfidenceService,
+        IQueryPlanDecisionGate queryPlanDecisionGate)
     {
         _serializer = serializer;
         _environment = environment;
@@ -42,6 +44,7 @@ public sealed class QueryPlanConfidenceDiagnosticsController : ControllerBase
         _queryPlanContextBuilder = queryPlanContextBuilder;
         _queryPlanValidationPipeline = queryPlanValidationPipeline;
         _queryPlanConfidenceService = queryPlanConfidenceService;
+        _queryPlanDecisionGate = queryPlanDecisionGate;
     }
 
     [HttpGet("query-plan-confidence")]
@@ -95,9 +98,11 @@ public sealed class QueryPlanConfidenceDiagnosticsController : ControllerBase
             goldenCase.Question,
             cancellationToken);
 
+        var decision = _queryPlanDecisionGate.Evaluate(confidence);
+
         return Ok(new
         {
-            passed = evaluation.Passed && confidence.CanProceed,
+            passed = evaluation.Passed && decision.ShouldExecute,
             stage = "QueryPlanConfidence",
             caseId = goldenCase.Id,
             question = goldenCase.Question,
@@ -138,6 +143,14 @@ public sealed class QueryPlanConfidenceDiagnosticsController : ControllerBase
                 confidence.Evidence,
                 confidence.Reasons,
                 confidence.BlockingReasons
+            },
+            decision = new
+            {
+                decision = decision.Decision.ToString(),
+                decision.ShouldExecute,
+                decision.RequiresConfirmation,
+                decision.Reason,
+                decision.Trace
             }
         });
     }
