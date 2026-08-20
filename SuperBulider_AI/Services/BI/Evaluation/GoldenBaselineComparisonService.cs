@@ -4,7 +4,8 @@ namespace SuperBuilder_AI.Services.BI.Evaluation;
 
 /// <summary>
 /// Phase 2.6 C.9.3
-/// 比较当前 Golden Dataset Candidate 与已发布 Baseline 的质量与覆盖变化。
+/// 比较已发布 Golden Baseline 与候选 Dataset。
+/// 不修改 Ground Truth，仅产生 Release Candidate Comparison。
 /// </summary>
 public sealed class GoldenBaselineComparisonService
 {
@@ -19,9 +20,7 @@ public sealed class GoldenBaselineComparisonService
         _coverageAnalyzer = coverageAnalyzer;
     }
 
-    public GoldenBaselineComparisonScorecard Compare(
-        GoldenBaseline baseline,
-        GoldenQueryDataset candidate)
+    public GoldenBaselineComparisonScorecard Compare(GoldenBaseline baseline, GoldenQueryDataset candidate)
     {
         ArgumentNullException.ThrowIfNull(baseline);
         ArgumentNullException.ThrowIfNull(candidate);
@@ -48,8 +47,10 @@ public sealed class GoldenBaselineComparisonService
         if (qualityDelta < 0) regressions.Add($"Quality score decreased by {-qualityDelta}.");
         if (missingDelta > 0) regressions.Add($"Missing dimension count increased by {missingDelta}.");
         if (!quality.Passed) regressions.Add("Candidate fails the Golden Dataset Quality Gate.");
+        if (coverage.EnabledCases == 0) regressions.Add("Candidate has no enabled Golden Cases.");
+        if (coverage.MissingDimensions.Count > 0) regressions.Add($"Candidate still has {coverage.MissingDimensions.Count} missing coverage dimensions.");
 
-        var passed = quality.Passed && regressions.Count == 0;
+        var passed = quality.Passed && coverage.EnabledCases > 0 && coverage.MissingDimensions.Count == 0 && regressions.Count == 0;
 
         return new GoldenBaselineComparisonScorecard
         {
