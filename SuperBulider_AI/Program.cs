@@ -73,6 +73,8 @@ builder.Services.AddScoped<ISqlDialect, MySqlDialect>();
 builder.Services.AddScoped<ISqlDialect, PostgreSqlDialect>();
 builder.Services.AddScoped<SqlDialectResolver>();
 
+builder.Services.AddScoped<GoldenBaselineComparisonService>();
+
 var app = builder.Build();
 if (!app.Environment.IsDevelopment()) { app.UseExceptionHandler("/Home/Error"); app.UseHsts(); }
 app.UseHttpsRedirection();
