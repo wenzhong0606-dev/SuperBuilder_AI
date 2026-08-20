@@ -176,6 +176,7 @@ public sealed class GoldenDatasetRunner
 
             var passed = evaluationConfidence.Passed;
             var diagnostics = BuildValidationDiagnostics(validationPipelineResult);
+            var evaluationDiagnostics = BuildEvaluationDiagnostics(evaluationConfidence);
             var caseResult = new GoldenCaseRunResult
             {
                 CaseId = goldenCase.Id,
@@ -193,7 +194,8 @@ public sealed class GoldenDatasetRunner
                 ConfidenceDecision = evaluationConfidence.Decision.Decision.ToString(),
                 ConfidenceLevel = evaluationConfidence.Confidence.Level.ToString(),
                 ConfidenceScore = evaluationConfidence.Confidence.Score,
-                ValidationDiagnostics = diagnostics
+                ValidationDiagnostics = diagnostics,
+                EvaluationDiagnostics = evaluationDiagnostics
             };
 
             return (caseResult, evaluationConfidence);
@@ -236,6 +238,25 @@ public sealed class GoldenDatasetRunner
             RepairAttempts = trace.TotalAttempts,
             ChangedPlanCount = trace.ChangedPlanCount,
             RepairStopReason = trace.StopReason
+        };
+    }
+
+    private static GoldenEvaluationDiagnostics BuildEvaluationDiagnostics(
+        QueryPlanEvaluationConfidenceResult result)
+    {
+        var evaluation = result.Evaluation;
+        return new GoldenEvaluationDiagnostics
+        {
+            Passed = evaluation.Passed,
+            Intent = evaluation.Intent,
+            Metrics = evaluation.Metrics,
+            Dimensions = evaluation.Dimensions,
+            Filters = evaluation.Filters,
+            Tables = evaluation.Tables,
+            Joins = evaluation.Joins,
+            QueryShape = evaluation.QueryShape,
+            BindingConsistency = evaluation.BindingConsistency,
+            SemanticEvidence = result.SemanticEvidence
         };
     }
 
