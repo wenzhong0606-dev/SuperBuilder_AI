@@ -90,15 +90,53 @@ public sealed class QueryPlanEvaluator
                || string.Equals(metric.SemanticType, semanticText, StringComparison.OrdinalIgnoreCase);
     }
 
+    /// <summary>
+    /// C.4.2 Dimension Evaluation。
+    /// Golden Dimension 目前只表达数据库无关的 SemanticText，因此本阶段不伪造
+    /// SemanticText 与 ColumnName 的直接等值关系；先验证三态集合语义、数量以及
+    /// Runtime Dimension 的最基本物理绑定完整性。真正的语义解析由 Semantic
+    /// Applicability / Resolution 层负责，后续 C.4 Evaluation Evidence 再接入。
+    /// </summary>
     private static QueryPlanEvaluationSectionResult EvaluateDimensions(GoldenQueryExpectation expected, QueryPlan runtime)
     {
         if (expected.Dimensions is null)
             return Pass("Golden 未指定 Dimensions，不进行断言。");
 
         var actual = runtime.Dimensions ?? new List<QueryDimension>();
-        return actual.Count == expected.Dimensions.Count
-            ? Pass($"Dimensions 数量匹配：{actual.Count}。")
-            : Fail($"Dimensions 数量不匹配：期望 {expected.Dimensions.Count}，实际 {actual.Count}。");
+
+        // Golden 明确指定空集合：要求 Runtime 也没有 Dimension。
+        if (expected.Dimensions.Count == 0)
+        {
+            return actual.Count == 0
+                ? Pass("Golden 明确要求无 Dimensions，Runtime 为空。")
+                : Fail($"Golden 明确要求无 Dimensions，实际存在 {actual.Count} 个 Dimension。");
+        }
+
+        if (actual.Count != expected.Dimensions.Count)
+        {
+            return Fail($"Dimensions 数量不匹配：期望 {expected.Dimensions.Count}，实际 {actual.Count}。");
+        }
+
+        for (var i = 0; i < actual.Count; i++)
+        {
+            var dimension = actual[i];
+
+            if (dimension.MetadataColumnId <= 0)
+            {
+                return Fail(
+                    $"第 {i + 1} 个 Dimension 物理绑定无效：MetadataColumnId={dimension.MetadataColumnId}。");
+            }
+
+            if (string.IsNullOrWhiteSpace(dimension.ColumnName))
+            {
+                return Fail(
+                    $"第 {i + 1} 个 Dimension 物理绑定无效：ColumnName 为空。");
+            }
+        }
+
+        return Pass(
+            $"Dimensions 数量与 Runtime 物理绑定完整性匹配：{actual.Count} 个 Dimension，均具有有效 MetadataColumnId 和 ColumnName。" +
+            " Golden SemanticText 当前不直接与 ColumnName 等值比较。");
     }
 
     private static QueryPlanEvaluationSectionResult EvaluateFilters(GoldenQueryExpectation expected, QueryPlan runtime)
