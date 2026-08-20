@@ -53,8 +53,6 @@ public sealed class SemanticApplicabilityEvaluator
             };
         }
 
-        // 同一物理字段可能同时由 semantic vector / column vector 返回多次。
-        // Applicability 判断的是业务候选，而不是 Qdrant 向量点数量，因此先按绑定去重。
         var semanticCandidates = results
             .Where(x => x.IsSemanticVector)
             .GroupBy(GetCandidateBindingKey, StringComparer.OrdinalIgnoreCase)
@@ -75,9 +73,85 @@ public sealed class SemanticApplicabilityEvaluator
             ? topSemantic.Score - secondSemantic.Score
             : null;
 
-        return metricType == "EntityCount"
+        var metricApplicability = metricType == "EntityCount"
             ? EvaluateEntityCount(goldenCase, metric.SemanticText, metrics.Count, semanticCandidates, entityCandidates, topSemantic, secondSemantic, scoreGap)
             : EvaluateColumnMetric(goldenCase, metric.SemanticText, metrics.Count, semanticCandidates, entityCandidates, topSemantic, secondSemantic, scoreGap);
+
+        if (!string.Equals(metricApplicability.State, "Resolved", StringComparison.OrdinalIgnoreCase))
+            return metricApplicability;
+
+        var filters = goldenCase.Expected?.Filters;
+        if (filters is null || filters.Count == 0)
+            return metricApplicability;
+
+        var filterResolutions = new List<SemanticApplicabilityFilterResolution>(filters.Count);
+        foreach (var filter in filters)
+        {
+            var filterResolution = await ResolveFilterAsync(filter, topK);
+            if (filterResolution is null)
+            {
+                return new SemanticApplicabilityResult
+                {
+                    CaseId = metricApplicability.CaseId,
+                    Question = metricApplicability.Question,
+                    MetricSemanticText = metricApplicability.MetricSemanticText,
+                    MetricType = metricApplicability.MetricType,
+                    State = "NotResolved",
+                    Reason = $"Filter 语义“{filter.SemanticText}”无法解析为稳定的 Metadata 物理绑定。",
+                    SearchCandidate = metricApplicability.SearchCandidate,
+                    Resolution = metricApplicability.Resolution,
+                    Evidence = metricApplicability.Evidence
+                };
+            }
+
+            filterResolutions.Add(filterResolution);
+        }
+
+        return new SemanticApplicabilityResult
+        {
+            CaseId = metricApplicability.CaseId,
+            Question = metricApplicability.Question,
+            MetricSemanticText = metricApplicability.MetricSemanticText,
+            MetricType = metricApplicability.MetricType,
+            State = metricApplicability.State,
+            Reason = metricApplicability.Reason,
+            SearchCandidate = metricApplicability.SearchCandidate,
+            Resolution = metricApplicability.Resolution,
+            FilterResolutions = filterResolutions,
+            Evidence = metricApplicability.Evidence
+        };
+    }
+
+    private async Task<SemanticApplicabilityFilterResolution?> ResolveFilterAsync(
+        GoldenFilterExpectation filter,
+        int topK)
+    {
+        if (string.IsNullOrWhiteSpace(filter.SemanticText))
+            return null;
+
+        var results = await _semanticSearchService.SearchAsync(filter.SemanticText, topK);
+        var candidates = results
+            .Where(x => x.IsSemanticVector && x.Table is not null && x.Column is not null)
+            .GroupBy(GetCandidateBindingKey, StringComparer.OrdinalIgnoreCase)
+            .Select(g => g.OrderByDescending(x => x.Score).First())
+            .OrderByDescending(x => x.Score)
+            .ToList();
+
+        var candidate = candidates.FirstOrDefault(x => ContainsSemanticText(x, filter.SemanticText));
+        if (candidate?.Table is null || candidate.Column is null)
+            return null;
+
+        return new SemanticApplicabilityFilterResolution
+        {
+            TableId = candidate.Table.Id,
+            DataSourceId = candidate.Table.DataSourceId,
+            ColumnId = candidate.Column.Id,
+            SemanticText = filter.SemanticText,
+            Table = candidate.Table.TableName,
+            Column = candidate.Column.ColumnName,
+            BusinessMeaning = candidate.Semantic?.BusinessMeaning,
+            Score = candidate.Score
+        };
     }
 
     private static SemanticApplicabilityResult EvaluateColumnMetric(
@@ -170,8 +244,6 @@ public sealed class SemanticApplicabilityEvaluator
             && topSemantic.Table is not null
             && topSemantic.Column is not null;
 
-        // 只有同样具备“直接指标证据”的其他业务绑定才算竞争候选。
-        // “数量”与“入库数量”存在字符重叠，并不意味着两个候选都能解释 Golden Metric。
         var competingCandidates = semanticCandidates
             .Skip(1)
             .Any(x =>
@@ -229,8 +301,6 @@ public sealed class SemanticApplicabilityEvaluator
             candidate.Table?.TableComment
         };
 
-        // 直接证据必须是一个完整语义短语的包含关系。
-        // 不再使用字符集合重叠：否则“入库数量”会与“盘点数量”“库存数量”“扫码数量”同时命中。
         return values.Any(value =>
             !string.IsNullOrWhiteSpace(value)
             && NormalizeSemanticText(value).Contains(normalizedMetric, StringComparison.OrdinalIgnoreCase));
