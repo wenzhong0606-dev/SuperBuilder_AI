@@ -41,7 +41,7 @@ public sealed class QueryPlanEvaluatorMetricAnchorTests
     }
 
     [Fact]
-    public void GQN001_WrongAggregation_FailsMetricEvaluation()
+    public void GQN001_GoldenCountAgainstRuntimeSum_FailsMetricEvaluation()
     {
         var expected = new GoldenQueryExpectation
         {
@@ -50,7 +50,8 @@ public sealed class QueryPlanEvaluatorMetricAnchorTests
                 new GoldenMetricExpectation
                 {
                     SemanticText = "入库数量",
-                    Aggregation = QueryAggregation.Sum
+                    Field = "quantity",
+                    Aggregation = QueryAggregation.Count
                 }
             }
         };
@@ -63,7 +64,7 @@ public sealed class QueryPlanEvaluatorMetricAnchorTests
                 {
                     Name = "入库数量",
                     Field = "quantity",
-                    Aggregation = QueryAggregation.Average
+                    Aggregation = QueryAggregation.Sum
                 }
             }
         };
