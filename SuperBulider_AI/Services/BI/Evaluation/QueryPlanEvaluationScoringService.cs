@@ -60,14 +60,14 @@ public sealed class QueryPlanEvaluationScoringService
         }).ToList();
 
         var overall = scores.Sum(x => x.Weight * Math.Clamp(x.Score, 0d, 1d));
-        var decision = overall >= 0.90 ? QueryPlanEvaluationDecision.Pass
-            : overall >= 0.60 ? QueryPlanEvaluationDecision.Partial
-            : QueryPlanEvaluationDecision.Fail;
+        var decision = overall >= 0.90 ? QueryPlanEvaluationOutcome.Pass
+            : overall >= 0.60 ? QueryPlanEvaluationOutcome.Partial
+            : QueryPlanEvaluationOutcome.Fail;
 
         return new QueryPlanEvaluationResult
         {
             CaseId = evaluation.CaseId,
-            Passed = decision == QueryPlanEvaluationDecision.Pass,
+            Passed = decision == QueryPlanEvaluationOutcome.Pass,
             Decision = decision,
             OverallScore = Math.Round(overall * 100d, 2),
             DimensionScores = scores,
