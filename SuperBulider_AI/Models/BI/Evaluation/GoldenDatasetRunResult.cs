@@ -41,6 +41,13 @@ public sealed class GoldenCaseRunResult
     /// 直接暴露 Pipeline 最终 ValidationResult，避免只返回“存在 N 个 Validation Error”而丢失根因。
     /// </summary>
     public GoldenValidationDiagnostics? ValidationDiagnostics { get; init; }
+
+    /// <summary>
+    /// Golden Runtime 的 QueryPlan Evaluation 诊断。
+    /// 暴露 Intent、Metrics、Dimensions、Filters、Tables、Joins、Shape 与 BindingConsistency，
+    /// 用于定位“Validation 已通过但 QueryPlan Evaluation 未通过”的具体断言。
+    /// </summary>
+    public GoldenEvaluationDiagnostics? EvaluationDiagnostics { get; init; }
 }
 
 /// <summary>
@@ -59,4 +66,22 @@ public sealed class GoldenValidationDiagnostics
     public int RepairAttempts { get; init; }
     public int ChangedPlanCount { get; init; }
     public string? RepairStopReason { get; init; }
+}
+
+/// <summary>
+/// Golden Runtime QueryPlan Evaluation 诊断信息。
+/// 仅用于可观测性，不改变原有 Evaluation 判定逻辑。
+/// </summary>
+public sealed class GoldenEvaluationDiagnostics
+{
+    public bool Passed { get; init; }
+    public QueryPlanEvaluationSectionResult? Intent { get; init; }
+    public QueryPlanEvaluationSectionResult? Metrics { get; init; }
+    public QueryPlanEvaluationSectionResult? Dimensions { get; init; }
+    public QueryPlanEvaluationSectionResult? Filters { get; init; }
+    public QueryPlanEvaluationSectionResult? Tables { get; init; }
+    public QueryPlanEvaluationSectionResult? Joins { get; init; }
+    public QueryPlanEvaluationSectionResult? QueryShape { get; init; }
+    public QueryPlanEvaluationSectionResult? BindingConsistency { get; init; }
+    public QueryPlanSemanticEvidenceResult? SemanticEvidence { get; init; }
 }
