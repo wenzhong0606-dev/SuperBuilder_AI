@@ -379,7 +379,8 @@ public sealed class SemanticApplicabilityEvaluator
         var values = new[]
         {
             candidate.Table.TableComment,
-            candidate.Table.TableName
+            candidate.Table.TableName,
+            candidate.Table.SearchText
         };
 
         return values.Any(value =>
@@ -399,7 +400,8 @@ public sealed class SemanticApplicabilityEvaluator
         var values = new[]
         {
             candidate.Table.TableComment,
-            candidate.Table.TableName
+            candidate.Table.TableName,
+            candidate.Table.SearchText
         };
 
         return values.Any(value =>
