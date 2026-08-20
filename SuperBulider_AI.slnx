@@ -1,4 +1,3 @@
 <Solution>
   <Project Path="SuperBulider_AI/SuperBuilder_AI.csproj" />
-  <Project Path="SuperBulider_AI.Tests/SuperBulider_AI.Tests.csproj" />
 </Solution>
