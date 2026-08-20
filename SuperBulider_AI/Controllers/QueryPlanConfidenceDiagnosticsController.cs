@@ -260,34 +260,25 @@ public sealed class QueryPlanConfidenceDiagnosticsController : ControllerBase
 
     private static QueryIntent BuildIntentFromGoldenCase(GoldenQueryCase goldenCase)
     {
-        var expectedJson = JsonSerializer.SerializeToElement(goldenCase.Expected);
-        var intentType = expectedJson.TryGetProperty("intentType", out var intentTypeElement)
-            ? intentTypeElement.GetString() ?? string.Empty
-            : string.Empty;
-
+        // 不再通过 JsonElement 二次序列化读取 Expected。
+        // GoldenQueryExpectation 已经提供强类型 IntentType，直接使用可以避免
+        // 属性命名策略/大小写策略导致 IntentType 被读取为空。
         var intent = new QueryIntent
         {
             OriginalQuestion = goldenCase.Question,
-            IntentType = intentType
+            IntentType = goldenCase.Expected.IntentType ?? string.Empty,
+            Limit = goldenCase.Expected.Limit ?? 0
         };
 
-        if (expectedJson.TryGetProperty("metrics", out var metricsElement) && metricsElement.ValueKind == JsonValueKind.Array)
+        if (goldenCase.Expected.Metrics is not null)
         {
-            foreach (var metricElement in metricsElement.EnumerateArray())
+            foreach (var metricExpectation in goldenCase.Expected.Metrics)
             {
                 intent.Metrics.Add(new QueryMetric
                 {
-                    Name = metricElement.TryGetProperty("semanticText", out var semanticText)
-                        ? semanticText.GetString() ?? string.Empty
-                        : metricElement.TryGetProperty("name", out var name)
-                            ? name.GetString() ?? string.Empty
-                            : string.Empty,
-                    Field = metricElement.TryGetProperty("field", out var field)
-                        ? field.GetString() ?? string.Empty
-                        : string.Empty,
-                    Aggregation = metricElement.TryGetProperty("aggregation", out var aggregation)
-                        ? aggregation.GetString() ?? "NONE"
-                        : "NONE"
+                    Name = metricExpectation.SemanticText ?? metricExpectation.Field ?? string.Empty,
+                    Field = metricExpectation.Field ?? string.Empty,
+                    Aggregation = metricExpectation.Aggregation ?? "NONE"
                 });
             }
         }
