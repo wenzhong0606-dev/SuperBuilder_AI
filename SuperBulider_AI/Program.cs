@@ -58,8 +58,10 @@ builder.Services.AddScoped<GoldenConfidenceCalibrationRunner>();
 builder.Services.AddScoped<GoldenDatasetCoverageAnalyzer>();
 builder.Services.AddScoped<GoldenDatasetQualityGate>();
 builder.Services.AddScoped<GoldenBaselineReleaseService>();
-builder.Services.AddScoped<IGoldenBaselineRegistry, GoldenBaselineRegistry>();
-builder.Services.AddScoped<IGoldenBaselinePersistence, InMemoryGoldenBaselinePersistence>();
+// Baseline Registry / InMemory Persistence 必须跨 HTTP Request 保持生命周期，
+// 否则 Release 与后续 Compare 会使用不同实例，导致已发布 Baseline 丢失。
+builder.Services.AddSingleton<IGoldenBaselineRegistry, GoldenBaselineRegistry>();
+builder.Services.AddSingleton<IGoldenBaselinePersistence, InMemoryGoldenBaselinePersistence>();
 builder.Services.AddScoped<GoldenBaselinePersistenceService>();
 builder.Services.AddScoped<GoldenBaselineLifecycleValidator>();
 builder.Services.AddScoped<GoldenDatasetRunner>();
