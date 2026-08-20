@@ -13,24 +13,19 @@ public sealed class SemanticApplicabilityResult
     public string MetricType { get; init; } = string.Empty;
     public string State { get; init; } = string.Empty;
     public string? Reason { get; init; }
-
-    /// <summary>
-    /// Semantic Search 返回的最高相关候选，仅作为检索证据。
-    /// </summary>
     public SemanticApplicabilityCandidate? SearchCandidate { get; init; }
+    public SemanticApplicabilityResolution? Resolution { get; init; }
 
     /// <summary>
-    /// 已通过 Applicability 判断、允许进入 QueryPlan 构造的物理绑定。
-    /// 只有 State=Resolved 时才应非空。
+    /// 已解析的 Filter 物理绑定。操作符和值仍由 QueryIntent 保留，
+    /// 这里只负责把业务语义稳定绑定到 MetadataColumn。
     /// </summary>
-    public SemanticApplicabilityResolution? Resolution { get; init; }
+    public IReadOnlyList<SemanticApplicabilityFilterResolution> FilterResolutions { get; init; }
+        = Array.Empty<SemanticApplicabilityFilterResolution>();
 
     public SemanticApplicabilityEvidence Evidence { get; init; } = new();
 }
 
-/// <summary>
-/// 已解析的语义到物理 Metadata 字段绑定。
-/// </summary>
 public sealed class SemanticApplicabilityResolution
 {
     public long TableId { get; init; }
@@ -42,9 +37,18 @@ public sealed class SemanticApplicabilityResolution
     public double? Score { get; init; }
 }
 
-/// <summary>
-/// Semantic Search 当前最高相关候选。
-/// </summary>
+public sealed class SemanticApplicabilityFilterResolution
+{
+    public long TableId { get; init; }
+    public long DataSourceId { get; init; }
+    public long ColumnId { get; init; }
+    public string SemanticText { get; init; } = string.Empty;
+    public string? Table { get; init; }
+    public string? Column { get; init; }
+    public string? BusinessMeaning { get; init; }
+    public double? Score { get; init; }
+}
+
 public sealed class SemanticApplicabilityCandidate
 {
     public string? VectorType { get; init; }
@@ -55,10 +59,6 @@ public sealed class SemanticApplicabilityCandidate
     public string? BusinessMeaning { get; init; }
 }
 
-/// <summary>
-/// Semantic Applicability 的结构化证据。
-/// 第一版不把 Evidence 压缩成单一 Confidence 分数。
-/// </summary>
 public sealed class SemanticApplicabilityEvidence
 {
     public bool SemanticCandidateExists { get; init; }
