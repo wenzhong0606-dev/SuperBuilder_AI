@@ -1,7 +1,7 @@
 namespace SuperBuilder_AI.Models.BI.Evaluation;
 
 /// <summary>
-/// Phase 2.6 C.5.2 Golden Dataset 批量回归执行结果。
+/// Phase 2.6 C.5.2 / C.6.3 Golden Dataset 批量回归执行结果。
 /// </summary>
 public sealed class GoldenDatasetRunResult
 {
@@ -16,6 +16,8 @@ public sealed class GoldenDatasetRunResult
     public int Unresolved { get; init; }
     public int Ambiguous { get; init; }
     public List<GoldenCaseRunResult> Cases { get; init; } = new();
+    public List<QueryPlanEvaluationConfidenceResult> ConfidenceResults { get; init; } = new();
+    public GoldenConfidenceCalibrationScorecard? ConfidenceCalibration { get; init; }
 }
 
 public sealed class GoldenCaseRunResult
