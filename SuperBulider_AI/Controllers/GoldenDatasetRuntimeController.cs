@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using SuperBuilder_AI.Models.BI.Evaluation;
 using SuperBuilder_AI.Services.BI.Evaluation;
 
 namespace SuperBuilder_AI.Controllers;
@@ -22,8 +23,7 @@ public sealed class GoldenDatasetRuntimeController : ControllerBase
     /// <summary>
     /// 运行 Golden Dataset。
     /// 不传 caseId：执行完整 Dataset Regression。
-    /// 传 caseId：仍使用统一 Runtime Pipeline 执行 Dataset，但只返回指定 Case 的诊断结果，
-    /// 避免 Controller 自己重新实现 Query Understanding / QueryPlan / Validation / Confidence Pipeline。
+    /// 传 caseId：仍使用统一 Runtime Pipeline 执行 Dataset，但只返回指定 Case 的诊断结果。
     /// </summary>
     [HttpGet("run")]
     public async Task<ActionResult<object>> Run(
@@ -35,13 +35,14 @@ public sealed class GoldenDatasetRuntimeController : ControllerBase
         {
             GoldenDatasetRuntimeService.ValidateTopK(topK);
 
+            GoldenQueryCase? selectedCase = null;
             if (!string.IsNullOrWhiteSpace(caseId))
             {
                 var dataset = _runtimeService.LoadDataset();
-                var exists = dataset.Cases.Any(x =>
+                selectedCase = dataset.Cases.FirstOrDefault(x =>
                     x.Enabled && string.Equals(x.Id, caseId, StringComparison.OrdinalIgnoreCase));
 
-                if (!exists)
+                if (selectedCase is null)
                 {
                     return NotFound(new
                     {
@@ -56,10 +57,10 @@ public sealed class GoldenDatasetRuntimeController : ControllerBase
             var run = result.Run;
             var scorecard = result.Scorecard;
 
-            if (!string.IsNullOrWhiteSpace(caseId))
+            if (selectedCase is not null)
             {
                 var goldenCase = run.Cases.FirstOrDefault(x =>
-                    string.Equals(x.CaseId, caseId, StringComparison.OrdinalIgnoreCase));
+                    string.Equals(x.CaseId, selectedCase.Id, StringComparison.OrdinalIgnoreCase));
 
                 if (goldenCase is null)
                 {
@@ -67,14 +68,19 @@ public sealed class GoldenDatasetRuntimeController : ControllerBase
                     {
                         passed = false,
                         decision = "NOT_FOUND",
-                        message = $"Golden Case '{caseId}' did not produce a runtime result."
+                        message = $"Golden Case '{selectedCase.Id}' did not produce a runtime result."
                     });
                 }
 
+                var expectedOutcomeSatisfied = EvaluateExpectedOutcome(goldenCase);
+
                 return Ok(new
                 {
-                    passed = goldenCase.Passed,
-                    decision = goldenCase.Decision,
+                    // caseId 诊断接口的 passed 表示 Golden Expected Outcome 是否满足。
+                    // GoldenCaseRunResult.Passed 保留 Runtime 原始执行结果；Negative Case
+                    // 被正确 FAIL/BLOCK 时，原始 Passed=false，但 ExpectedOutcomeSatisfied=true。
+                    passed = expectedOutcomeSatisfied,
+                    decision = expectedOutcomeSatisfied ? "PASS" : goldenCase.Decision,
                     stage = goldenCase.Stage,
                     phase = "Phase 2.6 C.13",
                     dataset = run.Dataset,
@@ -87,7 +93,11 @@ public sealed class GoldenDatasetRuntimeController : ControllerBase
                     confidenceDecision = goldenCase.ConfidenceDecision,
                     confidenceLevel = goldenCase.ConfidenceLevel,
                     confidenceScore = goldenCase.ConfidenceScore,
-                    reason = goldenCase.Reason,
+                    rawRuntimePassed = goldenCase.Passed,
+                    expectedOutcomeSatisfied,
+                    reason = expectedOutcomeSatisfied
+                        ? BuildExpectedOutcomeReason(goldenCase)
+                        : goldenCase.Reason,
                     caseResult = goldenCase,
                     fullRun = new
                     {
@@ -98,7 +108,11 @@ public sealed class GoldenDatasetRuntimeController : ControllerBase
                         blocked = run.Blocked,
                         review = run.Review,
                         unresolved = run.Unresolved,
-                        ambiguous = run.Ambiguous
+                        ambiguous = run.Ambiguous,
+                        regressionPassed = scorecard.Passed,
+                        overallPassRate = scorecard.OverallPassRate,
+                        positivePassRate = scorecard.PositivePassRate,
+                        negativeDetectionRate = scorecard.NegativeDetectionRate
                     }
                 });
             }
@@ -140,6 +154,7 @@ public sealed class GoldenDatasetRuntimeController : ControllerBase
                     x.Stage,
                     x.Decision,
                     x.Passed,
+                    expectedOutcomeSatisfied = EvaluateExpectedOutcome(x),
                     x.ApplicabilityState,
                     x.QueryPlanEvaluationPassed,
                     x.ConfidenceDecision,
@@ -148,7 +163,7 @@ public sealed class GoldenDatasetRuntimeController : ControllerBase
                     x.Reason
                 }),
                 failedCases = run.Cases
-                    .Where(x => x.Enabled && !x.Passed)
+                    .Where(x => x.Enabled && !EvaluateExpectedOutcome(x))
                     .Select(x => new
                     {
                         x.CaseId,
@@ -214,9 +229,32 @@ public sealed class GoldenDatasetRuntimeController : ControllerBase
         }
     }
 
+    private static bool EvaluateExpectedOutcome(GoldenCaseRunResult item)
+    {
+        return item.Category.ToLowerInvariant() switch
+        {
+            "positive" => item.Passed,
+            "negative" => !item.Passed && item.Decision is "FAIL" or "ERROR" or "BLOCK" or "REVIEW",
+            "ambiguous" => item.Passed && string.Equals(item.ApplicabilityState, "Ambiguous", StringComparison.OrdinalIgnoreCase),
+            "unresolved" => item.Passed && string.Equals(item.ApplicabilityState, "NotResolved", StringComparison.OrdinalIgnoreCase),
+            _ => item.Passed
+        };
+    }
+
+    private static string BuildExpectedOutcomeReason(GoldenCaseRunResult item)
+    {
+        return item.Category.ToLowerInvariant() switch
+        {
+            "negative" => $"Negative Case 正确检测到预期失败/拒绝：Runtime Decision={item.Decision}，Golden Expected Outcome 满足。",
+            "ambiguous" => "Golden Case 预期 Applicability=Ambiguous，实际匹配。",
+            "unresolved" => "Golden Case 预期 Applicability=NotResolved，实际匹配。",
+            _ => "Golden Case Expected Outcome 满足。"
+        };
+    }
+
     private static object BuildFullRunResponse(
-        Models.BI.Evaluation.GoldenDatasetRunResult run,
-        Models.BI.Evaluation.GoldenDatasetRegressionScorecard scorecard)
+        GoldenDatasetRunResult run,
+        GoldenDatasetRegressionScorecard scorecard)
     {
         var categorySummary = run.Cases
             .Where(x => x.Enabled)
@@ -226,8 +264,8 @@ public sealed class GoldenDatasetRuntimeController : ControllerBase
                 x => new
                 {
                     total = x.Count(),
-                    passed = x.Count(item => item.Passed),
-                    failed = x.Count(item => !item.Passed)
+                    passed = x.Count(item => EvaluateExpectedOutcome(item)),
+                    failed = x.Count(item => !EvaluateExpectedOutcome(item))
                 },
                 StringComparer.OrdinalIgnoreCase);
 
@@ -259,8 +297,10 @@ public sealed class GoldenDatasetRuntimeController : ControllerBase
             {
                 run.Total,
                 run.Executed,
-                run.Passed,
-                run.Failed,
+                rawRuntimePassed = run.Passed,
+                rawRuntimeFailed = run.Failed,
+                expectedOutcomePassed = run.Cases.Count(x => x.Enabled && EvaluateExpectedOutcome(x)),
+                expectedOutcomeFailed = run.Cases.Count(x => x.Enabled && !EvaluateExpectedOutcome(x)),
                 run.Blocked,
                 run.Review,
                 run.Unresolved,
@@ -269,7 +309,23 @@ public sealed class GoldenDatasetRuntimeController : ControllerBase
             categorySummary,
             stageSummary,
             scorecard,
-            cases = run.Cases,
+            cases = run.Cases.Select(x => new
+            {
+                x.CaseId,
+                x.Question,
+                x.Category,
+                x.Enabled,
+                x.Stage,
+                x.Decision,
+                rawRuntimePassed = x.Passed,
+                expectedOutcomeSatisfied = EvaluateExpectedOutcome(x),
+                x.Reason,
+                x.ApplicabilityState,
+                x.QueryPlanEvaluationPassed,
+                x.ConfidenceDecision,
+                x.ConfidenceLevel,
+                x.ConfidenceScore
+            }),
             confidenceCalibration = run.ConfidenceCalibration
         };
     }
