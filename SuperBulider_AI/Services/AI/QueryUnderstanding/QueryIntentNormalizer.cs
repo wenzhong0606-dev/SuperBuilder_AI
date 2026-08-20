@@ -1,4 +1,4 @@
-using SuperBulider_AI.Models.AI;
+using SuperBuilder_AI.Models.BI;
 
 namespace SuperBulider_AI.Services.AI.QueryUnderstanding;
 
