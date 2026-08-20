@@ -143,7 +143,6 @@ public sealed class QueryPlanEvaluator
 
         var actual = runtime.Filters ?? new List<QueryFilter>();
 
-        // Golden 明确指定空集合：要求 Runtime 也没有 Filter。
         if (expected.Filters.Count == 0)
         {
             return actual.Count == 0
@@ -165,15 +164,13 @@ public sealed class QueryPlanEvaluator
             if (!string.IsNullOrWhiteSpace(golden.Operator)
                 && !string.Equals(filter.Operator, golden.Operator, StringComparison.OrdinalIgnoreCase))
             {
-                return Fail(
-                    $"第 {i + 1} 个 Filter 操作符不匹配：期望 {golden.Operator}，实际 {filter.Operator}。");
+                return Fail($"第 {i + 1} 个 Filter 操作符不匹配：期望 {golden.Operator}，实际 {filter.Operator}。");
             }
 
             if (golden.Value is not null
                 && !string.Equals(filter.Value, golden.Value, StringComparison.Ordinal))
             {
-                return Fail(
-                    $"第 {i + 1} 个 Filter 值不匹配：期望 {golden.Value}，实际 {filter.Value}。");
+                return Fail($"第 {i + 1} 个 Filter 值不匹配：期望 {golden.Value}，实际 {filter.Value}。");
             }
         }
 
@@ -219,6 +216,48 @@ public sealed class QueryPlanEvaluator
         }
 
         return Pass("Query Shape 匹配。");
+    }
+
+    /// <summary>
+    /// C.4.4 Table Evaluation。
+    /// Golden Table 目前只表达数据库无关的 SemanticText，因此不将 SemanticText
+    /// 与 Runtime TableName/TableComment 做伪等值判断。本阶段验证集合三态、数量，
+    /// 以及 Runtime QueryTable 的 MetadataTableId/DataSourceId/TableName 物理绑定完整性。
+    /// </summary>
+    private static QueryPlanEvaluationSectionResult EvaluateTables(GoldenQueryExpectation expected, QueryPlan runtime)
+    {
+        if (expected.Tables is null)
+            return Pass("Golden 未指定 Tables，不进行断言。");
+
+        var actual = runtime.Tables ?? new List<QueryTable>();
+
+        if (expected.Tables.Count == 0)
+        {
+            return actual.Count == 0
+                ? Pass("Golden 明确要求无 Tables，Runtime 为空。")
+                : Fail($"Golden 明确要求无 Tables，实际存在 {actual.Count} 个 Table。");
+        }
+
+        if (actual.Count != expected.Tables.Count)
+            return Fail($"Tables 数量不匹配：期望 {expected.Tables.Count}，实际 {actual.Count}。");
+
+        for (var i = 0; i < actual.Count; i++)
+        {
+            var table = actual[i];
+
+            if (table.MetadataTableId <= 0)
+                return Fail($"第 {i + 1} 个 Table 物理绑定无效：MetadataTableId={table.MetadataTableId}。");
+
+            if (table.DataSourceId <= 0)
+                return Fail($"第 {i + 1} 个 Table 物理绑定无效：DataSourceId={table.DataSourceId}。");
+
+            if (string.IsNullOrWhiteSpace(table.TableName))
+                return Fail($"第 {i + 1} 个 Table 物理绑定无效：TableName 为空。");
+        }
+
+        return Pass(
+            $"Tables 数量与 Runtime 物理绑定完整性匹配：{actual.Count} 个 Table，均具有有效 MetadataTableId、DataSourceId 和 TableName。" +
+            " Golden SemanticText 当前不直接与 TableName/TableComment 等值比较。");
     }
 
     /// <summary>
