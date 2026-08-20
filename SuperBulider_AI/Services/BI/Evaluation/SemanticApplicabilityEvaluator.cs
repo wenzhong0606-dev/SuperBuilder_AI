@@ -311,6 +311,9 @@ public sealed class SemanticApplicabilityEvaluator
         var entityMatchedCandidates = !string.IsNullOrWhiteSpace(entitySemanticText)
             ? semanticCandidates
                 .Where(x => x.Table is not null && x.Column is not null && ContainsEntitySemanticText(x, entitySemanticText))
+                .GroupBy(x => x.Table!.Id)
+                .Select(g => g.OrderByDescending(x => x.Score).First())
+                .OrderByDescending(x => x.Score)
                 .ToList()
             : new List<MetadataSemanticSearchResult>();
 
@@ -325,9 +328,7 @@ public sealed class SemanticApplicabilityEvaluator
             directEvidence = true;
         }
 
-        var competingCandidates = entityMatchedCandidates
-            .Skip(1)
-            .Any(x => x.Table is not null && x.Column is not null);
+        var competingCandidates = entityMatchedCandidates.Count > 1;
 
         var state = directEvidence
             ? competingCandidates ? "Ambiguous" : "Resolved"
