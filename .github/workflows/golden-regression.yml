@@ -24,11 +24,5 @@ jobs:
       - name: Build
         run: dotnet build --no-restore --configuration Release
 
-      - name: Run Golden Regression
-        shell: bash
-        run: |
-          set -euo pipefail
-          echo "Golden Regression Gate"
-          echo "Build succeeded."
-          echo "Executable Golden Evaluation Regression is available through GoldenEvaluationRegressionService."
-          echo "Repository-level orchestration is intentionally kept separate from application runtime configuration."
+      - name: Run Golden Regression Tests
+        run: dotnet test SuperBulider_AI.Tests/SuperBulider_AI.Tests.csproj --no-restore --configuration Release --logger "console;verbosity=normal"
