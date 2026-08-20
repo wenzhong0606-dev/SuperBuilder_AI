@@ -53,8 +53,12 @@ public sealed class SemanticApplicabilityEvaluator
             };
         }
 
+        // 同一物理字段可能同时由 semantic vector / column vector 返回多次。
+        // Applicability 判断的是业务候选，而不是 Qdrant 向量点数量，因此先按绑定去重。
         var semanticCandidates = results
             .Where(x => x.IsSemanticVector)
+            .GroupBy(GetCandidateBindingKey, StringComparer.OrdinalIgnoreCase)
+            .Select(g => g.OrderByDescending(x => x.Score).First())
             .OrderByDescending(x => x.Score)
             .ToList();
 
@@ -161,13 +165,19 @@ public sealed class SemanticApplicabilityEvaluator
             };
         }
 
-        var directEvidence = ContainsSemanticText(topSemantic, semanticText)
+        var topLexicalMatch = ContainsSemanticText(topSemantic, semanticText);
+        var directEvidence = topLexicalMatch
             && topSemantic.Table is not null
             && topSemantic.Column is not null;
 
+        // 只有同样具备“直接指标证据”的其他业务绑定才算竞争候选。
+        // “数量”与“入库数量”存在字符重叠，并不意味着两个候选都能解释 Golden Metric。
         var competingCandidates = semanticCandidates
             .Skip(1)
-            .Any(x => ContainsSemanticText(x, semanticText));
+            .Any(x =>
+                x.Table is not null
+                && x.Column is not null
+                && ContainsSemanticText(x, semanticText));
 
         var state = directEvidence
             ? competingCandidates ? "Ambiguous" : "Resolved"
@@ -188,7 +198,7 @@ public sealed class SemanticApplicabilityEvaluator
                 SemanticCandidateExists = semanticCandidates.Count > 0,
                 EntityCandidateExists = entityCandidates.Count > 0,
                 DirectEntityCountEvidence = directEvidence,
-                LexicalMatch = ContainsSemanticText(topSemantic, semanticText),
+                LexicalMatch = topLexicalMatch,
                 CompetingCandidates = competingCandidates,
                 TopScore = topSemantic.Score,
                 SecondScore = secondSemantic?.Score,
@@ -202,6 +212,10 @@ public sealed class SemanticApplicabilityEvaluator
         if (string.IsNullOrWhiteSpace(semanticText))
             return false;
 
+        var normalizedMetric = NormalizeSemanticText(semanticText);
+        if (normalizedMetric.Length == 0)
+            return false;
+
         var values = new[]
         {
             candidate.Semantic?.BusinessMeaning,
@@ -210,35 +224,31 @@ public sealed class SemanticApplicabilityEvaluator
             candidate.Semantic?.ExampleQuestions,
             candidate.Semantic?.SearchText,
             candidate.Column?.ColumnName,
-            candidate.Table?.TableName
+            candidate.Column?.ColumnComment,
+            candidate.Table?.TableName,
+            candidate.Table?.TableComment
         };
 
-        if (values.Any(value =>
-                !string.IsNullOrWhiteSpace(value) &&
-                value.Contains(semanticText, StringComparison.OrdinalIgnoreCase)))
-            return true;
-
-        // Qdrant 已经完成语义召回；Applicability 不应再要求候选文本逐字等于 Golden metric。
-        // 对中文业务短语使用字符集合重叠作为补充证据，解决“入库单数量”与“入库数量”这类
-        // 业务同义/量词差异，同时保持至少两个有效字符的最低证据门槛。
-        var metricChars = NormalizeSemanticCharacters(semanticText);
-        if (metricChars.Count < 2)
-            return false;
-
-        return values
-            .Where(value => !string.IsNullOrWhiteSpace(value))
-            .Select(NormalizeSemanticCharacters)
-            .Any(candidateChars =>
-                candidateChars.Count >= 2 &&
-                metricChars.Intersect(candidateChars).Count() >= Math.Max(2, (int)Math.Ceiling(metricChars.Count * 0.5)));
+        // 直接证据必须是一个完整语义短语的包含关系。
+        // 不再使用字符集合重叠：否则“入库数量”会与“盘点数量”“库存数量”“扫码数量”同时命中。
+        return values.Any(value =>
+            !string.IsNullOrWhiteSpace(value)
+            && NormalizeSemanticText(value).Contains(normalizedMetric, StringComparison.OrdinalIgnoreCase));
     }
 
-    private static HashSet<char> NormalizeSemanticCharacters(string text)
+    private static string NormalizeSemanticText(string text)
     {
-        var ignored = new HashSet<char> { ' ', '\t', '\r', '\n', ',', '，', '。', '、', '的', '了', '请', '查', '询' };
-        return text
-            .Where(c => !ignored.Contains(c))
-            .ToHashSet();
+        return new string(text
+            .Where(c => !char.IsWhiteSpace(c) && c is not ',' and not '，' and not '。' and not '、' and not ':' and not '：')
+            .ToArray());
+    }
+
+    private static string GetCandidateBindingKey(MetadataSemanticSearchResult candidate)
+    {
+        return string.Join("|",
+            candidate.Table?.Id ?? 0,
+            candidate.Column?.Id ?? 0,
+            candidate.Semantic?.Id ?? 0);
     }
 
     private static SemanticApplicabilityCandidate ToCandidate(MetadataSemanticSearchResult candidate)
