@@ -32,4 +32,7 @@ public sealed class GoldenCaseRunResult
     public string Reason { get; init; } = string.Empty;
     public string? ApplicabilityState { get; init; }
     public bool? QueryPlanEvaluationPassed { get; init; }
+    public string? ConfidenceDecision { get; init; }
+    public string? ConfidenceLevel { get; init; }
+    public double? ConfidenceScore { get; init; }
 }
