@@ -49,6 +49,7 @@ builder.Services.AddScoped<GoldenQueryDatasetSerializer>();
 builder.Services.AddScoped<SemanticApplicabilityEvaluator>();
 builder.Services.AddScoped<QueryPlanEvaluationGate>();
 builder.Services.AddScoped<QueryPlanEvaluator>();
+builder.Services.AddScoped<QueryPlanMetricScoringService>();
 builder.Services.AddScoped<QueryPlanEvaluationScoringService>();
 builder.Services.AddScoped<QueryPlanEvaluationConfidenceEvidenceAdapter>();
 builder.Services.AddScoped<QueryPlanEvaluationConfidenceService>();
