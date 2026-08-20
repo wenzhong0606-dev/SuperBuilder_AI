@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
+using SuperBuilder_AI.Interfaces.BI;
 using SuperBuilder_AI.Models.BI;
 using SuperBuilder_AI.Models.BI.Evaluation;
 using SuperBuilder_AI.Services.BI.Evaluation;
