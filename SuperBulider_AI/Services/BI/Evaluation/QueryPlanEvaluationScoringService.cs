@@ -4,35 +4,32 @@ namespace SuperBuilder_AI.Services.BI.Evaluation;
 
 public sealed class QueryPlanEvaluationScoringService
 {
-    private static readonly IReadOnlyDictionary<string, double> DefaultWeights =
-        new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase)
-        {
-            ["Intent"] = 0.10,
-            ["Metrics"] = 0.25,
-            ["Dimensions"] = 0.15,
-            ["Filters"] = 0.10,
-            ["Tables"] = 0.15,
-            ["Joins"] = 0.10,
-            ["QueryShape"] = 0.10,
-            ["BindingConsistency"] = 0.05
-        };
+    private static readonly IReadOnlyDictionary<string, double> DefaultWeights = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase)
+    {
+        ["Intent"] = 0.10,
+        ["Metrics"] = 0.25,
+        ["Dimensions"] = 0.15,
+        ["Filters"] = 0.10,
+        ["Tables"] = 0.15,
+        ["Joins"] = 0.10,
+        ["QueryShape"] = 0.10,
+        ["BindingConsistency"] = 0.05
+    };
 
     private readonly QueryPlanMetricScoringService _metricScoringService;
 
     public QueryPlanEvaluationScoringService(QueryPlanMetricScoringService metricScoringService)
-    {
-        _metricScoringService = metricScoringService;
-    }
+        => _metricScoringService = metricScoringService;
 
     public QueryPlanEvaluationResult Score(QueryPlanEvaluationResult evaluation)
     {
         ArgumentNullException.ThrowIfNull(evaluation);
 
-        var metricScore = evaluation.Metrics;
-        if (evaluation.MetricExpectations is not null || evaluation.ActualMetrics is not null)
+        var metricSection = evaluation.Metrics;
+        if (evaluation.MetricExpectations is not null)
         {
             var detailed = _metricScoringService.Evaluate(evaluation.MetricExpectations, evaluation.ActualMetrics);
-            metricScore = new QueryPlanEvaluationSectionResult
+            metricSection = new QueryPlanEvaluationSectionResult
             {
                 Passed = detailed.Passed,
                 Score = detailed.Score,
@@ -44,7 +41,7 @@ public sealed class QueryPlanEvaluationScoringService
         var sections = new[]
         {
             (Name: "Intent", Result: evaluation.Intent),
-            (Name: "Metrics", Result: metricScore),
+            (Name: "Metrics", Result: metricSection),
             (Name: "Dimensions", Result: evaluation.Dimensions),
             (Name: "Filters", Result: evaluation.Filters),
             (Name: "Tables", Result: evaluation.Tables),
@@ -57,12 +54,12 @@ public sealed class QueryPlanEvaluationScoringService
         {
             Dimension = x.Name,
             Weight = DefaultWeights[x.Name],
-            Score = Math.Clamp(x.Result.Score, 0d, 1d),
+            Score = x.Result.Score,
             Passed = x.Result.Passed,
             Reason = x.Result.Reason
         }).ToList();
 
-        var overall = scores.Sum(x => x.Weight * x.Score);
+        var overall = scores.Sum(x => x.Weight * Math.Clamp(x.Score, 0d, 1d));
         var decision = overall >= 0.90 ? QueryPlanEvaluationDecision.Pass
             : overall >= 0.60 ? QueryPlanEvaluationDecision.Partial
             : QueryPlanEvaluationDecision.Fail;
@@ -75,7 +72,7 @@ public sealed class QueryPlanEvaluationScoringService
             OverallScore = Math.Round(overall * 100d, 2),
             DimensionScores = scores,
             Intent = evaluation.Intent,
-            Metrics = metricScore,
+            Metrics = metricSection,
             Dimensions = evaluation.Dimensions,
             Filters = evaluation.Filters,
             Tables = evaluation.Tables,
