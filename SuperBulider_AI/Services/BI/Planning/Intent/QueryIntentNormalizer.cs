@@ -78,6 +78,8 @@ public sealed class QueryIntentNormalizer
 
 		NormalizeAggregation(intent);
 
+		NormalizeYearFilters(intent);
+
 		return intent;
 	}
 
@@ -230,7 +232,6 @@ public sealed class QueryIntentNormalizer
 		QueryIntent intent,
 		string question)
 	{
-		// 优先使用模型明确标记的排序指标。
 		var explicitMetric =
 			intent.Metrics.FirstOrDefault(
 				x => x.IsOrderingMetric);
@@ -240,7 +241,6 @@ public sealed class QueryIntentNormalizer
 			return explicitMetric;
 		}
 
-		// 根据用户问题与 Metric.Name / Field 匹配。
 		var matched =
 			intent.Metrics
 				.Where(x =>
@@ -324,6 +324,45 @@ public sealed class QueryIntentNormalizer
 		}
 	}
 
+	/// <summary>
+	/// 将明确的“YYYY年”年度语义确定性规范化为年度起始日期过滤。
+	/// 例如：2025年入库数量 -> Filter Operator >=，Value = 2025-01-01。
+	/// 这里只修正年度语义本身，不覆盖已经明确使用其他比较符的过滤条件。
+	/// </summary>
+	private static void NormalizeYearFilters(QueryIntent intent)
+	{
+		foreach (var filter in intent.Filters)
+		{
+			if (filter == null || string.IsNullOrWhiteSpace(filter.Value))
+			{
+				continue;
+			}
+
+			var value = filter.Value.Trim();
+			var match = Regex.Match(value, @"^(\d{4})年?$");
+			if (!match.Success)
+			{
+				continue;
+			}
+
+			if (!int.TryParse(match.Groups[1].Value, out var year) ||
+				year < 1900 ||
+				year > 9999)
+			{
+				continue;
+			}
+
+			if (!string.IsNullOrWhiteSpace(filter.Operator) &&
+				!string.Equals(filter.Operator.Trim(), "=", StringComparison.OrdinalIgnoreCase))
+			{
+				continue;
+			}
+
+			filter.Operator = ">=";
+			filter.Value = $"{year:D4}-01-01";
+		}
+	}
+
 	private static string NormalizeAggregationValue(
 		string? value)
 	{
@@ -379,9 +418,7 @@ public sealed class QueryIntentNormalizer
 				continue;
 			}
 
-			if (!units.TryGetValue(
-					ch,
-					out var unit))
+			if (!units.TryGetValue(ch, out var unit))
 			{
 				continue;
 			}
@@ -390,10 +427,8 @@ public sealed class QueryIntentNormalizer
 			{
 				section += number;
 				total += section * unit;
-
 				section = 0;
 				number = 0;
-
 				continue;
 			}
 
