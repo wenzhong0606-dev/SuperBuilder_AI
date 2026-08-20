@@ -5,9 +5,7 @@ namespace SuperBuilder_AI.Services.BI.Evaluation;
 
 /// <summary>
 /// Phase 2.4-D.2 QueryPlan Evaluator。
-/// 第一版比较 Golden Contract 已明确表达的业务约束，并增加 Runtime QueryPlan
-/// 的物理绑定一致性检查。
-/// Golden 为 null 的字段表示“不断言”，而不是要求 Runtime 为 null。
+/// Golden Contract 与 Runtime QueryPlan 解耦；Golden 为 null 的字段表示不断言。
 /// </summary>
 public sealed class QueryPlanEvaluator
 {
@@ -21,6 +19,7 @@ public sealed class QueryPlanEvaluator
         var dimensions = EvaluateDimensions(expected, runtime);
         var filters = EvaluateFilters(expected, runtime);
         var tables = EvaluateTables(expected, runtime);
+        var joins = EvaluateJoins(expected, runtime);
         var shape = EvaluateShape(expected, runtime);
         var bindingConsistency = EvaluateBindingConsistency(expected, runtime);
 
@@ -28,12 +27,13 @@ public sealed class QueryPlanEvaluator
         {
             CaseId = caseId,
             Passed = intent.Passed && metrics.Passed && dimensions.Passed && filters.Passed
-                      && tables.Passed && shape.Passed && bindingConsistency.Passed,
+                      && tables.Passed && joins.Passed && shape.Passed && bindingConsistency.Passed,
             Intent = intent,
             Metrics = metrics,
             Dimensions = dimensions,
             Filters = filters,
             Tables = tables,
+            Joins = joins,
             QueryShape = shape,
             BindingConsistency = bindingConsistency
         };
@@ -122,6 +122,55 @@ public sealed class QueryPlanEvaluator
             if (string.IsNullOrWhiteSpace(table.TableName)) return Fail($"第 {i + 1} 个 Table 物理绑定无效：TableName 为空。");
         }
         return Pass($"Tables 数量与 Runtime 物理绑定完整性匹配：{actual.Count} 个 Table，均具有有效 MetadataTableId、DataSourceId 和 TableName。Golden SemanticText 当前不直接与 TableName/TableComment 等值比较。");
+    }
+
+    /// <summary>
+    /// C.4.5 Join Evaluation。
+    /// Golden Join 只表达左右表/字段的业务语义及 JoinType，不直接绑定物理 Id。
+    /// 当前阶段验证三态、数量、JoinType，以及 Runtime Join 的物理引用完整性。
+    /// SemanticText 到 Metadata Id 的对应关系由 Semantic Resolution 提供，不能在此猜测。
+    /// </summary>
+    private static QueryPlanEvaluationSectionResult EvaluateJoins(GoldenQueryExpectation expected, QueryPlan runtime)
+    {
+        if (expected.Joins is null) return Pass("Golden 未指定 Joins，不进行断言。");
+
+        var actual = runtime.Joins ?? new List<QueryJoin>();
+
+        if (expected.Joins.Count == 0)
+            return actual.Count == 0
+                ? Pass("Golden 明确要求无 Joins，Runtime 为空。")
+                : Fail($"Golden 明确要求无 Joins，实际存在 {actual.Count} 个 Join。");
+
+        if (actual.Count != expected.Joins.Count)
+            return Fail($"Joins 数量不匹配：期望 {expected.Joins.Count}，实际 {actual.Count}。");
+
+        var tables = runtime.Tables ?? new List<QueryTable>();
+        var tableIds = tables.Select(t => t.MetadataTableId).Where(id => id > 0).ToHashSet();
+
+        for (var i = 0; i < expected.Joins.Count; i++)
+        {
+            var golden = expected.Joins[i];
+            var join = actual[i];
+
+            if (join.LeftTableId <= 0 || !tableIds.Contains(join.LeftTableId))
+                return Fail($"第 {i + 1} 个 Join 左表绑定无效：LeftTableId={join.LeftTableId}。");
+            if (join.RightTableId <= 0 || !tableIds.Contains(join.RightTableId))
+                return Fail($"第 {i + 1} 个 Join 右表绑定无效：RightTableId={join.RightTableId}。");
+            if (join.LeftTableId == join.RightTableId)
+                return Fail($"第 {i + 1} 个 Join 非法：LeftTableId 与 RightTableId 相同（{join.LeftTableId}）。");
+            if (join.LeftColumnId <= 0)
+                return Fail($"第 {i + 1} 个 Join 左字段绑定无效：LeftColumnId={join.LeftColumnId}。");
+            if (join.RightColumnId <= 0)
+                return Fail($"第 {i + 1} 个 Join 右字段绑定无效：RightColumnId={join.RightColumnId}。");
+            if (string.IsNullOrWhiteSpace(join.LeftColumnName) || string.IsNullOrWhiteSpace(join.RightColumnName))
+                return Fail($"第 {i + 1} 个 Join 字段名称绑定无效：LeftColumnName/RightColumnName 不得为空。");
+
+            var expectedJoinType = string.IsNullOrWhiteSpace(golden.JoinType) ? "INNER" : golden.JoinType;
+            if (!string.Equals(join.JoinType, expectedJoinType, StringComparison.OrdinalIgnoreCase))
+                return Fail($"第 {i + 1} 个 Join 类型不匹配：期望 {expectedJoinType}，实际 {join.JoinType}。");
+        }
+
+        return Pass($"Joins 数量、JoinType 与 Runtime 物理引用完整性匹配：{actual.Count} 个 Join。Golden 左右表/字段 SemanticText 当前不直接与物理名称等值比较。");
     }
 
     private static QueryPlanEvaluationSectionResult EvaluateShape(GoldenQueryExpectation expected, QueryPlan runtime)
