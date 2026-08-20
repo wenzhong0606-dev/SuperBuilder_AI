@@ -484,7 +484,7 @@ public sealed class SemanticApplicabilityEvaluator
             TableId = candidate.Table.Id,
             DataSourceId = candidate.Table.DataSourceId,
             ColumnId = candidate.Column.Id,
-            SemanticText = candidate.Semantic?.BusinessMeaning ?? candidate.Column.ColumnComment ?? candidate.Column.ColumnName ?? string.Empty,
+            //SemanticText = candidate.Semantic?.BusinessMeaning ?? candidate.Column.ColumnComment ?? candidate.Column.ColumnName ?? string.Empty,
             Table = candidate.Table.TableName,
             Column = candidate.Column.ColumnName,
             BusinessMeaning = candidate.Semantic?.BusinessMeaning,
