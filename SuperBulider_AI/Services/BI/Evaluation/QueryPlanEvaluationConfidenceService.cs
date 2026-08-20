@@ -5,12 +5,14 @@ using SuperBuilder_AI.Models.BI.Evaluation;
 namespace SuperBuilder_AI.Services.BI.Evaluation;
 
 /// <summary>
-/// Phase 2.6 C.6.2
+/// Phase 2.6 C.6.2 / C.14
 /// 将 QueryPlan Evaluation、Semantic Evidence 与既有 Phase 2.4
 /// Confidence / Decision Gate 串成统一诊断流程。
 ///
-/// 重要边界：本服务不重算 Confidence，也不修改既有 Confidence 权重。
-/// Evaluation Evidence 当前作为独立证据返回，供后续 C.6.3 Calibration 使用。
+/// C.14 Evaluation Decision Gate：
+/// QueryPlan Evaluation 是 SQL Builder 之前的硬安全门。
+/// 即使 Confidence Score 很高，只要 Evaluation 或 Semantic Evidence
+/// 明确失败，就不得通过 Decision Gate 进入 SQL Builder。
 /// </summary>
 public sealed class QueryPlanEvaluationConfidenceService
 {
@@ -72,9 +74,45 @@ public sealed class QueryPlanEvaluationConfidenceService
             evaluation,
             semanticEvidence);
 
-        // C.6.2 明确不把 Evaluation Evidence 伪装成原 Confidence Score 的输入。
-        // Phase 2.4 ConfidenceService 当前拥有固定内部 Evidence/Weight 计算契约。
-        // 本结果将两套证据并列保存，C.6.3 再进行 Golden Calibration。
+        // =========================================================
+        // Phase 2.6 C.14 — Evaluation Decision Gate
+        // =========================================================
+        //
+        // Confidence 是“这个 QueryPlan 看起来有多可靠”；
+        // Evaluation 是“这个 QueryPlan 是否满足 Golden 预期”。
+        // 两者不能互相覆盖。
+        //
+        // 因此：
+        //
+        // Evaluation = FAIL
+        //     ↓
+        // Hard Blocking
+        //     ↓
+        // Decision Gate = Reject
+        //
+        // 即使 Confidence = High / Score >= 0.80，
+        // 也绝对不能因为高分而 Proceed。
+        //
+        // Negative Golden Case 的“正确失败”由 GoldenDatasetRegressionEvaluator
+        // 解释为 Expected Outcome 满足；这里仍然必须让 Runtime Decision = Reject，
+        // 从而阻止错误 QueryPlan 进入 SQL Builder。
+        if (!evaluation.Passed)
+        {
+            AddBlockingReason(
+                confidence,
+                "QueryPlan Evaluation 未通过，禁止进入 SQL Builder。");
+        }
+
+        if (semanticEvidence is not null && !semanticEvidence.Passed)
+        {
+            AddBlockingReason(
+                confidence,
+                "QueryPlan Semantic Evidence 未通过，禁止进入 SQL Builder。");
+        }
+
+        // C.6.2 原有 Decision Gate 继续负责 Confidence Level、Validation、Repair
+        // 等安全规则；C.14 在调用 Gate 前把 Evaluation Failure 注入同一套
+        // BlockingReasons，因此最终 Trace 仍然保持统一，不引入第二套 Decision 模型。
         var decision = _decisionGate.Evaluate(confidence);
 
         var passed = evaluation.Passed
@@ -92,5 +130,18 @@ public sealed class QueryPlanEvaluationConfidenceService
             Decision = decision,
             Passed = passed
         };
+    }
+
+    private static void AddBlockingReason(
+        QueryPlanConfidence confidence,
+        string reason)
+    {
+        if (confidence.BlockingReasons.Any(x =>
+                string.Equals(x, reason, StringComparison.Ordinal)))
+        {
+            return;
+        }
+
+        confidence.BlockingReasons.Add(reason);
     }
 }
