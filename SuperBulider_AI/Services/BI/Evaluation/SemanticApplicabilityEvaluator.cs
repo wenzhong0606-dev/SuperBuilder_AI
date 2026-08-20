@@ -292,41 +292,41 @@ public sealed class SemanticApplicabilityEvaluator
         var topLexicalMatch = ContainsSemanticText(topSemantic, semanticText);
         var entitySemanticText = ExtractEntitySemanticText(semanticText);
 
-        // EntityCount 首先解析“实体”本身，而不是把包含“入库单”的数量字段、外键字段当作实体候选。
-        // 只有表级语义能够证明实体时，才允许进入 Resolved/Ambiguous。
+        // EntityCount 解析的是“被计数的实体”，不能把 quantity、金额、库存等指标字段，
+        // 也不能把 *_id 外键字段，仅因为语义文本中出现实体名称，就提升为实体候选。
         var tableEntityCandidates = !string.IsNullOrWhiteSpace(entitySemanticText)
             ? semanticCandidates
-                .Where(x => x.Table is not null && ContainsTableEntitySemanticText(x, entitySemanticText))
+                .Where(x => x.Table is not null && ContainsDirectEntityEvidence(x, entitySemanticText))
                 .GroupBy(x => x.Table!.Id)
-                .Select(g => g.OrderByDescending(x => x.Score).First())
-                .OrderByDescending(x => x.Score)
+                .Select(g => g.OrderByDescending(x => GetEntityEvidenceScore(x, entitySemanticText)).First())
+                .OrderByDescending(x => GetEntityEvidenceScore(x, entitySemanticText))
                 .ToList()
             : new List<MetadataSemanticSearchResult>();
 
-        // 精确实体匹配只允许 TableName / TableComment。
-        // SearchText 是拼接后的表+字段全文，不能作为“精确实体”的依据，否则诸如“入库单明细”
-        // 或包含“入库单ID”的字段描述会被错误提升为同级实体候选。
-        var exactEntityCandidates = !string.IsNullOrWhiteSpace(entitySemanticText)
-            ? tableEntityCandidates
-                .Where(x => MatchesExactEntityTableSemanticText(x, entitySemanticText))
-                .GroupBy(x => x.Table!.Id)
-                .Select(g => g.OrderByDescending(x => x.Score).First())
-                .OrderByDescending(x => x.Score)
-                .ToList()
-            : new List<MetadataSemanticSearchResult>();
+        // 如果存在真正的表级精确实体语义，优先使用它；否则使用带稳定实体标识字段的语义候选。
+        var exactEntityCandidates = tableEntityCandidates
+            .Where(x => MatchesExactEntityTableSemanticText(x, entitySemanticText))
+            .GroupBy(x => x.Table!.Id)
+            .Select(g => g.OrderByDescending(x => GetEntityEvidenceScore(x, entitySemanticText)).First())
+            .OrderByDescending(x => GetEntityEvidenceScore(x, entitySemanticText))
+            .ToList();
 
-        // 精确 TableName/TableComment 唯一时直接解析；只有多个真正的精确实体表才保持 Ambiguous。
-        // 没有精确实体时，才退回表级包含匹配。
         var entityCandidatesForResolution = exactEntityCandidates.Count > 0
             ? exactEntityCandidates
             : tableEntityCandidates;
 
         var entityCandidate = entityCandidatesForResolution.FirstOrDefault();
-        var competingCandidates = entityCandidatesForResolution.Count > 1;
+        var secondEntityCandidate = entityCandidatesForResolution.Skip(1).FirstOrDefault();
+        var entityScore = entityCandidate is null ? 0 : GetEntityEvidenceScore(entityCandidate, entitySemanticText);
+        var secondEntityScore = secondEntityCandidate is null ? 0 : GetEntityEvidenceScore(secondEntityCandidate, entitySemanticText);
 
-        // EntityCount 不允许仅凭 metric field 的 lexical match 建立实体证据。
-        // “入库单数量”中的“数量”可能命中 quantity 字段，但真正需要解析的是“入库单”这个实体。
-        var directEvidence = entityCandidate is not null;
+        // 只有证据等级接近的两个真实实体才判 Ambiguous。
+        // “入库单ID”这类外键字段与“入库单号/编码”这类实体标识字段不能构成同等级竞争。
+        var competingCandidates = entityCandidate is not null
+            && secondEntityCandidate is not null
+            && secondEntityScore >= entityScore - 8;
+
+        var directEvidence = entityCandidate is not null && entityScore >= 60;
         if (directEvidence)
             topSemantic = entityCandidate;
 
@@ -351,11 +351,160 @@ public sealed class SemanticApplicabilityEvaluator
                 DirectEntityCountEvidence = directEvidence,
                 LexicalMatch = topLexicalMatch || !string.IsNullOrWhiteSpace(entityCandidate?.Table?.TableComment),
                 CompetingCandidates = competingCandidates,
-                TopScore = topSemantic.Score,
-                SecondScore = secondSemantic?.Score,
-                ScoreGap = scoreGap
+                TopScore = entityCandidate?.Score ?? topSemantic.Score,
+                SecondScore = secondEntityCandidate?.Score ?? secondSemantic?.Score,
+                ScoreGap = secondEntityCandidate is not null
+                    ? entityScore - secondEntityScore
+                    : scoreGap
             }
         };
+    }
+
+    private static bool ContainsDirectEntityEvidence(MetadataSemanticSearchResult candidate, string entitySemanticText)
+    {
+        if (candidate.Table is null || string.IsNullOrWhiteSpace(entitySemanticText))
+            return false;
+
+        var normalizedEntity = NormalizeSemanticText(entitySemanticText);
+        if (normalizedEntity.Length == 0)
+            return false;
+
+        // 不使用 Table.SearchText：它是表、字段、业务语义的拼接全文，容易把“入库单ID”等
+        // 非实体证据误提升为 EntityCount 候选。
+        var values = new[]
+        {
+            candidate.Table.TableName,
+            candidate.Table.TableComment,
+            candidate.Semantic?.BusinessMeaning,
+            candidate.Semantic?.Keywords,
+            candidate.Semantic?.Synonyms,
+            candidate.Semantic?.ExampleQuestions,
+            candidate.Semantic?.SearchText,
+            candidate.Column?.ColumnName,
+            candidate.Column?.ColumnComment
+        };
+
+        return values.Any(value =>
+            !string.IsNullOrWhiteSpace(value)
+            && NormalizeSemanticText(value).Contains(normalizedEntity, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static double GetEntityEvidenceScore(MetadataSemanticSearchResult candidate, string entitySemanticText)
+    {
+        if (candidate.Table is null || string.IsNullOrWhiteSpace(entitySemanticText))
+            return 0;
+
+        var normalizedEntity = NormalizeSemanticText(entitySemanticText);
+        var score = 0d;
+
+        if (NormalizeSemanticText(candidate.Table.TableComment ?? string.Empty)
+            .Equals(normalizedEntity, StringComparison.OrdinalIgnoreCase))
+            score += 100;
+
+        if (NormalizeSemanticText(candidate.Table.TableName ?? string.Empty)
+            .Equals(normalizedEntity, StringComparison.OrdinalIgnoreCase))
+            score += 95;
+
+        var semanticKeywords = new[]
+        {
+            candidate.Semantic?.Keywords,
+            candidate.Semantic?.Synonyms
+        };
+
+        if (semanticKeywords.Any(value => ContainsExactSemanticToken(value, normalizedEntity)))
+            score += 90;
+
+        if (!string.IsNullOrWhiteSpace(candidate.Semantic?.BusinessMeaning)
+            && NormalizeSemanticText(candidate.Semantic.BusinessMeaning).Contains(normalizedEntity, StringComparison.OrdinalIgnoreCase))
+            score += 80;
+
+        if (!string.IsNullOrWhiteSpace(candidate.Column?.ColumnComment)
+            && NormalizeSemanticText(candidate.Column.ColumnComment).Contains(normalizedEntity, StringComparison.OrdinalIgnoreCase))
+            score += 70;
+
+        if (!string.IsNullOrWhiteSpace(candidate.Column?.ColumnName)
+            && NormalizeSemanticText(candidate.Column.ColumnName).Contains(normalizedEntity, StringComparison.OrdinalIgnoreCase))
+            score += 65;
+
+        var columnName = NormalizeSemanticText(candidate.Column?.ColumnName ?? string.Empty);
+        var columnComment = NormalizeSemanticText(candidate.Column?.ColumnComment ?? string.Empty);
+        var semanticMeaning = NormalizeSemanticText(candidate.Semantic?.BusinessMeaning ?? string.Empty);
+
+        // 实体编码/单号是 COUNT(Entity) 的稳定物理绑定，优先于明细外键。
+        if (IsEntityIdentifierColumn(columnName, columnComment, semanticMeaning, normalizedEntity))
+            score += 20;
+
+        // *_id / 关联ID 通常表示父实体外键，不应与实体自身的编码/主标识同级竞争。
+        if (IsLikelyForeignKeyColumn(columnName, columnComment, semanticMeaning))
+            score -= 25;
+
+        // 数量、金额、库存等度量字段不能作为 EntityCount 的实体标识。
+        if (IsLikelyMeasureColumn(columnName, columnComment, semanticMeaning))
+            score -= 35;
+
+        return score;
+    }
+
+    private static bool ContainsExactSemanticToken(string? value, string normalizedEntity)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return false;
+
+        var normalized = NormalizeSemanticText(value);
+        if (normalized.Equals(normalizedEntity, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        var separators = new[] { ',', '，', ';', '；', '/', '、', '|', '\n', '\r' };
+        var tokens = value.Split(separators, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        return tokens.Any(token =>
+            NormalizeSemanticText(token).Equals(normalizedEntity, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static bool IsEntityIdentifierColumn(
+        string columnName,
+        string columnComment,
+        string semanticMeaning,
+        string normalizedEntity)
+    {
+        if (string.IsNullOrWhiteSpace(columnName))
+            return false;
+
+        if (columnName.Equals("code", StringComparison.OrdinalIgnoreCase)
+            || columnName.EndsWith("code", StringComparison.OrdinalIgnoreCase)
+            || columnName.Contains("number", StringComparison.OrdinalIgnoreCase)
+            || columnName.Contains("no", StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        return columnComment.Contains("单号", StringComparison.OrdinalIgnoreCase)
+            || columnComment.Contains("编码", StringComparison.OrdinalIgnoreCase)
+            || semanticMeaning.Contains("业务编码", StringComparison.OrdinalIgnoreCase)
+            || semanticMeaning.Contains("单号", StringComparison.OrdinalIgnoreCase)
+            || semanticMeaning.Contains("唯一编号", StringComparison.OrdinalIgnoreCase)
+            || semanticMeaning.Contains(normalizedEntity, StringComparison.OrdinalIgnoreCase)
+                && (semanticMeaning.Contains("编码", StringComparison.OrdinalIgnoreCase)
+                    || semanticMeaning.Contains("编号", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static bool IsLikelyForeignKeyColumn(string columnName, string columnComment, string semanticMeaning)
+    {
+        if (columnName.EndsWith("id", StringComparison.OrdinalIgnoreCase)
+            || columnName.EndsWith("_id", StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        return columnComment.Contains("关联", StringComparison.OrdinalIgnoreCase)
+            || semanticMeaning.Contains("关联", StringComparison.OrdinalIgnoreCase)
+            || semanticMeaning.Contains("外键", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsLikelyMeasureColumn(string columnName, string columnComment, string semanticMeaning)
+    {
+        var text = $"{columnName}|{columnComment}|{semanticMeaning}";
+        var measureTerms = new[]
+        {
+            "quantity", "amount", "price", "库存", "数量", "金额", "价格", "重量", "体积", "余额"
+        };
+
+        return measureTerms.Any(term => text.Contains(term, StringComparison.OrdinalIgnoreCase));
     }
 
     private static string ExtractEntitySemanticText(string semanticText)
@@ -379,8 +528,6 @@ public sealed class SemanticApplicabilityEvaluator
         if (normalizedEntity.Length == 0)
             return false;
 
-        // 精确实体只认可稳定的表名/表注释。
-        // Table.SearchText 是全文索引文本，不具备实体边界，不能用于 exact match。
         var values = new[]
         {
             candidate.Table.TableComment,
