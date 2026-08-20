@@ -34,10 +34,6 @@ public sealed class SemanticApplicabilityEvaluator
             };
         }
 
-        // ApplicabilityResult 当前描述一个“主 Metric”的物理解析。
-        // 多 Metric Case 不再使用 SingleOrDefault()，避免多个 Metric 直接抛出异常。
-        // 这里选择第一个 Golden Metric 作为 Applicability 主语义；其余 Metric 仍由
-        // QueryUnderstanding + QueryPlanEvaluation 在后续阶段完整断言。
         var metric = metrics[0];
         var metricType = metric.Aggregation == QueryAggregation.Count ? "EntityCount" : "ColumnMetric";
         var results = await _semanticSearchService.SearchAsync(goldenCase.Question, topK);
@@ -165,9 +161,6 @@ public sealed class SemanticApplicabilityEvaluator
             };
         }
 
-        // COUNT/DistinctCount 不能因为“没有专门的 EntityCount vector”就永久 NotResolved。
-        // 当前 Metadata Semantic 模型没有独立的 EntityCount 标记，因此使用现有 semantic
-        // candidate 的直接语义匹配 + 物理表/字段绑定作为第一阶段的 EntityCount Evidence。
         var directEvidence = ContainsSemanticText(topSemantic, semanticText)
             && topSemantic.Table is not null
             && topSemantic.Column is not null;
@@ -214,12 +207,38 @@ public sealed class SemanticApplicabilityEvaluator
             candidate.Semantic?.BusinessMeaning,
             candidate.Semantic?.Keywords,
             candidate.Semantic?.Synonyms,
-            candidate.Semantic?.ExampleQuestions
+            candidate.Semantic?.ExampleQuestions,
+            candidate.Semantic?.SearchText,
+            candidate.Column?.ColumnName,
+            candidate.Table?.TableName
         };
 
-        return values.Any(value =>
-            !string.IsNullOrWhiteSpace(value) &&
-            value.Contains(semanticText, StringComparison.OrdinalIgnoreCase));
+        if (values.Any(value =>
+                !string.IsNullOrWhiteSpace(value) &&
+                value.Contains(semanticText, StringComparison.OrdinalIgnoreCase)))
+            return true;
+
+        // Qdrant 已经完成语义召回；Applicability 不应再要求候选文本逐字等于 Golden metric。
+        // 对中文业务短语使用字符集合重叠作为补充证据，解决“入库单数量”与“入库数量”这类
+        // 业务同义/量词差异，同时保持至少两个有效字符的最低证据门槛。
+        var metricChars = NormalizeSemanticCharacters(semanticText);
+        if (metricChars.Count < 2)
+            return false;
+
+        return values
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Select(NormalizeSemanticCharacters)
+            .Any(candidateChars =>
+                candidateChars.Count >= 2 &&
+                metricChars.Intersect(candidateChars).Count() >= Math.Max(2, (int)Math.Ceiling(metricChars.Count * 0.5)));
+    }
+
+    private static HashSet<char> NormalizeSemanticCharacters(string text)
+    {
+        var ignored = new HashSet<char> { ' ', '\t', '\r', '\n', ',', '，', '。', '、', '的', '了', '请', '查', '询' };
+        return text
+            .Where(c => !ignored.Contains(c))
+            .ToHashSet();
     }
 
     private static SemanticApplicabilityCandidate ToCandidate(MetadataSemanticSearchResult candidate)
