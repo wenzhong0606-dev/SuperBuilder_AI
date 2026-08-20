@@ -292,20 +292,19 @@ public sealed class SemanticApplicabilityEvaluator
         var topLexicalMatch = ContainsSemanticText(topSemantic, semanticText);
         var entitySemanticText = ExtractEntitySemanticText(semanticText);
 
-        var entityMatchedCandidates = !string.IsNullOrWhiteSpace(entitySemanticText)
+        // EntityCount 首先解析“实体”本身，而不是把包含“入库单”的数量字段、外键字段当作实体候选。
+        // 只有表级语义能够证明实体时，才允许进入 Resolved/Ambiguous。
+        var tableEntityCandidates = !string.IsNullOrWhiteSpace(entitySemanticText)
             ? semanticCandidates
-                .Where(x => x.Table is not null && x.Column is not null && ContainsEntitySemanticText(x, entitySemanticText))
+                .Where(x => x.Table is not null && ContainsTableEntitySemanticText(x, entitySemanticText))
                 .GroupBy(x => x.Table!.Id)
                 .Select(g => g.OrderByDescending(x => x.Score).First())
                 .OrderByDescending(x => x.Score)
                 .ToList()
             : new List<MetadataSemanticSearchResult>();
 
-        // EntityCount 的“实体”必须首先由表级语义确定。
-        // 不能把某个字段的 Keywords/Synonyms 中恰好出现“入库单”视为另一个实体表。
-        // 否则同一业务实体的外键、明细字段会制造伪竞争候选，导致 GQ-002 错误进入 Ambiguous。
         var exactEntityCandidates = !string.IsNullOrWhiteSpace(entitySemanticText)
-            ? entityMatchedCandidates
+            ? tableEntityCandidates
                 .Where(x => MatchesExactEntityTableSemanticText(x, entitySemanticText))
                 .GroupBy(x => x.Table!.Id)
                 .Select(g => g.OrderByDescending(x => x.Score).First())
@@ -313,23 +312,20 @@ public sealed class SemanticApplicabilityEvaluator
                 .ToList()
             : new List<MetadataSemanticSearchResult>();
 
-        var entityCandidate = exactEntityCandidates.FirstOrDefault()
-            ?? entityMatchedCandidates.FirstOrDefault();
+        // 精确表级语义优先；若没有精确匹配，则允许唯一的表级包含匹配。
+        // 不再从字段 Semantic Keywords/Synonyms 回退，否则同一实体的外键/明细字段会制造伪竞争。
+        var entityCandidatesForResolution = exactEntityCandidates.Count > 0
+            ? exactEntityCandidates
+            : tableEntityCandidates;
 
-        var directEvidence = topLexicalMatch
-            && topSemantic.Table is not null
-            && topSemantic.Column is not null;
+        var entityCandidate = entityCandidatesForResolution.FirstOrDefault();
+        var competingCandidates = entityCandidatesForResolution.Count > 1;
 
-        if (!directEvidence && entityCandidate is not null)
-        {
+        // EntityCount 不允许仅凭 metric field 的 lexical match 建立实体证据。
+        // “入库单数量”中的“数量”可能命中 quantity 字段，但真正需要解析的是“入库单”这个实体。
+        var directEvidence = entityCandidate is not null;
+        if (directEvidence)
             topSemantic = entityCandidate;
-            directEvidence = true;
-        }
-
-        // 唯一表级实体语义优先；只有多个不同表都明确声明同一实体时才 Ambiguous。
-        // 如果不存在表级精确语义，才退化到字段/搜索文本证据。
-        var competingCandidates = exactEntityCandidates.Count > 1
-            || (exactEntityCandidates.Count == 0 && entityMatchedCandidates.Count > 1);
 
         var state = directEvidence
             ? competingCandidates ? "Ambiguous" : "Resolved"
@@ -350,7 +346,7 @@ public sealed class SemanticApplicabilityEvaluator
                 SemanticCandidateExists = semanticCandidates.Count > 0,
                 EntityCandidateExists = entityCandidates.Count > 0,
                 DirectEntityCountEvidence = directEvidence,
-                LexicalMatch = topLexicalMatch || !string.IsNullOrWhiteSpace(entityCandidate?.Table?.SearchText),
+                LexicalMatch = topLexicalMatch || !string.IsNullOrWhiteSpace(entityCandidate?.Table?.TableComment),
                 CompetingCandidates = competingCandidates,
                 TopScore = topSemantic.Score,
                 SecondScore = secondSemantic?.Score,
@@ -380,19 +376,35 @@ public sealed class SemanticApplicabilityEvaluator
         if (normalizedEntity.Length == 0)
             return false;
 
-        // 只允许“表级”字段定义实体：TableComment / TableName / BusinessDomain。
-        // Column Semantic 的 Keywords/Synonyms/BusinessMeaning 不参与 EntityCount 的
-        // 实体唯一性判断，因为外键列等经常会包含被引用实体名称。
         var values = new[]
         {
             candidate.Table.TableComment,
-            candidate.Table.TableName,
-            candidate.Table.BusinessDomain
+            candidate.Table.TableName
         };
 
         return values.Any(value =>
             !string.IsNullOrWhiteSpace(value)
             && NormalizeSemanticText(value).Equals(normalizedEntity, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static bool ContainsTableEntitySemanticText(MetadataSemanticSearchResult candidate, string entitySemanticText)
+    {
+        if (candidate.Table is null)
+            return false;
+
+        var normalizedEntity = NormalizeSemanticText(entitySemanticText);
+        if (normalizedEntity.Length == 0)
+            return false;
+
+        var values = new[]
+        {
+            candidate.Table.TableComment,
+            candidate.Table.TableName
+        };
+
+        return values.Any(value =>
+            !string.IsNullOrWhiteSpace(value)
+            && NormalizeSemanticText(value).Contains(normalizedEntity, StringComparison.OrdinalIgnoreCase));
     }
 
     private static bool ContainsEntitySemanticText(MetadataSemanticSearchResult candidate, string entitySemanticText)
@@ -484,7 +496,6 @@ public sealed class SemanticApplicabilityEvaluator
             TableId = candidate.Table.Id,
             DataSourceId = candidate.Table.DataSourceId,
             ColumnId = candidate.Column.Id,
-            //SemanticText = candidate.Semantic?.BusinessMeaning ?? candidate.Column.ColumnComment ?? candidate.Column.ColumnName ?? string.Empty,
             Table = candidate.Table.TableName,
             Column = candidate.Column.ColumnName,
             BusinessMeaning = candidate.Semantic?.BusinessMeaning,
@@ -516,7 +527,7 @@ public sealed class SemanticApplicabilityEvaluator
             "Resolved" => string.IsNullOrWhiteSpace(entitySemanticText)
                 ? "Direct EntityCount semantic evidence matched an existing table/column binding."
                 : "Direct EntityCount semantic evidence matched a stable business-entity table binding.",
-            "Ambiguous" => "Multiple semantic candidates contain direct EntityCount evidence; Applicability remains Ambiguous.",
+            "Ambiguous" => "Multiple table-level semantic candidates contain direct EntityCount evidence; Applicability remains Ambiguous.",
             _ when !topLexicalMatch => "Top semantic candidate does not provide sufficient evidence for the Golden metric.",
             _ => "No direct EntityCount semantic evidence could be resolved from the current semantic candidates."
         };
