@@ -260,9 +260,6 @@ public sealed class QueryPlanConfidenceDiagnosticsController : ControllerBase
 
     private static QueryIntent BuildIntentFromGoldenCase(GoldenQueryCase goldenCase)
     {
-        // 不再通过 JsonElement 二次序列化读取 Expected。
-        // GoldenQueryExpectation 已经提供强类型 IntentType，直接使用可以避免
-        // 属性命名策略/大小写策略导致 IntentType 被读取为空。
         var intent = new QueryIntent
         {
             OriginalQuestion = goldenCase.Question,
@@ -276,9 +273,9 @@ public sealed class QueryPlanConfidenceDiagnosticsController : ControllerBase
             {
                 intent.Metrics.Add(new QueryMetric
                 {
-                    Name = metricExpectation.SemanticText ?? metricExpectation.Field ?? string.Empty,
+                    Name = metricExpectation.SemanticText,
                     Field = metricExpectation.Field ?? string.Empty,
-                    Aggregation = metricExpectation.Aggregation ?? "NONE"
+                    Aggregation = metricExpectation.Aggregation.ToString().ToUpperInvariant()
                 });
             }
         }
