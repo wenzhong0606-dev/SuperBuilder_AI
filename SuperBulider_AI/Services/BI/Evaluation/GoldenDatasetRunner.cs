@@ -217,7 +217,7 @@ public sealed class GoldenDatasetRunner
     private static GoldenCaseRunResult ExpectedApplicabilityOutcome(
         GoldenQueryCase goldenCase,
         SemanticApplicabilityResult applicability,
-        QueryPlanEvaluationDecision decision,
+        QueryPlanEvaluationGateDecision decision,
         string expectedState)
     {
         var passed = string.Equals(applicability.State, expectedState, StringComparison.OrdinalIgnoreCase);
