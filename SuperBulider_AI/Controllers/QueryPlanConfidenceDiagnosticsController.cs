@@ -1,5 +1,5 @@
+using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
-using SuperBuilder_AI.Interfaces.BI;
 using SuperBuilder_AI.Models.BI;
 using SuperBuilder_AI.Models.BI.Evaluation;
 using SuperBuilder_AI.Services.BI.Evaluation;
@@ -8,6 +8,7 @@ namespace SuperBuilder_AI.Controllers;
 
 /// <summary>
 /// Phase 2.4-E QueryPlan Confidence 诊断入口。
+/// 使用 Golden Case 已确定的 Intent 构造 QueryIntent，避免 Confidence 校准被外部 Qwen API 状态干扰。
 /// </summary>
 [ApiController]
 [Route("evaluation/diagnostics")]
@@ -17,7 +18,6 @@ public sealed class QueryPlanConfidenceDiagnosticsController : ControllerBase
     private readonly IWebHostEnvironment _environment;
     private readonly SemanticApplicabilityEvaluator _semanticApplicabilityEvaluator;
     private readonly QueryPlanEvaluationGate _queryPlanEvaluationGate;
-    private readonly IQueryUnderstandingService _queryUnderstandingService;
     private readonly IQueryPlanBuilder _queryPlanBuilder;
     private readonly QueryPlanEvaluator _queryPlanEvaluator;
     private readonly IQueryPlanContextBuilder _queryPlanContextBuilder;
@@ -29,7 +29,6 @@ public sealed class QueryPlanConfidenceDiagnosticsController : ControllerBase
         IWebHostEnvironment environment,
         SemanticApplicabilityEvaluator semanticApplicabilityEvaluator,
         QueryPlanEvaluationGate queryPlanEvaluationGate,
-        IQueryUnderstandingService queryUnderstandingService,
         IQueryPlanBuilder queryPlanBuilder,
         QueryPlanEvaluator queryPlanEvaluator,
         IQueryPlanContextBuilder queryPlanContextBuilder,
@@ -40,7 +39,6 @@ public sealed class QueryPlanConfidenceDiagnosticsController : ControllerBase
         _environment = environment;
         _semanticApplicabilityEvaluator = semanticApplicabilityEvaluator;
         _queryPlanEvaluationGate = queryPlanEvaluationGate;
-        _queryUnderstandingService = queryUnderstandingService;
         _queryPlanBuilder = queryPlanBuilder;
         _queryPlanEvaluator = queryPlanEvaluator;
         _queryPlanContextBuilder = queryPlanContextBuilder;
@@ -81,7 +79,8 @@ public sealed class QueryPlanConfidenceDiagnosticsController : ControllerBase
 
         cancellationToken.ThrowIfCancellationRequested();
 
-        var intent = await _queryUnderstandingService.UnderstandAsync(goldenCase.Question);
+        // Confidence 校准必须可重复。Golden Case 已经定义期望 Intent，因此这里不再次调用 Qwen。
+        var intent = BuildIntentFromGoldenCase(goldenCase);
         var resolution = QueryPlanSemanticResolutionFactory.From(applicability);
         var runtimePlan = await _queryPlanBuilder.BuildAsync(intent, resolution);
         var evaluation = _queryPlanEvaluator.Evaluate(goldenCase.Id, goldenCase.Expected, runtimePlan);
@@ -126,6 +125,42 @@ public sealed class QueryPlanConfidenceDiagnosticsController : ControllerBase
                 confidence.BlockingReasons
             }
         });
+    }
+
+    private static QueryIntent BuildIntentFromGoldenCase(GoldenQueryCase goldenCase)
+    {
+        var expectedJson = JsonSerializer.SerializeToElement(goldenCase.Expected);
+        var intentType = expectedJson.TryGetProperty("intentType", out var intentTypeElement)
+            ? intentTypeElement.GetString() ?? string.Empty
+            : string.Empty;
+
+        var intent = new QueryIntent
+        {
+            OriginalQuestion = goldenCase.Question,
+            IntentType = intentType
+        };
+
+        if (expectedJson.TryGetProperty("metrics", out var metricsElement) &&
+            metricsElement.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var metricElement in metricsElement.EnumerateArray())
+            {
+                intent.Metrics.Add(new QueryMetric
+                {
+                    Name = metricElement.TryGetProperty("semanticText", out var semanticText)
+                        ? semanticText.GetString() ?? string.Empty
+                        : string.Empty,
+                    Field = metricElement.TryGetProperty("field", out var field)
+                        ? field.GetString() ?? string.Empty
+                        : string.Empty,
+                    Aggregation = metricElement.TryGetProperty("aggregation", out var aggregation)
+                        ? aggregation.GetString() ?? "NONE"
+                        : "NONE"
+                });
+            }
+        }
+
+        return intent;
     }
 
     private GoldenQueryCase? LoadGoldenCase(string caseId)
