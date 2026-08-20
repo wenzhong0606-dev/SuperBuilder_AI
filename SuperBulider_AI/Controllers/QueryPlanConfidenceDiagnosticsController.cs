@@ -9,7 +9,8 @@ namespace SuperBuilder_AI.Controllers;
 
 /// <summary>
 /// Phase 2.4-E QueryPlan Confidence 诊断入口。
-/// 使用 Golden Case 已确定的 Intent 构造 QueryIntent，避免 Confidence 校准被外部 Qwen API 状态干扰。
+/// 使用 Semantic Resolution 已确认的物理绑定构造确定性的 Runtime QueryPlan，
+/// 避免 Confidence 校准被 Qwen 或 QueryPlanBuilder 的二次 Metadata 推断干扰。
 /// </summary>
 [ApiController]
 [Route("evaluation/diagnostics")]
@@ -19,7 +20,6 @@ public sealed class QueryPlanConfidenceDiagnosticsController : ControllerBase
     private readonly IWebHostEnvironment _environment;
     private readonly SemanticApplicabilityEvaluator _semanticApplicabilityEvaluator;
     private readonly QueryPlanEvaluationGate _queryPlanEvaluationGate;
-    private readonly IQueryPlanBuilder _queryPlanBuilder;
     private readonly QueryPlanEvaluator _queryPlanEvaluator;
     private readonly IQueryPlanContextBuilder _queryPlanContextBuilder;
     private readonly IQueryPlanValidationPipeline _queryPlanValidationPipeline;
@@ -30,7 +30,6 @@ public sealed class QueryPlanConfidenceDiagnosticsController : ControllerBase
         IWebHostEnvironment environment,
         SemanticApplicabilityEvaluator semanticApplicabilityEvaluator,
         QueryPlanEvaluationGate queryPlanEvaluationGate,
-        IQueryPlanBuilder queryPlanBuilder,
         QueryPlanEvaluator queryPlanEvaluator,
         IQueryPlanContextBuilder queryPlanContextBuilder,
         IQueryPlanValidationPipeline queryPlanValidationPipeline,
@@ -40,7 +39,6 @@ public sealed class QueryPlanConfidenceDiagnosticsController : ControllerBase
         _environment = environment;
         _semanticApplicabilityEvaluator = semanticApplicabilityEvaluator;
         _queryPlanEvaluationGate = queryPlanEvaluationGate;
-        _queryPlanBuilder = queryPlanBuilder;
         _queryPlanEvaluator = queryPlanEvaluator;
         _queryPlanContextBuilder = queryPlanContextBuilder;
         _queryPlanValidationPipeline = queryPlanValidationPipeline;
@@ -80,11 +78,17 @@ public sealed class QueryPlanConfidenceDiagnosticsController : ControllerBase
 
         cancellationToken.ThrowIfCancellationRequested();
 
-        // Confidence 校准必须可重复。Golden Case 已经定义期望 Intent，因此这里不再次调用 Qwen。
+        // Confidence 校准必须可重复：直接使用 Semantic Resolution 已确认的物理绑定。
+        // 这里不再次调用 Qwen，也不调用 QueryPlanBuilder.BuildAsync(intent)，避免重新进行
+        // Metadata 搜索导致 Runtime Plan 与已确认 Resolution 发生二次推断漂移。
         var intent = BuildIntentFromGoldenCase(goldenCase);
         var resolution = QueryPlanSemanticResolutionFactory.From(applicability);
-        var runtimePlan = await _queryPlanBuilder.BuildAsync(intent, resolution);
-        var evaluation = _queryPlanEvaluator.Evaluate(goldenCase.Id, goldenCase.Expected, runtimePlan);
+        var runtimePlan = BuildRuntimePlanFromResolution(intent, resolution);
+
+        var evaluation = _queryPlanEvaluator.Evaluate(
+            goldenCase.Id,
+            goldenCase.Expected,
+            runtimePlan);
 
         var validationContext = await _queryPlanContextBuilder.BuildAsync(runtimePlan);
         var validationResult = await _queryPlanValidationPipeline
@@ -108,6 +112,23 @@ public sealed class QueryPlanConfidenceDiagnosticsController : ControllerBase
             applicability,
             resolution,
             gate,
+            runtimePlan = new
+            {
+                intentType = runtimePlan.Intent?.IntentType,
+                dataSourceId = runtimePlan.DataSourceId,
+                metrics = runtimePlan.Metrics,
+                dimensions = runtimePlan.Dimensions.Count,
+                filters = runtimePlan.Filters.Count,
+                tables = runtimePlan.Tables.Count,
+                joins = runtimePlan.Joins.Count,
+                fields = runtimePlan.Fields.Count,
+                isAggregate = runtimePlan.IsAggregate,
+                distinct = runtimePlan.Distinct,
+                limit = runtimePlan.Limit,
+                isRanking = runtimePlan.IsRanking,
+                isDetailRanking = runtimePlan.IsDetailRanking,
+                isAggregateRanking = runtimePlan.IsAggregateRanking
+            },
             evaluation,
             validation = new
             {
@@ -125,6 +146,135 @@ public sealed class QueryPlanConfidenceDiagnosticsController : ControllerBase
                 confidence.Reasons,
                 confidence.BlockingReasons
             }
+        });
+    }
+
+    private static QueryPlan BuildRuntimePlanFromResolution(
+        QueryIntent intent,
+        QueryPlanSemanticResolution resolution)
+    {
+        var plan = new QueryPlan
+        {
+            Intent = intent,
+            DataSourceId = resolution.Metric?.DataSourceId
+                ?? resolution.Filters.FirstOrDefault()?.DataSourceId
+                ?? resolution.Dimensions.FirstOrDefault()?.DataSourceId
+                ?? resolution.Orders.FirstOrDefault()?.DataSourceId
+                ?? 0,
+            IsAggregate = string.Equals(
+                intent.IntentType,
+                "Aggregate",
+                StringComparison.OrdinalIgnoreCase),
+            Distinct = false,
+            Limit = null,
+            IsRanking = false,
+            IsDetailRanking = false,
+            IsAggregateRanking = false
+        };
+
+        var bindings = new List<QueryPlanColumnBinding>();
+
+        if (resolution.Metric is not null)
+        {
+            var metric = intent.Metrics.FirstOrDefault(x =>
+                string.Equals(x.Name, resolution.Metric.SemanticText, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(x.Field, resolution.Metric.Column, StringComparison.OrdinalIgnoreCase));
+
+            metric ??= new QueryMetric
+            {
+                Name = resolution.Metric.SemanticText,
+                Field = resolution.Metric.Column,
+                Aggregation = "SUM"
+            };
+
+            metric.Field = resolution.Metric.Column;
+            plan.Metrics.Add(metric);
+            plan.Fields.Add(new QueryField
+            {
+                MetadataColumnId = resolution.Metric.ColumnId,
+                ColumnName = resolution.Metric.Column,
+                Aggregation = metric.GetAggregation().ToString()
+            });
+
+            plan.Tables.Add(new QueryTable
+            {
+                MetadataTableId = resolution.Metric.TableId,
+                DataSourceId = resolution.Metric.DataSourceId,
+                TableName = resolution.Metric.Table
+            });
+        }
+
+        foreach (var binding in resolution.Filters)
+        {
+            EnsureTable(plan, binding.TableId, binding.DataSourceId, binding.Table);
+            var filter = intent.Filters.FirstOrDefault(x =>
+                string.Equals(x.Field, binding.Column, StringComparison.OrdinalIgnoreCase));
+            if (filter is not null)
+                filter.Field = binding.Column;
+
+            plan.Fields.Add(new QueryField
+            {
+                MetadataColumnId = binding.ColumnId,
+                ColumnName = binding.Column,
+                Aggregation = "NONE"
+            });
+        }
+
+        foreach (var binding in resolution.Dimensions)
+        {
+            EnsureTable(plan, binding.TableId, binding.DataSourceId, binding.Table);
+            var dimension = intent.Dimensions.FirstOrDefault(x =>
+                string.Equals(x.ColumnName, binding.Column, StringComparison.OrdinalIgnoreCase));
+            if (dimension is not null)
+            {
+                dimension.MetadataColumnId = binding.ColumnId;
+                dimension.ColumnName = binding.Column;
+            }
+
+            plan.Fields.Add(new QueryField
+            {
+                MetadataColumnId = binding.ColumnId,
+                ColumnName = binding.Column,
+                Aggregation = "NONE"
+            });
+        }
+
+        foreach (var binding in resolution.Orders)
+        {
+            EnsureTable(plan, binding.TableId, binding.DataSourceId, binding.Table);
+            var order = intent.Orders.FirstOrDefault(x =>
+                string.Equals(x.Field, binding.Column, StringComparison.OrdinalIgnoreCase));
+            if (order is not null)
+            {
+                order.MetadataColumnId = binding.ColumnId;
+                order.Field = binding.Column;
+            }
+
+            plan.Fields.Add(new QueryField
+            {
+                MetadataColumnId = binding.ColumnId,
+                ColumnName = binding.Column,
+                Aggregation = "NONE"
+            });
+        }
+
+        return plan;
+    }
+
+    private static void EnsureTable(
+        QueryPlan plan,
+        long tableId,
+        long dataSourceId,
+        string tableName)
+    {
+        if (plan.Tables.Any(x => x.MetadataTableId == tableId))
+            return;
+
+        plan.Tables.Add(new QueryTable
+        {
+            MetadataTableId = tableId,
+            DataSourceId = dataSourceId,
+            TableName = tableName
         });
     }
 
@@ -150,7 +300,9 @@ public sealed class QueryPlanConfidenceDiagnosticsController : ControllerBase
                 {
                     Name = metricElement.TryGetProperty("semanticText", out var semanticText)
                         ? semanticText.GetString() ?? string.Empty
-                        : string.Empty,
+                        : metricElement.TryGetProperty("name", out var name)
+                            ? name.GetString() ?? string.Empty
+                            : string.Empty,
                     Field = metricElement.TryGetProperty("field", out var field)
                         ? field.GetString() ?? string.Empty
                         : string.Empty,
@@ -179,4 +331,6 @@ public sealed class QueryPlanConfidenceDiagnosticsController : ControllerBase
         return dataset.Cases.SingleOrDefault(x =>
             string.Equals(x.Id, caseId, StringComparison.OrdinalIgnoreCase));
     }
+
+    private sealed record QueryPlanColumnBinding;
 }
