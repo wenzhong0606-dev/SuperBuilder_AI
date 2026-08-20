@@ -346,7 +346,7 @@ public sealed class SemanticApplicabilityEvaluator
                 SemanticCandidateExists = semanticCandidates.Count > 0,
                 EntityCandidateExists = entityCandidates.Count > 0,
                 DirectEntityCountEvidence = directEvidence,
-                LexicalMatch = topLexicalMatch || !string.IsNullOrWhiteSpace(entityCandidate?.Table?.SearchText),
+                LexicalMatch = topLexicalMatch || !string.IsNullOrWhiteSpace(entityCandidate?.Table?.TableComment),
                 CompetingCandidates = competingCandidates,
                 TopScore = topSemantic.Score,
                 SecondScore = secondSemantic?.Score,
@@ -379,8 +379,7 @@ public sealed class SemanticApplicabilityEvaluator
         var values = new[]
         {
             candidate.Table.TableComment,
-            candidate.Table.TableName,
-            candidate.Table.BusinessDomain
+            candidate.Table.TableName
         };
 
         return values.Any(value =>
@@ -400,9 +399,7 @@ public sealed class SemanticApplicabilityEvaluator
         var values = new[]
         {
             candidate.Table.TableComment,
-            candidate.Table.TableName,
-            candidate.Table.BusinessDomain,
-            candidate.Table.SearchText
+            candidate.Table.TableName
         };
 
         return values.Any(value =>
