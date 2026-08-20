@@ -48,6 +48,7 @@ builder.Services.AddScoped<IQueryPlanExplainabilityService, QueryPlanExplainabil
 builder.Services.AddScoped<GoldenQueryDatasetSerializer>();
 builder.Services.AddScoped<SemanticApplicabilityEvaluator>();
 builder.Services.AddScoped<QueryPlanEvaluationGate>();
+builder.Services.AddScoped<QueryPlanJoinScoringService>();
 builder.Services.AddScoped<QueryPlanEvaluator>();
 builder.Services.AddScoped<QueryPlanMetricScoringService>();
 builder.Services.AddScoped<QueryPlanEvaluationScoringService>();
@@ -72,7 +73,6 @@ builder.Services.AddScoped<ISqlDialect, SqlServerDialect>();
 builder.Services.AddScoped<ISqlDialect, MySqlDialect>();
 builder.Services.AddScoped<ISqlDialect, PostgreSqlDialect>();
 builder.Services.AddScoped<SqlDialectResolver>();
-
 builder.Services.AddScoped<GoldenBaselineComparisonService>();
 
 var app = builder.Build();
