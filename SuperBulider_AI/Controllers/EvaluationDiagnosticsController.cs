@@ -7,11 +7,6 @@ using SuperBuilder_AI.Services.BI.Evaluation;
 
 namespace SuperBuilder_AI.Controllers;
 
-/// <summary>
-/// Phase 2.6 Evaluation Dataset 诊断入口。
-/// 验证 Golden Dataset Contract、源码资产加载、运行时 Semantic 检索诊断、
-/// Semantic Applicability、QueryPlan Evaluation Gate、真实 QueryPlan Evaluation 与批量回归。
-/// </summary>
 [ApiController]
 [Route("evaluation/diagnostics")]
 public sealed class EvaluationDiagnosticsController : ControllerBase
@@ -25,6 +20,7 @@ public sealed class EvaluationDiagnosticsController : ControllerBase
     private readonly IQueryPlanBuilder _queryPlanBuilder;
     private readonly QueryPlanEvaluator _queryPlanEvaluator;
     private readonly GoldenDatasetRunner _goldenDatasetRunner;
+    private readonly GoldenDatasetRegressionEvaluator _goldenDatasetRegressionEvaluator;
 
     public EvaluationDiagnosticsController(
         GoldenQueryDatasetSerializer serializer,
@@ -35,7 +31,8 @@ public sealed class EvaluationDiagnosticsController : ControllerBase
         IQueryUnderstandingService queryUnderstandingService,
         IQueryPlanBuilder queryPlanBuilder,
         QueryPlanEvaluator queryPlanEvaluator,
-        GoldenDatasetRunner goldenDatasetRunner)
+        GoldenDatasetRunner goldenDatasetRunner,
+        GoldenDatasetRegressionEvaluator goldenDatasetRegressionEvaluator)
     {
         _serializer = serializer;
         _environment = environment;
@@ -46,44 +43,30 @@ public sealed class EvaluationDiagnosticsController : ControllerBase
         _queryPlanBuilder = queryPlanBuilder;
         _queryPlanEvaluator = queryPlanEvaluator;
         _goldenDatasetRunner = goldenDatasetRunner;
+        _goldenDatasetRegressionEvaluator = goldenDatasetRegressionEvaluator;
     }
 
     [HttpGet("golden-dataset")]
     public ActionResult<object> GoldenDataset()
     {
-        var path = Path.Combine(_environment.ContentRootPath, "Evaluation", "Golden", "query-plan-golden-v1.json");
+        var path = GoldenPath();
         if (!System.IO.File.Exists(path)) return NotFound(new { passed = false, message = "Golden Dataset asset was not found.", path });
         var dataset = _serializer.Deserialize(System.IO.File.ReadAllText(path));
         var cases = dataset.Cases ?? new List<GoldenQueryCase>();
         var duplicateIds = cases.Where(x => !string.IsNullOrWhiteSpace(x.Id)).GroupBy(x => x.Id, StringComparer.OrdinalIgnoreCase).Where(g => g.Count() > 1).Select(g => g.Key).ToList();
         var enabledCases = cases.Where(x => x.Enabled).ToList();
-        var positiveCases = enabledCases.Count(IsPositiveCase);
-        var negativeCases = enabledCases.Count(IsNegativeCase);
-        var ambiguousCases = enabledCases.Count(IsAmbiguousCase);
-        var unresolvedCases = enabledCases.Count(IsUnresolvedCase);
         var invalidCases = cases.Where(IsInvalidCase).Select(x => x.Id).ToList();
-        var passed = !string.IsNullOrWhiteSpace(dataset.Version) && dataset.Dataset == "query-plan-golden" && cases.Count > 0 && duplicateIds.Count == 0 && invalidCases.Count == 0 && enabledCases.Count > 0;
         return Ok(new
         {
-            passed,
+            passed = !string.IsNullOrWhiteSpace(dataset.Version) && dataset.Dataset == "query-plan-golden" && cases.Count > 0 && duplicateIds.Count == 0 && invalidCases.Count == 0 && enabledCases.Count > 0,
             dataset = dataset.Dataset,
             version = dataset.Version,
             caseCount = cases.Count,
             enabledCaseCount = enabledCases.Count,
-            categoryCounts = new { positive = positiveCases, negative = negativeCases, ambiguous = ambiguousCases, unresolved = unresolvedCases },
+            categoryCounts = new { positive = enabledCases.Count(IsPositiveCase), negative = enabledCases.Count(IsNegativeCase), ambiguous = enabledCases.Count(IsAmbiguousCase), unresolved = enabledCases.Count(IsUnresolvedCase) },
             duplicateIds,
             invalidCases,
-            cases = cases.Select(x => new
-            {
-                x.Id, x.Name, x.Question, x.Difficulty, x.Enabled, x.Version,
-                category = GetCategory(x),
-                metric = x.Expected?.Metrics?.SingleOrDefault()?.SemanticText,
-                aggregation = x.Expected?.Metrics?.SingleOrDefault()?.Aggregation.ToString(),
-                dimensionsState = x.Expected?.Dimensions is null ? "null" : x.Expected.Dimensions.Count == 0 ? "empty" : "values",
-                filtersState = x.Expected?.Filters is null ? "null" : x.Expected.Filters.Count == 0 ? "empty" : "values",
-                tablesState = x.Expected?.Tables is null ? "null" : x.Expected.Tables.Count == 0 ? "empty" : "values",
-                joinsState = x.Expected?.Joins is null ? "null" : x.Expected.Joins.Count == 0 ? "empty" : "values"
-            }),
+            cases = cases.Select(x => new { x.Id, x.Name, x.Question, x.Difficulty, x.Enabled, x.Version, category = GetCategory(x), metric = x.Expected?.Metrics?.SingleOrDefault()?.SemanticText, aggregation = x.Expected?.Metrics?.SingleOrDefault()?.Aggregation.ToString(), dimensionsState = State(x.Expected?.Dimensions), filtersState = State(x.Expected?.Filters), tablesState = State(x.Expected?.Tables), joinsState = State(x.Expected?.Joins) }),
             sourcePath = path
         });
     }
@@ -92,10 +75,22 @@ public sealed class EvaluationDiagnosticsController : ControllerBase
     public async Task<ActionResult<GoldenDatasetRunResult>> GoldenDatasetRun([FromQuery] int topK = 10, CancellationToken cancellationToken = default)
     {
         if (topK < 1 || topK > 100) return BadRequest(new { passed = false, message = "topK must be between 1 and 100." });
-        var path = Path.Combine(_environment.ContentRootPath, "Evaluation", "Golden", "query-plan-golden-v1.json");
+        var path = GoldenPath();
         if (!System.IO.File.Exists(path)) return NotFound(new { passed = false, message = "Golden Dataset asset was not found.", path });
         var result = await _goldenDatasetRunner.RunAsync(await System.IO.File.ReadAllTextAsync(path, cancellationToken), topK, cancellationToken);
         return Ok(result);
+    }
+
+    [HttpGet("golden-regression")]
+    public async Task<ActionResult<object>> GoldenRegression([FromQuery] int topK = 10, CancellationToken cancellationToken = default)
+    {
+        if (topK < 1 || topK > 100) return BadRequest(new { passed = false, message = "topK must be between 1 and 100." });
+        var path = GoldenPath();
+        if (!System.IO.File.Exists(path)) return NotFound(new { passed = false, message = "Golden Dataset asset was not found.", path });
+        var json = await System.IO.File.ReadAllTextAsync(path, cancellationToken);
+        var run = await _goldenDatasetRunner.RunAsync(json, topK, cancellationToken);
+        var scorecard = _goldenDatasetRegressionEvaluator.Evaluate(run);
+        return Ok(new { passed = scorecard.Passed, dataset = run.Dataset, version = run.Version, run, scorecard });
     }
 
     [HttpGet("semantic")]
@@ -111,7 +106,6 @@ public sealed class EvaluationDiagnosticsController : ControllerBase
     public async Task<ActionResult<object>> Applicability([FromQuery] string caseId, [FromQuery] int topK = 10)
     {
         if (string.IsNullOrWhiteSpace(caseId)) return BadRequest(new { passed = false, message = "caseId is required." });
-        if (topK < 1 || topK > 100) return BadRequest(new { passed = false, message = "topK must be between 1 and 100." });
         var goldenCase = LoadGoldenCase(caseId);
         if (goldenCase is null) return NotFound(new { passed = false, message = $"Golden Case '{caseId}' was not found." });
         var result = await _semanticApplicabilityEvaluator.EvaluateAsync(goldenCase, topK);
@@ -121,8 +115,6 @@ public sealed class EvaluationDiagnosticsController : ControllerBase
     [HttpGet("query-plan-gate")]
     public async Task<ActionResult<object>> QueryPlanGate([FromQuery] string caseId, [FromQuery] int topK = 10)
     {
-        if (string.IsNullOrWhiteSpace(caseId)) return BadRequest(new { passed = false, message = "caseId is required." });
-        if (topK < 1 || topK > 100) return BadRequest(new { passed = false, message = "topK must be between 1 and 100." });
         var goldenCase = LoadGoldenCase(caseId);
         if (goldenCase is null) return NotFound(new { passed = false, message = $"Golden Case '{caseId}' was not found." });
         var applicability = await _semanticApplicabilityEvaluator.EvaluateAsync(goldenCase, topK);
@@ -133,8 +125,6 @@ public sealed class EvaluationDiagnosticsController : ControllerBase
     [HttpGet("query-plan-evaluation")]
     public async Task<ActionResult<object>> QueryPlanEvaluation([FromQuery] string caseId, [FromQuery] int topK = 10)
     {
-        if (string.IsNullOrWhiteSpace(caseId)) return BadRequest(new { passed = false, message = "caseId is required." });
-        if (topK < 1 || topK > 100) return BadRequest(new { passed = false, message = "topK must be between 1 and 100." });
         var goldenCase = LoadGoldenCase(caseId);
         if (goldenCase is null) return NotFound(new { passed = false, message = $"Golden Case '{caseId}' was not found." });
         var applicability = await _semanticApplicabilityEvaluator.EvaluateAsync(goldenCase, topK);
@@ -150,14 +140,11 @@ public sealed class EvaluationDiagnosticsController : ControllerBase
     [HttpGet("serialization-roundtrip")]
     public ActionResult<object> SerializationRoundTrip()
     {
-        const string sourceJson = """
-        { "version": "1.0", "dataset": "query-plan-golden", "cases": [{ "id": "SER-001", "name": "Serialization Contract", "question": "验证 Golden Dataset 序列化契约", "expected": { "intentType": "Aggregate", "dimensions": [], "metrics": [{ "semanticText": "入库数量", "aggregation": "sum" }] }, "version": "1.0", "enabled": true }] }
-        """;
+        const string sourceJson = """{ "version": "1.0", "dataset": "query-plan-golden", "cases": [{ "id": "SER-001", "name": "Serialization Contract", "question": "验证 Golden Dataset 序列化契约", "expected": { "intentType": "Aggregate", "dimensions": [], "metrics": [{ "semanticText": "入库数量", "aggregation": "sum" }] }, "version": "1.0", "enabled": true }] }""";
         var dataset = _serializer.Deserialize(sourceJson);
-        var caseItem = dataset.Cases.Single();
-        var expected = caseItem.Expected;
+        var expected = dataset.Cases.Single().Expected;
         var serializedJson = _serializer.Serialize(dataset);
-        return Ok(new { passed = expected is not null && expected.Metrics is { Count: 1 } && expected.Metrics[0].Aggregation == QueryAggregation.Sum && expected.Metrics[0].SemanticText == "入库数量" && expected.Dimensions is { Count: 0 } && !serializedJson.Contains("businessKey", StringComparison.OrdinalIgnoreCase), metricsState = expected?.Metrics is null ? "null" : expected.Metrics.Count == 0 ? "empty" : "values", dimensionsState = expected?.Dimensions is null ? "null" : expected.Dimensions.Count == 0 ? "empty" : "values", aggregation = expected?.Metrics?.FirstOrDefault()?.Aggregation.ToString(), semanticText = expected?.Metrics?.FirstOrDefault()?.SemanticText, containsBusinessKey = serializedJson.Contains("businessKey", StringComparison.OrdinalIgnoreCase), serializedJson });
+        return Ok(new { passed = expected is not null && expected.Metrics is { Count: 1 } && expected.Metrics[0].Aggregation == QueryAggregation.Sum && expected.Metrics[0].SemanticText == "入库数量" && expected.Dimensions is { Count: 0 } && !serializedJson.Contains("businessKey", StringComparison.OrdinalIgnoreCase), metricsState = State(expected?.Metrics), dimensionsState = State(expected?.Dimensions), aggregation = expected?.Metrics?.FirstOrDefault()?.Aggregation.ToString(), semanticText = expected?.Metrics?.FirstOrDefault()?.SemanticText, containsBusinessKey = serializedJson.Contains("businessKey", StringComparison.OrdinalIgnoreCase), serializedJson });
     }
 
     [HttpGet("three-state")]
@@ -170,31 +157,13 @@ public sealed class EvaluationDiagnosticsController : ControllerBase
         return Ok(new { missingMetricsIsNull = missing.Metrics is null, emptyMetricsIsNotNull = empty.Metrics is not null, emptyMetricsCount = empty.Metrics?.Count });
     }
 
-    private GoldenQueryCase? LoadGoldenCase(string caseId)
-    {
-        var path = Path.Combine(_environment.ContentRootPath, "Evaluation", "Golden", "query-plan-golden-v1.json");
-        if (!System.IO.File.Exists(path)) return null;
-        var dataset = _serializer.Deserialize(System.IO.File.ReadAllText(path));
-        return dataset.Cases.SingleOrDefault(x => string.Equals(x.Id, caseId, StringComparison.OrdinalIgnoreCase));
-    }
-
-    private static string GetCategory(GoldenQueryCase item)
-    {
-        if (IsNegativeCase(item)) return "negative";
-        if (IsAmbiguousCase(item)) return "ambiguous";
-        if (IsUnresolvedCase(item)) return "unresolved";
-        return "positive";
-    }
-
+    private string GoldenPath() => Path.Combine(_environment.ContentRootPath, "Evaluation", "Golden", "query-plan-golden-v1.json");
+    private GoldenQueryCase? LoadGoldenCase(string caseId) { var path = GoldenPath(); if (!System.IO.File.Exists(path)) return null; return _serializer.Deserialize(System.IO.File.ReadAllText(path)).Cases.SingleOrDefault(x => string.Equals(x.Id, caseId, StringComparison.OrdinalIgnoreCase)); }
+    private static string State<T>(ICollection<T>? value) => value is null ? "null" : value.Count == 0 ? "empty" : "values";
+    private static string GetCategory(GoldenQueryCase item) => IsNegativeCase(item) ? "negative" : IsAmbiguousCase(item) ? "ambiguous" : IsUnresolvedCase(item) ? "unresolved" : "positive";
     private static bool IsNegativeCase(GoldenQueryCase item) => item.Tags?.Any(tag => string.Equals(tag, "negative", StringComparison.OrdinalIgnoreCase)) == true;
     private static bool IsAmbiguousCase(GoldenQueryCase item) => item.Tags?.Any(tag => string.Equals(tag, "ambiguous", StringComparison.OrdinalIgnoreCase)) == true;
     private static bool IsUnresolvedCase(GoldenQueryCase item) => item.Tags?.Any(tag => string.Equals(tag, "unresolved", StringComparison.OrdinalIgnoreCase)) == true;
     private static bool IsPositiveCase(GoldenQueryCase item) => !IsNegativeCase(item) && !IsAmbiguousCase(item) && !IsUnresolvedCase(item);
-
-    private static bool IsInvalidCase(GoldenQueryCase item)
-    {
-        if (string.IsNullOrWhiteSpace(item.Id) || string.IsNullOrWhiteSpace(item.Question) || item.Expected is null) return true;
-        if (item.Enabled && string.IsNullOrWhiteSpace(item.Name)) return true;
-        return false;
-    }
+    private static bool IsInvalidCase(GoldenQueryCase item) => string.IsNullOrWhiteSpace(item.Id) || string.IsNullOrWhiteSpace(item.Question) || item.Expected is null || (item.Enabled && string.IsNullOrWhiteSpace(item.Name));
 }
