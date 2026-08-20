@@ -24,6 +24,7 @@ public sealed class EvaluationDiagnosticsController : ControllerBase
     private readonly GoldenDatasetCoverageAnalyzer _goldenDatasetCoverageAnalyzer;
     private readonly GoldenDatasetQualityGate _goldenDatasetQualityGate;
     private readonly GoldenBaselineReleaseService _goldenBaselineReleaseService;
+    private readonly GoldenBaselineComparisonService _goldenBaselineComparisonService;
 
     public EvaluationDiagnosticsController(
         GoldenQueryDatasetSerializer serializer,
@@ -38,7 +39,8 @@ public sealed class EvaluationDiagnosticsController : ControllerBase
         GoldenDatasetRegressionEvaluator goldenDatasetRegressionEvaluator,
         GoldenDatasetCoverageAnalyzer goldenDatasetCoverageAnalyzer,
         GoldenDatasetQualityGate goldenDatasetQualityGate,
-        GoldenBaselineReleaseService goldenBaselineReleaseService)
+        GoldenBaselineReleaseService goldenBaselineReleaseService,
+        GoldenBaselineComparisonService goldenBaselineComparisonService)
     {
         _serializer = serializer;
         _environment = environment;
@@ -53,6 +55,7 @@ public sealed class EvaluationDiagnosticsController : ControllerBase
         _goldenDatasetCoverageAnalyzer = goldenDatasetCoverageAnalyzer;
         _goldenDatasetQualityGate = goldenDatasetQualityGate;
         _goldenBaselineReleaseService = goldenBaselineReleaseService;
+        _goldenBaselineComparisonService = goldenBaselineComparisonService;
     }
 
     [HttpGet("golden-dataset")]
@@ -114,6 +117,25 @@ public sealed class EvaluationDiagnosticsController : ControllerBase
         if (!System.IO.File.Exists(path)) return NotFound(new { passed = false, message = "Golden Dataset asset was not found.", path });
         var dataset = _serializer.Deserialize(System.IO.File.ReadAllText(path));
         return Ok(_goldenBaselineReleaseService.Evaluate(dataset));
+    }
+
+    [HttpGet("golden-baseline-comparison")]
+    public ActionResult<GoldenBaselineComparisonScorecard> GoldenBaselineComparison()
+    {
+        var path = GoldenPath();
+        if (!System.IO.File.Exists(path)) return NotFound(new { passed = false, message = "Golden Dataset asset was not found.", path });
+        var dataset = _serializer.Deserialize(System.IO.File.ReadAllText(path));
+        var release = _goldenBaselineReleaseService.Evaluate(dataset);
+        if (!release.Passed || release.Baseline is null)
+            return Ok(new GoldenBaselineComparisonScorecard
+            {
+                Passed = false,
+                Decision = "BLOCK",
+                BaselineVersion = string.Empty,
+                CandidateVersion = dataset.Version,
+                Regressions = release.BlockingReasons.ToList()
+            });
+        return Ok(_goldenBaselineComparisonService.Compare(release.Baseline, dataset));
     }
 
     [HttpGet("golden-dataset-run")]
