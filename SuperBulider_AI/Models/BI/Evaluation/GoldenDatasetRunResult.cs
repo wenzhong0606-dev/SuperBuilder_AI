@@ -35,4 +35,28 @@ public sealed class GoldenCaseRunResult
     public string? ConfidenceDecision { get; init; }
     public string? ConfidenceLevel { get; init; }
     public double? ConfidenceScore { get; init; }
+
+    /// <summary>
+    /// Golden Runtime 的 Validation 诊断。
+    /// 直接暴露 Pipeline 最终 ValidationResult，避免只返回“存在 N 个 Validation Error”而丢失根因。
+    /// </summary>
+    public GoldenValidationDiagnostics? ValidationDiagnostics { get; init; }
+}
+
+/// <summary>
+/// Golden Runtime Validation / Repair 诊断信息。
+/// 仅用于可观测性，不参与 Golden Case 判定。
+/// </summary>
+public sealed class GoldenValidationDiagnostics
+{
+    public bool ValidationPassed { get; init; }
+    public int ErrorCount { get; init; }
+    public int WarningCount { get; init; }
+    public List<SemanticValidationError> Errors { get; init; } = new();
+    public List<SemanticValidationError> Warnings { get; init; } = new();
+    public QueryPlanRepairTrace? RepairTrace { get; init; }
+    public string? RepairStatus { get; init; }
+    public int RepairAttempts { get; init; }
+    public int ChangedPlanCount { get; init; }
+    public string? RepairStopReason { get; init; }
 }
