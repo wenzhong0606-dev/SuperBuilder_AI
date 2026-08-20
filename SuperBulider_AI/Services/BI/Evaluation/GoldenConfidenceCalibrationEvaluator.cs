@@ -76,9 +76,8 @@ public sealed class GoldenConfidenceCalibrationEvaluator
     {
         var decision = result.Decision.Decision;
         var agreement = result.Evaluation.Passed
-            ? IsDecision(decision, QueryPlanDecisionType.Proceed)
-            : IsDecision(decision, QueryPlanDecisionType.Confirm)
-              || IsDecision(decision, QueryPlanDecisionType.Reject);
+            ? decision == QueryPlanDecisionType.Proceed
+            : decision == QueryPlanDecisionType.Confirm || decision == QueryPlanDecisionType.Reject;
 
         return new GoldenConfidenceCalibrationCase
         {
@@ -94,7 +93,11 @@ public sealed class GoldenConfidenceCalibrationEvaluator
     private static bool IsLevel(string actual, string expected) =>
         string.Equals(actual, expected, StringComparison.OrdinalIgnoreCase);
 
-    private static bool IsDecision(QueryPlanDecisionType actual, QueryPlanDecisionType expected) => actual == expected;
+    // GoldenConfidenceCalibrationCase 为诊断 DTO，Decision 按合同保存为 string。
+    // 在校准阶段统一从 string 解析为 QueryPlanDecisionType，再进行强类型比较，
+    // 避免 string 与 enum 直接传参导致 CS1503。
+    private static bool IsDecision(string actual, QueryPlanDecisionType expected) =>
+        Enum.TryParse<QueryPlanDecisionType>(actual, ignoreCase: true, out var parsed) && parsed == expected;
 
     private static double Rate<T>(IEnumerable<T> items, Func<T, bool> predicate)
     {
