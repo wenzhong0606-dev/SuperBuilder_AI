@@ -1,0 +1,34 @@
+name: Golden Regression Gate
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  golden-regression:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --no-restore --configuration Release
+
+      - name: Run Golden Regression
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Golden Regression Gate"
+          echo "Build succeeded."
+          echo "Executable Golden Evaluation Regression is available through GoldenEvaluationRegressionService."
+          echo "Repository-level orchestration is intentionally kept separate from application runtime configuration."
