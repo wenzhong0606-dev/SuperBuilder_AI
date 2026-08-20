@@ -303,6 +303,9 @@ public sealed class SemanticApplicabilityEvaluator
                 .ToList()
             : new List<MetadataSemanticSearchResult>();
 
+        // 精确实体匹配只允许 TableName / TableComment。
+        // SearchText 是拼接后的表+字段全文，不能作为“精确实体”的依据，否则诸如“入库单明细”
+        // 或包含“入库单ID”的字段描述会被错误提升为同级实体候选。
         var exactEntityCandidates = !string.IsNullOrWhiteSpace(entitySemanticText)
             ? tableEntityCandidates
                 .Where(x => MatchesExactEntityTableSemanticText(x, entitySemanticText))
@@ -312,8 +315,8 @@ public sealed class SemanticApplicabilityEvaluator
                 .ToList()
             : new List<MetadataSemanticSearchResult>();
 
-        // 精确表级语义优先；若没有精确匹配，则允许唯一的表级包含匹配。
-        // 不再从字段 Semantic Keywords/Synonyms 回退，否则同一实体的外键/明细字段会制造伪竞争。
+        // 精确 TableName/TableComment 唯一时直接解析；只有多个真正的精确实体表才保持 Ambiguous。
+        // 没有精确实体时，才退回表级包含匹配。
         var entityCandidatesForResolution = exactEntityCandidates.Count > 0
             ? exactEntityCandidates
             : tableEntityCandidates;
@@ -376,11 +379,12 @@ public sealed class SemanticApplicabilityEvaluator
         if (normalizedEntity.Length == 0)
             return false;
 
+        // 精确实体只认可稳定的表名/表注释。
+        // Table.SearchText 是全文索引文本，不具备实体边界，不能用于 exact match。
         var values = new[]
         {
             candidate.Table.TableComment,
-            candidate.Table.TableName,
-            candidate.Table.SearchText
+            candidate.Table.TableName
         };
 
         return values.Any(value =>
