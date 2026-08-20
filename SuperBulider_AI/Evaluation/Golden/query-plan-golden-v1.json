@@ -1,5 +1,5 @@
 {
-  "version": "1.0",
+  "version": "1.1",
   "dataset": "query-plan-golden",
   "cases": [
     {
@@ -8,28 +8,13 @@
       "question": "查询入库数量",
       "expected": {
         "intentType": "Aggregate",
-        "metrics": [
-          {
-            "semanticText": "入库数量",
-            "field": "quantity",
-            "aggregation": "sum"
-          }
-        ],
-        "dimensions": [],
-        "filters": null,
-        "tables": null,
-        "joins": null,
-        "orders": null,
+        "metrics": [{ "semanticText": "入库数量", "field": "quantity", "aggregation": "sum" }],
+        "dimensions": [], "filters": null, "tables": null, "joins": null, "orders": null,
         "isAggregate": true
       },
       "difficulty": "easy",
-      "tags": [
-        "aggregate",
-        "single-metric",
-        "sum"
-      ],
-      "version": "1.0",
-      "enabled": true
+      "tags": ["aggregate", "single-metric", "sum", "positive"],
+      "version": "1.1", "enabled": true
     },
     {
       "id": "GQ-002",
@@ -37,27 +22,142 @@
       "question": "查询入库单数量",
       "expected": {
         "intentType": "Aggregate",
-        "metrics": [
-          {
-            "semanticText": "入库单数量",
-            "aggregation": "count"
-          }
-        ],
-        "dimensions": [],
-        "filters": null,
-        "tables": null,
-        "joins": null,
-        "orders": null,
+        "metrics": [{ "semanticText": "入库单数量", "aggregation": "count" }],
+        "dimensions": [], "filters": null, "tables": null, "joins": null, "orders": null,
         "isAggregate": true
       },
       "difficulty": "easy",
-      "tags": [
-        "aggregate",
-        "single-metric",
-        "count"
-      ],
-      "version": "1.0",
-      "enabled": true
+      "tags": ["aggregate", "single-metric", "count", "entity-count", "positive"],
+      "version": "1.1", "enabled": true
+    },
+    {
+      "id": "GQ-003",
+      "name": "Metric By Dimension",
+      "question": "按物料查询入库数量",
+      "expected": {
+        "intentType": "Aggregate",
+        "metrics": [{ "semanticText": "入库数量", "aggregation": "sum" }],
+        "dimensions": [{ "semanticText": "物料" }],
+        "filters": null, "tables": null, "joins": null, "orders": null,
+        "isAggregate": true
+      },
+      "difficulty": "medium",
+      "tags": ["aggregate", "dimension", "group-by", "positive"],
+      "version": "1.1", "enabled": true
+    },
+    {
+      "id": "GQ-004",
+      "name": "Metric With Filter",
+      "question": "查询2025年入库数量",
+      "expected": {
+        "intentType": "Aggregate",
+        "metrics": [{ "semanticText": "入库数量", "aggregation": "sum" }],
+        "dimensions": [],
+        "filters": [{ "semanticText": "入库日期", "operator": ">=", "value": "2025-01-01" }],
+        "tables": null, "joins": null, "orders": null,
+        "isAggregate": true
+      },
+      "difficulty": "medium",
+      "tags": ["aggregate", "filter", "date", "positive"],
+      "version": "1.1", "enabled": true
+    },
+    {
+      "id": "GQ-005",
+      "name": "Metric With Join",
+      "question": "查询各供应商的入库数量",
+      "expected": {
+        "intentType": "Aggregate",
+        "metrics": [{ "semanticText": "入库数量", "aggregation": "sum" }],
+        "dimensions": [{ "semanticText": "供应商" }],
+        "filters": null,
+        "tables": [{ "semanticText": "入库单" }, { "semanticText": "供应商" }],
+        "joins": [{
+          "leftTableSemanticText": "入库单",
+          "leftColumnSemanticText": "供应商ID",
+          "rightTableSemanticText": "供应商",
+          "rightColumnSemanticText": "供应商ID",
+          "joinType": "INNER"
+        }],
+        "orders": null,
+        "isAggregate": true
+      },
+      "difficulty": "hard",
+      "tags": ["aggregate", "dimension", "join", "multi-table", "positive"],
+      "version": "1.1", "enabled": true
+    },
+    {
+      "id": "GQ-006",
+      "name": "Ranking Metric",
+      "question": "查询入库数量最多的前10个物料",
+      "expected": {
+        "intentType": "Ranking",
+        "metrics": [{ "semanticText": "入库数量", "aggregation": "sum" }],
+        "dimensions": [{ "semanticText": "物料" }],
+        "filters": null, "tables": null, "joins": null,
+        "orders": [{ "isMetric": true, "metricSemanticText": "入库数量", "aggregation": "sum", "direction": "DESC" }],
+        "isAggregate": true, "limit": 10, "isRanking": true
+      },
+      "difficulty": "hard",
+      "tags": ["ranking", "top-n", "order", "limit", "positive"],
+      "version": "1.1", "enabled": true
+    },
+    {
+      "id": "GQ-N001",
+      "name": "Wrong Aggregation Negative",
+      "question": "查询入库数量",
+      "expected": {
+        "intentType": "Aggregate",
+        "metrics": [{ "semanticText": "入库数量", "field": "quantity", "aggregation": "count" }],
+        "dimensions": [], "filters": null, "tables": null, "joins": null, "orders": null,
+        "isAggregate": true
+      },
+      "difficulty": "medium",
+      "tags": ["negative", "wrong-aggregation"],
+      "version": "1.1", "enabled": true
+    },
+    {
+      "id": "GQ-N002",
+      "name": "Wrong Filter Negative",
+      "question": "查询2025年入库数量",
+      "expected": {
+        "intentType": "Aggregate",
+        "metrics": [{ "semanticText": "入库数量", "aggregation": "sum" }],
+        "dimensions": [],
+        "filters": [{ "semanticText": "入库日期", "operator": "=", "value": "2025-01-01" }],
+        "tables": null, "joins": null, "orders": null,
+        "isAggregate": true
+      },
+      "difficulty": "medium",
+      "tags": ["negative", "wrong-filter"],
+      "version": "1.1", "enabled": true
+    },
+    {
+      "id": "GQ-A001",
+      "name": "Ambiguous Metric Semantic",
+      "question": "查询数量",
+      "expected": {
+        "intentType": "Aggregate",
+        "metrics": [{ "semanticText": "数量", "aggregation": "sum" }],
+        "dimensions": [], "filters": null, "tables": null, "joins": null, "orders": null,
+        "isAggregate": true
+      },
+      "difficulty": "hard",
+      "tags": ["ambiguous", "semantic-resolution", "score-gap"],
+      "version": "1.1", "enabled": true
+    },
+    {
+      "id": "GQ-U001",
+      "name": "Unresolved Semantic",
+      "question": "查询火星库存温度",
+      "expected": {
+        "intentType": "Aggregate",
+        "metrics": [{ "semanticText": "火星库存温度", "aggregation": "average" }],
+        "dimensions": [], "filters": null, "tables": null, "joins": null, "orders": null,
+        "isAggregate": true
+      },
+      "difficulty": "hard",
+      "tags": ["unresolved", "not-resolved", "negative-gate"],
+      "version": "1.1", "enabled": true
     }
   ]
 }
