@@ -10,7 +10,7 @@ namespace SuperBuilder_AI.Controllers;
 /// <summary>
 /// Phase 2.6 Evaluation Dataset 诊断入口。
 /// 验证 Golden Dataset Contract、源码资产加载、运行时 Semantic 检索诊断、
-/// Semantic Applicability、QueryPlan Evaluation Gate 与真实 QueryPlan Evaluation，不执行 Repair。
+/// Semantic Applicability、QueryPlan Evaluation Gate、真实 QueryPlan Evaluation 与批量回归。
 /// </summary>
 [ApiController]
 [Route("evaluation/diagnostics")]
@@ -24,6 +24,7 @@ public sealed class EvaluationDiagnosticsController : ControllerBase
     private readonly IQueryUnderstandingService _queryUnderstandingService;
     private readonly IQueryPlanBuilder _queryPlanBuilder;
     private readonly QueryPlanEvaluator _queryPlanEvaluator;
+    private readonly GoldenDatasetRunner _goldenDatasetRunner;
 
     public EvaluationDiagnosticsController(
         GoldenQueryDatasetSerializer serializer,
@@ -33,7 +34,8 @@ public sealed class EvaluationDiagnosticsController : ControllerBase
         QueryPlanEvaluationGate queryPlanEvaluationGate,
         IQueryUnderstandingService queryUnderstandingService,
         IQueryPlanBuilder queryPlanBuilder,
-        QueryPlanEvaluator queryPlanEvaluator)
+        QueryPlanEvaluator queryPlanEvaluator,
+        GoldenDatasetRunner goldenDatasetRunner)
     {
         _serializer = serializer;
         _environment = environment;
@@ -43,37 +45,24 @@ public sealed class EvaluationDiagnosticsController : ControllerBase
         _queryUnderstandingService = queryUnderstandingService;
         _queryPlanBuilder = queryPlanBuilder;
         _queryPlanEvaluator = queryPlanEvaluator;
+        _goldenDatasetRunner = goldenDatasetRunner;
     }
 
     [HttpGet("golden-dataset")]
     public ActionResult<object> GoldenDataset()
     {
         var path = Path.Combine(_environment.ContentRootPath, "Evaluation", "Golden", "query-plan-golden-v1.json");
-        if (!System.IO.File.Exists(path))
-            return NotFound(new { passed = false, message = "Golden Dataset asset was not found.", path });
-
+        if (!System.IO.File.Exists(path)) return NotFound(new { passed = false, message = "Golden Dataset asset was not found.", path });
         var dataset = _serializer.Deserialize(System.IO.File.ReadAllText(path));
         var cases = dataset.Cases ?? new List<GoldenQueryCase>();
-        var duplicateIds = cases
-            .Where(x => !string.IsNullOrWhiteSpace(x.Id))
-            .GroupBy(x => x.Id, StringComparer.OrdinalIgnoreCase)
-            .Where(g => g.Count() > 1)
-            .Select(g => g.Key)
-            .ToList();
+        var duplicateIds = cases.Where(x => !string.IsNullOrWhiteSpace(x.Id)).GroupBy(x => x.Id, StringComparer.OrdinalIgnoreCase).Where(g => g.Count() > 1).Select(g => g.Key).ToList();
         var enabledCases = cases.Where(x => x.Enabled).ToList();
         var positiveCases = enabledCases.Count(IsPositiveCase);
         var negativeCases = enabledCases.Count(IsNegativeCase);
         var ambiguousCases = enabledCases.Count(IsAmbiguousCase);
         var unresolvedCases = enabledCases.Count(IsUnresolvedCase);
         var invalidCases = cases.Where(IsInvalidCase).Select(x => x.Id).ToList();
-
-        var passed = dataset.Version is not null
-                     && dataset.Dataset == "query-plan-golden"
-                     && cases.Count > 0
-                     && duplicateIds.Count == 0
-                     && invalidCases.Count == 0
-                     && enabledCases.Count > 0;
-
+        var passed = !string.IsNullOrWhiteSpace(dataset.Version) && dataset.Dataset == "query-plan-golden" && cases.Count > 0 && duplicateIds.Count == 0 && invalidCases.Count == 0 && enabledCases.Count > 0;
         return Ok(new
         {
             passed,
@@ -81,23 +70,12 @@ public sealed class EvaluationDiagnosticsController : ControllerBase
             version = dataset.Version,
             caseCount = cases.Count,
             enabledCaseCount = enabledCases.Count,
-            categoryCounts = new
-            {
-                positive = positiveCases,
-                negative = negativeCases,
-                ambiguous = ambiguousCases,
-                unresolved = unresolvedCases
-            },
+            categoryCounts = new { positive = positiveCases, negative = negativeCases, ambiguous = ambiguousCases, unresolved = unresolvedCases },
             duplicateIds,
             invalidCases,
             cases = cases.Select(x => new
             {
-                x.Id,
-                x.Name,
-                x.Question,
-                x.Difficulty,
-                x.Enabled,
-                x.Version,
+                x.Id, x.Name, x.Question, x.Difficulty, x.Enabled, x.Version,
                 category = GetCategory(x),
                 metric = x.Expected?.Metrics?.SingleOrDefault()?.SemanticText,
                 aggregation = x.Expected?.Metrics?.SingleOrDefault()?.Aggregation.ToString(),
@@ -108,6 +86,16 @@ public sealed class EvaluationDiagnosticsController : ControllerBase
             }),
             sourcePath = path
         });
+    }
+
+    [HttpGet("golden-dataset-run")]
+    public async Task<ActionResult<GoldenDatasetRunResult>> GoldenDatasetRun([FromQuery] int topK = 10, CancellationToken cancellationToken = default)
+    {
+        if (topK < 1 || topK > 100) return BadRequest(new { passed = false, message = "topK must be between 1 and 100." });
+        var path = Path.Combine(_environment.ContentRootPath, "Evaluation", "Golden", "query-plan-golden-v1.json");
+        if (!System.IO.File.Exists(path)) return NotFound(new { passed = false, message = "Golden Dataset asset was not found.", path });
+        var result = await _goldenDatasetRunner.RunAsync(await System.IO.File.ReadAllTextAsync(path, cancellationToken), topK, cancellationToken);
+        return Ok(result);
     }
 
     [HttpGet("semantic")]
