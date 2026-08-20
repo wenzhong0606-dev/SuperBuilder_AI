@@ -27,7 +27,8 @@ public sealed class SemanticApplicabilityEvaluator
 
         var metric = metrics[0];
         var metricType = metric.Aggregation == QueryAggregation.Count ? "EntityCount" : "ColumnMetric";
-        var results = await _semanticSearchService.SearchAsync(goldenCase.Question, topK);
+        // Metric 解析必须以 Golden 声明的 SemanticText 为检索入口，避免“最多/前10个/物料”等 Query Modifier 污染 Metric 召回。
+        var results = await _semanticSearchService.SearchAsync(metric.SemanticText, topK);
         if (results.Count == 0)
             return new SemanticApplicabilityResult { CaseId = goldenCase.Id, Question = goldenCase.Question, MetricSemanticText = metric.SemanticText, MetricType = metricType, State = "NotResolved", Reason = "Semantic Search returned no candidates." };
 
