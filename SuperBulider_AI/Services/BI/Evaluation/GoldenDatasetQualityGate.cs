@@ -75,8 +75,10 @@ public sealed class GoldenDatasetQualityGate
         if (expected.Metrics is not null && expected.Metrics.Any(x => string.IsNullOrWhiteSpace(x.SemanticText)))
             issues.Add(Issue("METRIC_SEMANTIC_MISSING", "Error", item.Id, "Metric semantic text is required when metrics are specified."));
 
-        if (expected.Tables is not null && expected.Tables.Any(x => string.IsNullOrWhiteSpace(x.TableName)))
-            issues.Add(Issue("TABLE_NAME_MISSING", "Error", item.Id, "Table name is required when tables are specified."));
+        // GoldenTableExpectation 当前以数据库无关的 SemanticText 表达表语义，
+        // 不再要求物理 TableName，避免 Quality Gate 反向绑定物理元数据。
+        if (expected.Tables is not null && expected.Tables.Any(x => string.IsNullOrWhiteSpace(x.SemanticText)))
+            issues.Add(Issue("TABLE_SEMANTIC_MISSING", "Error", item.Id, "Table semantic text is required when tables are specified."));
     }
 
     private static GoldenDatasetQualityIssue Issue(string code, string severity, string caseId, string message) => new()
