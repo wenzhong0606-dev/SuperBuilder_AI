@@ -104,7 +104,6 @@ public sealed class QueryPlanEvaluator
 
         var actual = runtime.Dimensions ?? new List<QueryDimension>();
 
-        // Golden 明确指定空集合：要求 Runtime 也没有 Dimension。
         if (expected.Dimensions.Count == 0)
         {
             return actual.Count == 0
@@ -113,25 +112,17 @@ public sealed class QueryPlanEvaluator
         }
 
         if (actual.Count != expected.Dimensions.Count)
-        {
             return Fail($"Dimensions 数量不匹配：期望 {expected.Dimensions.Count}，实际 {actual.Count}。");
-        }
 
         for (var i = 0; i < actual.Count; i++)
         {
             var dimension = actual[i];
 
             if (dimension.MetadataColumnId <= 0)
-            {
-                return Fail(
-                    $"第 {i + 1} 个 Dimension 物理绑定无效：MetadataColumnId={dimension.MetadataColumnId}。");
-            }
+                return Fail($"第 {i + 1} 个 Dimension 物理绑定无效：MetadataColumnId={dimension.MetadataColumnId}。");
 
             if (string.IsNullOrWhiteSpace(dimension.ColumnName))
-            {
-                return Fail(
-                    $"第 {i + 1} 个 Dimension 物理绑定无效：ColumnName 为空。");
-            }
+                return Fail($"第 {i + 1} 个 Dimension 物理绑定无效：ColumnName 为空。");
         }
 
         return Pass(
@@ -139,15 +130,56 @@ public sealed class QueryPlanEvaluator
             " Golden SemanticText 当前不直接与 ColumnName 等值比较。");
     }
 
+    /// <summary>
+    /// C.4.3 Filter Evaluation。
+    /// Golden Filter 是数据库无关的业务语义 Contract：SemanticText 不直接与 Runtime
+    /// Field 做字符串等值判断；Operator 与 Value 则属于 Golden 已明确表达的约束，
+    /// 因此在本阶段直接进行精确比较。Runtime Field 必须存在，作为最基本的物理绑定证据。
+    /// </summary>
     private static QueryPlanEvaluationSectionResult EvaluateFilters(GoldenQueryExpectation expected, QueryPlan runtime)
     {
         if (expected.Filters is null)
             return Pass("Golden 未指定 Filters，不进行断言。");
 
         var actual = runtime.Filters ?? new List<QueryFilter>();
-        return actual.Count == expected.Filters.Count
-            ? Pass($"Filters 数量匹配：{actual.Count}。")
-            : Fail($"Filters 数量不匹配：期望 {expected.Filters.Count}，实际 {actual.Count}。");
+
+        // Golden 明确指定空集合：要求 Runtime 也没有 Filter。
+        if (expected.Filters.Count == 0)
+        {
+            return actual.Count == 0
+                ? Pass("Golden 明确要求无 Filters，Runtime 为空。")
+                : Fail($"Golden 明确要求无 Filters，实际存在 {actual.Count} 个 Filter。");
+        }
+
+        if (actual.Count != expected.Filters.Count)
+            return Fail($"Filters 数量不匹配：期望 {expected.Filters.Count}，实际 {actual.Count}。");
+
+        for (var i = 0; i < expected.Filters.Count; i++)
+        {
+            var golden = expected.Filters[i];
+            var filter = actual[i];
+
+            if (string.IsNullOrWhiteSpace(filter.Field))
+                return Fail($"第 {i + 1} 个 Filter 物理绑定无效：Field 为空。");
+
+            if (!string.IsNullOrWhiteSpace(golden.Operator)
+                && !string.Equals(filter.Operator, golden.Operator, StringComparison.OrdinalIgnoreCase))
+            {
+                return Fail(
+                    $"第 {i + 1} 个 Filter 操作符不匹配：期望 {golden.Operator}，实际 {filter.Operator}。");
+            }
+
+            if (golden.Value is not null
+                && !string.Equals(filter.Value, golden.Value, StringComparison.Ordinal))
+            {
+                return Fail(
+                    $"第 {i + 1} 个 Filter 值不匹配：期望 {golden.Value}，实际 {filter.Value}。");
+            }
+        }
+
+        return Pass(
+            $"Filters 数量、Operator、Golden 已声明的 Value 约束匹配；{actual.Count} 个 Runtime Filter 均具有有效 Field。" +
+            " Golden SemanticText 当前不直接与 Runtime Field 等值比较。");
     }
 
     private static QueryPlanEvaluationSectionResult EvaluateShape(GoldenQueryExpectation expected, QueryPlan runtime)
@@ -230,14 +262,10 @@ public sealed class QueryPlanEvaluator
         }
 
         if (expected.Tables is not null && tables.Count != expected.Tables.Count)
-        {
             return Fail($"Binding 一致性失败：Golden Tables={expected.Tables.Count}，Runtime Tables={tables.Count}。");
-        }
 
         if (expected.Joins is not null && joins.Count != expected.Joins.Count)
-        {
             return Fail($"Binding 一致性失败：Golden Joins={expected.Joins.Count}，Runtime Joins={joins.Count}。");
-        }
 
         return Pass(
             $"Binding 一致性通过：DataSource={runtime.DataSourceId}，Tables={tables.Count}，Joins={joins.Count}，无重复表且所有 Join 均引用已绑定表。");
