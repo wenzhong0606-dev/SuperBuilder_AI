@@ -9,13 +9,13 @@ namespace SuperBuilder_AI.Services.BI.Evaluation;
 /// </summary>
 public sealed class QueryPlanEvaluationGate
 {
-    public QueryPlanEvaluationDecision Evaluate(SemanticApplicabilityResult applicability)
+    public QueryPlanEvaluationGateDecision Evaluate(SemanticApplicabilityResult applicability)
     {
         ArgumentNullException.ThrowIfNull(applicability);
 
         return applicability.State switch
         {
-            "Resolved" => new QueryPlanEvaluationDecision
+            "Resolved" => new QueryPlanEvaluationGateDecision
             {
                 CaseId = applicability.CaseId,
                 Decision = "PASS",
@@ -24,7 +24,7 @@ public sealed class QueryPlanEvaluationGate
                 ApplicabilityState = applicability.State
             },
 
-            "NotResolved" => new QueryPlanEvaluationDecision
+            "NotResolved" => new QueryPlanEvaluationGateDecision
             {
                 CaseId = applicability.CaseId,
                 Decision = "BLOCK",
@@ -33,7 +33,7 @@ public sealed class QueryPlanEvaluationGate
                 ApplicabilityState = applicability.State
             },
 
-            "Ambiguous" => new QueryPlanEvaluationDecision
+            "Ambiguous" => new QueryPlanEvaluationGateDecision
             {
                 CaseId = applicability.CaseId,
                 Decision = "REVIEW",
@@ -42,7 +42,7 @@ public sealed class QueryPlanEvaluationGate
                 ApplicabilityState = applicability.State
             },
 
-            _ => new QueryPlanEvaluationDecision
+            _ => new QueryPlanEvaluationGateDecision
             {
                 CaseId = applicability.CaseId,
                 Decision = "BLOCK",
