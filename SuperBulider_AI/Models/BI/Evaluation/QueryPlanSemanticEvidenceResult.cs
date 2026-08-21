@@ -21,28 +21,15 @@ public sealed class QueryPlanSemanticEvidenceResult
     public bool DataSourceBindingMatchesResolution { get; init; }
     public double? ResolutionScore { get; init; }
 
-    /// <summary>
-    /// Metric Semantic Resolution → Runtime Metric Binding Evidence。
-    /// </summary>
     public IReadOnlyList<QueryPlanSemanticBindingEvidence> Metrics { get; init; }
         = Array.Empty<QueryPlanSemanticBindingEvidence>();
 
-    /// <summary>
-    /// Dimension Semantic Resolution → Runtime Dimension Binding Evidence。
-    /// </summary>
     public IReadOnlyList<QueryPlanSemanticBindingEvidence> Dimensions { get; init; }
         = Array.Empty<QueryPlanSemanticBindingEvidence>();
 
-    /// <summary>
-    /// Filter Semantic Resolution → Runtime Filter Binding Evidence。
-    /// </summary>
     public IReadOnlyList<QueryPlanSemanticBindingEvidence> Filters { get; init; }
         = Array.Empty<QueryPlanSemanticBindingEvidence>();
 
-    /// <summary>
-    /// Resolution → Runtime Table / DataSource Binding Evidence。
-    /// Table Evidence 来源于当前 Applicability 中可用的物理 Resolution。
-    /// </summary>
     public IReadOnlyList<QueryPlanSemanticBindingEvidence> Tables { get; init; }
         = Array.Empty<QueryPlanSemanticBindingEvidence>();
 }
@@ -51,22 +38,19 @@ public sealed class QueryPlanSemanticEvidenceResult
 /// 统一 Semantic Binding Evidence Snapshot。
 /// 不持有 Planning Model / Resolution 对象本身，避免 Evaluation Model 反向耦合规划层。
 /// </summary>
-public sealed class QueryPlanSemanticBindingEvidence
+public sealed record QueryPlanSemanticBindingEvidence
 {
     public string SemanticText { get; init; } = string.Empty;
-
     public bool ResolutionExists { get; init; }
     public long ResolvedColumnId { get; init; }
     public string? ResolvedColumn { get; init; }
     public long ResolvedTableId { get; init; }
     public string? ResolvedTable { get; init; }
     public long ResolvedDataSourceId { get; init; }
-
     public long? RuntimeColumnId { get; init; }
     public string? RuntimeColumn { get; init; }
     public long? RuntimeTableId { get; init; }
     public long? RuntimeDataSourceId { get; init; }
-
     public bool BindingMatched { get; init; }
     public double? ResolutionScore { get; init; }
     public string Reason { get; init; } = string.Empty;
