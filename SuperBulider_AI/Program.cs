@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using SuperBuilder_AI.Data;
 using SuperBuilder_AI.Infrastructure.Database;
 using SuperBuilder_AI.Infrastructure.Vector;
+using SuperBuilder_AI.Interfaces;
 using SuperBuilder_AI.Models;
 using SuperBuilder_AI.Services.BI;
 using SuperBuilder_AI.Services.BI.Evaluation;
@@ -17,12 +18,17 @@ builder.Services.AddDbContext<SuperBIContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 builder.Services.Configure<QdrantOptions>(builder.Configuration.GetSection("Qdrant"));
-builder.Services.AddScoped<DataSourceMetadataReader>();
+builder.Services.AddScoped<IDataSourceMetadataReader, MySqlMetadataReader>();
 builder.Services.AddScoped<MetadataScannerService>();
 builder.Services.AddScoped<MetadataSearchTextBuilder>();
+builder.Services.AddScoped<IMetadataSearchTextBuilder>(sp => sp.GetRequiredService<MetadataSearchTextBuilder>());
 builder.Services.AddScoped<MetadataPromptBuilder>();
 builder.Services.AddScoped<FakeEmbeddingService>();
 builder.Services.AddScoped<IEmbeddingService>(sp => sp.GetRequiredService<FakeEmbeddingService>());
+builder.Services.AddScoped<QwenService>();
+builder.Services.AddScoped<IQwenService>(sp => sp.GetRequiredService<QwenService>());
+builder.Services.AddScoped<MetadataSemanticService>();
+builder.Services.AddScoped<IMetadataSemanticService>(sp => sp.GetRequiredService<MetadataSemanticService>());
 builder.Services.AddScoped<QdrantService>();
 builder.Services.AddScoped<IQdrantService>(sp => sp.GetRequiredService<QdrantService>());
 builder.Services.AddScoped<MetadataVectorService>();
