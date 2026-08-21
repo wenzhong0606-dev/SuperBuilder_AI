@@ -5,10 +5,6 @@ namespace SuperBuilder_AI.Services.BI;
 
 public partial class QueryPlanBuilder
 {
-    /// <summary>
-    /// 使用已经完成 Semantic Applicability Resolution 的绑定构建 QueryPlan。
-    /// Resolution 中已经确认的字段只允许直接绑定，不再通过 ResolveColumn 二次猜测。
-    /// </summary>
     public async Task<QueryPlan> BuildAsync(
         QueryIntent intent,
         QueryPlanSemanticResolution? resolution)
@@ -40,135 +36,83 @@ public partial class QueryPlanBuilder
             return plan;
 
         NormalizeToResolvedTables(plan, resolution);
-
         ApplyMetricResolution(plan, resolution.Metric);
-
-        // C.13：Semantic Applicability 当前以主 Metric 为稳定 Resolution。
-        // 多 Metric 查询的其余指标必须继续保持各自的 QueryIntent 语义绑定，
-        // 不能因为主 Metric Resolution 只有一个就让第二个 Metric 退化为全局候选中的最高相似列。
         await ApplySecondaryMetricResolutionsAsync(plan, intent, resolution);
-
         ApplyFilterResolutions(plan, resolution.Filters);
-
         EnsureResolvedDimensions(plan, resolution.Dimensions);
         ApplyDimensionResolutions(plan, resolution.Dimensions);
-
         ApplyOrderResolutions(plan, resolution.Orders);
-
         await ApplyResolvedJoinInferenceAsync(plan, resolution);
-
         return plan;
     }
 
-    private static void EnsureResolvedDimensions(
-        QueryPlan plan,
-        IReadOnlyList<QueryPlanDimensionResolution> bindings)
+    private static void EnsureResolvedDimensions(QueryPlan plan, IReadOnlyList<QueryPlanDimensionResolution> bindings)
     {
-        if (bindings.Count == 0)
-            return;
-
-        while (plan.Dimensions.Count < bindings.Count)
-        {
-            plan.Dimensions.Add(new QueryDimension());
-        }
+        if (bindings.Count == 0) return;
+        while (plan.Dimensions.Count < bindings.Count) plan.Dimensions.Add(new QueryDimension());
     }
 
-    private static void NormalizeToResolvedTables(
-        QueryPlan plan,
-        QueryPlanSemanticResolution resolution)
+    private static void NormalizeToResolvedTables(QueryPlan plan, QueryPlanSemanticResolution resolution)
     {
         var resolvedTableIds = new HashSet<long>();
-
-        if (resolution.Metric is not null)
-            resolvedTableIds.Add(resolution.Metric.TableId);
-
-        foreach (var binding in resolution.Filters)
-            resolvedTableIds.Add(binding.TableId);
-
-        foreach (var binding in resolution.Dimensions)
-            resolvedTableIds.Add(binding.TableId);
-
-        foreach (var binding in resolution.Orders)
-            resolvedTableIds.Add(binding.TableId);
-
-        if (resolvedTableIds.Count == 0)
-            return;
-
-        plan.Joins.RemoveAll(join =>
-            !resolvedTableIds.Contains(join.LeftTableId)
-            || !resolvedTableIds.Contains(join.RightTableId));
-
-        plan.Tables.RemoveAll(table =>
-            !resolvedTableIds.Contains(table.MetadataTableId));
+        if (resolution.Metric is not null) resolvedTableIds.Add(resolution.Metric.TableId);
+        foreach (var binding in resolution.Filters) resolvedTableIds.Add(binding.TableId);
+        foreach (var binding in resolution.Dimensions) resolvedTableIds.Add(binding.TableId);
+        foreach (var binding in resolution.Orders) resolvedTableIds.Add(binding.TableId);
+        if (resolvedTableIds.Count == 0) return;
+        plan.Joins.RemoveAll(join => !resolvedTableIds.Contains(join.LeftTableId) || !resolvedTableIds.Contains(join.RightTableId));
+        plan.Tables.RemoveAll(table => !resolvedTableIds.Contains(table.MetadataTableId));
     }
 
-    private async Task ApplySecondaryMetricResolutionsAsync(
-        QueryPlan plan,
-        QueryIntent intent,
-        QueryPlanSemanticResolution resolution)
+    private async Task ApplySecondaryMetricResolutionsAsync(QueryPlan plan, QueryIntent intent, QueryPlanSemanticResolution resolution)
     {
-        if (resolution.Metric is null || intent.Metrics.Count <= 1 || plan.Metrics.Count <= 1)
-            return;
+        if (resolution.Metric is null || intent.Metrics.Count <= 1 || plan.Metrics.Count <= 1) return;
 
         for (var i = 0; i < intent.Metrics.Count && i < plan.Metrics.Count; i++)
         {
             var intentMetric = intent.Metrics[i];
             var runtimeMetric = plan.Metrics[i];
 
-            // 主 Metric 已由稳定 Resolution 绑定。
             if (MatchesMetric(runtimeMetric, resolution.Metric.SemanticText)
                 || string.Equals(intentMetric.Name, resolution.Metric.SemanticText, StringComparison.OrdinalIgnoreCase))
-            {
-                continue;
-            }
-
-            if (resolution.Metric.TableId <= 0)
                 continue;
 
-            // C.13 多指标绑定优先使用 QueryIntent 已经确定的物理 Field。
-            // 例如“入库数量和入库金额”在 Normalizer 中已经得到
-            // quantity / amount，此时不应该再次依赖向量搜索决定第二个 Metric。
+            if (resolution.Metric.TableId <= 0) continue;
+
+            // C.13：若 QueryIntent 已经给出物理 Field，则先进行同表精确列绑定。
+            // 例如 amount / quantity，不再让全局最高相似语义列决定第二指标。
             var explicitField = intentMetric.Field?.Trim();
-            var explicitColumn = plan.Tables
-                .Where(x => x.MetadataTableId == resolution.Metric.TableId)
-                .SelectMany(_ => Enumerable.Empty<SuperBuilder_AI.Models.Metadata.MetadataColumn>());
-
-            var resolvedColumn = await ResolveDeterministicMetricColumnAsync(
-                intentMetric,
-                resolution.Metric.TableId,
-                plan,
-                resolution);
-
-            if (resolvedColumn is not null)
+            if (!string.IsNullOrWhiteSpace(explicitField))
             {
-                runtimeMetric.Field = resolvedColumn.ColumnName ?? runtimeMetric.Field;
-                EnsureResolutionField(
-                    plan,
-                    resolvedColumn.Id,
-                    resolvedColumn.ColumnName ?? runtimeMetric.Field,
-                    runtimeMetric.GetAggregation().ToString());
-                continue;
+                var exactCandidates = await _metadataSearch.SearchAsync(explicitField, 20);
+                var exactColumn = exactCandidates
+                    .Where(x => x.Table is not null
+                        && x.Table.Id == resolution.Metric.TableId
+                        && x.Column is not null
+                        && string.Equals(x.Column.ColumnName, explicitField, StringComparison.OrdinalIgnoreCase))
+                    .OrderByDescending(x => x.Score)
+                    .Select(x => x.Column!)
+                    .FirstOrDefault();
+
+                if (exactColumn is not null)
+                {
+                    runtimeMetric.Field = exactColumn.ColumnName ?? runtimeMetric.Field;
+                    EnsureResolutionField(plan, exactColumn.Id, exactColumn.ColumnName ?? runtimeMetric.Field, runtimeMetric.GetAggregation().ToString());
+                    continue;
+                }
             }
 
-            var searchText = !string.IsNullOrWhiteSpace(intentMetric.Name)
-                ? intentMetric.Name
-                : intentMetric.Field;
-
-            if (string.IsNullOrWhiteSpace(searchText))
-                continue;
+            var searchText = !string.IsNullOrWhiteSpace(intentMetric.Name) ? intentMetric.Name : intentMetric.Field;
+            if (string.IsNullOrWhiteSpace(searchText)) continue;
 
             var candidates = await _metadataSearch.SearchAsync(searchText, 20);
-
             var tableCandidates = candidates
-                .Where(x => x.Table is not null
-                    && x.Table.Id == resolution.Metric.TableId
-                    && x.Column is not null)
+                .Where(x => x.Table is not null && x.Table.Id == resolution.Metric.TableId && x.Column is not null)
                 .GroupBy(x => x.Column!.Id)
                 .Select(g => g.OrderByDescending(x => x.Score).First())
                 .ToList();
 
-            if (tableCandidates.Count == 0)
-                continue;
+            if (tableCandidates.Count == 0) continue;
 
             var ranked = tableCandidates
                 .Select(x => new
@@ -181,56 +125,24 @@ public partial class QueryPlanBuilder
                 .Select(x => new
                 {
                     x.Column,
-                    FinalScore = x.LexicalScore * 100
-                                 + x.SemanticTypeScore * 20
-                                 + x.SemanticScore * 10
+                    FinalScore = x.LexicalScore * 100 + x.SemanticTypeScore * 20 + x.SemanticScore * 10
                 })
                 .OrderByDescending(x => x.FinalScore)
                 .ToList();
 
             var best = ranked.FirstOrDefault();
-            if (best is null)
-                continue;
-
-            // 只有存在足够明确的二级指标证据时才覆盖原始绑定。
-            if (best.FinalScore < 3)
-                continue;
+            if (best is null || best.FinalScore < 3) continue;
 
             runtimeMetric.Field = best.Column.ColumnName ?? runtimeMetric.Field;
-            EnsureResolutionField(
-                plan,
-                best.Column.Id,
-                best.Column.ColumnName ?? runtimeMetric.Field,
-                runtimeMetric.GetAggregation().ToString());
+            EnsureResolutionField(plan, best.Column.Id, best.Column.ColumnName ?? runtimeMetric.Field, runtimeMetric.GetAggregation().ToString());
         }
     }
 
-    private static async Task<SuperBuilder_AI.Models.Metadata.MetadataColumn?> ResolveDeterministicMetricColumnAsync(
-        QueryMetric metric,
-        long tableId,
-        QueryPlan plan,
-        QueryPlanSemanticResolution resolution)
-    {
-        var field = metric.Field?.Trim();
-        if (string.IsNullOrWhiteSpace(field))
-            return null;
-
-        // 当前 QueryPlan 已经可能包含目标表字段，但 QueryTable 本身不携带 Columns。
-        // 因此这里只处理能够由已解析 Resolution 明确得到的物理列；
-        // 对 quantity / amount 等确定性字段，交由 Metadata 搜索结果中的同表列完成精确命中。
-        return null;
-    }
-
-    private static double CalculateSemanticTypeCompatibility(
-        QueryMetric metric,
-        SuperBuilder_AI.Models.Metadata.MetadataColumn column)
+    private static double CalculateSemanticTypeCompatibility(QueryMetric metric, SuperBuilder_AI.Models.Metadata.MetadataColumn column)
     {
         var type = metric.SemanticType?.Trim().ToLowerInvariant();
         var name = column.ColumnName?.Trim().ToLowerInvariant() ?? string.Empty;
-
-        if (string.IsNullOrWhiteSpace(type))
-            return 0;
-
+        if (string.IsNullOrWhiteSpace(type)) return 0;
         return type switch
         {
             "amount" when name == "amount" || name.Contains("amount") || name.Contains("total_amount") || name.Contains("money") || name.Contains("price") => 1.0,
@@ -241,84 +153,44 @@ public partial class QueryPlanBuilder
         };
     }
 
-    private async Task ApplyResolvedJoinInferenceAsync(
-        QueryPlan plan,
-        QueryPlanSemanticResolution resolution)
+    private async Task ApplyResolvedJoinInferenceAsync(QueryPlan plan, QueryPlanSemanticResolution resolution)
     {
-        if (resolution.Metric is null || resolution.Dimensions.Count == 0)
-            return;
-
+        if (resolution.Metric is null || resolution.Dimensions.Count == 0) return;
         var metricTableId = resolution.Metric.TableId;
-        if (metricTableId <= 0)
-            return;
+        if (metricTableId <= 0) return;
 
         foreach (var dimension in resolution.Dimensions)
         {
-            if (dimension.TableId <= 0 || dimension.TableId == metricTableId)
-                continue;
-
+            if (dimension.TableId <= 0 || dimension.TableId == metricTableId) continue;
             var searchTexts = new List<string>();
-
-            if (!string.IsNullOrWhiteSpace(dimension.SemanticText))
-                searchTexts.Add(dimension.SemanticText);
-
-            if (!string.IsNullOrWhiteSpace(dimension.SemanticText))
-                searchTexts.Add($"{dimension.SemanticText}ID");
-
-            if (!string.IsNullOrWhiteSpace(resolution.Metric.Table))
-                searchTexts.Add(resolution.Metric.Table);
+            if (!string.IsNullOrWhiteSpace(dimension.SemanticText)) searchTexts.Add(dimension.SemanticText);
+            if (!string.IsNullOrWhiteSpace(dimension.SemanticText)) searchTexts.Add($"{dimension.SemanticText}ID");
+            if (!string.IsNullOrWhiteSpace(resolution.Metric.Table)) searchTexts.Add(resolution.Metric.Table);
 
             var metadataResults = new List<SuperBuilder_AI.Models.AI.MetadataSemanticSearchResult>();
-
             foreach (var searchText in searchTexts.Distinct(StringComparer.OrdinalIgnoreCase))
-            {
-                var results = await _metadataSearch.SearchAsync(searchText, 20);
-                metadataResults.AddRange(results);
-            }
+                metadataResults.AddRange(await _metadataSearch.SearchAsync(searchText, 20));
 
             metadataResults = metadataResults
                 .Where(x => x.Table is not null && x.Column is not null)
                 .GroupBy(x => $"{x.Table!.Id}|{x.Column!.Id}|{x.Semantic?.Id ?? 0}", StringComparer.OrdinalIgnoreCase)
                 .Select(x => x.OrderByDescending(item => item.Score).First())
                 .ToList();
-
-            if (metadataResults.Count == 0)
-                continue;
+            if (metadataResults.Count == 0) continue;
 
             var candidates = await _joinInference.InferAsync(metadataResults);
-
             var candidate = candidates
-                .Where(x =>
-                    (x.LeftTableId == metricTableId && x.RightTableId == dimension.TableId)
-                    || (x.LeftTableId == dimension.TableId && x.RightTableId == metricTableId))
+                .Where(x => (x.LeftTableId == metricTableId && x.RightTableId == dimension.TableId) || (x.LeftTableId == dimension.TableId && x.RightTableId == metricTableId))
                 .OrderByDescending(x => x.Confidence)
                 .FirstOrDefault();
+            if (candidate is null || candidate.LeftTableId == candidate.RightTableId) continue;
 
-            if (candidate is null)
-                continue;
-
-            if (candidate.LeftTableId == candidate.RightTableId)
-                continue;
-
-            if (!plan.Tables.Any(x => x.MetadataTableId == candidate.LeftTableId)
-                || !plan.Tables.Any(x => x.MetadataTableId == candidate.RightTableId))
-            {
-                continue;
-            }
+            if (!plan.Tables.Any(x => x.MetadataTableId == candidate.LeftTableId) || !plan.Tables.Any(x => x.MetadataTableId == candidate.RightTableId)) continue;
 
             var exists = plan.Joins.Any(x =>
-                (x.LeftTableId == candidate.LeftTableId
-                 && x.LeftColumnId == candidate.LeftColumnId
-                 && x.RightTableId == candidate.RightTableId
-                 && x.RightColumnId == candidate.RightColumnId)
-                ||
-                (x.LeftTableId == candidate.RightTableId
-                 && x.LeftColumnId == candidate.RightColumnId
-                 && x.RightTableId == candidate.LeftTableId
-                 && x.RightColumnId == candidate.LeftColumnId));
-
-            if (exists)
-                continue;
+                (x.LeftTableId == candidate.LeftTableId && x.LeftColumnId == candidate.LeftColumnId && x.RightTableId == candidate.RightTableId && x.RightColumnId == candidate.RightColumnId)
+                || (x.LeftTableId == candidate.RightTableId && x.LeftColumnId == candidate.RightColumnId && x.RightTableId == candidate.LeftTableId && x.RightColumnId == candidate.LeftColumnId));
+            if (exists) continue;
 
             plan.Joins.Add(new QueryJoin
             {
@@ -337,35 +209,26 @@ public partial class QueryPlanBuilder
 
     private static void ApplyMetricResolution(QueryPlan plan, QueryPlanMetricResolution? binding)
     {
-        if (binding is null)
-            return;
-
+        if (binding is null) return;
         ValidateResolutionColumn(binding.ColumnId, binding.Column, "Metric");
         var matchedMetric = false;
-
         foreach (var metric in plan.Metrics)
         {
-            if (!MatchesMetric(metric, binding.SemanticText))
-                continue;
-
+            if (!MatchesMetric(metric, binding.SemanticText)) continue;
             matchedMetric = true;
             metric.Field = binding.Column;
             EnsureResolutionTable(plan, binding.TableId, binding.DataSourceId, binding.Table, "Metric");
             EnsureResolutionField(plan, binding.ColumnId, binding.Column, metric.GetAggregation().ToString());
         }
-
         if (!matchedMetric)
             throw new InvalidOperationException($"QueryPlan Semantic Binding Drift：未找到与已解析 Metric“{binding.SemanticText}”对应的 Runtime Metric。");
     }
 
     private static void ApplyFilterResolutions(QueryPlan plan, IReadOnlyList<QueryPlanFilterResolution> bindings)
     {
-        if (bindings.Count == 0)
-            return;
-
+        if (bindings.Count == 0) return;
         if (plan.Filters.Count != bindings.Count)
             throw new InvalidOperationException($"QueryPlan Semantic Binding Drift：Filter 数量不一致，Resolution={bindings.Count}，Runtime={plan.Filters.Count}。");
-
         for (var i = 0; i < bindings.Count; i++)
         {
             var binding = bindings[i];
@@ -377,12 +240,9 @@ public partial class QueryPlanBuilder
 
     private static void ApplyDimensionResolutions(QueryPlan plan, IReadOnlyList<QueryPlanDimensionResolution> bindings)
     {
-        if (bindings.Count == 0)
-            return;
-
+        if (bindings.Count == 0) return;
         if (plan.Dimensions.Count != bindings.Count)
             throw new InvalidOperationException($"QueryPlan Semantic Binding Drift：Dimension 数量不一致，Resolution={bindings.Count}，Runtime={plan.Dimensions.Count}。");
-
         for (var i = 0; i < bindings.Count; i++)
         {
             var binding = bindings[i];
@@ -395,12 +255,9 @@ public partial class QueryPlanBuilder
 
     private static void ApplyOrderResolutions(QueryPlan plan, IReadOnlyList<QueryPlanOrderResolution> bindings)
     {
-        if (bindings.Count == 0)
-            return;
-
+        if (bindings.Count == 0) return;
         if (plan.Orders.Count != bindings.Count)
             throw new InvalidOperationException($"QueryPlan Semantic Binding Drift：Order 数量不一致，Resolution={bindings.Count}，Runtime={plan.Orders.Count}。");
-
         for (var i = 0; i < bindings.Count; i++)
         {
             var binding = bindings[i];
@@ -415,7 +272,6 @@ public partial class QueryPlanBuilder
     {
         if (tableId <= 0 || dataSourceId <= 0 || string.IsNullOrWhiteSpace(tableName))
             throw new InvalidOperationException($"Semantic Resolution 缺少有效的 {bindingType} Table Binding。");
-
         var existing = plan.Tables.FirstOrDefault(table => table.MetadataTableId == tableId);
         if (existing is not null)
         {
@@ -423,13 +279,7 @@ public partial class QueryPlanBuilder
                 throw new InvalidOperationException($"QueryPlan Semantic Binding Drift：{bindingType} TableId={tableId} 的 DataSourceId 不一致，Resolution={dataSourceId}，Runtime={existing.DataSourceId}。");
             return;
         }
-
-        plan.Tables.Add(new QueryTable
-        {
-            MetadataTableId = tableId,
-            DataSourceId = dataSourceId,
-            TableName = tableName
-        });
+        plan.Tables.Add(new QueryTable { MetadataTableId = tableId, DataSourceId = dataSourceId, TableName = tableName });
     }
 
     private static void EnsureResolutionField(QueryPlan plan, long columnId, string columnName, string aggregation)
@@ -438,17 +288,10 @@ public partial class QueryPlanBuilder
         if (existing is not null)
         {
             existing.ColumnName = columnName;
-            if (string.IsNullOrWhiteSpace(existing.Aggregation) || existing.Aggregation.Equals("NONE", StringComparison.OrdinalIgnoreCase))
-                existing.Aggregation = aggregation;
+            if (string.IsNullOrWhiteSpace(existing.Aggregation) || existing.Aggregation.Equals("NONE", StringComparison.OrdinalIgnoreCase)) existing.Aggregation = aggregation;
             return;
         }
-
-        plan.Fields.Add(new QueryField
-        {
-            MetadataColumnId = columnId,
-            ColumnName = columnName,
-            Aggregation = aggregation
-        });
+        plan.Fields.Add(new QueryField { MetadataColumnId = columnId, ColumnName = columnName, Aggregation = aggregation });
     }
 
     private static void ValidateResolutionColumn(long columnId, string column, string bindingType)
@@ -459,9 +302,7 @@ public partial class QueryPlanBuilder
 
     private static bool MatchesMetric(QueryMetric metric, string semanticText)
     {
-        if (string.IsNullOrWhiteSpace(semanticText))
-            return true;
-
+        if (string.IsNullOrWhiteSpace(semanticText)) return true;
         return string.Equals(metric.Name, semanticText, StringComparison.OrdinalIgnoreCase)
                || string.Equals(metric.Field, semanticText, StringComparison.OrdinalIgnoreCase)
                || string.Equals(metric.SemanticType, semanticText, StringComparison.OrdinalIgnoreCase);
