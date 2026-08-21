@@ -1,12 +1,15 @@
 using Microsoft.EntityFrameworkCore;
 using SuperBuilder_AI.Data;
 using SuperBuilder_AI.Infrastructure.Database;
-using SuperBuilder_AI.Infrastructure.Vector;
-using SuperBuilder_AI.Models;
 using SuperBuilder_AI.Services.BI;
 using SuperBuilder_AI.Services.BI.Evaluation;
-using SuperBuilder_AI.Services.BI.Query;
 using SuperBuilder_AI.Services;
+using SuperBuilder_AI.Configuration;
+using SuperBuilder_AI.Interfaces.BI.Evaluation;
+using SuperBuilder_AI.Interfaces;
+using SuperBuilder_AI.Interfaces.BI;
+using SuperBuilder_AI.Interfaces.Database;
+using SuperBuilder_AI.Services.Database;
 
 var builder = WebApplication.CreateBuilder(args);
 
