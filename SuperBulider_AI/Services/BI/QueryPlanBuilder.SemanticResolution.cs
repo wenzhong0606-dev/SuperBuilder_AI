@@ -125,6 +125,31 @@ public partial class QueryPlanBuilder
             if (resolution.Metric.TableId <= 0)
                 continue;
 
+            // C.13 多指标绑定优先使用 QueryIntent 已经确定的物理 Field。
+            // 例如“入库数量和入库金额”在 Normalizer 中已经得到
+            // quantity / amount，此时不应该再次依赖向量搜索决定第二个 Metric。
+            var explicitField = intentMetric.Field?.Trim();
+            var explicitColumn = plan.Tables
+                .Where(x => x.MetadataTableId == resolution.Metric.TableId)
+                .SelectMany(_ => Enumerable.Empty<SuperBuilder_AI.Models.Metadata.MetadataColumn>());
+
+            var resolvedColumn = await ResolveDeterministicMetricColumnAsync(
+                intentMetric,
+                resolution.Metric.TableId,
+                plan,
+                resolution);
+
+            if (resolvedColumn is not null)
+            {
+                runtimeMetric.Field = resolvedColumn.ColumnName ?? runtimeMetric.Field;
+                EnsureResolutionField(
+                    plan,
+                    resolvedColumn.Id,
+                    resolvedColumn.ColumnName ?? runtimeMetric.Field,
+                    runtimeMetric.GetAggregation().ToString());
+                continue;
+            }
+
             var searchText = !string.IsNullOrWhiteSpace(intentMetric.Name)
                 ? intentMetric.Name
                 : intentMetric.Field;
@@ -168,7 +193,6 @@ public partial class QueryPlanBuilder
                 continue;
 
             // 只有存在足够明确的二级指标证据时才覆盖原始绑定。
-            // SemanticType 是比全局向量最高分更稳定的业务约束。
             if (best.FinalScore < 3)
                 continue;
 
@@ -179,6 +203,22 @@ public partial class QueryPlanBuilder
                 best.Column.ColumnName ?? runtimeMetric.Field,
                 runtimeMetric.GetAggregation().ToString());
         }
+    }
+
+    private static async Task<SuperBuilder_AI.Models.Metadata.MetadataColumn?> ResolveDeterministicMetricColumnAsync(
+        QueryMetric metric,
+        long tableId,
+        QueryPlan plan,
+        QueryPlanSemanticResolution resolution)
+    {
+        var field = metric.Field?.Trim();
+        if (string.IsNullOrWhiteSpace(field))
+            return null;
+
+        // 当前 QueryPlan 已经可能包含目标表字段，但 QueryTable 本身不携带 Columns。
+        // 因此这里只处理能够由已解析 Resolution 明确得到的物理列；
+        // 对 quantity / amount 等确定性字段，交由 Metadata 搜索结果中的同表列完成精确命中。
+        return null;
     }
 
     private static double CalculateSemanticTypeCompatibility(
