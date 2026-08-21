@@ -29,6 +29,7 @@ builder.Services.AddScoped<IMetadataSearchTextBuilder>(sp => sp.GetRequiredServi
 builder.Services.AddScoped<MetadataPromptBuilder>();
 builder.Services.AddScoped<MetadataContextBuilder>();
 builder.Services.AddScoped<IMetadataContextBuilder>(sp => sp.GetRequiredService<MetadataContextBuilder>());
+builder.Services.AddScoped<IQueryPlanContextBuilder, QueryPlanContextBuilder>();
 builder.Services.AddScoped<FakeEmbeddingService>();
 builder.Services.AddScoped<IEmbeddingService>(sp => sp.GetRequiredService<FakeEmbeddingService>());
 builder.Services.AddScoped<QwenService>();
