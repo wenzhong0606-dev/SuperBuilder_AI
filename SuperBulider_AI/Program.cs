@@ -5,7 +5,7 @@ using SuperBuilder_AI.Interfaces;
 using SuperBuilder_AI.Models;
 using SuperBuilder_AI.Services.BI;
 using SuperBuilder_AI.Services.BI.Evaluation;
-using SuperBuilder_AI.Services.BI.Planning.Intent;
+using SuperBuilder_AI.Services.BI.Planning;
 using SuperBuilder_AI.Services;
 using SuperBuilder_AI.Configuration;
 using SuperBuilder_AI.Interfaces.BI.Evaluation;
@@ -29,7 +29,6 @@ builder.Services.AddScoped<IMetadataSearchTextBuilder>(sp => sp.GetRequiredServi
 builder.Services.AddScoped<MetadataPromptBuilder>();
 builder.Services.AddScoped<MetadataContextBuilder>();
 builder.Services.AddScoped<IMetadataContextBuilder>(sp => sp.GetRequiredService<MetadataContextBuilder>());
-builder.Services.AddScoped<MetadataPromptBuilder>();
 builder.Services.AddScoped<FakeEmbeddingService>();
 builder.Services.AddScoped<IEmbeddingService>(sp => sp.GetRequiredService<FakeEmbeddingService>());
 builder.Services.AddScoped<QwenService>();
