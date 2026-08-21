@@ -13,28 +13,45 @@ public static class QueryPlanSemanticResolutionFactory
         ArgumentNullException.ThrowIfNull(applicability);
 
         if (!string.Equals(applicability.State, "Resolved", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException($"只有 State=Resolved 的 Semantic Applicability 才允许创建 QueryPlanSemanticResolution，当前状态为“{applicability.State}”。");
+
+        var metricResolutions = applicability.MetricResolutions
+            .Where(x => x.TableId > 0 && x.DataSourceId > 0 && x.ColumnId > 0 && !string.IsNullOrWhiteSpace(x.Table) && !string.IsNullOrWhiteSpace(x.Column))
+            .Select(x => new QueryPlanMetricResolution
+            {
+                TableId = x.TableId,
+                DataSourceId = x.DataSourceId,
+                ColumnId = x.ColumnId,
+                SemanticText = x.SemanticText,
+                Table = x.Table ?? string.Empty,
+                Column = x.Column ?? string.Empty,
+                BusinessMeaning = x.BusinessMeaning,
+                Score = x.Score
+            })
+            .ToList();
+
+        // 向后兼容旧的单 Metric Resolution：旧数据只有 Resolution 时仍允许继续运行。
+        if (metricResolutions.Count == 0 && applicability.Resolution is not null)
         {
-            throw new InvalidOperationException(
-                $"只有 State=Resolved 的 Semantic Applicability 才允许创建 QueryPlanSemanticResolution，当前状态为“{applicability.State}”。");
+            var resolution = applicability.Resolution;
+            if (resolution.TableId <= 0 || resolution.DataSourceId <= 0 || resolution.ColumnId <= 0 || string.IsNullOrWhiteSpace(resolution.Table) || string.IsNullOrWhiteSpace(resolution.Column))
+                throw new InvalidOperationException("Semantic Applicability Resolution 不完整：TableId、DataSourceId、ColumnId、Table、Column 均必须有效。");
+
+            metricResolutions.Add(new QueryPlanMetricResolution
+            {
+                TableId = resolution.TableId,
+                DataSourceId = resolution.DataSourceId,
+                ColumnId = resolution.ColumnId,
+                SemanticText = applicability.MetricSemanticText,
+                Table = resolution.Table,
+                Column = resolution.Column,
+                BusinessMeaning = resolution.BusinessMeaning,
+                Score = resolution.Score
+            });
         }
 
-        if (applicability.Resolution is null)
-        {
-            throw new InvalidOperationException(
-                "Semantic Applicability 已标记为 Resolved，但没有提供 Resolution，禁止继续构建 QueryPlan。");
-        }
-
-        var resolution = applicability.Resolution;
-
-        if (resolution.TableId <= 0
-            || resolution.DataSourceId <= 0
-            || resolution.ColumnId <= 0
-            || string.IsNullOrWhiteSpace(resolution.Table)
-            || string.IsNullOrWhiteSpace(resolution.Column))
-        {
-            throw new InvalidOperationException(
-                "Semantic Applicability Resolution 不完整：TableId、DataSourceId、ColumnId、Table、Column 均必须有效。");
-        }
+        if (metricResolutions.Count == 0)
+            throw new InvalidOperationException("Semantic Applicability 已标记为 Resolved，但没有提供任何 Metric 物理绑定，禁止继续构建 QueryPlan。");
 
         var filters = applicability.FilterResolutions
             .Select(filter => new QueryPlanFilterResolution
@@ -66,17 +83,8 @@ public static class QueryPlanSemanticResolutionFactory
 
         return new QueryPlanSemanticResolution
         {
-            Metric = new QueryPlanMetricResolution
-            {
-                TableId = resolution.TableId,
-                DataSourceId = resolution.DataSourceId,
-                ColumnId = resolution.ColumnId,
-                SemanticText = applicability.MetricSemanticText,
-                Table = resolution.Table,
-                Column = resolution.Column,
-                BusinessMeaning = resolution.BusinessMeaning,
-                Score = resolution.Score
-            },
+            Metrics = metricResolutions,
+            Metric = metricResolutions[0],
             Filters = filters,
             Dimensions = dimensions
         };
