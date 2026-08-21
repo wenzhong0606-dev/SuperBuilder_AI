@@ -20,12 +20,6 @@ public partial class QueryPlanBuilder
             && resolution.Metric is not null
             && resolution.Dimensions.Any(x => x.TableId > 0 && x.TableId != resolution.Metric.TableId))
         {
-            // Semantic Applicability 已经确认 Dimension 属于不同物理表时，
-            // 不应让原始单表 ResolveColumn 再次尝试把 Dimension 映射到主表。
-            // 原始 BuildAsync(intent) 的 Dimension 解析只适用于单表候选；
-            // 跨表 Dimension 的最终物理绑定由 Resolution 负责。
-            // 因此暂时移除 Dimension，仅完成 Metric / Filter / 主表 / 基础 Join 构建，
-            // 随后由 ApplyDimensionResolutions 与 ApplyResolvedJoinInference 补齐已确认绑定。
             var originalDimensions = intent.Dimensions;
             try
             {
@@ -48,22 +42,19 @@ public partial class QueryPlanBuilder
         NormalizeToResolvedTables(plan, resolution);
 
         ApplyMetricResolution(plan, resolution.Metric);
+
+        // C.13：Semantic Applicability 当前以主 Metric 为稳定 Resolution。
+        // 多 Metric 查询的其余指标必须继续保持各自的 QueryIntent 语义绑定，
+        // 不能因为主 Metric Resolution 只有一个就让第二个 Metric 退化为全局候选中的最高相似列。
+        await ApplySecondaryMetricResolutionsAsync(plan, intent, resolution);
+
         ApplyFilterResolutions(plan, resolution.Filters);
 
-        // 原始 BuildAsync 在跨表场景下被刻意跳过了 Dimension，因此这里必须先
-        // 建立与 Resolution 一一对应的 Runtime Dimension 占位，再执行最终物理绑定。
-        // 否则 ApplyDimensionResolutions 会把 Resolution=1 / Runtime=0 误判为 Binding Drift。
         EnsureResolvedDimensions(plan, resolution.Dimensions);
         ApplyDimensionResolutions(plan, resolution.Dimensions);
 
         ApplyOrderResolutions(plan, resolution.Orders);
 
-        // Phase 2.6：当 Semantic Applicability 已经稳定解析出 Metric 与 Dimension
-        // 分属不同物理表时，必须在最终 QueryPlan 中补齐两表之间的 Join。
-        // 原有 BuildAsync(intent) 的 JoinInference 依赖初始 Metadata Search 结果，
-        // 在 Resolution 已经补入第二张表的场景下可能没有足够的 Join 候选，因此这里
-        // 基于已确认的物理表再次执行一次受限 JoinInference。该过程不会猜测新的业务表，
-        // 只允许连接 Resolution 已确认的表。
         await ApplyResolvedJoinInferenceAsync(plan, resolution);
 
         return plan;
@@ -76,19 +67,12 @@ public partial class QueryPlanBuilder
         if (bindings.Count == 0)
             return;
 
-        // 跨表 Dimension 的原始解析被跳过，因此按 Resolution 顺序创建 Runtime Dimension。
-        // 这里只创建结构占位，不进行任何新的语义猜测。
         while (plan.Dimensions.Count < bindings.Count)
         {
             plan.Dimensions.Add(new QueryDimension());
         }
     }
 
-    /// <summary>
-    /// Resolution 已经确认了本次查询需要的物理表。
-    /// Builder 原始流程中的 JoinInference 属于候选推断，不能在已有稳定 Resolution 时
-    /// 把未经语义绑定确认的表继续带入最终 QueryPlan。
-    /// </summary>
     private static void NormalizeToResolvedTables(
         QueryPlan plan,
         QueryPlanSemanticResolution resolution)
@@ -116,6 +100,105 @@ public partial class QueryPlanBuilder
 
         plan.Tables.RemoveAll(table =>
             !resolvedTableIds.Contains(table.MetadataTableId));
+    }
+
+    private async Task ApplySecondaryMetricResolutionsAsync(
+        QueryPlan plan,
+        QueryIntent intent,
+        QueryPlanSemanticResolution resolution)
+    {
+        if (resolution.Metric is null || intent.Metrics.Count <= 1 || plan.Metrics.Count <= 1)
+            return;
+
+        for (var i = 0; i < intent.Metrics.Count && i < plan.Metrics.Count; i++)
+        {
+            var intentMetric = intent.Metrics[i];
+            var runtimeMetric = plan.Metrics[i];
+
+            // 主 Metric 已由稳定 Resolution 绑定。
+            if (MatchesMetric(runtimeMetric, resolution.Metric.SemanticText)
+                || string.Equals(intentMetric.Name, resolution.Metric.SemanticText, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            if (resolution.Metric.TableId <= 0)
+                continue;
+
+            var searchText = !string.IsNullOrWhiteSpace(intentMetric.Name)
+                ? intentMetric.Name
+                : intentMetric.Field;
+
+            if (string.IsNullOrWhiteSpace(searchText))
+                continue;
+
+            var candidates = await _metadataSearch.SearchAsync(searchText, 20);
+
+            var tableCandidates = candidates
+                .Where(x => x.Table is not null
+                    && x.Table.Id == resolution.Metric.TableId
+                    && x.Column is not null)
+                .GroupBy(x => x.Column!.Id)
+                .Select(g => g.OrderByDescending(x => x.Score).First())
+                .ToList();
+
+            if (tableCandidates.Count == 0)
+                continue;
+
+            var ranked = tableCandidates
+                .Select(x => new
+                {
+                    Column = x.Column!,
+                    LexicalScore = CalculateLexicalScore(searchText, x.Column!),
+                    SemanticScore = x.Score,
+                    SemanticTypeScore = CalculateSemanticTypeCompatibility(intentMetric, x.Column!)
+                })
+                .Select(x => new
+                {
+                    x.Column,
+                    FinalScore = x.LexicalScore * 100
+                                 + x.SemanticTypeScore * 20
+                                 + x.SemanticScore * 10
+                })
+                .OrderByDescending(x => x.FinalScore)
+                .ToList();
+
+            var best = ranked.FirstOrDefault();
+            if (best is null)
+                continue;
+
+            // 只有存在足够明确的二级指标证据时才覆盖原始绑定。
+            // SemanticType 是比全局向量最高分更稳定的业务约束。
+            if (best.FinalScore < 3)
+                continue;
+
+            runtimeMetric.Field = best.Column.ColumnName ?? runtimeMetric.Field;
+            EnsureResolutionField(
+                plan,
+                best.Column.Id,
+                best.Column.ColumnName ?? runtimeMetric.Field,
+                runtimeMetric.GetAggregation().ToString());
+        }
+    }
+
+    private static double CalculateSemanticTypeCompatibility(
+        QueryMetric metric,
+        SuperBuilder_AI.Models.Metadata.MetadataColumn column)
+    {
+        var type = metric.SemanticType?.Trim().ToLowerInvariant();
+        var name = column.ColumnName?.Trim().ToLowerInvariant() ?? string.Empty;
+
+        if (string.IsNullOrWhiteSpace(type))
+            return 0;
+
+        return type switch
+        {
+            "amount" when name == "amount" || name.Contains("amount") || name.Contains("total_amount") || name.Contains("money") || name.Contains("price") => 1.0,
+            "quantity" when name == "quantity" || name.Contains("quantity") || name.Contains("qty") => 1.0,
+            "count" when name == "id" || name.EndsWith("_id") => 0.8,
+            "ratio" when name.Contains("ratio") || name.Contains("rate") => 1.0,
+            _ => 0
+        };
     }
 
     private async Task ApplyResolvedJoinInferenceAsync(
