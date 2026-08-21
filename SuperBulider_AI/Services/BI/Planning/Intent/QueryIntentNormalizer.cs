@@ -78,6 +78,8 @@ public sealed class QueryIntentNormalizer
 
 		NormalizeAggregation(intent);
 
+		NormalizeMetricFields(intent);
+
 		NormalizeYearFilters(intent);
 
 		return intent;
@@ -104,267 +106,163 @@ public sealed class QueryIntentNormalizer
 			.ToList();
 	}
 
-	private static void NormalizeLimit(
-		QueryIntent intent,
-		string question)
+	private static void NormalizeLimit(QueryIntent intent, string question)
 	{
 		if (intent.Limit is > 0)
-		{
 			return;
-		}
 
-		var arabic = Regex.Match(
-			question,
-			@"(?i)(?:top\s*|前\s*|最近\s*|最后\s*)(\d+)");
-
-		if (arabic.Success &&
-			int.TryParse(
-				arabic.Groups[1].Value,
-				out var arabicLimit) &&
-			arabicLimit > 0)
+		var arabic = Regex.Match(question, @"(?i)(?:top\s*|前\s*|最近\s*|最后\s*)(\d+)");
+		if (arabic.Success && int.TryParse(arabic.Groups[1].Value, out var arabicLimit) && arabicLimit > 0)
 		{
 			intent.Limit = arabicLimit;
 			return;
 		}
 
-		var chinese = Regex.Match(
-			question,
-			@"([零一二两三四五六七八九十百千万]+)(?:条|个|项|笔|张|份|记录|凭证|单据|订单)");
-
+		var chinese = Regex.Match(question, @"([零一二两三四五六七八九十百千万]+)(?:条|个|项|笔|张|份|记录|凭证|单据|订单)");
 		if (!chinese.Success)
-		{
 			return;
-		}
 
-		var value = ParseChineseNumber(
-			chinese.Groups[1].Value);
-
+		var value = ParseChineseNumber(chinese.Groups[1].Value);
 		if (value > 0)
-		{
 			intent.Limit = value;
-		}
 	}
 
-	private static void NormalizeRanking(
-		QueryIntent intent,
-		string question)
+	private static void NormalizeRanking(QueryIntent intent, string question)
 	{
-		var isDesc =
-			DescWords.Any(
-				x => question.Contains(
-					x,
-					StringComparison.OrdinalIgnoreCase));
+		var isDesc = DescWords.Any(x => question.Contains(x, StringComparison.OrdinalIgnoreCase));
+		var isAsc = AscWords.Any(x => question.Contains(x, StringComparison.OrdinalIgnoreCase));
+		var isTimeDesc = TimeDescWords.Any(x => question.Contains(x, StringComparison.OrdinalIgnoreCase));
 
-		var isAsc =
-			AscWords.Any(
-				x => question.Contains(
-					x,
-					StringComparison.OrdinalIgnoreCase));
-
-		var isTimeDesc =
-			TimeDescWords.Any(
-				x => question.Contains(
-					x,
-					StringComparison.OrdinalIgnoreCase));
-
-		var hasTopN =
-			intent.Limit.HasValue &&
-			(
-				isDesc ||
-				isAsc ||
-				isTimeDesc ||
-				Regex.IsMatch(
-					question,
-					@"(?i)\btop\s*\d+") ||
-				Regex.IsMatch(
-					question,
-					@"前[一二两三四五六七八九十百千万0-9]+")
-			);
+		var hasTopN = intent.Limit.HasValue &&
+			(isDesc || isAsc || isTimeDesc || Regex.IsMatch(question, @"(?i)\btop\s*\d+") || Regex.IsMatch(question, @"前[一二两三四五六七八九十百千万0-9]+"));
 
 		if (!hasTopN)
-		{
 			return;
-		}
 
 		intent.IntentType = "Ranking";
 
 		if (isAsc)
-		{
 			intent.OrderDirection = "ASC";
-		}
 		else if (isDesc || isTimeDesc)
-		{
 			intent.OrderDirection = "DESC";
-		}
 
-		ResolveOrderingMetric(
-			intent,
-			question);
+		ResolveOrderingMetric(intent, question);
 	}
 
-	private static void ResolveOrderingMetric(
-		QueryIntent intent,
-		string question)
+	private static void ResolveOrderingMetric(QueryIntent intent, string question)
 	{
 		if (!string.IsNullOrWhiteSpace(intent.OrderBy))
-		{
 			return;
-		}
 
-		var metric = FindMetricFromQuestion(
-			intent,
-			question);
-
+		var metric = FindMetricFromQuestion(intent, question);
 		if (metric == null)
-		{
 			return;
-		}
 
 		metric.IsOrderingMetric = true;
-
-		intent.OrderBy =
-			string.IsNullOrWhiteSpace(metric.Field)
-				? metric.Name
-				: metric.Field;
+		intent.OrderBy = string.IsNullOrWhiteSpace(metric.Field) ? metric.Name : metric.Field;
 	}
 
-	private static QueryMetric? FindMetricFromQuestion(
-		QueryIntent intent,
-		string question)
+	private static QueryMetric? FindMetricFromQuestion(QueryIntent intent, string question)
 	{
-		var explicitMetric =
-			intent.Metrics.FirstOrDefault(
-				x => x.IsOrderingMetric);
-
+		var explicitMetric = intent.Metrics.FirstOrDefault(x => x.IsOrderingMetric);
 		if (explicitMetric != null)
-		{
 			return explicitMetric;
-		}
 
-		var matched =
-			intent.Metrics
-				.Where(x =>
-					!string.IsNullOrWhiteSpace(x.Name) ||
-					!string.IsNullOrWhiteSpace(x.Field))
-				.OrderByDescending(
-					x => ScoreMetric(
-						x,
-						question))
-				.FirstOrDefault();
-
-		return matched;
+		return intent.Metrics
+			.Where(x => !string.IsNullOrWhiteSpace(x.Name) || !string.IsNullOrWhiteSpace(x.Field))
+			.OrderByDescending(x => ScoreMetric(x, question))
+			.FirstOrDefault();
 	}
 
-	private static int ScoreMetric(
-		QueryMetric metric,
-		string question)
+	private static int ScoreMetric(QueryMetric metric, string question)
 	{
 		var score = 0;
 
-		if (!string.IsNullOrWhiteSpace(metric.Name) &&
-			question.Contains(
-				metric.Name,
-				StringComparison.OrdinalIgnoreCase))
-		{
+		if (!string.IsNullOrWhiteSpace(metric.Name) && question.Contains(metric.Name, StringComparison.OrdinalIgnoreCase))
 			score += 100;
-		}
 
-		if (!string.IsNullOrWhiteSpace(metric.Field) &&
-			question.Contains(
-				metric.Field,
-				StringComparison.OrdinalIgnoreCase))
-		{
+		if (!string.IsNullOrWhiteSpace(metric.Field) && question.Contains(metric.Field, StringComparison.OrdinalIgnoreCase))
 			score += 80;
-		}
 
-		if (string.Equals(
-				metric.SemanticType,
-				"Quantity",
-				StringComparison.OrdinalIgnoreCase) &&
-			question.Contains("数量"))
-		{
+		if (string.Equals(metric.SemanticType, "Quantity", StringComparison.OrdinalIgnoreCase) && question.Contains("数量"))
 			score += 60;
-		}
 
-		if (string.Equals(
-				metric.SemanticType,
-				"Amount",
-				StringComparison.OrdinalIgnoreCase) &&
-			(
-				question.Contains("金额") ||
-				question.Contains("金额")
-			))
-		{
+		if (string.Equals(metric.SemanticType, "Amount", StringComparison.OrdinalIgnoreCase) && question.Contains("金额"))
 			score += 60;
-		}
 
-		if (string.Equals(
-				metric.SemanticType,
-				"Count",
-				StringComparison.OrdinalIgnoreCase) &&
-			(
-				question.Contains("数量") ||
-				question.Contains("多少")
-			))
-		{
+		if (string.Equals(metric.SemanticType, "Count", StringComparison.OrdinalIgnoreCase) && (question.Contains("数量") || question.Contains("多少")))
 			score += 40;
-		}
 
 		return score;
 	}
 
-	private static void NormalizeAggregation(
-		QueryIntent intent)
+	private static void NormalizeAggregation(QueryIntent intent)
+	{
+		foreach (var metric in intent.Metrics)
+			metric.Aggregation = NormalizeAggregationValue(metric.Aggregation);
+	}
+
+	/// <summary>
+	/// 对明显的业务语义与物理字段冲突进行确定性修正。
+	/// 该层不进行Metadata搜索，只修正能够由Metric.Name明确判断的结构性错误。
+	/// </summary>
+	private static void NormalizeMetricFields(QueryIntent intent)
 	{
 		foreach (var metric in intent.Metrics)
 		{
-			metric.Aggregation =
-				NormalizeAggregationValue(
-					metric.Aggregation);
+			var name = metric.Name?.Trim() ?? string.Empty;
+			var field = metric.Field?.Trim() ?? string.Empty;
+
+			if (name.Contains("金额", StringComparison.OrdinalIgnoreCase)
+				&& !field.Equals("amount", StringComparison.OrdinalIgnoreCase)
+				&& !field.Contains("amount", StringComparison.OrdinalIgnoreCase)
+				&& !field.Contains("money", StringComparison.OrdinalIgnoreCase)
+				&& !field.Contains("price", StringComparison.OrdinalIgnoreCase))
+			{
+				metric.Field = "amount";
+				metric.SemanticType = "Amount";
+				continue;
+			}
+
+			if (name.Contains("数量", StringComparison.OrdinalIgnoreCase)
+				&& !field.Equals("quantity", StringComparison.OrdinalIgnoreCase)
+				&& !field.Contains("quantity", StringComparison.OrdinalIgnoreCase)
+				&& !field.Equals("qty", StringComparison.OrdinalIgnoreCase))
+			{
+				metric.Field = "quantity";
+				if (string.IsNullOrWhiteSpace(metric.SemanticType))
+					metric.SemanticType = "Quantity";
+			}
 		}
 	}
 
 	/// <summary>
 	/// 将明确的“YYYY年”年度语义确定性规范化为年度起始日期过滤。
-	/// 例如：2025年入库数量 -> Filter Operator >=，Value = 2025-01-01。
-	/// 这里只修正年度语义本身，不覆盖已经明确使用其他比较符的过滤条件。
 	/// </summary>
 	private static void NormalizeYearFilters(QueryIntent intent)
 	{
 		foreach (var filter in intent.Filters)
 		{
 			if (filter == null || string.IsNullOrWhiteSpace(filter.Value))
-			{
 				continue;
-			}
 
 			var value = filter.Value.Trim();
 			var match = Regex.Match(value, @"^(\d{4})年?$");
 			if (!match.Success)
-			{
 				continue;
-			}
 
-			if (!int.TryParse(match.Groups[1].Value, out var year) ||
-				year < 1900 ||
-				year > 9999)
-			{
+			if (!int.TryParse(match.Groups[1].Value, out var year) || year < 1900 || year > 9999)
 				continue;
-			}
 
-			if (!string.IsNullOrWhiteSpace(filter.Operator) &&
-				!string.Equals(filter.Operator.Trim(), "=", StringComparison.OrdinalIgnoreCase))
-			{
+			if (!string.IsNullOrWhiteSpace(filter.Operator) && !string.Equals(filter.Operator.Trim(), "=", StringComparison.OrdinalIgnoreCase))
 				continue;
-			}
 
 			filter.Operator = ">=";
 			filter.Value = $"{year:D4}-01-01";
 		}
 	}
 
-	private static string NormalizeAggregationValue(
-		string? value)
+	private static string NormalizeAggregationValue(string? value)
 	{
 		return value?.Trim().ToUpperInvariant() switch
 		{
@@ -380,30 +278,17 @@ public sealed class QueryIntentNormalizer
 		};
 	}
 
-	private static int ParseChineseNumber(
-		string value)
+	private static int ParseChineseNumber(string value)
 	{
 		var digits = new Dictionary<char, int>
 		{
-			['零'] = 0,
-			['一'] = 1,
-			['二'] = 2,
-			['两'] = 2,
-			['三'] = 3,
-			['四'] = 4,
-			['五'] = 5,
-			['六'] = 6,
-			['七'] = 7,
-			['八'] = 8,
-			['九'] = 9
+			['零'] = 0, ['一'] = 1, ['二'] = 2, ['两'] = 2, ['三'] = 3, ['四'] = 4,
+			['五'] = 5, ['六'] = 6, ['七'] = 7, ['八'] = 8, ['九'] = 9
 		};
 
 		var units = new Dictionary<char, int>
 		{
-			['十'] = 10,
-			['百'] = 100,
-			['千'] = 1000,
-			['万'] = 10000
+			['十'] = 10, ['百'] = 100, ['千'] = 1000, ['万'] = 10000
 		};
 
 		var total = 0;
@@ -419,9 +304,7 @@ public sealed class QueryIntentNormalizer
 			}
 
 			if (!units.TryGetValue(ch, out var unit))
-			{
 				continue;
-			}
 
 			if (unit == 10000)
 			{
@@ -433,9 +316,7 @@ public sealed class QueryIntentNormalizer
 			}
 
 			if (number == 0)
-			{
 				number = 1;
-			}
 
 			section += number * unit;
 			number = 0;
