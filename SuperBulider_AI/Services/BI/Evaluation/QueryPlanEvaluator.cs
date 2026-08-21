@@ -46,6 +46,7 @@ public sealed class QueryPlanEvaluator
 
     /// <summary>
     /// C.4.8：独立评价 Semantic Applicability Resolution 与 Runtime QueryPlan 的物理绑定。
+    /// Semantic Evidence 当前以 Golden Metrics[0] 作为主 Metric；其余 Metric 由 EvaluateMetrics 独立验证。
     /// </summary>
     public QueryPlanSemanticEvidenceResult EvaluateSemanticEvidence(
         string caseId,
@@ -57,8 +58,8 @@ public sealed class QueryPlanEvaluator
         ArgumentNullException.ThrowIfNull(runtime);
         ArgumentNullException.ThrowIfNull(applicability);
 
-        var goldenMetric = expected.Metrics?.SingleOrDefault();
-        var runtimeMetric = runtime.Metrics?.SingleOrDefault();
+        var goldenMetric = expected.Metrics?.FirstOrDefault();
+        var runtimeMetric = runtime.Metrics?.FirstOrDefault();
         var resolution = applicability.Resolution;
         var resolutionExists = resolution is not null;
         var runtimeMetricExists = runtimeMetric is not null;
@@ -69,7 +70,7 @@ public sealed class QueryPlanEvaluator
             {
                 CaseId = caseId,
                 Passed = true,
-                Reason = "Golden 未定义单一 Metric，不进行 Semantic Resolution Evidence 断言。",
+                Reason = "Golden 未定义 Metric，不进行 Semantic Resolution Evidence 断言。",
                 ApplicabilityState = applicability.State,
                 ResolutionExists = resolutionExists,
                 RuntimeMetricExists = runtimeMetricExists
@@ -109,7 +110,7 @@ public sealed class QueryPlanEvaluator
         {
             CaseId = caseId,
             Passed = true,
-            Reason = "Semantic Resolution 与 Runtime QueryPlan 的 Metric Field、Table、DataSource 物理绑定一致。",
+            Reason = "Semantic Resolution 与 Runtime QueryPlan 的主 Metric Field、Table、DataSource 物理绑定一致；其余 Metrics 由 Metrics Evaluation 独立验证。",
             GoldenSemanticText = goldenMetric.SemanticText,
             ApplicabilityState = applicability.State,
             ResolutionExists = true,
