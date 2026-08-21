@@ -80,11 +80,14 @@ public partial class QueryPlanBuilder
             if (resolution.Metric.TableId <= 0) continue;
 
             // C.13：若 QueryIntent 已经给出物理 Field，则先进行同表精确列绑定。
-            // 例如 amount / quantity，不再让全局最高相似语义列决定第二指标。
+            // 对多指标场景，显式 Field 是确定性绑定依据，不能被全局语义相似度重新覆盖。
+            // 例如“入库数量和入库金额”中第二 Metric 已规范化为 amount。
             var explicitField = intentMetric.Field?.Trim();
             if (!string.IsNullOrWhiteSpace(explicitField))
             {
-                var exactCandidates = await _metadataSearch.SearchAsync(explicitField, 20);
+                var exactCandidates = await _metadataSearch.SearchAsync(
+                    $"{resolution.Metric.Table} {explicitField}",
+                    100);
                 var exactColumn = exactCandidates
                     .Where(x => x.Table is not null
                         && x.Table.Id == resolution.Metric.TableId
@@ -96,10 +99,20 @@ public partial class QueryPlanBuilder
 
                 if (exactColumn is not null)
                 {
-                    runtimeMetric.Field = exactColumn.ColumnName ?? runtimeMetric.Field;
-                    EnsureResolutionField(plan, exactColumn.Id, exactColumn.ColumnName ?? runtimeMetric.Field, runtimeMetric.GetAggregation().ToString());
+                    runtimeMetric.Field = exactColumn.ColumnName ?? explicitField;
+                    EnsureResolutionField(
+                        plan,
+                        exactColumn.Id,
+                        exactColumn.ColumnName ?? explicitField,
+                        runtimeMetric.GetAggregation().ToString());
                     continue;
                 }
+
+                // C.13：Normalizer 已明确给出物理 Field 时，不能退化为全局语义搜索。
+                // 否则“入库金额”可能再次被“入库数量”的高相似度候选覆盖。
+                // 保留显式 Field，后续 QueryPlan Metadata Validation 再负责检查物理字段有效性。
+                runtimeMetric.Field = explicitField;
+                continue;
             }
 
             var searchText = !string.IsNullOrWhiteSpace(intentMetric.Name) ? intentMetric.Name : intentMetric.Field;
