@@ -102,7 +102,12 @@ public sealed class SemanticApplicabilityEvaluator
     {
         if (topSemantic is null) return new SemanticApplicabilityResult { CaseId = goldenCase.Id, Question = goldenCase.Question, MetricSemanticText = semanticText, MetricType = "ColumnMetric", State = "NotResolved", Reason = "No semantic vector candidate was returned." };
         var topLexicalMatch = ContainsSemanticText(topSemantic, semanticText);
-        var competingCandidates = semanticCandidates.Skip(1).Any(x => ContainsSemanticText(x, semanticText));
+        // 仅当竞争候选与 Top Candidate 的分差处于可疑区间时才判定 Ambiguous。
+        // 低分且仅因共享“数量/入库”等词命中的候选，不应阻断稳定的 Top Semantic Binding。
+        const double ambiguityScoreGapThreshold = 0.05d;
+        var competingCandidates = secondSemantic is not null
+            && ContainsSemanticText(secondSemantic, semanticText)
+            && (scoreGap ?? 0d) <= ambiguityScoreGapThreshold;
         var state = topLexicalMatch ? competingCandidates ? "Ambiguous" : "Resolved" : "NotResolved";
         return new SemanticApplicabilityResult { CaseId = goldenCase.Id, Question = goldenCase.Question, MetricSemanticText = semanticText, MetricType = "ColumnMetric", State = state, Reason = BuildColumnReason(state, topLexicalMatch, metricCount), SearchCandidate = ToCandidate(topSemantic), Resolution = state == "Resolved" ? ToResolution(topSemantic) : null, Evidence = new SemanticApplicabilityEvidence { SemanticCandidateExists = semanticCandidates.Count > 0, EntityCandidateExists = entityCandidates.Count > 0, DirectEntityCountEvidence = false, LexicalMatch = topLexicalMatch, CompetingCandidates = competingCandidates, TopScore = topSemantic.Score, SecondScore = secondSemantic?.Score, ScoreGap = scoreGap } };
     }
