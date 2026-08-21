@@ -5,14 +5,33 @@ namespace SuperBuilder_AI.Services.BI.Evaluation;
 
 /// <summary>
 /// Phase 2.6 QueryPlan Evaluator。
+/// 负责组织各 Evaluation Section，并将最终结果交给统一 Scoring Contract。
 /// Golden Contract 与 Runtime QueryPlan 解耦；Golden 为 null 的字段表示不断言。
 /// </summary>
 public sealed class QueryPlanEvaluator
 {
     private readonly QueryPlanJoinScoringService _joinScoringService;
+    private readonly QueryPlanMetricScoringService _metricScoringService;
+    private readonly QueryPlanDimensionScoringService _dimensionScoringService;
+    private readonly QueryPlanFilterScoringService _filterScoringService;
+    private readonly QueryPlanQueryShapeScoringService _queryShapeScoringService;
+    private readonly QueryPlanEvaluationScoringService _evaluationScoringService;
 
-    public QueryPlanEvaluator(QueryPlanJoinScoringService joinScoringService)
-        => _joinScoringService = joinScoringService;
+    public QueryPlanEvaluator(
+        QueryPlanJoinScoringService joinScoringService,
+        QueryPlanMetricScoringService metricScoringService,
+        QueryPlanDimensionScoringService dimensionScoringService,
+        QueryPlanFilterScoringService filterScoringService,
+        QueryPlanQueryShapeScoringService queryShapeScoringService,
+        QueryPlanEvaluationScoringService evaluationScoringService)
+    {
+        _joinScoringService = joinScoringService;
+        _metricScoringService = metricScoringService;
+        _dimensionScoringService = dimensionScoringService;
+        _filterScoringService = filterScoringService;
+        _queryShapeScoringService = queryShapeScoringService;
+        _evaluationScoringService = evaluationScoringService;
+    }
 
     public QueryPlanEvaluationResult Evaluate(string caseId, GoldenQueryExpectation expected, QueryPlan runtime)
     {
@@ -20,19 +39,51 @@ public sealed class QueryPlanEvaluator
         ArgumentNullException.ThrowIfNull(runtime);
 
         var intent = EvaluateIntent(expected, runtime);
-        var metrics = EvaluateMetrics(expected, runtime);
-        var dimensions = EvaluateDimensions(expected, runtime);
-        var filters = EvaluateFilters(expected, runtime);
+
+        var metricEvaluation = _metricScoringService.Evaluate(expected.Metrics, runtime.Metrics);
+        var metrics = new QueryPlanEvaluationSectionResult
+        {
+            Passed = metricEvaluation.Passed,
+            Score = metricEvaluation.Score,
+            Reason = metricEvaluation.Reason,
+            Details = metricEvaluation.Items
+        };
+
+        var dimensionEvaluation = _dimensionScoringService.Evaluate(expected.Dimensions, runtime.Dimensions);
+        var dimensions = new QueryPlanEvaluationSectionResult
+        {
+            Passed = dimensionEvaluation.Passed,
+            Score = dimensionEvaluation.Score,
+            Reason = dimensionEvaluation.Reason,
+            Details = dimensionEvaluation.Items
+        };
+
+        var filterEvaluation = _filterScoringService.Evaluate(expected.Filters, runtime.Filters);
+        var filters = new QueryPlanEvaluationSectionResult
+        {
+            Passed = filterEvaluation.Passed,
+            Score = filterEvaluation.Score,
+            Reason = filterEvaluation.Reason,
+            Details = filterEvaluation.Items
+        };
+
         var tables = EvaluateTables(expected, runtime);
         var joins = EvaluateJoins(expected, runtime);
-        var shape = EvaluateShape(expected, runtime);
+
+        var queryShapeEvaluation = _queryShapeScoringService.Evaluate(expected, runtime);
+        var shape = new QueryPlanEvaluationSectionResult
+        {
+            Passed = queryShapeEvaluation.Passed,
+            Score = queryShapeEvaluation.Score,
+            Reason = queryShapeEvaluation.Reason,
+            Details = queryShapeEvaluation.Checks
+        };
+
         var bindingConsistency = EvaluateBindingConsistency(expected, runtime);
 
-        return new QueryPlanEvaluationResult
+        var raw = new QueryPlanEvaluationResult
         {
             CaseId = caseId,
-            Passed = intent.Passed && metrics.Passed && dimensions.Passed && filters.Passed
-                      && tables.Passed && joins.Passed && shape.Passed && bindingConsistency.Passed,
             Intent = intent,
             Metrics = metrics,
             Dimensions = dimensions,
@@ -40,13 +91,18 @@ public sealed class QueryPlanEvaluator
             Tables = tables,
             Joins = joins,
             QueryShape = shape,
-            BindingConsistency = bindingConsistency
+            BindingConsistency = bindingConsistency,
+            MetricExpectations = expected.Metrics,
+            ActualMetrics = runtime.Metrics
         };
+
+        // C.13.1：最终 PASS / PARTIAL / FAIL / OverallScore 只能由统一 Scoring Contract 产生。
+        return _evaluationScoringService.Score(raw);
     }
 
     /// <summary>
     /// C.4.8：独立评价 Semantic Applicability Resolution 与 Runtime QueryPlan 的物理绑定。
-    /// Semantic Evidence 当前以 Golden Metrics[0] 作为主 Metric；其余 Metric 由 EvaluateMetrics 独立验证。
+    /// 当前仍以 Golden Metrics[0] 作为主 Semantic Evidence；多 Metric 的完整闭环由 Metrics Scoring 独立保证。
     /// </summary>
     public QueryPlanSemanticEvidenceResult EvaluateSemanticEvidence(
         string caseId,
@@ -110,7 +166,7 @@ public sealed class QueryPlanEvaluator
         {
             CaseId = caseId,
             Passed = true,
-            Reason = "Semantic Resolution 与 Runtime QueryPlan 的主 Metric Field、Table、DataSource 物理绑定一致；其余 Metrics 由 Metrics Evaluation 独立验证。",
+            Reason = "Semantic Resolution 与 Runtime QueryPlan 的主 Metric Field、Table、DataSource 物理绑定一致；其余 Metrics 由 Metrics Scoring 独立验证。",
             GoldenSemanticText = goldenMetric.SemanticText,
             ApplicabilityState = applicability.State,
             ResolutionExists = true,
@@ -156,58 +212,6 @@ public sealed class QueryPlanEvaluator
             : Fail($"期望 IntentType={expected.IntentType}，实际为 {actual ?? "null"}。");
     }
 
-    private static QueryPlanEvaluationSectionResult EvaluateMetrics(GoldenQueryExpectation expected, QueryPlan runtime)
-    {
-        if (expected.Metrics is null) return Pass("Golden 未指定 Metrics，不进行断言。");
-        var actual = runtime.Metrics ?? new List<QueryMetric>();
-        if (actual.Count != expected.Metrics.Count) return Fail($"Metric 数量不匹配：期望 {expected.Metrics.Count}，实际 {actual.Count}。");
-        for (var i = 0; i < expected.Metrics.Count; i++)
-        {
-            var golden = expected.Metrics[i];
-            var metric = actual[i];
-            if (!string.IsNullOrWhiteSpace(golden.SemanticText) && !MatchesSemantic(metric, golden.SemanticText)) return Fail($"第 {i + 1} 个 Metric 语义不匹配：期望“{golden.SemanticText}”。");
-            if (!string.IsNullOrWhiteSpace(golden.Field) && !string.Equals(metric.Field, golden.Field, StringComparison.OrdinalIgnoreCase)) return Fail($"第 {i + 1} 个 Metric 字段不匹配：期望 {golden.Field}，实际 {metric.Field ?? "null"}。");
-            if (metric.GetAggregation() != golden.Aggregation) return Fail($"第 {i + 1} 个 Metric 聚合不匹配：期望 {golden.Aggregation}，实际 {metric.GetAggregation()}。");
-        }
-        return Pass("Metrics 匹配。");
-    }
-
-    private static bool MatchesSemantic(QueryMetric metric, string semanticText) =>
-        string.Equals(metric.Name, semanticText, StringComparison.OrdinalIgnoreCase)
-        || string.Equals(metric.Field, semanticText, StringComparison.OrdinalIgnoreCase)
-        || string.Equals(metric.SemanticType, semanticText, StringComparison.OrdinalIgnoreCase);
-
-    private static QueryPlanEvaluationSectionResult EvaluateDimensions(GoldenQueryExpectation expected, QueryPlan runtime)
-    {
-        if (expected.Dimensions is null) return Pass("Golden 未指定 Dimensions，不进行断言。");
-        var actual = runtime.Dimensions ?? new List<QueryDimension>();
-        if (expected.Dimensions.Count == 0) return actual.Count == 0 ? Pass("Golden 明确要求无 Dimensions，Runtime 为空。") : Fail($"Golden 明确要求无 Dimensions，实际存在 {actual.Count} 个 Dimension。");
-        if (actual.Count != expected.Dimensions.Count) return Fail($"Dimensions 数量不匹配：期望 {expected.Dimensions.Count}，实际 {actual.Count}。");
-        for (var i = 0; i < actual.Count; i++)
-        {
-            if (actual[i].MetadataColumnId <= 0) return Fail($"第 {i + 1} 个 Dimension 物理绑定无效：MetadataColumnId={actual[i].MetadataColumnId}。");
-            if (string.IsNullOrWhiteSpace(actual[i].ColumnName)) return Fail($"第 {i + 1} 个 Dimension 物理绑定无效：ColumnName 为空。");
-        }
-        return Pass($"Dimensions 数量与 Runtime 物理绑定完整性匹配：{actual.Count} 个 Dimension。Golden SemanticText 当前不直接与 ColumnName 等值比较。");
-    }
-
-    private static QueryPlanEvaluationSectionResult EvaluateFilters(GoldenQueryExpectation expected, QueryPlan runtime)
-    {
-        if (expected.Filters is null) return Pass("Golden 未指定 Filters，不进行断言。");
-        var actual = runtime.Filters ?? new List<QueryFilter>();
-        if (expected.Filters.Count == 0) return actual.Count == 0 ? Pass("Golden 明确要求无 Filters，Runtime 为空。") : Fail($"Golden 明确要求无 Filters，实际存在 {actual.Count} 个 Filter。");
-        if (actual.Count != expected.Filters.Count) return Fail($"Filters 数量不匹配：期望 {expected.Filters.Count}，实际 {actual.Count}。");
-        for (var i = 0; i < expected.Filters.Count; i++)
-        {
-            var golden = expected.Filters[i];
-            var filter = actual[i];
-            if (string.IsNullOrWhiteSpace(filter.Field)) return Fail($"第 {i + 1} 个 Filter 物理绑定无效：Field 为空。");
-            if (!string.IsNullOrWhiteSpace(golden.Operator) && !string.Equals(filter.Operator, golden.Operator, StringComparison.OrdinalIgnoreCase)) return Fail($"第 {i + 1} 个 Filter 操作符不匹配：期望 {golden.Operator}，实际 {filter.Operator}。");
-            if (golden.Value is not null && !string.Equals(filter.Value, golden.Value, StringComparison.Ordinal)) return Fail($"第 {i + 1} 个 Filter 值不匹配：期望 {golden.Value}，实际 {filter.Value}。");
-        }
-        return Pass($"Filters 数量、Operator、Golden 已声明的 Value 约束匹配；{actual.Count} 个 Runtime Filter 均具有有效 Field。Golden SemanticText 当前不直接与 Runtime Field 等值比较。");
-    }
-
     private static QueryPlanEvaluationSectionResult EvaluateTables(GoldenQueryExpectation expected, QueryPlan runtime)
     {
         if (expected.Tables is null) return Pass("Golden 未指定 Tables，不进行断言。");
@@ -236,20 +240,6 @@ public sealed class QueryPlanEvaluator
             Reason = result.Reason,
             Details = result.Items
         };
-    }
-
-    private static QueryPlanEvaluationSectionResult EvaluateShape(GoldenQueryExpectation expected, QueryPlan runtime)
-    {
-        if (expected.IsAggregate.HasValue && runtime.IsAggregate != expected.IsAggregate.Value) return Fail($"IsAggregate 不匹配：期望 {expected.IsAggregate.Value}，实际 {runtime.IsAggregate}。");
-        if (expected.Distinct.HasValue && runtime.Distinct != expected.Distinct.Value) return Fail($"Distinct 不匹配：期望 {expected.Distinct.Value}，实际 {runtime.Distinct}。");
-        if (expected.Limit.HasValue && runtime.Limit != expected.Limit.Value) return Fail($"Limit 不匹配：期望 {expected.Limit.Value}，实际 {runtime.Limit}。");
-        if (expected.IsRanking.HasValue && runtime.IsRanking != expected.IsRanking.Value) return Fail($"IsRanking 不匹配：期望 {expected.IsRanking.Value}，实际 {runtime.IsRanking}。");
-        if (expected.IsDetailRanking.HasValue && runtime.IsDetailRanking != expected.IsDetailRanking.Value) return Fail($"IsDetailRanking 不匹配：期望 {expected.IsDetailRanking.Value}，实际 {runtime.IsDetailRanking}。");
-        if (expected.IsAggregateRanking.HasValue && runtime.IsAggregateRanking != expected.IsAggregateRanking.Value) return Fail($"IsAggregateRanking 不匹配：期望 {expected.IsAggregateRanking.Value}，实际 {runtime.IsAggregateRanking}。");
-        if (expected.Orders is not null && (runtime.Orders?.Count ?? 0) != expected.Orders.Count) return Fail($"Orders 数量不匹配：期望 {expected.Orders.Count}，实际 {runtime.Orders?.Count ?? 0}。");
-        if (expected.Joins is not null && (runtime.Joins?.Count ?? 0) != expected.Joins.Count) return Fail($"Joins 数量不匹配：期望 {expected.Joins.Count}，实际 {runtime.Joins?.Count ?? 0}。");
-        if (expected.Tables is not null && (runtime.Tables?.Count ?? 0) != expected.Tables.Count) return Fail($"Tables 数量不匹配：期望 {expected.Tables.Count}，实际 {runtime.Tables?.Count ?? 0}。");
-        return Pass("Query Shape 匹配。");
     }
 
     private static QueryPlanEvaluationSectionResult EvaluateBindingConsistency(GoldenQueryExpectation expected, QueryPlan runtime)
