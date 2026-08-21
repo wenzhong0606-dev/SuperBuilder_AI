@@ -85,8 +85,18 @@ public class QueryPlan
 
 	/// <summary>
 	/// 是否属于 Ranking / TopN 查询。
+	///
+	/// QueryIntentNormalizer 会将明确的 Ranking 语义规范化为
+	/// IntentType=Ranking。QueryPlan 作为执行层应保留这一确定性语义，
+	/// 即使 Builder 没有再次显式赋值。显式 setter 仍保留，兼容后续执行层直接设置。
 	/// </summary>
-	public bool IsRanking { get; set; }
+	private bool _isRanking;
+
+	public bool IsRanking
+	{
+		get => _isRanking || Intent?.IsRanking == true;
+		set => _isRanking = value;
+	}
 
 	/// <summary>
 	/// 是否属于明细 TopN。
