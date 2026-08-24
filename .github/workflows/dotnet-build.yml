@@ -40,7 +40,7 @@ jobs:
         run: echo "SuperBuilder AI Release 编译通过"
 
   controller-runtime:
-    name: C.13.2 Controller Runtime Smoke
+    name: V2.6 Evaluation Controller Runtime Smoke
     needs: build
     runs-on: ubuntu-latest
 
@@ -99,7 +99,7 @@ jobs:
       - name: Controller Golden Coverage
         run: |
           curl --fail --silent --show-error http://127.0.0.1:5050/evaluation/diagnostics/golden-dataset-coverage | tee /tmp/golden-coverage.json
-          grep -q '"passed":true' /tmp/golden-coverage.json
+          test "$(jq '.missingDimensions | length' /tmp/golden-coverage.json)" -eq 0
 
       - name: Controller Golden Quality
         run: |
