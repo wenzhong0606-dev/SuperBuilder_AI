@@ -199,6 +199,23 @@ public sealed class QueryPlanConfidenceDiagnosticsController : ControllerBase
             plan.Fields.Add(new QueryField { MetadataColumnId = binding.ColumnId, ColumnName = binding.Column, Aggregation = "NONE" });
         }
 
+        if (plan.Orders.Count == 0 && intent.IsRanking && resolution.Metric is not null && !string.IsNullOrWhiteSpace(intent.OrderBy))
+        {
+            var orderMetric = intent.Metrics.FirstOrDefault(x => x.IsOrderingMetric)
+                ?? intent.Metrics.FirstOrDefault(x => string.Equals(x.Name, intent.OrderBy, StringComparison.OrdinalIgnoreCase))
+                ?? plan.Metrics.FirstOrDefault();
+            if (orderMetric is not null)
+            {
+                plan.Orders.Add(new QueryOrder
+                {
+                    MetadataColumnId = resolution.Metric.ColumnId,
+                    Field = resolution.Metric.Column,
+                    Direction = intent.OrderDirection ?? "ASC"
+                });
+                plan.Fields.Add(new QueryField { MetadataColumnId = resolution.Metric.ColumnId, ColumnName = resolution.Metric.Column, Aggregation = orderMetric.Aggregation });
+            }
+        }
+
         var aggregateRanking = intent.IsRanking
             && plan.Dimensions.Count > 0
             && plan.Metrics.Any(x => x.GetAggregation() != QueryAggregation.None);
