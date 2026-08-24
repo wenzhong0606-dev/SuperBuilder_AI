@@ -6,16 +6,17 @@ using SuperBuilder_AI.Models.BI.Evaluation;
 namespace SuperBuilder_AI.Services.BI.Evaluation;
 
 /// <summary>
-/// Phase 2.6.3.5-C.2 Semantic Applicability Evaluator。
-/// Semantic Applicability 不只负责 Metric，还负责在 Golden 明确要求时解析 Filter / Dimension 的稳定物理绑定。
+/// Phase 2.6 C.13.2：统一 Semantic Applicability。
+/// Metric / Filter / Dimension / Table 都必须先完成稳定语义解析，再允许 QueryPlan 消费。
 /// </summary>
 public sealed class SemanticApplicabilityEvaluator
 {
+    private const double AmbiguityScoreGapThreshold = 0.05d;
     private readonly IMetadataSemanticSearchService _semanticSearchService;
 
     public SemanticApplicabilityEvaluator(IMetadataSemanticSearchService semanticSearchService)
     {
-        _semanticSearchService = semanticSearchService;
+        _semanticSearchService = semanticSearchService ?? throw new ArgumentNullException(nameof(semanticSearchService));
     }
 
     public async Task<SemanticApplicabilityResult> EvaluateAsync(GoldenQueryCase goldenCase, int topK = 10)
@@ -23,239 +24,168 @@ public sealed class SemanticApplicabilityEvaluator
         ArgumentNullException.ThrowIfNull(goldenCase);
         var metrics = goldenCase.Expected?.Metrics ?? new List<GoldenMetricExpectation>();
         if (metrics.Count == 0)
-            return new SemanticApplicabilityResult { CaseId = goldenCase.Id, Question = goldenCase.Question, State = "NotApplicable", MetricType = "Unknown", Reason = "Golden Case does not define a Metric." };
+            return new() { CaseId = goldenCase.Id, Question = goldenCase.Question, State = "NotApplicable", MetricType = "Unknown", Reason = "Golden Case does not define a Metric." };
 
-        var metric = metrics[0];
-        var metricType = metric.Aggregation == QueryAggregation.Count ? "EntityCount" : "ColumnMetric";
-        // Metric 解析必须以 Golden 声明的 SemanticText 为检索入口，避免“最多/前10个/物料”等 Query Modifier 污染 Metric 召回。
-        var results = await _semanticSearchService.SearchAsync(metric.SemanticText, topK);
-        if (results.Count == 0)
-            return new SemanticApplicabilityResult { CaseId = goldenCase.Id, Question = goldenCase.Question, MetricSemanticText = metric.SemanticText, MetricType = metricType, State = "NotResolved", Reason = "Semantic Search returned no candidates." };
-
-        var semanticCandidates = results.Where(x => x.IsSemanticVector).GroupBy(GetCandidateBindingKey, StringComparer.OrdinalIgnoreCase).Select(g => g.OrderByDescending(x => x.Score).First()).OrderByDescending(x => x.Score).ToList();
-        var entityCandidates = results.Where(x => x.Table is not null).Select(x => x.Table?.TableName).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
-        var topSemantic = semanticCandidates.FirstOrDefault();
-        var secondSemantic = semanticCandidates.Skip(1).FirstOrDefault();
-        double? scoreGap = topSemantic is not null && secondSemantic is not null ? topSemantic.Score - secondSemantic.Score : null;
-
-        var metricApplicability = metricType == "EntityCount"
-            ? EvaluateEntityCount(goldenCase, metric.SemanticText, metrics.Count, semanticCandidates, entityCandidates, topSemantic, secondSemantic, scoreGap)
-            : EvaluateColumnMetric(goldenCase, metric.SemanticText, metrics.Count, semanticCandidates, entityCandidates, topSemantic, secondSemantic, scoreGap);
-
-        if (!string.Equals(metricApplicability.State, "Resolved", StringComparison.OrdinalIgnoreCase))
-            return metricApplicability;
+        var metricResolutions = new List<SemanticApplicabilityMetricResolution>();
+        SemanticApplicabilityResult? firstMetricResult = null;
+        for (var i = 0; i < metrics.Count; i++)
+        {
+            var metric = metrics[i];
+            var result = await ResolveMetricAsync(goldenCase, metric, metrics.Count, topK);
+            if (firstMetricResult is null) firstMetricResult = result;
+            if (!string.Equals(result.State, "Resolved", StringComparison.OrdinalIgnoreCase))
+                return result with { MetricResolutions = metricResolutions };
+            if (result.Resolution is null)
+                return CopyWithFailure(result, $"Metric “{metric.SemanticText}” 已标记 Resolved，但没有稳定 Resolution。");
+            metricResolutions.Add(new SemanticApplicabilityMetricResolution
+            {
+                TableId = result.Resolution.TableId, DataSourceId = result.Resolution.DataSourceId, ColumnId = result.Resolution.ColumnId,
+                SemanticText = metric.SemanticText, Table = result.Resolution.Table, Column = result.Resolution.Column,
+                BusinessMeaning = result.Resolution.BusinessMeaning, Score = result.Resolution.Score
+            });
+        }
 
         var filterResolutions = new List<SemanticApplicabilityFilterResolution>();
-        if (goldenCase.Expected?.Filters is not null)
-            foreach (var filter in goldenCase.Expected.Filters)
-            {
-                var resolution = await ResolveFilterAsync(filter, topK);
-                if (resolution is null) return CopyWithFailure(metricApplicability, $"Filter 语义“{filter.SemanticText}”无法解析为稳定的 Metadata 物理绑定。");
-                filterResolutions.Add(resolution);
-            }
+        foreach (var filter in goldenCase.Expected?.Filters ?? new List<GoldenFilterExpectation>())
+        {
+            var resolution = await ResolveFilterAsync(filter, topK);
+            if (resolution is null) return CopyWithFailure(firstMetricResult!, $"Filter 语义“{filter.SemanticText}”无法解析为稳定的 Metadata 物理绑定。");
+            filterResolutions.Add(resolution);
+        }
 
         var dimensionResolutions = new List<SemanticApplicabilityDimensionResolution>();
-        if (goldenCase.Expected?.Dimensions is not null)
-            foreach (var dimension in goldenCase.Expected.Dimensions)
-            {
-                var resolution = await ResolveDimensionAsync(dimension, topK);
-                if (resolution is null) return CopyWithFailure(metricApplicability, $"Dimension 语义“{dimension.SemanticText}”无法解析为稳定的 Metadata 物理绑定。");
-                dimensionResolutions.Add(resolution);
-            }
+        foreach (var dimension in goldenCase.Expected?.Dimensions ?? new List<GoldenDimensionExpectation>())
+        {
+            var resolution = await ResolveDimensionAsync(dimension, topK);
+            if (resolution is null) return CopyWithFailure(firstMetricResult!, $"Dimension 语义“{dimension.SemanticText}”无法解析为稳定的 Metadata 物理绑定。");
+            dimensionResolutions.Add(resolution);
+        }
+
+        var tableResolutions = await ResolveTablesAsync(goldenCase.Expected?.Tables, metricResolutions, filterResolutions, dimensionResolutions, topK);
+        if (goldenCase.Expected?.Tables is not null && tableResolutions.Count != goldenCase.Expected.Tables.Count)
+            return CopyWithFailure(firstMetricResult!, "Golden Table SemanticText 没有形成逐项稳定 Table Resolution。");
 
         return new SemanticApplicabilityResult
         {
-            CaseId = metricApplicability.CaseId, Question = metricApplicability.Question, MetricSemanticText = metricApplicability.MetricSemanticText,
-            MetricType = metricApplicability.MetricType, State = metricApplicability.State, Reason = metricApplicability.Reason,
-            SearchCandidate = metricApplicability.SearchCandidate, Resolution = metricApplicability.Resolution,
-            FilterResolutions = filterResolutions, DimensionResolutions = dimensionResolutions, Evidence = metricApplicability.Evidence
+            CaseId = firstMetricResult!.CaseId, Question = firstMetricResult.Question, MetricSemanticText = firstMetricResult.MetricSemanticText,
+            MetricType = firstMetricResult.MetricType, State = "Resolved", Reason = metrics.Count > 1 ? $"All {metrics.Count} Golden Metrics、Filters、Dimensions、Tables 均已完成稳定 Semantic Resolution。" : "Golden Metrics、Filters、Dimensions、Tables 均已完成稳定 Semantic Resolution。",
+            SearchCandidate = firstMetricResult.SearchCandidate, Resolution = firstMetricResult.Resolution, MetricResolutions = metricResolutions,
+            FilterResolutions = filterResolutions, DimensionResolutions = dimensionResolutions, TableResolutions = tableResolutions,
+            Evidence = firstMetricResult.Evidence
+        };
+    }
+
+    private async Task<SemanticApplicabilityResult> ResolveMetricAsync(GoldenQueryCase goldenCase, GoldenMetricExpectation metric, int metricCount, int topK)
+    {
+        if (string.IsNullOrWhiteSpace(metric.SemanticText)) return new() { CaseId = goldenCase.Id, Question = goldenCase.Question, MetricSemanticText = metric.SemanticText, MetricType = "Unknown", State = "NotResolved", Reason = "Metric SemanticText 为空。" };
+        var metricType = metric.Aggregation == QueryAggregation.Count ? "EntityCount" : "ColumnMetric";
+        var results = await _semanticSearchService.SearchAsync(metric.SemanticText, topK);
+        if (results.Count == 0) return new() { CaseId = goldenCase.Id, Question = goldenCase.Question, MetricSemanticText = metric.SemanticText, MetricType = metricType, State = "NotResolved", Reason = "Semantic Search returned no candidates." };
+        var candidates = results.Where(x => x.IsSemanticVector && x.Table is not null && x.Column is not null).GroupBy(GetCandidateBindingKey, StringComparer.OrdinalIgnoreCase).Select(g => g.OrderByDescending(x => x.Score).First()).OrderByDescending(x => x.Score).ToList();
+        if (candidates.Count == 0) return new() { CaseId = goldenCase.Id, Question = goldenCase.Question, MetricSemanticText = metric.SemanticText, MetricType = metricType, State = "NotResolved", Reason = "No semantic vector candidate with physical binding was returned." };
+        var top = candidates[0];
+        var second = candidates.Skip(1).FirstOrDefault();
+        var lexical = ContainsSemanticText(top, metric.SemanticText);
+        var gap = second is null ? (double?)null : top.Score - second.Score;
+        var competing = second is not null && ContainsSemanticText(second, metric.SemanticText) && gap <= AmbiguityScoreGapThreshold;
+
+        if (metricType == "EntityCount")
+        {
+            var entityText = ExtractEntitySemanticText(metric.SemanticText);
+            var entityCandidates = string.IsNullOrWhiteSpace(entityText) ? new List<MetadataSemanticSearchResult>() : candidates.Where(x => ContainsDirectEntityEvidence(x, entityText)).OrderByDescending(x => GetEntityEvidenceScore(x, entityText)).ToList();
+            var entity = entityCandidates.FirstOrDefault();
+            var entityScore = entity is null ? 0 : GetEntityEvidenceScore(entity, entityText);
+            var secondEntity = entityCandidates.Skip(1).FirstOrDefault();
+            var entityGap = secondEntity is null ? (double?)null : entityScore - GetEntityEvidenceScore(secondEntity, entityText);
+            var entityCompeting = secondEntity is not null && entityGap <= 8;
+            if (entity is not null && entityScore >= 60)
+            {
+                top = entity;
+                competing = entityCompeting;
+                lexical = true;
+                gap = entityGap;
+            }
+            else
+                return new() { CaseId = goldenCase.Id, Question = goldenCase.Question, MetricSemanticText = metric.SemanticText, MetricType = metricType, State = "NotResolved", Reason = "No direct EntityCount semantic evidence could be resolved.", SearchCandidate = ToCandidate(top), Evidence = new SemanticApplicabilityEvidence { SemanticCandidateExists = candidates.Count > 0, DirectEntityCountEvidence = false, LexicalMatch = lexical, CompetingCandidates = false, TopScore = top.Score, SecondScore = second?.Score, ScoreGap = gap } };
+        }
+
+        var state = lexical ? competing ? "Ambiguous" : "Resolved" : "NotResolved";
+        return new SemanticApplicabilityResult
+        {
+            CaseId = goldenCase.Id, Question = goldenCase.Question, MetricSemanticText = metric.SemanticText, MetricType = metricType, State = state,
+            Reason = state == "Resolved" ? $"Metric SemanticText 已稳定绑定到 {top.Table!.TableName}.{top.Column!.ColumnName}。" : state == "Ambiguous" ? "存在分差不足的竞争 Semantic Candidate，禁止继续构建 QueryPlan。" : "Top Candidate 缺少 Golden SemanticText 的直接语义证据。",
+            SearchCandidate = ToCandidate(top), Resolution = state == "Resolved" ? ToResolution(top) : null,
+            Evidence = new SemanticApplicabilityEvidence { SemanticCandidateExists = candidates.Count > 0, EntityCandidateExists = results.Any(x => x.Table is not null), DirectEntityCountEvidence = metricType == "EntityCount", LexicalMatch = lexical, CompetingCandidates = competing, TopScore = top.Score, SecondScore = second?.Score, ScoreGap = gap }
         };
     }
 
     private async Task<SemanticApplicabilityFilterResolution?> ResolveFilterAsync(GoldenFilterExpectation filter, int topK)
     {
         if (string.IsNullOrWhiteSpace(filter.SemanticText)) return null;
-        var results = await _semanticSearchService.SearchAsync(filter.SemanticText, topK);
-        var candidates = results.Where(x => x.IsSemanticVector && x.Table is not null && x.Column is not null).GroupBy(GetCandidateBindingKey, StringComparer.OrdinalIgnoreCase).Select(g => g.OrderByDescending(x => x.Score).First()).OrderByDescending(x => x.Score).ToList();
-        var candidate = candidates.FirstOrDefault(x => ContainsSemanticText(x, filter.SemanticText));
-        if (candidate?.Table is null || candidate.Column is null) return null;
-        return new SemanticApplicabilityFilterResolution { TableId = candidate.Table.Id, DataSourceId = candidate.Table.DataSourceId, ColumnId = candidate.Column.Id, SemanticText = filter.SemanticText, Table = candidate.Table.TableName, Column = candidate.Column.ColumnName, BusinessMeaning = candidate.Semantic?.BusinessMeaning, Score = candidate.Score };
+        var candidates = (await _semanticSearchService.SearchAsync(filter.SemanticText, topK)).Where(x => x.IsSemanticVector && x.Table is not null && x.Column is not null).GroupBy(GetCandidateBindingKey, StringComparer.OrdinalIgnoreCase).Select(g => g.OrderByDescending(x => x.Score).First()).OrderByDescending(x => x.Score).ToList();
+        var direct = candidates.Where(x => ContainsSemanticText(x, filter.SemanticText)).ToList();
+        if (direct.Count == 0) return null;
+        if (direct.Count > 1 && direct[0].Score - direct[1].Score <= AmbiguityScoreGapThreshold) return null;
+        var c = direct[0];
+        return new() { TableId = c.Table!.Id, DataSourceId = c.Table.DataSourceId, ColumnId = c.Column!.Id, SemanticText = filter.SemanticText, Table = c.Table.TableName, Column = c.Column.ColumnName, BusinessMeaning = c.Semantic?.BusinessMeaning, Score = c.Score };
     }
 
     private async Task<SemanticApplicabilityDimensionResolution?> ResolveDimensionAsync(GoldenDimensionExpectation dimension, int topK)
     {
         if (string.IsNullOrWhiteSpace(dimension.SemanticText)) return null;
-        var results = await _semanticSearchService.SearchAsync(dimension.SemanticText, topK);
-        var candidates = results.Where(x => x.IsSemanticVector && x.Table is not null && x.Column is not null).GroupBy(GetCandidateBindingKey, StringComparer.OrdinalIgnoreCase).Select(g => g.OrderByDescending(x => x.Score).First()).OrderByDescending(x => x.Score).ToList();
-        var candidate = candidates.FirstOrDefault(x => ContainsSemanticText(x, dimension.SemanticText));
-        if (candidate?.Table is null || candidate.Column is null) return null;
-        return new SemanticApplicabilityDimensionResolution { TableId = candidate.Table.Id, DataSourceId = candidate.Table.DataSourceId, ColumnId = candidate.Column.Id, SemanticText = dimension.SemanticText, Table = candidate.Table.TableName, Column = candidate.Column.ColumnName, BusinessMeaning = candidate.Semantic?.BusinessMeaning, Score = candidate.Score };
+        var candidates = (await _semanticSearchService.SearchAsync(dimension.SemanticText, topK)).Where(x => x.IsSemanticVector && x.Table is not null && x.Column is not null).GroupBy(GetCandidateBindingKey, StringComparer.OrdinalIgnoreCase).Select(g => g.OrderByDescending(x => x.Score).First()).OrderByDescending(x => x.Score).ToList();
+        var direct = candidates.Where(x => ContainsSemanticText(x, dimension.SemanticText)).ToList();
+        if (direct.Count == 0 || direct.Count > 1 && direct[0].Score - direct[1].Score <= AmbiguityScoreGapThreshold) return null;
+        var c = direct[0];
+        return new() { TableId = c.Table!.Id, DataSourceId = c.Table.DataSourceId, ColumnId = c.Column!.Id, SemanticText = dimension.SemanticText, Table = c.Table.TableName, Column = c.Column.ColumnName, BusinessMeaning = c.Semantic?.BusinessMeaning, Score = c.Score };
     }
 
-    private static SemanticApplicabilityResult CopyWithFailure(SemanticApplicabilityResult source, string reason) => new()
+    private async Task<IReadOnlyList<SemanticApplicabilityTableResolution>> ResolveTablesAsync(IReadOnlyList<GoldenTableExpectation>? expected, IReadOnlyList<SemanticApplicabilityMetricResolution> metrics, IReadOnlyList<SemanticApplicabilityFilterResolution> filters, IReadOnlyList<SemanticApplicabilityDimensionResolution> dimensions, int topK)
     {
-        CaseId = source.CaseId, Question = source.Question, MetricSemanticText = source.MetricSemanticText, MetricType = source.MetricType,
-        State = "NotResolved", Reason = reason, SearchCandidate = source.SearchCandidate, Resolution = source.Resolution, Evidence = source.Evidence
-    };
-
-    private static SemanticApplicabilityResult EvaluateColumnMetric(GoldenQueryCase goldenCase, string semanticText, int metricCount, IReadOnlyList<MetadataSemanticSearchResult> semanticCandidates, IReadOnlyList<string?> entityCandidates, MetadataSemanticSearchResult? topSemantic, MetadataSemanticSearchResult? secondSemantic, double? scoreGap)
-    {
-        if (topSemantic is null) return new SemanticApplicabilityResult { CaseId = goldenCase.Id, Question = goldenCase.Question, MetricSemanticText = semanticText, MetricType = "ColumnMetric", State = "NotResolved", Reason = "No semantic vector candidate was returned." };
-        var topLexicalMatch = ContainsSemanticText(topSemantic, semanticText);
-        // 仅当竞争候选与 Top Candidate 的分差处于可疑区间时才判定 Ambiguous。
-        // 低分且仅因共享“数量/入库”等词命中的候选，不应阻断稳定的 Top Semantic Binding。
-        const double ambiguityScoreGapThreshold = 0.05d;
-        var competingCandidates = secondSemantic is not null
-            && ContainsSemanticText(secondSemantic, semanticText)
-            && (scoreGap ?? 0d) <= ambiguityScoreGapThreshold;
-        var state = topLexicalMatch ? competingCandidates ? "Ambiguous" : "Resolved" : "NotResolved";
-        return new SemanticApplicabilityResult { CaseId = goldenCase.Id, Question = goldenCase.Question, MetricSemanticText = semanticText, MetricType = "ColumnMetric", State = state, Reason = BuildColumnReason(state, topLexicalMatch, metricCount), SearchCandidate = ToCandidate(topSemantic), Resolution = state == "Resolved" ? ToResolution(topSemantic) : null, Evidence = new SemanticApplicabilityEvidence { SemanticCandidateExists = semanticCandidates.Count > 0, EntityCandidateExists = entityCandidates.Count > 0, DirectEntityCountEvidence = false, LexicalMatch = topLexicalMatch, CompetingCandidates = competingCandidates, TopScore = topSemantic.Score, SecondScore = secondSemantic?.Score, ScoreGap = scoreGap } };
-    }
-
-    private static SemanticApplicabilityResult EvaluateEntityCount(GoldenQueryCase goldenCase, string semanticText, int metricCount, IReadOnlyList<MetadataSemanticSearchResult> semanticCandidates, IReadOnlyList<string?> entityCandidates, MetadataSemanticSearchResult? topSemantic, MetadataSemanticSearchResult? secondSemantic, double? scoreGap)
-    {
-        if (topSemantic is null)
-            return new SemanticApplicabilityResult { CaseId = goldenCase.Id, Question = goldenCase.Question, MetricSemanticText = semanticText, MetricType = "EntityCount", State = "NotResolved", Reason = "No semantic vector candidate was returned.", Evidence = new SemanticApplicabilityEvidence { SemanticCandidateExists = false, EntityCandidateExists = entityCandidates.Count > 0, DirectEntityCountEvidence = false } };
-
-        var topLexicalMatch = ContainsSemanticText(topSemantic, semanticText);
-        var entitySemanticText = ExtractEntitySemanticText(semanticText);
-        var tableEntityCandidates = string.IsNullOrWhiteSpace(entitySemanticText)
-            ? new List<MetadataSemanticSearchResult>()
-            : semanticCandidates.Where(x => x.Table is not null && ContainsDirectEntityEvidence(x, entitySemanticText)).GroupBy(x => x.Table!.Id).Select(g => g.OrderByDescending(x => GetEntityEvidenceScore(x, entitySemanticText)).First()).OrderByDescending(x => GetEntityEvidenceScore(x, entitySemanticText)).ToList();
-
-        var exactEntityCandidates = tableEntityCandidates.Where(x => MatchesExactEntityTableSemanticText(x, entitySemanticText)).GroupBy(x => x.Table!.Id).Select(g => g.OrderByDescending(x => GetEntityEvidenceScore(x, entitySemanticText)).First()).OrderByDescending(x => GetEntityEvidenceScore(x, entitySemanticText)).ToList();
-        var entityCandidatesForResolution = exactEntityCandidates.Count > 0 ? exactEntityCandidates : tableEntityCandidates;
-        var entityCandidate = entityCandidatesForResolution.FirstOrDefault();
-        var secondEntityCandidate = entityCandidatesForResolution.Skip(1).FirstOrDefault();
-        var entityScore = entityCandidate is null ? 0 : GetEntityEvidenceScore(entityCandidate, entitySemanticText);
-        var secondEntityScore = secondEntityCandidate is null ? 0 : GetEntityEvidenceScore(secondEntityCandidate, entitySemanticText);
-
-        var competingCandidates = entityCandidate is not null && secondEntityCandidate is not null && secondEntityScore >= entityScore - 8;
-        var directEvidence = entityCandidate is not null && entityScore >= 60;
-        if (directEvidence) topSemantic = entityCandidate;
-        var state = directEvidence ? competingCandidates ? "Ambiguous" : "Resolved" : "NotResolved";
-
-        return new SemanticApplicabilityResult
+        if (expected is null) return Array.Empty<SemanticApplicabilityTableResolution>();
+        var results = new List<SemanticApplicabilityTableResolution>();
+        foreach (var table in expected)
         {
-            CaseId = goldenCase.Id, Question = goldenCase.Question, MetricSemanticText = semanticText, MetricType = "EntityCount", State = state,
-            Reason = BuildEntityCountReason(state, metricCount, topLexicalMatch, entitySemanticText), SearchCandidate = ToCandidate(topSemantic), Resolution = state == "Resolved" ? ToResolution(topSemantic) : null,
-            Evidence = new SemanticApplicabilityEvidence { SemanticCandidateExists = semanticCandidates.Count > 0, EntityCandidateExists = entityCandidates.Count > 0, DirectEntityCountEvidence = directEvidence, LexicalMatch = topLexicalMatch || !string.IsNullOrWhiteSpace(entityCandidate?.Table?.TableComment), CompetingCandidates = competingCandidates, TopScore = entityCandidate?.Score ?? topSemantic.Score, SecondScore = secondEntityCandidate?.Score ?? secondSemantic?.Score, ScoreGap = secondEntityCandidate is not null ? entityScore - secondEntityScore : scoreGap }
-        };
+            if (string.IsNullOrWhiteSpace(table.SemanticText)) return Array.Empty<SemanticApplicabilityTableResolution>();
+            var candidates = (await _semanticSearchService.SearchAsync(table.SemanticText, topK)).Where(x => x.IsSemanticVector && x.Table is not null).GroupBy(x => $"{x.Table!.Id}:{x.Table.DataSourceId}", StringComparer.OrdinalIgnoreCase).Select(g => g.OrderByDescending(x => x.Score).First()).OrderByDescending(x => x.Score).ToList();
+            var direct = candidates.Where(x => ContainsTableSemanticText(x, table.SemanticText)).ToList();
+            if (direct.Count == 0) return Array.Empty<SemanticApplicabilityTableResolution>();
+            if (direct.Count > 1 && direct[0].Score - direct[1].Score <= AmbiguityScoreGapThreshold) return Array.Empty<SemanticApplicabilityTableResolution>();
+            var c = direct[0];
+            results.Add(new() { TableId = c.Table!.Id, DataSourceId = c.Table.DataSourceId, SemanticText = table.SemanticText, Table = c.Table.TableName, BusinessMeaning = c.Semantic?.BusinessMeaning, Score = c.Score });
+        }
+        return results;
     }
 
-    private static bool ContainsDirectEntityEvidence(MetadataSemanticSearchResult candidate, string entitySemanticText)
+    private static SemanticApplicabilityResult CopyWithFailure(SemanticApplicabilityResult source, string reason) => new() { CaseId = source.CaseId, Question = source.Question, MetricSemanticText = source.MetricSemanticText, MetricType = source.MetricType, State = "NotResolved", Reason = reason, SearchCandidate = source.SearchCandidate, Resolution = source.Resolution, MetricResolutions = source.MetricResolutions, FilterResolutions = source.FilterResolutions, DimensionResolutions = source.DimensionResolutions, TableResolutions = source.TableResolutions, Evidence = source.Evidence };
+
+    private static bool ContainsDirectEntityEvidence(MetadataSemanticSearchResult candidate, string entityText) => candidate.Table is not null && new[] { candidate.Table.TableName, candidate.Table.TableComment, candidate.Semantic?.BusinessMeaning, candidate.Semantic?.Keywords, candidate.Semantic?.Synonyms, candidate.Semantic?.SearchText, candidate.Column?.ColumnName, candidate.Column?.ColumnComment }.Any(x => !string.IsNullOrWhiteSpace(x) && NormalizeSemanticText(x).Contains(NormalizeSemanticText(entityText), StringComparison.OrdinalIgnoreCase));
+    private static double GetEntityEvidenceScore(MetadataSemanticSearchResult candidate, string entityText)
     {
-        if (candidate.Table is null || string.IsNullOrWhiteSpace(entitySemanticText)) return false;
-        var normalizedEntity = NormalizeSemanticText(entitySemanticText);
-        if (normalizedEntity.Length == 0) return false;
-        var values = new[] { candidate.Table.TableName, candidate.Table.TableComment, candidate.Semantic?.BusinessMeaning, candidate.Semantic?.Keywords, candidate.Semantic?.Synonyms, candidate.Semantic?.ExampleQuestions, candidate.Semantic?.SearchText, candidate.Column?.ColumnName, candidate.Column?.ColumnComment };
-        return values.Any(value => !string.IsNullOrWhiteSpace(value) && NormalizeSemanticText(value).Contains(normalizedEntity, StringComparison.OrdinalIgnoreCase));
-    }
-
-    private static double GetEntityEvidenceScore(MetadataSemanticSearchResult candidate, string entitySemanticText)
-    {
-        if (candidate.Table is null || string.IsNullOrWhiteSpace(entitySemanticText)) return 0;
-        var normalizedEntity = NormalizeSemanticText(entitySemanticText);
-        var score = 0d;
-        if (NormalizeSemanticText(candidate.Table.TableComment ?? string.Empty).Equals(normalizedEntity, StringComparison.OrdinalIgnoreCase)) score += 100;
-        if (NormalizeSemanticText(candidate.Table.TableName ?? string.Empty).Equals(normalizedEntity, StringComparison.OrdinalIgnoreCase)) score += 95;
-        if (new[] { candidate.Semantic?.Keywords, candidate.Semantic?.Synonyms }.Any(value => ContainsExactSemanticToken(value, normalizedEntity))) score += 90;
-        if (!string.IsNullOrWhiteSpace(candidate.Semantic?.BusinessMeaning) && NormalizeSemanticText(candidate.Semantic.BusinessMeaning).Contains(normalizedEntity, StringComparison.OrdinalIgnoreCase)) score += 80;
-        if (!string.IsNullOrWhiteSpace(candidate.Column?.ColumnComment) && NormalizeSemanticText(candidate.Column.ColumnComment).Contains(normalizedEntity, StringComparison.OrdinalIgnoreCase)) score += 70;
-        if (!string.IsNullOrWhiteSpace(candidate.Column?.ColumnName) && NormalizeSemanticText(candidate.Column.ColumnName).Contains(normalizedEntity, StringComparison.OrdinalIgnoreCase)) score += 65;
-
-        var columnName = NormalizeSemanticText(candidate.Column?.ColumnName ?? string.Empty);
-        var columnComment = NormalizeSemanticText(candidate.Column?.ColumnComment ?? string.Empty);
-        var semanticMeaning = NormalizeSemanticText(candidate.Semantic?.BusinessMeaning ?? string.Empty);
-        if (IsEntityIdentifierColumn(columnName, columnComment, semanticMeaning, normalizedEntity)) score += 20;
-
-        if (IsLikelyForeignKeyColumn(columnName, columnComment, semanticMeaning)) score -= 100;
-        if (IsLikelyMeasureColumn(columnName, columnComment, semanticMeaning)) score -= 35;
+        if (candidate.Table is null) return 0;
+        var e = NormalizeSemanticText(entityText); var score = 0d;
+        if (NormalizeSemanticText(candidate.Table.TableComment ?? string.Empty).Equals(e, StringComparison.OrdinalIgnoreCase)) score += 100;
+        if (NormalizeSemanticText(candidate.Table.TableName ?? string.Empty).Equals(e, StringComparison.OrdinalIgnoreCase)) score += 95;
+        if (!string.IsNullOrWhiteSpace(candidate.Semantic?.BusinessMeaning) && NormalizeSemanticText(candidate.Semantic.BusinessMeaning).Contains(e, StringComparison.OrdinalIgnoreCase)) score += 80;
+        if (!string.IsNullOrWhiteSpace(candidate.Column?.ColumnComment) && NormalizeSemanticText(candidate.Column.ColumnComment).Contains(e, StringComparison.OrdinalIgnoreCase)) score += 70;
+        if (!string.IsNullOrWhiteSpace(candidate.Column?.ColumnName) && NormalizeSemanticText(candidate.Column.ColumnName).Contains(e, StringComparison.OrdinalIgnoreCase)) score += 65;
+        var column = NormalizeSemanticText(candidate.Column?.ColumnName ?? string.Empty);
+        if (column.EndsWith("id", StringComparison.OrdinalIgnoreCase) || column.EndsWith("_id", StringComparison.OrdinalIgnoreCase)) score -= 100;
         return score;
     }
 
-    private static bool ContainsExactSemanticToken(string? value, string normalizedEntity)
+    private static string ExtractEntitySemanticText(string text)
     {
-        if (string.IsNullOrWhiteSpace(value)) return false;
-        var normalized = NormalizeSemanticText(value);
-        if (normalized.Equals(normalizedEntity, StringComparison.OrdinalIgnoreCase)) return true;
-        var separators = new[] { ',', '，', ';', '；', '/', '、', '|', '\n', '\r' };
-        return value.Split(separators, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Any(token => NormalizeSemanticText(token).Equals(normalizedEntity, StringComparison.OrdinalIgnoreCase));
-    }
-
-    private static bool IsEntityIdentifierColumn(string columnName, string columnComment, string semanticMeaning, string normalizedEntity)
-    {
-        if (string.IsNullOrWhiteSpace(columnName)) return false;
-        if (columnName.Equals("code", StringComparison.OrdinalIgnoreCase) || columnName.EndsWith("code", StringComparison.OrdinalIgnoreCase) || columnName.Contains("number", StringComparison.OrdinalIgnoreCase) || columnName.Contains("no", StringComparison.OrdinalIgnoreCase)) return true;
-        return columnComment.Contains("单号", StringComparison.OrdinalIgnoreCase) || columnComment.Contains("编码", StringComparison.OrdinalIgnoreCase) || semanticMeaning.Contains("业务编码", StringComparison.OrdinalIgnoreCase) || semanticMeaning.Contains("单号", StringComparison.OrdinalIgnoreCase) || semanticMeaning.Contains("唯一编号", StringComparison.OrdinalIgnoreCase) || semanticMeaning.Contains(normalizedEntity, StringComparison.OrdinalIgnoreCase) && (semanticMeaning.Contains("编码", StringComparison.OrdinalIgnoreCase) || semanticMeaning.Contains("编号", StringComparison.OrdinalIgnoreCase));
-    }
-
-    private static bool IsLikelyForeignKeyColumn(string columnName, string columnComment, string semanticMeaning)
-    {
-        if (columnName.EndsWith("id", StringComparison.OrdinalIgnoreCase) || columnName.EndsWith("_id", StringComparison.OrdinalIgnoreCase)) return true;
-        return columnComment.Contains("关联", StringComparison.OrdinalIgnoreCase) || semanticMeaning.Contains("关联", StringComparison.OrdinalIgnoreCase) || semanticMeaning.Contains("外键", StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static bool IsLikelyMeasureColumn(string columnName, string columnComment, string semanticMeaning)
-    {
-        var text = $"{columnName}|{columnComment}|{semanticMeaning}";
-        return new[] { "quantity", "amount", "price", "库存", "数量", "金额", "价格", "重量", "体积", "余额" }.Any(term => text.Contains(term, StringComparison.OrdinalIgnoreCase));
-    }
-
-    private static string ExtractEntitySemanticText(string semanticText)
-    {
-        var normalized = NormalizeSemanticText(semanticText);
-        foreach (var suffix in new[] { "数量", "个数", "总数", "数目" })
-            if (normalized.EndsWith(suffix, StringComparison.OrdinalIgnoreCase)) return normalized[..^suffix.Length];
+        var n = NormalizeSemanticText(text);
+        foreach (var suffix in new[] { "数量", "个数", "总数", "数目" }) if (n.EndsWith(suffix, StringComparison.OrdinalIgnoreCase)) return n[..^suffix.Length];
         return string.Empty;
     }
 
-    private static bool MatchesExactEntityTableSemanticText(MetadataSemanticSearchResult candidate, string entitySemanticText)
-    {
-        if (candidate.Table is null) return false;
-        var normalizedEntity = NormalizeSemanticText(entitySemanticText);
-        if (normalizedEntity.Length == 0) return false;
-        return new[] { candidate.Table.TableComment, candidate.Table.TableName }.Any(value => !string.IsNullOrWhiteSpace(value) && NormalizeSemanticText(value).Equals(normalizedEntity, StringComparison.OrdinalIgnoreCase));
-    }
-
-    private static bool ContainsTableEntitySemanticText(MetadataSemanticSearchResult candidate, string entitySemanticText)
-    {
-        if (candidate.Table is null) return false;
-        var normalizedEntity = NormalizeSemanticText(entitySemanticText);
-        if (normalizedEntity.Length == 0) return false;
-        return new[] { candidate.Table.TableName, candidate.Table.TableComment, candidate.Table.SearchText }.Any(value => !string.IsNullOrWhiteSpace(value) && NormalizeSemanticText(value).Contains(normalizedEntity, StringComparison.OrdinalIgnoreCase));
-    }
-
-    private static bool ContainsEntitySemanticText(MetadataSemanticSearchResult candidate, string entitySemanticText)
-    {
-        if (string.IsNullOrWhiteSpace(entitySemanticText)) return false;
-        var normalizedEntity = NormalizeSemanticText(entitySemanticText);
-        if (normalizedEntity.Length == 0) return false;
-        return new[] { candidate.Table?.TableName, candidate.Table?.TableComment, candidate.Table?.SearchText, candidate.Semantic?.BusinessMeaning, candidate.Semantic?.Keywords, candidate.Semantic?.Synonyms, candidate.Semantic?.ExampleQuestions, candidate.Semantic?.SearchText, candidate.Column?.ColumnName, candidate.Column?.ColumnComment }.Any(value => !string.IsNullOrWhiteSpace(value) && NormalizeSemanticText(value).Contains(normalizedEntity, StringComparison.OrdinalIgnoreCase));
-    }
-
-    private static bool ContainsSemanticText(MetadataSemanticSearchResult candidate, string semanticText)
-    {
-        var normalized = NormalizeSemanticText(semanticText);
-        if (normalized.Length == 0) return false;
-        return new[] { candidate.Table?.TableName, candidate.Table?.TableComment, candidate.Table?.SearchText, candidate.Column?.ColumnName, candidate.Column?.ColumnComment, candidate.Semantic?.BusinessMeaning, candidate.Semantic?.Keywords, candidate.Semantic?.Synonyms, candidate.Semantic?.ExampleQuestions, candidate.Semantic?.SearchText }.Any(value => !string.IsNullOrWhiteSpace(value) && NormalizeSemanticText(value).Contains(normalized, StringComparison.OrdinalIgnoreCase));
-    }
-
+    private static bool ContainsSemanticText(MetadataSemanticSearchResult c, string text) => ContainsAny(c, text, c.Table?.TableName, c.Table?.TableComment, c.Table?.SearchText, c.Column?.ColumnName, c.Column?.ColumnComment, c.Semantic?.BusinessMeaning, c.Semantic?.Keywords, c.Semantic?.Synonyms, c.Semantic?.ExampleQuestions, c.Semantic?.SearchText);
+    private static bool ContainsTableSemanticText(MetadataSemanticSearchResult c, string text) => ContainsAny(c, text, c.Table?.TableName, c.Table?.TableComment, c.Table?.SearchText, c.Semantic?.BusinessMeaning, c.Semantic?.Keywords, c.Semantic?.Synonyms, c.Semantic?.SearchText);
+    private static bool ContainsAny(MetadataSemanticSearchResult _, string text, params string?[] values) { var n = NormalizeSemanticText(text); return n.Length > 0 && values.Any(v => !string.IsNullOrWhiteSpace(v) && NormalizeSemanticText(v).Contains(n, StringComparison.OrdinalIgnoreCase)); }
     private static string NormalizeSemanticText(string value) => new(value.Where(c => !char.IsWhiteSpace(c) && c != '_' && c != '-').ToArray());
-    private static string GetCandidateBindingKey(MetadataSemanticSearchResult candidate) => $"{candidate.Table?.Id ?? 0}:{candidate.Column?.Id ?? 0}";
-
-    private static SemanticApplicabilityCandidate? ToCandidate(MetadataSemanticSearchResult? candidate)
-    {
-        if (candidate?.Table is null || candidate.Column is null) return null;
-        return new SemanticApplicabilityCandidate { VectorType = candidate.VectorType, VectorId = candidate.VectorId, Score = candidate.Score, Table = candidate.Table.TableName, Column = candidate.Column.ColumnName, BusinessMeaning = candidate.Semantic?.BusinessMeaning };
-    }
-
-    private static SemanticApplicabilityResolution? ToResolution(MetadataSemanticSearchResult? candidate)
-    {
-        if (candidate?.Table is null || candidate.Column is null) return null;
-        return new SemanticApplicabilityResolution { TableId = candidate.Table.Id, DataSourceId = candidate.Table.DataSourceId, ColumnId = candidate.Column.Id, Table = candidate.Table.TableName, Column = candidate.Column.ColumnName, BusinessMeaning = candidate.Semantic?.BusinessMeaning, Score = candidate.Score };
-    }
-
-    private static string BuildColumnReason(string state, bool lexicalMatch, int metricCount) => metricCount > 1 ? $"Primary Metric semantic applicability={state}; Golden Case contains {metricCount} metrics and the primary metric was evaluated first." : state switch { "Resolved" => "Direct semantic candidate matched the requested metric semantic text.", "Ambiguous" => "Multiple semantic candidates contain direct evidence for the Golden metric; Applicability remains Ambiguous.", _ when !lexicalMatch => "Top semantic candidate does not provide sufficient lexical evidence for the Golden metric.", _ => "No stable semantic applicability could be resolved." };
-    private static string BuildEntityCountReason(string state, int metricCount, bool topLexicalMatch, string entitySemanticText) => metricCount > 1 ? $"Primary EntityCount semantic applicability={state}; Golden Case contains {metricCount} metrics and the primary metric was evaluated first." : state switch { "Resolved" => string.IsNullOrWhiteSpace(entitySemanticText) ? "Direct EntityCount semantic evidence matched an existing table/column binding." : "Direct EntityCount semantic evidence matched a stable business-entity table binding.", "Ambiguous" => "Multiple table-level semantic candidates contain direct EntityCount evidence; Applicability remains Ambiguous.", _ when !topLexicalMatch => "Top semantic candidate does not provide sufficient evidence for the Golden metric.", _ => "No direct EntityCount semantic evidence could be resolved from the current semantic candidates." };
+    private static string GetCandidateBindingKey(MetadataSemanticSearchResult c) => $"{c.Table?.Id ?? 0}:{c.Column?.Id ?? 0}";
+    private static SemanticApplicabilityCandidate? ToCandidate(MetadataSemanticSearchResult? c) => c?.Table is null || c.Column is null ? null : new() { VectorType = c.VectorType, VectorId = c.VectorId, Score = c.Score, Table = c.Table.TableName, Column = c.Column.ColumnName, BusinessMeaning = c.Semantic?.BusinessMeaning };
+    private static SemanticApplicabilityResolution? ToResolution(MetadataSemanticSearchResult? c) => c?.Table is null || c.Column is null ? null : new() { TableId = c.Table.Id, DataSourceId = c.Table.DataSourceId, ColumnId = c.Column.Id, Table = c.Table.TableName, Column = c.Column.ColumnName, BusinessMeaning = c.Semantic?.BusinessMeaning, Score = c.Score };
 }
