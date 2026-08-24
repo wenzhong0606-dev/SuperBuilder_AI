@@ -24,204 +24,123 @@ public sealed class QueryPlanEvaluator
 
     public QueryPlanEvaluationResult Evaluate(string caseId, GoldenQueryExpectation expected, QueryPlan runtime)
     {
-        ArgumentNullException.ThrowIfNull(expected);
-        ArgumentNullException.ThrowIfNull(runtime);
+        ArgumentNullException.ThrowIfNull(expected); ArgumentNullException.ThrowIfNull(runtime);
         var intent = EvaluateIntent(expected, runtime);
-        var metricEvaluation = _metricScoringService.Evaluate(expected.Metrics, runtime.Metrics);
-        var metrics = new QueryPlanEvaluationSectionResult { Passed = metricEvaluation.Passed, Score = metricEvaluation.Score, Reason = metricEvaluation.Reason, Details = metricEvaluation.Items };
-        var dimensionEvaluation = _dimensionScoringService.Evaluate(expected.Dimensions, runtime.Dimensions);
-        var dimensions = new QueryPlanEvaluationSectionResult { Passed = dimensionEvaluation.Passed, Score = dimensionEvaluation.Score, Reason = dimensionEvaluation.Reason, Details = dimensionEvaluation.Items };
-        var filterEvaluation = _filterScoringService.Evaluate(expected.Filters, runtime.Filters);
-        var filters = new QueryPlanEvaluationSectionResult { Passed = filterEvaluation.Passed, Score = filterEvaluation.Score, Reason = filterEvaluation.Reason, Details = filterEvaluation.Items };
-        var tables = EvaluateTables(expected, runtime);
-        var joins = EvaluateJoins(expected, runtime);
-        var queryShapeEvaluation = _queryShapeScoringService.Evaluate(expected, runtime);
-        var shape = new QueryPlanEvaluationSectionResult { Passed = queryShapeEvaluation.Passed, Score = queryShapeEvaluation.Score, Reason = queryShapeEvaluation.Reason, Details = queryShapeEvaluation.Checks };
-        var bindingConsistency = EvaluateBindingConsistency(expected, runtime);
+        var m = _metricScoringService.Evaluate(expected.Metrics, runtime.Metrics);
+        var d = _dimensionScoringService.Evaluate(expected.Dimensions, runtime.Dimensions);
+        var f = _filterScoringService.Evaluate(expected.Filters, runtime.Filters);
+        var q = _queryShapeScoringService.Evaluate(expected, runtime);
         var raw = new QueryPlanEvaluationResult
         {
-            CaseId = caseId, Intent = intent, Metrics = metrics, Dimensions = dimensions, Filters = filters, Tables = tables, Joins = joins, QueryShape = shape, BindingConsistency = bindingConsistency,
-            MetricExpectations = expected.Metrics, ActualMetrics = runtime.Metrics
+            CaseId = caseId, Intent = intent,
+            Metrics = new() { Passed = m.Passed, Score = m.Score, Reason = m.Reason, Details = m.Items },
+            Dimensions = new() { Passed = d.Passed, Score = d.Score, Reason = d.Reason, Details = d.Items },
+            Filters = new() { Passed = f.Passed, Score = f.Score, Reason = f.Reason, Details = f.Items },
+            Tables = EvaluateTables(expected, runtime), Joins = EvaluateJoins(expected, runtime),
+            QueryShape = new() { Passed = q.Passed, Score = q.Score, Reason = q.Reason, Details = q.Checks },
+            BindingConsistency = EvaluateBindingConsistency(expected, runtime), MetricExpectations = expected.Metrics, ActualMetrics = runtime.Metrics
         };
         return _evaluationScoringService.Score(raw);
     }
 
     public QueryPlanSemanticEvidenceResult EvaluateSemanticEvidence(string caseId, GoldenQueryExpectation expected, QueryPlan runtime, SemanticApplicabilityResult applicability)
     {
-        ArgumentNullException.ThrowIfNull(expected);
-        ArgumentNullException.ThrowIfNull(runtime);
-        ArgumentNullException.ThrowIfNull(applicability);
-
-        var metricResolutions = applicability.Resolution is null ? Array.Empty<SemanticApplicabilityResolution>() : new[] { applicability.Resolution };
+        ArgumentNullException.ThrowIfNull(expected); ArgumentNullException.ThrowIfNull(runtime); ArgumentNullException.ThrowIfNull(applicability);
+        var metricResolutions = applicability.MetricResolutions.Count > 0
+            ? applicability.MetricResolutions.Select(ToBaseResolution).ToList()
+            : applicability.Resolution is null ? new List<SemanticApplicabilityResolution>() : new() { applicability.Resolution };
         var metricEvidence = EvaluateMetrics(expected, runtime, metricResolutions);
         var dimensionEvidence = EvaluateDimensions(expected, runtime, applicability.DimensionResolutions);
         var filterEvidence = EvaluateFilters(expected, runtime, applicability.FilterResolutions);
         var tableEvidence = EvaluateTablesSemantic(expected, runtime, applicability);
-        var allEvidence = metricEvidence.Concat(dimensionEvidence).Concat(filterEvidence).Concat(tableEvidence).ToList();
-        var hasSemanticExpectation = expected.Metrics?.Count > 0 || expected.Dimensions?.Count > 0 || expected.Filters?.Count > 0 || expected.Tables is not null;
+        var all = metricEvidence.Concat(dimensionEvidence).Concat(filterEvidence).Concat(tableEvidence).ToList();
 
-        if (!string.Equals(applicability.CaseId, caseId, StringComparison.OrdinalIgnoreCase))
-            return SemanticEvidenceFailure(caseId, expected.Metrics?.FirstOrDefault()?.SemanticText ?? string.Empty, applicability, "Applicability CaseId 与当前 Evaluation CaseId 不一致。", metricEvidence, dimensionEvidence, filterEvidence, tableEvidence);
+        if (!string.Equals(applicability.CaseId, caseId, StringComparison.OrdinalIgnoreCase)) return Failure(caseId, expected, applicability, "Applicability CaseId 与当前 Evaluation CaseId 不一致。", metricEvidence, dimensionEvidence, filterEvidence, tableEvidence);
+        if (!string.Equals(applicability.State, "Resolved", StringComparison.OrdinalIgnoreCase)) return Failure(caseId, expected, applicability, $"Semantic Applicability 当前状态为 {applicability.State}，禁止继续通过 Semantic Evidence。", metricEvidence, dimensionEvidence, filterEvidence, tableEvidence);
+        var failed = all.FirstOrDefault(x => !x.Passed);
+        if (failed is not null) return Failure(caseId, expected, applicability, failed.Reason, metricEvidence, dimensionEvidence, filterEvidence, tableEvidence);
 
-        if (!hasSemanticExpectation)
-        {
-            return new QueryPlanSemanticEvidenceResult
-            {
-                CaseId = caseId, Passed = true, Reason = "Golden 未定义需要 Semantic Resolution Evidence 的字段，不进行 Semantic Evidence 断言。", ApplicabilityState = applicability.State,
-                ResolutionExists = applicability.Resolution is not null, Metrics = metricEvidence, Dimensions = dimensionEvidence, Filters = filterEvidence, Tables = tableEvidence
-            };
-        }
-
-        if (!string.Equals(applicability.State, "Resolved", StringComparison.OrdinalIgnoreCase))
-            return SemanticEvidenceFailure(caseId, expected.Metrics?.FirstOrDefault()?.SemanticText ?? applicability.MetricSemanticText, applicability, $"Golden Semantic Evidence 需要 Resolution，但 Applicability 当前状态为 {applicability.State}。", metricEvidence, dimensionEvidence, filterEvidence, tableEvidence);
-
-        var failedEvidence = allEvidence.FirstOrDefault(x => !x.Passed);
-        if (failedEvidence is not null)
-            return SemanticEvidenceFailure(caseId, failedEvidence.SemanticText, applicability, failedEvidence.Reason, metricEvidence, dimensionEvidence, filterEvidence, tableEvidence);
-
-        var scores = allEvidence.Where(x => x.ResolutionScore.HasValue).Select(x => x.ResolutionScore!.Value).ToList();
-        var legacyMetric = metricEvidence.FirstOrDefault();
+        var scores = all.Where(x => x.ResolutionScore.HasValue).Select(x => x.ResolutionScore!.Value).ToList();
         return new QueryPlanSemanticEvidenceResult
         {
-            CaseId = caseId, Passed = true, Reason = "Semantic Resolution 与 Runtime QueryPlan 的 Metric、Dimension、Filter、Table 物理绑定一致。", GoldenSemanticText = legacyMetric?.SemanticText ?? applicability.MetricSemanticText,
-            ApplicabilityState = applicability.State, ResolutionExists = applicability.Resolution is not null, RuntimeMetricExists = runtime.Metrics?.Count > 0,
-            MetricFieldMatchesResolution = legacyMetric?.BindingMatched ?? true, TableBindingMatchesResolution = tableEvidence.Count == 0 || tableEvidence.All(x => x.Passed),
-            DataSourceBindingMatchesResolution = tableEvidence.Count == 0 || tableEvidence.All(x => x.RuntimeDataSourceId == x.ResolvedDataSourceId), ResolutionScore = scores.Count == 0 ? applicability.Resolution?.Score : scores.Average(),
-            Metrics = metricEvidence, Dimensions = dimensionEvidence, Filters = filterEvidence, Tables = tableEvidence
+            CaseId = caseId, Passed = true, Reason = "Metric、Dimension、Filter、Table 的 Golden SemanticText 均通过统一 Resolution 与 Runtime Physical Binding 校验。",
+            GoldenSemanticText = metricEvidence.FirstOrDefault()?.SemanticText ?? applicability.MetricSemanticText,
+            ApplicabilityState = applicability.State, ResolutionExists = metricResolutions.Count > 0, RuntimeMetricExists = runtime.Metrics.Count > 0,
+            MetricFieldMatchesResolution = metricEvidence.All(x => x.Passed), TableBindingMatchesResolution = tableEvidence.Count == 0 || tableEvidence.All(x => x.Passed),
+            DataSourceBindingMatchesResolution = all.Where(x => x.RuntimeDataSourceId.HasValue && x.ResolvedDataSourceId.HasValue).All(x => x.RuntimeDataSourceId == x.ResolvedDataSourceId),
+            ResolutionScore = scores.Count == 0 ? null : scores.Average(), Metrics = metricEvidence, Dimensions = dimensionEvidence, Filters = filterEvidence, Tables = tableEvidence
         };
     }
 
     private static IReadOnlyList<QueryPlanSemanticBindingEvidence> EvaluateMetrics(GoldenQueryExpectation expected, QueryPlan runtime, IReadOnlyList<SemanticApplicabilityResolution> resolutions)
     {
-        var goldenMetrics = expected.Metrics ?? new List<GoldenMetricExpectation>();
-        var runtimeMetrics = runtime.Metrics ?? new List<QueryMetric>();
-        var results = new List<QueryPlanSemanticBindingEvidence>();
-        for (var i = 0; i < goldenMetrics.Count; i++)
+        var golden = expected.Metrics ?? new(); var actual = runtime.Metrics ?? new List<QueryMetric>(); var result = new List<QueryPlanSemanticBindingEvidence>();
+        for (var i = 0; i < golden.Count; i++)
         {
-            var golden = goldenMetrics[i];
-            var resolution = i < resolutions.Count ? resolutions[i] : null;
-            var runtimeMetric = FindRuntimeMetric(golden, runtimeMetrics, i);
-            if (resolution is null) { results.Add(FailEvidence(golden.SemanticText, "Golden Metric 没有对应的 Semantic Resolution。")); continue; }
-            if (runtimeMetric is null)
-            {
-                results.Add(FailEvidence(golden.SemanticText, "Golden Metric 没有对应的 Runtime Metric。") with { ResolutionExists = true, ResolvedColumnId = resolution.ColumnId, ResolvedColumn = resolution.Column, ResolvedTableId = resolution.TableId, ResolvedTable = resolution.Table, ResolvedDataSourceId = resolution.DataSourceId, ResolutionScore = resolution.Score });
-                continue;
-            }
-            var fieldMatches = string.IsNullOrWhiteSpace(resolution.Column) ? resolution.ColumnId <= 0 || string.IsNullOrWhiteSpace(runtimeMetric.Field) : string.Equals(runtimeMetric.Field, resolution.Column, StringComparison.OrdinalIgnoreCase);
-            results.Add(new QueryPlanSemanticBindingEvidence
-            {
-                SemanticText = golden.SemanticText, ResolutionExists = true, ResolvedColumnId = resolution.ColumnId, ResolvedColumn = resolution.Column, ResolvedTableId = resolution.TableId, ResolvedTable = resolution.Table, ResolvedDataSourceId = resolution.DataSourceId,
-                RuntimeColumn = runtimeMetric.Field, RuntimeTableId = FindRuntimeTable(runtime, resolution)?.MetadataTableId, RuntimeDataSourceId = runtime.DataSourceId, BindingMatched = fieldMatches, ResolutionScore = resolution.Score, Passed = fieldMatches,
-                Reason = fieldMatches ? "Runtime Metric Field 与 Semantic Resolution.Column 一致。" : $"Runtime Metric Field={runtimeMetric.Field} 与 Resolution.Column={resolution.Column} 不一致。"
-            });
+            var g = golden[i]; var r = i < resolutions.Count ? resolutions[i] : null; var a = i < actual.Count ? actual[i] : actual.FirstOrDefault(x => string.Equals(x.SemanticText, g.SemanticText, StringComparison.OrdinalIgnoreCase));
+            if (r is null) { result.Add(Fail(g.SemanticText, "Golden Metric 没有对应的 Semantic Resolution。")); continue; }
+            if (a is null) { result.Add(Fail(g.SemanticText, "Golden Metric 没有对应的 Runtime Metric。") with { ResolutionExists = true, ResolvedColumnId = r.ColumnId, ResolvedColumn = r.Column, ResolvedTableId = r.TableId, ResolvedTable = r.Table, ResolvedDataSourceId = r.DataSourceId, ResolutionScore = r.Score }); continue; }
+            var binding = string.Equals(a.Field, r.Column, StringComparison.OrdinalIgnoreCase) && a.SemanticText.Equals(g.SemanticText, StringComparison.OrdinalIgnoreCase);
+            result.Add(new() { SemanticText = g.SemanticText, ResolutionExists = true, ResolvedColumnId = r.ColumnId, ResolvedColumn = r.Column, ResolvedTableId = r.TableId, ResolvedTable = r.Table, ResolvedDataSourceId = r.DataSourceId, RuntimeColumn = a.Field, RuntimeTableId = FindTable(runtime, r)?.MetadataTableId, RuntimeDataSourceId = runtime.DataSourceId, BindingMatched = binding, ResolutionScore = r.Score, Passed = binding, Reason = binding ? "Runtime Metric SemanticText / Field 与 Resolution 一致。" : "Runtime Metric 的 SemanticText 或物理 Field 与 Resolution 不一致。" });
         }
-        return results;
+        return result;
     }
 
     private static IReadOnlyList<QueryPlanSemanticBindingEvidence> EvaluateDimensions(GoldenQueryExpectation expected, QueryPlan runtime, IReadOnlyList<SemanticApplicabilityDimensionResolution> resolutions)
     {
-        var goldenDimensions = expected.Dimensions ?? new List<GoldenDimensionExpectation>();
-        var runtimeDimensions = runtime.Dimensions ?? new List<QueryDimension>();
-        var results = new List<QueryPlanSemanticBindingEvidence>();
-        for (var i = 0; i < goldenDimensions.Count; i++)
+        var golden = expected.Dimensions ?? new(); var actual = runtime.Dimensions ?? new List<QueryDimension>(); var result = new List<QueryPlanSemanticBindingEvidence>();
+        for (var i = 0; i < golden.Count; i++)
         {
-            var golden = goldenDimensions[i];
-            var resolution = i < resolutions.Count ? resolutions[i] : null;
-            var runtimeDimension = i < runtimeDimensions.Count ? runtimeDimensions[i] : null;
-            if (resolution is null) { results.Add(FailEvidence(golden.SemanticText, "Golden Dimension 没有对应的 Semantic Resolution。")); continue; }
-            if (runtimeDimension is null)
-            {
-                results.Add(FailEvidence(golden.SemanticText, "Golden Dimension 没有对应的 Runtime Dimension。") with { ResolutionExists = true, ResolvedColumnId = resolution.ColumnId, ResolvedColumn = resolution.Column, ResolvedTableId = resolution.TableId, ResolvedTable = resolution.Table, ResolvedDataSourceId = resolution.DataSourceId, ResolutionScore = resolution.Score });
-                continue;
-            }
-            var columnMatches = runtimeDimension.MetadataColumnId > 0 && runtimeDimension.MetadataColumnId == resolution.ColumnId;
-            var nameMatches = string.IsNullOrWhiteSpace(resolution.Column) || string.Equals(runtimeDimension.ColumnName, resolution.Column, StringComparison.OrdinalIgnoreCase);
-            var binding = columnMatches && nameMatches;
-            results.Add(new QueryPlanSemanticBindingEvidence
-            {
-                SemanticText = golden.SemanticText, ResolutionExists = true, ResolvedColumnId = resolution.ColumnId, ResolvedColumn = resolution.Column, ResolvedTableId = resolution.TableId, ResolvedTable = resolution.Table, ResolvedDataSourceId = resolution.DataSourceId,
-                RuntimeColumnId = runtimeDimension.MetadataColumnId, RuntimeColumn = runtimeDimension.ColumnName, RuntimeTableId = (runtime.Tables ?? new List<QueryTable>()).FirstOrDefault(x => x.MetadataTableId == resolution.TableId && x.DataSourceId == resolution.DataSourceId)?.MetadataTableId, RuntimeDataSourceId = runtime.DataSourceId,
-                BindingMatched = binding, ResolutionScore = resolution.Score, Passed = binding, Reason = binding ? "Runtime Dimension MetadataColumnId / ColumnName 与 Semantic Resolution 一致。" : "Runtime Dimension 的物理列绑定与 Semantic Resolution 不一致。"
-            });
+            var g = golden[i]; var r = i < resolutions.Count ? resolutions[i] : null; var a = i < actual.Count ? actual[i] : null;
+            if (r is null) { result.Add(Fail(g.SemanticText, "Golden Dimension 没有对应的 Semantic Resolution。")); continue; }
+            if (a is null) { result.Add(Fail(g.SemanticText, "Golden Dimension 没有对应的 Runtime Dimension。") with { ResolutionExists = true, ResolvedColumnId = r.ColumnId, ResolvedColumn = r.Column, ResolvedTableId = r.TableId, ResolvedTable = r.Table, ResolvedDataSourceId = r.DataSourceId, ResolutionScore = r.Score }); continue; }
+            var binding = a.MetadataColumnId == r.ColumnId && string.Equals(a.ColumnName, r.Column, StringComparison.OrdinalIgnoreCase) && string.Equals(a.SemanticText, g.SemanticText, StringComparison.OrdinalIgnoreCase);
+            result.Add(new() { SemanticText = g.SemanticText, ResolutionExists = true, ResolvedColumnId = r.ColumnId, ResolvedColumn = r.Column, ResolvedTableId = r.TableId, ResolvedTable = r.Table, ResolvedDataSourceId = r.DataSourceId, RuntimeColumnId = a.MetadataColumnId, RuntimeColumn = a.ColumnName, RuntimeTableId = FindTable(runtime, r)?.MetadataTableId, RuntimeDataSourceId = runtime.DataSourceId, BindingMatched = binding, ResolutionScore = r.Score, Passed = binding, Reason = binding ? "Runtime Dimension SemanticText / MetadataColumnId / ColumnName 与 Resolution 一致。" : "Runtime Dimension 的语义或物理绑定与 Resolution 不一致。" });
         }
-        return results;
+        return result;
     }
 
     private static IReadOnlyList<QueryPlanSemanticBindingEvidence> EvaluateFilters(GoldenQueryExpectation expected, QueryPlan runtime, IReadOnlyList<SemanticApplicabilityFilterResolution> resolutions)
     {
-        var goldenFilters = expected.Filters ?? new List<GoldenFilterExpectation>();
-        var runtimeFilters = runtime.Filters ?? new List<QueryFilter>();
-        var results = new List<QueryPlanSemanticBindingEvidence>();
-        for (var i = 0; i < goldenFilters.Count; i++)
+        var golden = expected.Filters ?? new(); var actual = runtime.Filters ?? new List<QueryFilter>(); var result = new List<QueryPlanSemanticBindingEvidence>();
+        for (var i = 0; i < golden.Count; i++)
         {
-            var golden = goldenFilters[i];
-            var resolution = i < resolutions.Count ? resolutions[i] : null;
-            var runtimeFilter = i < runtimeFilters.Count ? runtimeFilters[i] : null;
-            if (resolution is null) { results.Add(FailEvidence(golden.SemanticText, "Golden Filter 没有对应的 Semantic Resolution。")); continue; }
-            if (runtimeFilter is null)
-            {
-                results.Add(FailEvidence(golden.SemanticText, "Golden Filter 没有对应的 Runtime Filter.") with { ResolutionExists = true, ResolvedColumnId = resolution.ColumnId, ResolvedColumn = resolution.Column, ResolvedTableId = resolution.TableId, ResolvedTable = resolution.Table, ResolvedDataSourceId = resolution.DataSourceId, ResolutionScore = resolution.Score });
-                continue;
-            }
-            var binding = !string.IsNullOrWhiteSpace(resolution.Column) && string.Equals(runtimeFilter.Field, resolution.Column, StringComparison.OrdinalIgnoreCase);
-            results.Add(new QueryPlanSemanticBindingEvidence
-            {
-                SemanticText = golden.SemanticText, ResolutionExists = true, ResolvedColumnId = resolution.ColumnId, ResolvedColumn = resolution.Column, ResolvedTableId = resolution.TableId, ResolvedTable = resolution.Table, ResolvedDataSourceId = resolution.DataSourceId,
-                RuntimeColumn = runtimeFilter.Field, RuntimeTableId = (runtime.Tables ?? new List<QueryTable>()).FirstOrDefault(x => x.MetadataTableId == resolution.TableId && x.DataSourceId == resolution.DataSourceId)?.MetadataTableId, RuntimeDataSourceId = runtime.DataSourceId,
-                BindingMatched = binding, ResolutionScore = resolution.Score, Passed = binding, Reason = binding ? "Runtime Filter Field 与 Filter Semantic Resolution.Column 一致。" : $"Runtime Filter Field={runtimeFilter.Field} 与 Resolution.Column={resolution.Column} 不一致。"
-            });
+            var g = golden[i]; var r = i < resolutions.Count ? resolutions[i] : null; var a = i < actual.Count ? actual[i] : null;
+            if (r is null) { result.Add(Fail(g.SemanticText, "Golden Filter 没有对应的 Semantic Resolution。")); continue; }
+            if (a is null) { result.Add(Fail(g.SemanticText, "Golden Filter 没有对应的 Runtime Filter。") with { ResolutionExists = true, ResolvedColumnId = r.ColumnId, ResolvedColumn = r.Column, ResolvedTableId = r.TableId, ResolvedTable = r.Table, ResolvedDataSourceId = r.DataSourceId, ResolutionScore = r.Score }); continue; }
+            var binding = string.Equals(a.SemanticText, g.SemanticText, StringComparison.OrdinalIgnoreCase) && string.Equals(a.Field, r.Column, StringComparison.OrdinalIgnoreCase);
+            result.Add(new() { SemanticText = g.SemanticText, ResolutionExists = true, ResolvedColumnId = r.ColumnId, ResolvedColumn = r.Column, ResolvedTableId = r.TableId, ResolvedTable = r.Table, ResolvedDataSourceId = r.DataSourceId, RuntimeColumn = a.Field, RuntimeTableId = FindTable(runtime, r)?.MetadataTableId, RuntimeDataSourceId = runtime.DataSourceId, BindingMatched = binding, ResolutionScore = r.Score, Passed = binding, Reason = binding ? "Runtime Filter SemanticText / Field 与 Resolution 一致。" : "Runtime Filter 的语义或物理 Field 与 Resolution 不一致。" });
         }
-        return results;
+        return result;
     }
 
     private static IReadOnlyList<QueryPlanSemanticBindingEvidence> EvaluateTablesSemantic(GoldenQueryExpectation expected, QueryPlan runtime, SemanticApplicabilityResult applicability)
     {
-        if (expected.Tables is null || expected.Tables.Count == 0) return Array.Empty<QueryPlanSemanticBindingEvidence>();
-        var resolutions = new List<(long TableId, long DataSourceId, string? Table, double? Score)>();
-        if (applicability.Resolution is not null) resolutions.Add((applicability.Resolution.TableId, applicability.Resolution.DataSourceId, applicability.Resolution.Table, applicability.Resolution.Score));
-        resolutions.AddRange(applicability.FilterResolutions.Select(x => (x.TableId, x.DataSourceId, x.Table, x.Score)));
-        resolutions.AddRange(applicability.DimensionResolutions.Select(x => (x.TableId, x.DataSourceId, x.Table, x.Score)));
-        var distinct = resolutions.GroupBy(x => new { x.TableId, x.DataSourceId }).Select(x => x.First()).ToList();
-        var results = new List<QueryPlanSemanticBindingEvidence>();
-        var runtimeTables = runtime.Tables ?? new List<QueryTable>();
-        foreach (var resolution in distinct)
+        if (expected.Tables is null) return Array.Empty<QueryPlanSemanticBindingEvidence>();
+        var resolutions = applicability.TableResolutions;
+        if (resolutions.Count != expected.Tables.Count) return new[] { Fail(string.Empty, $"Golden Table Resolution 数量不一致：Expected={expected.Tables.Count}，Resolved={resolutions.Count}。") };
+        var result = new List<QueryPlanSemanticBindingEvidence>();
+        for (var i = 0; i < expected.Tables.Count; i++)
         {
-            var table = runtimeTables.FirstOrDefault(x => x.MetadataTableId == resolution.TableId && x.DataSourceId == resolution.DataSourceId);
-            var matched = table is not null && (string.IsNullOrWhiteSpace(resolution.Table) || string.Equals(table.TableName, resolution.Table, StringComparison.OrdinalIgnoreCase));
-            results.Add(new QueryPlanSemanticBindingEvidence { SemanticText = resolution.Table ?? string.Empty, ResolutionExists = true, ResolvedTableId = resolution.TableId, ResolvedTable = resolution.Table, ResolvedDataSourceId = resolution.DataSourceId, RuntimeTableId = table?.MetadataTableId, RuntimeDataSourceId = table?.DataSourceId, BindingMatched = matched, ResolutionScore = resolution.Score, Passed = matched, Reason = matched ? "Runtime Table 与 Semantic Resolution 的 TableId / DataSourceId / TableName 一致。" : "Runtime Table 与 Semantic Resolution 的物理绑定不一致。" });
+            var g = expected.Tables[i]; var r = resolutions[i]; var a = (runtime.Tables ?? new List<QueryTable>()).FirstOrDefault(x => x.MetadataTableId == r.TableId && x.DataSourceId == r.DataSourceId);
+            var binding = a is not null && string.Equals(a.SemanticText, g.SemanticText, StringComparison.OrdinalIgnoreCase) && string.Equals(a.TableName, r.Table, StringComparison.OrdinalIgnoreCase);
+            result.Add(new() { SemanticText = g.SemanticText, ResolutionExists = true, ResolvedTableId = r.TableId, ResolvedTable = r.Table, ResolvedDataSourceId = r.DataSourceId, RuntimeTableId = a?.MetadataTableId, RuntimeDataSourceId = a?.DataSourceId, BindingMatched = binding, ResolutionScore = r.Score, Passed = binding, Reason = binding ? "Runtime Table SemanticText / TableName 与 Table Resolution 一致。" : "Runtime Table 的语义或物理表绑定与 Table Resolution 不一致。" });
         }
-        if (distinct.Count == 0 && expected.Tables.Count > 0) results.Add(FailEvidence(string.Empty, "Golden 明确要求 Tables，但 Applicability 没有提供可验证的 Table Resolution。"));
-        return results;
+        return result;
     }
 
-    private static QueryMetric? FindRuntimeMetric(GoldenMetricExpectation golden, IReadOnlyList<QueryMetric> runtimeMetrics, int index)
-    {
-        if (index < runtimeMetrics.Count && string.Equals(runtimeMetrics[index].Name, golden.SemanticText, StringComparison.OrdinalIgnoreCase)) return runtimeMetrics[index];
-        return runtimeMetrics.FirstOrDefault(x => string.Equals(x.Name, golden.SemanticText, StringComparison.OrdinalIgnoreCase));
-    }
+    private static SemanticApplicabilityResolution ToBaseResolution(SemanticApplicabilityMetricResolution x) => new() { TableId = x.TableId, DataSourceId = x.DataSourceId, ColumnId = x.ColumnId, Table = x.Table, Column = x.Column, BusinessMeaning = x.BusinessMeaning, Score = x.Score };
+    private static QueryTable? FindTable(QueryPlan runtime, SemanticApplicabilityResolution r) => (runtime.Tables ?? new List<QueryTable>()).FirstOrDefault(x => x.MetadataTableId == r.TableId && x.DataSourceId == r.DataSourceId);
+    private static QueryPlanSemanticBindingEvidence Fail(string text, string reason) => new() { SemanticText = text, Passed = false, BindingMatched = false, Reason = reason };
 
-    private static QueryTable? FindRuntimeTable(QueryPlan runtime, SemanticApplicabilityResolution resolution)
-        => (runtime.Tables ?? new List<QueryTable>()).FirstOrDefault(x => x.MetadataTableId == resolution.TableId && x.DataSourceId == resolution.DataSourceId);
-
-    private static QueryPlanSemanticBindingEvidence FailEvidence(string semanticText, string reason) => new() { SemanticText = semanticText, Passed = false, BindingMatched = false, Reason = reason };
-
-    private static QueryPlanSemanticEvidenceResult SemanticEvidenceFailure(string caseId, string semanticText, SemanticApplicabilityResult applicability, string reason, IReadOnlyList<QueryPlanSemanticBindingEvidence> metrics, IReadOnlyList<QueryPlanSemanticBindingEvidence> dimensions, IReadOnlyList<QueryPlanSemanticBindingEvidence> filters, IReadOnlyList<QueryPlanSemanticBindingEvidence> tables)
-    {
-        var first = metrics.Concat(dimensions).Concat(filters).Concat(tables).FirstOrDefault();
-        return new QueryPlanSemanticEvidenceResult
-        {
-            CaseId = caseId, Passed = false, Reason = reason, GoldenSemanticText = semanticText, ApplicabilityState = applicability.State, ResolutionExists = applicability.Resolution is not null,
-            RuntimeMetricExists = false, MetricFieldMatchesResolution = first?.BindingMatched ?? false, TableBindingMatchesResolution = tables.Count == 0 || tables.All(x => x.Passed),
-            DataSourceBindingMatchesResolution = tables.Count == 0 || tables.All(x => x.RuntimeDataSourceId == x.ResolvedDataSourceId), ResolutionScore = applicability.Resolution?.Score,
-            Metrics = metrics, Dimensions = dimensions, Filters = filters, Tables = tables
-        };
-    }
+    private static QueryPlanSemanticEvidenceResult Failure(string caseId, GoldenQueryExpectation expected, SemanticApplicabilityResult applicability, string reason, IReadOnlyList<QueryPlanSemanticBindingEvidence> m, IReadOnlyList<QueryPlanSemanticBindingEvidence> d, IReadOnlyList<QueryPlanSemanticBindingEvidence> f, IReadOnlyList<QueryPlanSemanticBindingEvidence> t)
+        => new() { CaseId = caseId, Passed = false, Reason = reason, GoldenSemanticText = expected.Metrics?.FirstOrDefault()?.SemanticText ?? applicability.MetricSemanticText, ApplicabilityState = applicability.State, ResolutionExists = applicability.MetricResolutions.Count > 0 || applicability.Resolution is not null, MetricFieldMatchesResolution = m.Count > 0 && m.All(x => x.Passed), TableBindingMatchesResolution = t.Count == 0 || t.All(x => x.Passed), DataSourceBindingMatchesResolution = t.Count == 0 || t.All(x => x.RuntimeDataSourceId == x.ResolvedDataSourceId), Metrics = m, Dimensions = d, Filters = f, Tables = t };
 
     private static QueryPlanEvaluationSectionResult EvaluateIntent(GoldenQueryExpectation expected, QueryPlan runtime)
     {
         if (string.IsNullOrWhiteSpace(expected.IntentType)) return Pass("Golden 未指定 IntentType，不进行断言。");
-        var actual = runtime.Intent?.IntentType.ToString();
-        return string.Equals(expected.IntentType, actual, StringComparison.OrdinalIgnoreCase) ? Pass($"IntentType 匹配：{actual}。"): Fail($"期望 IntentType={expected.IntentType}，实际为 {actual ?? "null"}。");
+        var actual = runtime.Intent?.IntentType?.ToString();
+        return string.Equals(expected.IntentType, actual, StringComparison.OrdinalIgnoreCase) ? Pass($"IntentType 匹配：{actual}。") : Fail($"期望 IntentType={expected.IntentType}，实际为 {actual ?? "null"}。");
     }
 
     private static QueryPlanEvaluationSectionResult EvaluateTables(GoldenQueryExpectation expected, QueryPlan runtime)
@@ -230,28 +149,26 @@ public sealed class QueryPlanEvaluator
         var actual = runtime.Tables ?? new List<QueryTable>();
         if (expected.Tables.Count == 0) return actual.Count == 0 ? Pass("Golden 明确要求无 Tables，Runtime 为空。") : Fail($"Golden 明确要求无 Tables，实际存在 {actual.Count} 个 Table。");
         if (actual.Count != expected.Tables.Count) return Fail($"Tables 数量不匹配：期望 {expected.Tables.Count}，实际 {actual.Count}。");
-        for (var i = 0; i < actual.Count; i++) { var table = actual[i]; if (table.MetadataTableId <= 0) return Fail($"第 {i + 1} 个 Table 物理绑定无效：MetadataTableId={table.MetadataTableId}。"); if (table.DataSourceId <= 0) return Fail($"第 {i + 1} 个 Table 物理绑定无效：DataSourceId={table.DataSourceId}。"); if (string.IsNullOrWhiteSpace(table.TableName)) return Fail($"第 {i + 1} 个 Table 物理绑定无效：TableName 为空。"); }
-        return Pass($"Tables 数量与 Runtime 物理绑定完整性匹配：{actual.Count} 个 Table，均具有有效 MetadataTableId、DataSourceId 和 TableName。Golden SemanticText 当前不直接与 TableName/TableComment 等值比较。");
+        if (actual.Any(x => x.MetadataTableId <= 0 || x.DataSourceId <= 0 || string.IsNullOrWhiteSpace(x.TableName))) return Fail("Runtime Table 存在无效物理绑定。");
+        return Pass($"Tables 数量与 Runtime 物理绑定完整性匹配：{actual.Count} 个 Table。");
     }
 
     private QueryPlanEvaluationSectionResult EvaluateJoins(GoldenQueryExpectation expected, QueryPlan runtime)
     {
         if (expected.Joins is null) return Pass("Golden 未指定 Joins，不进行断言。");
-        var actual = runtime.Joins ?? new List<QueryJoin>();
-        var result = _joinScoringService.Evaluate(expected.Joins, actual);
-        return new QueryPlanEvaluationSectionResult { Passed = result.Passed, Score = result.Score, Reason = result.Reason, Details = result.Items };
+        var r = _joinScoringService.Evaluate(expected.Joins, runtime.Joins ?? new List<QueryJoin>());
+        return new() { Passed = r.Passed, Score = r.Score, Reason = r.Reason, Details = r.Items };
     }
 
     private static QueryPlanEvaluationSectionResult EvaluateBindingConsistency(GoldenQueryExpectation expected, QueryPlan runtime)
     {
         var tables = runtime.Tables ?? new List<QueryTable>(); var joins = runtime.Joins ?? new List<QueryJoin>();
-        if (runtime.DataSourceId > 0 && tables.Any(table => table.DataSourceId > 0 && table.DataSourceId != runtime.DataSourceId)) return Fail("Binding 一致性失败：QueryPlan.Tables 存在与 QueryPlan.DataSourceId 不一致的数据源。");
-        var duplicateTableIds = tables.Where(table => table.MetadataTableId > 0).GroupBy(table => table.MetadataTableId).Where(group => group.Count() > 1).Select(group => group.Key).ToList();
-        if (duplicateTableIds.Count > 0) return Fail($"Binding 一致性失败：存在重复 MetadataTableId：{string.Join(", ", duplicateTableIds)}。");
-        foreach (var join in joins) if (!tables.Any(table => table.MetadataTableId == join.LeftTableId) || !tables.Any(table => table.MetadataTableId == join.RightTableId)) return Fail($"Binding 一致性失败：Join 引用了 QueryPlan.Tables 中不存在的表，LeftTableId={join.LeftTableId}，RightTableId={join.RightTableId}。");
+        if (runtime.DataSourceId > 0 && tables.Any(x => x.DataSourceId > 0 && x.DataSourceId != runtime.DataSourceId)) return Fail("Binding 一致性失败：存在与 QueryPlan.DataSourceId 不一致的 Table。");
+        if (tables.Where(x => x.MetadataTableId > 0).GroupBy(x => x.MetadataTableId).Any(x => x.Count() > 1)) return Fail("Binding 一致性失败：存在重复 MetadataTableId。");
+        if (joins.Any(j => !tables.Any(t => t.MetadataTableId == j.LeftTableId) || !tables.Any(t => t.MetadataTableId == j.RightTableId))) return Fail("Binding 一致性失败：Join 引用了不存在的 Table。");
         if (expected.Tables is not null && tables.Count != expected.Tables.Count) return Fail($"Binding 一致性失败：Golden Tables={expected.Tables.Count}，Runtime Tables={tables.Count}。");
         if (expected.Joins is not null && joins.Count != expected.Joins.Count) return Fail($"Binding 一致性失败：Golden Joins={expected.Joins.Count}，Runtime Joins={joins.Count}。");
-        return Pass($"Binding 一致性通过：DataSource={runtime.DataSourceId}，Tables={tables.Count}，Joins={joins.Count}，无重复表且所有 Join 均引用已绑定表。");
+        return Pass($"Binding 一致性通过：DataSource={runtime.DataSourceId}，Tables={tables.Count}，Joins={joins.Count}。");
     }
 
     private static QueryPlanEvaluationSectionResult Pass(string reason) => new() { Passed = true, Score = 1d, Reason = reason };
