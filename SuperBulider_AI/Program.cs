@@ -21,6 +21,7 @@ builder.Services.AddHttpClient();
 builder.Services.AddDbContext<SuperBIContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
+builder.Services.Configure<QwenOptions>(builder.Configuration.GetSection("Qwen"));
 builder.Services.Configure<QdrantOptions>(builder.Configuration.GetSection("Qdrant"));
 builder.Services.AddScoped<IDataSourceMetadataReader, MySqlMetadataReader>();
 builder.Services.AddScoped<MetadataScannerService>();
@@ -50,6 +51,8 @@ builder.Services.AddScoped<IQueryJoinInferenceService>(sp => sp.GetRequiredServi
 builder.Services.AddScoped<QueryPlanValidator>();
 builder.Services.AddScoped<QueryPlanBuilder>();
 builder.Services.AddScoped<IQueryPlanBuilder>(sp => sp.GetRequiredService<QueryPlanBuilder>());
+builder.Services.AddScoped<IQueryPlanRepairService, QueryPlanRepairService>();
+builder.Services.AddScoped<IQueryPlanValidationPipeline, QueryPlanValidationPipeline>();
 builder.Services.AddScoped<QueryPlanEvaluationGate>();
 builder.Services.AddScoped<QueryPlanJoinScoringService>();
 builder.Services.AddScoped<QueryPlanMetricScoringService>();
