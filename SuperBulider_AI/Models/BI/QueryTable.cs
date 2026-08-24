@@ -1,61 +1,14 @@
-﻿using SuperBuilder_AI.Models.Metadata;
-
-
-namespace SuperBuilder_AI.Models.BI;
+﻿namespace SuperBuilder_AI.Models.BI;
 
 /// <summary>
 /// 查询表计划。
-///
-/// 对应:
-///
-/// MetadataTable
-///
-/// 用于动态查询生成阶段。
+/// SemanticText 保存 Golden 业务语义，TableName 保存物理表名。
 /// </summary>
 public class QueryTable
 {
-
-
-	/// <summary>
-	/// Metadata表Id。
-	/// </summary>
-	public long MetadataTableId
-	{
-		get;
-		set;
-	}
-
-
-
-	/// <summary>
-	/// 数据源Id。
-	/// </summary>
-	public long DataSourceId
-	{
-		get;
-		set;
-	}
-
-
-
-	/// <summary>
-	/// 数据库表名。
-	/// </summary>
-	public string? TableName
-	{
-		get;
-		set;
-	}
-
-
-
-	/// <summary>
-	/// 表描述。
-	/// </summary>
-	public string? TableComment
-	{
-		get;
-		set;
-	}
-
+    public long MetadataTableId { get; set; }
+    public long DataSourceId { get; set; }
+    public string? SemanticText { get; set; }
+    public string? TableName { get; set; }
+    public string? TableComment { get; set; }
 }
