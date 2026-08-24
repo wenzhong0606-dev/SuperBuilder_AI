@@ -1,8 +1,5 @@
 namespace SuperBuilder_AI.Models.BI.Evaluation;
 
-/// <summary>
-/// Phase 2.6 C.13.2 Semantic Applicability：Resolved 表示所有 Golden 语义断言均已获得稳定物理绑定。
-/// </summary>
 public sealed class SemanticApplicabilityResult
 {
     public string CaseId { get; init; } = string.Empty;
@@ -20,7 +17,7 @@ public sealed class SemanticApplicabilityResult
     public SemanticApplicabilityEvidence Evidence { get; init; } = new();
 }
 
-public sealed class SemanticApplicabilityResolution
+public class SemanticApplicabilityResolution
 {
     public long TableId { get; init; }
     public long DataSourceId { get; init; }
