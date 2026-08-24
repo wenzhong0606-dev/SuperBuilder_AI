@@ -1,10 +1,10 @@
 # SuperBuilder AI Native BI Phase开发计划
 
-> 文档版本：v2.7  
+> 文档版本：v2.8  
 > 文档性质：项目正式开发基线  
 > **唯一源码基线：GitHub `master`**  
 > 当前开发阶段：**Phase 2.6 — Query Evaluation Framework**  
-> 当前工作单元：**C.13.2 已完成源码审计与 Builder Contract 修复，当前转入 V2.6 Ranking Contract 审计**
+> 当前工作单元：**C.13.3-LR 已完成 13/13；Phase 2.6 测试 API 全量存在性审计已完成；下一工作单元继续 V2.6 Ranking Contract 审计**
 
 ---
 
@@ -29,6 +29,7 @@
 17. **不得通过删除功能、放宽 Gate、修改 Coverage Analyzer 或伪造 Golden Case 来掩盖能力缺失。**
 18. **Ranking / DetailRanking / AggregateRanking 必须遵守自身 Contract 边界。** 不得为了当前 C 项通过 Coverage 而强行删除、绕过或重新定义这些能力。
 19. **每次 GitHub 更新后必须能够从 Commit、开发计划和源码恢复当前工作状态，确保会话中断后可继续。**
+20. **每次代码修改推送 `master` 后，必须先由本地环境 `git pull` 拉取最新 `master`，再进行本地 Build 与 Controller / Action Runtime 测试。** 本地实际结果作为正式验收证据。
 
 ---
 
@@ -63,17 +64,21 @@
        ↓
 13. Build
        ↓
-14. Controller / Runtime 真实验证
+14. 推送 master
        ↓
-15. Golden Dataset Regression
+15. 本地 git pull 拉取最新 master
        ↓
-16. Coverage / Quality / Release Gate
+16. Controller / Runtime 真实验证
        ↓
-17. 确认无回归
+17. Golden Dataset Regression
        ↓
-18. 更新开发计划
+18. Coverage / Quality / Release Gate
        ↓
-19. 中文提交 master
+19. 确认无回归
+       ↓
+20. 更新开发计划
+       ↓
+21. 中文提交 master
 ```
 
 ### 完整相关源码至少包括
@@ -156,22 +161,29 @@ Namespace 必须逐文件以 `master` 源码为准，不根据旧目录或历史
 
 # 四、当前正式源码基线
 
-最近已完成的源码修复：
+当前 `master` 最新源码基线：
+
+```text
+Commit: c403a68ab705b4a96fc770d87e0abaf0f31775d0
+中文描述：修正 C.13.3 本地基础设施诊断汇总 Action
+```
+
+历史关键修复：
 
 ```text
 Commit: debfefa1dc0360fd79eda37582061913b9e3a68e
 中文描述：修复 C.13.2 Semantic Resolution 二次语义搜索漂移
 ```
 
-该修改已通过 GitHub Actions：
+`debfefa1...` 已通过此前 GitHub Actions：
 
 ```text
 Workflow Run: 32684194952
-Release Build: PASS
-Controller 启动: PASS
+Release Build：PASS
+Controller 启动：PASS
 ```
 
-当前必须以该 Commit 之后的 `master` 作为后续审计基线。
+后续审计、测试和计划校准均以当前 `master` 最新 Commit 为准。
 
 ---
 
@@ -284,7 +296,7 @@ GitHub Actions `32684194952` 已证明：
 
 ## 8.4 当前 Exit Blocker
 
-当前 Golden Coverage 返回：
+此前记录的 Golden Coverage 状态为：
 
 ```text
 Ranking          = 4
@@ -292,9 +304,9 @@ DetailRanking    = 0
 AggregateRanking = 0
 ```
 
-因此 Golden Coverage Gate FAIL，后续 Quality / Release Gate 被正确阻断。
+但本次基于当前 `master` 的源码复核发现，Golden Dataset 已实际包含 `GQ-006 / GQ-010 / GQ-N004 / GQ-N005` 的 AggregateRanking 期望以及 `GQ-011` 的 DetailRanking 期望。因此，旧 Coverage 数字与当前 Golden Ground Truth 存在状态漂移，必须通过当前 Runtime / Coverage 实测重新确认，不得继续把旧数字当作当前事实。
 
-**该失败不能通过以下方式解决：**
+**该问题不能通过以下方式解决：**
 
 ```text
 ❌ 修改 Coverage Analyzer 让 0 通过
@@ -309,14 +321,14 @@ AggregateRanking = 0
 ```text
 源码审计       COMPLETE
 Contract 修复  COMPLETE
-Release Build  PASS
-Controller     PASS
+Release Build  PASS（历史关键修复）
+Controller     PASS（历史关键修复）
 Golden 基础链  PASS
-Coverage Gate  BLOCKED（Ranking Contract Coverage）
+Coverage Gate  待以当前 master Runtime 重新确认
 C.13.2 全阶段   NOT YET COMPLETE
 ```
 
-因此 C.13.2 暂不标记 COMPLETE；但**后续工作不得继续扩大 C.13.2 的 Semantic Evaluation 修改面**，而应转入 V2.6 Ranking Contract 专项审计。
+因此 C.13.2 暂不标记 COMPLETE；后续仍不得扩大 C.13.2 Semantic Evaluation 修改面，应继续围绕 V2.6 Ranking Contract / Coverage 状态一致性推进。
 
 ---
 
@@ -326,15 +338,7 @@ C.13.2 全阶段   NOT YET COMPLETE
 
 ## 9.1 当前问题
 
-现有 Golden Dataset 已有 Ranking 正负 Case，但 Coverage 结果：
-
-```text
-Ranking = 4
-DetailRanking = 0
-AggregateRanking = 0
-```
-
-因此当前首先审计分类链，而不是立即新增 Case。
+当前 Golden Dataset 已存在 Ranking、DetailRanking、AggregateRanking 的 Ground Truth；此前 Coverage 记录与当前 Dataset 存在状态漂移。因此当前首先审计分类链和 Coverage 实际运行结果，而不是立即新增 Case。
 
 ## 9.2 强制审计链
 
@@ -378,9 +382,10 @@ GQ-006
 GQ-010
 GQ-N004
 GQ-N005
+GQ-011
 ```
 
-目标不是修改 Case，而是确定它们为什么被识别为 `Ranking`，却没有产生 `DetailRanking / AggregateRanking` 覆盖。
+目标不是修改 Case，而是确定它们的 Ranking 子类型 Ground Truth、Runtime QueryPlan 和 Coverage 结果是否一致。
 
 ## 9.4 Ranking Contract 原则
 
@@ -485,7 +490,115 @@ C.13 Exit 必须同时满足：
 
 ---
 
-# 十五、当前阶段完成度与门禁
+# 十五、C.13.3-LR — 本地 Runtime 测试与 API 存在性审计
+
+## 15.1 审计结论
+
+**C.13.3-LR-01 ～ C.13.3-LR-13：13/13 已完成。** 已按既定要求冻结，不重复执行。
+
+本次进一步对上一轮 Phase 2.6 整体评审提供的全部测试地址逐一进行当前 `master` Controller / Route 源码存在性核验。
+
+结论：**本次列出的测试地址对应 API 均已存在，无需补齐接口。**
+
+## 15.2 API 存在性矩阵
+
+| 用途 | HTTP API | 当前 master | Controller / Action | 结论 |
+|---|---|---|---|---|
+| SQL Server 本地检查 | `GET /evaluation/local-runtime/sqlserver` | ✅ | `LocalRuntimeDiagnosticsController.SqlServer` | 已存在 |
+| Qdrant 本地检查 | `GET /evaluation/local-runtime/qdrant` | ✅ | `LocalRuntimeDiagnosticsController.Qdrant` | 已存在 |
+| 本地基础设施汇总 | `GET /evaluation/local-runtime/infrastructure` | ✅ | `LocalRuntimeDiagnosticsController.Infrastructure` | 已存在 |
+| Golden 全量 Regression | `GET /evaluation/golden-runtime/run?topK=10` | ✅ | `GoldenDatasetRuntimeController.Run` | 已存在 |
+| Golden 单 Case | `GET /evaluation/golden-runtime/run?caseId=GQ-006&topK=10` | ✅ | `GoldenDatasetRuntimeController.Run` | 已存在 |
+| Golden Cases 总览 | `GET /evaluation/golden-runtime/cases?topK=10` | ✅ | `GoldenDatasetRuntimeController.Cases` | 已存在 |
+| Phase 2.6 Release Gate | `GET /evaluation/golden-runtime/release-gate?topK=10` | ✅ | `GoldenDatasetRuntimeController.ReleaseGate` | 已存在 |
+| Semantic Applicability Debug | `GET /evaluation/semantic-applicability/debug?question=查询入库数量&topK=10` | ✅ | `SemanticApplicabilityDiagnosticsController.Debug` | 已存在 |
+| Golden Baseline 列表 | `GET /evaluation/diagnostics/golden-baselines` | ✅ | `GoldenBaselineDiagnosticsController.GoldenBaselines` | 已存在 |
+| Golden Baseline 指定版本 | `GET /evaluation/diagnostics/golden-baseline/{version}` | ✅ | `GoldenBaselineDiagnosticsController.GoldenBaseline` | 已存在 |
+| QueryPlan Confidence GQ-006 | `GET /evaluation/diagnostics/query-plan-confidence?caseId=GQ-006&topK=10` | ✅ | `QueryPlanConfidenceDiagnosticsController.QueryPlanConfidence` | 已存在 |
+| QueryPlan Confidence GQ-011 | `GET /evaluation/diagnostics/query-plan-confidence?caseId=GQ-011&topK=10` | ✅ | `QueryPlanConfidenceDiagnosticsController.QueryPlanConfidence` | 已存在 |
+
+## 15.3 当前本地测试基址
+
+当前项目 `launchSettings.json` 使用：
+
+```text
+HTTP  : http://localhost:5032
+HTTPS : https://localhost:7086
+```
+
+本轮优先使用 HTTP 进行 Controller / Action 验证，避免开发证书因素干扰。
+
+## 15.4 完整测试地址
+
+```text
+# C.13.3-LR
+http://localhost:5032/evaluation/local-runtime/infrastructure
+http://localhost:5032/evaluation/local-runtime/sqlserver
+http://localhost:5032/evaluation/local-runtime/qdrant
+
+# Golden Runtime
+http://localhost:5032/evaluation/golden-runtime/run?topK=10
+http://localhost:5032/evaluation/golden-runtime/cases?topK=10
+http://localhost:5032/evaluation/golden-runtime/release-gate?topK=10
+
+# Ranking / Golden Case
+http://localhost:5032/evaluation/golden-runtime/run?caseId=GQ-006&topK=10
+http://localhost:5032/evaluation/golden-runtime/run?caseId=GQ-010&topK=10
+http://localhost:5032/evaluation/golden-runtime/run?caseId=GQ-011&topK=10
+http://localhost:5032/evaluation/golden-runtime/run?caseId=GQ-N004&topK=10
+http://localhost:5032/evaluation/golden-runtime/run?caseId=GQ-N005&topK=10
+
+# Semantic Applicability
+http://localhost:5032/evaluation/semantic-applicability/debug?question=查询入库数量&topK=10
+
+# Golden Baseline
+http://localhost:5032/evaluation/diagnostics/golden-baselines
+http://localhost:5032/evaluation/diagnostics/golden-baseline/{version}
+
+# QueryPlan Confidence
+http://localhost:5032/evaluation/diagnostics/query-plan-confidence?caseId=GQ-006&topK=10
+http://localhost:5032/evaluation/diagnostics/query-plan-confidence?caseId=GQ-011&topK=10
+```
+
+## 15.5 API 存在性审计证据
+
+当前 `master` 已确认：
+
+- `LocalRuntimeDiagnosticsController` 提供 `sqlserver`、`qdrant`、`infrastructure` 三个 Action；
+- `GoldenDatasetRuntimeController` 提供 `run`、`cases`、`release-gate` 三个 Action，并支持 `caseId` 单 Case 筛选；
+- `SemanticApplicabilityDiagnosticsController` 提供 `debug` Action；
+- `GoldenBaselineDiagnosticsController` 提供 `golden-baselines` 与 `golden-baseline/{version}`；
+- `QueryPlanConfidenceDiagnosticsController` 提供 `query-plan-confidence`。
+
+因此本轮没有发现“计划中的测试地址不存在 API”的情况，**没有新增测试 Controller / Action，也没有新建 Test Project**。
+
+## 15.6 API 存在不等于 Runtime PASS
+
+本次仅完成“测试地址 → Controller → Action”的源码存在性审计。API 是否真实通过，仍必须由本地：
+
+```text
+修改 master（若有）
+   ↓
+git pull
+   ↓
+dotnet build
+   ↓
+dotnet run
+   ↓
+逐一访问上述 Controller / Action
+   ↓
+记录真实 JSON 结果
+   ↓
+Golden Regression
+   ↓
+Coverage / Quality / Release Gate
+```
+
+进行验收。不得仅因为 Action 存在就将 Runtime 标记 COMPLETE。
+
+---
+
+# 十六、当前阶段完成度与门禁
 
 当前 Phase 2.6 仍为 **IN PROGRESS**。
 
@@ -506,23 +619,25 @@ Release Gate
 当前已确认：
 
 ```text
-C.13.2 Builder Contract 修复       PASS
-Release Build                       PASS
-Controller 启动                     PASS
+C.13.2 Builder Contract 修复       PASS（历史关键修复）
+Release Build                       PASS（历史关键修复）
+Controller 启动                     PASS（历史关键修复）
 Golden Dataset Contract             PASS
-Golden Coverage                    BLOCKED
+C.13.3-LR-01～LR-13                PASS / 13/13 已完成
+测试地址 API 存在性审计             PASS / 全部存在
+Golden Coverage                    待当前 master Runtime 重新确认
 ```
 
 因此当前不更新为 Phase 2.6 COMPLETE。
 
 ---
 
-# 十六、会话中断后的恢复协议
+# 十七、会话中断后的恢复协议
 
 为保证新的 ChatGPT 会话可以直接从 GitHub 开发计划恢复，任何后续会话开始时必须按以下顺序：
 
 ```text
-1. 读取本文件 V2.0 最新版本
+1. 读取本文件 V2.8 最新版本
 2. 读取 master 最新 Commit
 3. 读取最近一次源码 Commit / Workflow Run
 4. 根据“当前工作单元”恢复任务
@@ -536,15 +651,17 @@ Golden Coverage                    BLOCKED
 ```text
 Phase：2.6
 工作单元：V2.6 Ranking Contract
-最近源码修复：debfefa1dc0360fd79eda37582061913b9e3a68e
-Workflow Run：32684194952
-当前阻塞：DetailRanking = 0；AggregateRanking = 0
-下一步：完整审计 GQ-006 / GQ-010 / GQ-N004 / GQ-N005 → Normalizer → Builder → Evaluator → Coverage
+C.13.3-LR：13/13 COMPLETE
+测试 API 存在性：全部存在
+当前 master：c403a68ab705b4a96fc770d87e0abaf0f31775d0
+历史关键修复：debfefa1dc0360fd79eda37582061913b9e3a68e
+当前重点：重新确认 Golden Coverage 与当前 Golden Ground Truth 的一致性
+下一步：完整审计 GQ-006 / GQ-010 / GQ-N004 / GQ-N005 / GQ-011 → Normalizer → Builder → Evaluator → Coverage → Runtime
 ```
 
 ---
 
-# 十七、最终开发原则
+# 十八、最终开发原则
 
 1. `master` 是唯一源码基线。
 2. 不创建新的开发分支。
@@ -568,25 +685,26 @@ Workflow Run：32684194952
 20. Contract 类型变化必须检查所有 Caller / Callee。
 21. Namespace、Interface、Implementation、DTO、Model、Resolution 以 master 实际源码为准。
 22. 阶段验收必须同时证明源码、Contract、DI、Runtime、Golden Dataset 与开发计划一致。
-23. **开发计划本身必须成为会话恢复锚点：每次形成阶段性最终结论后及时更新，避免会话中断导致工作状态丢失。**
+23. **每次代码修改推送 `master` 后必须由本地环境 `git pull`，再进行 Build、Controller / Action Runtime 和 Golden Regression 验证。**
+24. **测试地址必须先完成“地址 → Route → Controller → Action”存在性审计；不存在时先补齐接口，再更新开发计划。**
+25. **开发计划本身必须成为会话恢复锚点：每次形成阶段性最终结论后及时更新，避免会话中断导致工作状态丢失。**
 
 ---
 
-# 十八、本次 V2.7 更新记录
+# 十九、本次 V2.8 更新记录
 
-本次更新基于 `master` 当前真实状态，不提前宣称 C.13.2 或 Phase 2.6 完成。
+本次更新基于当前 `master` `c403a68ab705b4a96fc770d87e0abaf0f31775d0` 的真实源码。
 
 新增 / 固化：
 
-1. C.13.2 全链路源码审计完成；
-2. `QueryPlanBuilder` Semantic Resolution 二次语义搜索漂移已修复；
-3. Commit `debfefa1dc0360fd79eda37582061913b9e3a68e` 已进入 master；
-4. Workflow Run `32684194952` 已确认 Release Build 与 Controller 启动成功；
-5. Golden Dataset Contract 已通过；
-6. Golden Coverage 当前真实阻塞为 `DetailRanking = 0`、`AggregateRanking = 0`；
-7. 明确禁止通过修改 Coverage Gate / Analyzer、删除 Ranking 能力或伪造 Case 解决阻塞；
-8. 当前正式工作单元切换为 **V2.6 Ranking Contract 审计**；
-9. 固化 Controller 验证、不新建 Test Project、中文 Commit、先完整审计再修改、严格 Phase/C 项边界等既有要求；
-10. 增加“会话中断恢复协议”，确保后续新会话可通过本文件直接恢复。
+1. `C.13.3-LR-01 ～ LR-13` 明确记录为 **13/13 已完成**，不重复执行；
+2. 对本轮 Phase 2.6 整体评审提供的全部测试地址执行 Controller / Route / Action 存在性审计；
+3. 确认 SQL Server、Qdrant、本地基础设施、Golden Runtime、Golden Cases、Release Gate、Semantic Applicability、Golden Baseline、QueryPlan Confidence 测试 API **全部存在**；
+4. 本轮不存在缺失 API，因此**没有新增 Controller / Action，也没有新建 Test Project**；
+5. 固化完整本地测试地址矩阵，统一基址为 `http://localhost:5032`；
+6. 固化“API 存在不等于 Runtime PASS”，必须通过本地 `git pull → Build → Controller / Action → Golden Regression → Coverage / Quality / Release Gate` 完成真实验收；
+7. 将当前 `master` 最新 Commit `c403a68ab705b4a96fc770d87e0abaf0f31775d0` 写入源码基线；
+8. 发现并记录旧 Coverage 数字与当前 Golden Ground Truth 存在状态漂移，后续以当前 master Runtime 实测为准；
+9. 当前工作锚点继续保持为 **V2.6 Ranking Contract / Coverage 一致性审计**。
 
-> **本计划的核心原则：源码事实优先、完整审计后修改、真实 Runtime 验证、Golden Regression 验收、开发计划作为持续恢复锚点。**
+> **本计划的核心原则：源码事实优先、完整审计后修改、真实 Runtime 验证、Golden Regression 验收、测试地址先做 API 存在性审计、开发计划作为持续恢复锚点。**
