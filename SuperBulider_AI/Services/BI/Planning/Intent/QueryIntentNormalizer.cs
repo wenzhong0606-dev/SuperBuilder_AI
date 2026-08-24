@@ -1,4 +1,4 @@
-﻿using System.Text.RegularExpressions;
+using System.Text.RegularExpressions;
 using SuperBuilder_AI.Models.BI;
 
 namespace SuperBuilder_AI.Services.BI.Planning;
@@ -12,6 +12,7 @@ public sealed class QueryIntentNormalizer
     private static readonly string[] DescWords = { "最多", "最大", "最大的", "最高", "最高的", "数量最多", "金额最多", "销量最多", "库存最多", "库存数量最多", "Top", "top", "排名前" };
     private static readonly string[] AscWords = { "最少", "最小", "最小的", "最低", "最低的", "数量最少", "金额最少", "销量最少", "库存最少", "库存数量最少" };
     private static readonly string[] TimeDescWords = { "最近", "最新", "最近创建", "最新创建", "最近新增", "最新新增" };
+    private static readonly string[] DetailWords = { "明细", "列表", "记录", "每条", "逐条", "原始数据", "详情" };
 
     public QueryIntent Normalize(QueryIntent intent)
     {
@@ -22,6 +23,7 @@ public sealed class QueryIntentNormalizer
         NormalizeRanking(intent, question);
         NormalizeAggregation(intent);
         NormalizeMetricFields(intent);
+        NormalizeQuantityAggregationSemantics(intent, question);
         NormalizeSemanticTexts(intent);
         NormalizeYearFilters(intent);
         return intent;
@@ -94,6 +96,27 @@ public sealed class QueryIntentNormalizer
 
     private static void NormalizeAggregation(QueryIntent intent)
     { foreach (var metric in intent.Metrics) metric.Aggregation = NormalizeAggregationValue(metric.Aggregation); }
+
+    private static void NormalizeQuantityAggregationSemantics(QueryIntent intent, string question)
+    {
+        if (intent.Metrics.Count == 0 || string.IsNullOrWhiteSpace(question)) return;
+        if (intent.IntentType.Equals("Ranking", StringComparison.OrdinalIgnoreCase)) return;
+        if (DetailWords.Any(x => question.Contains(x, StringComparison.OrdinalIgnoreCase))) return;
+
+        var hasQuantityMetric = false;
+        foreach (var metric in intent.Metrics)
+        {
+            if (!IsQuantityMetric(metric)) continue;
+            hasQuantityMetric = true;
+            if (string.Equals(metric.Aggregation, "NONE", StringComparison.OrdinalIgnoreCase))
+                metric.Aggregation = "SUM";
+        }
+
+        if (hasQuantityMetric && intent.Metrics.Any(x => string.Equals(x.Aggregation, "SUM", StringComparison.OrdinalIgnoreCase)))
+        {
+            intent.IntentType = "Aggregate";
+        }
+    }
 
     private static void NormalizeMetricFields(QueryIntent intent)
     {
