@@ -19,25 +19,19 @@ jobs:
   build:
     name: 编译检查
     runs-on: ubuntu-latest
-
     steps:
       - name: 检出源码
         uses: actions/checkout@v4
-
       - name: 设置 .NET 环境
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
-
       - name: 输出 .NET 版本
         run: dotnet --info
-
       - name: 恢复 NuGet 依赖
         run: dotnet restore
-
       - name: Release 编译
         run: dotnet build --configuration Release --no-restore
-
       - name: 输出编译完成信息
         if: success()
         run: echo "SuperBuilder AI Release 编译通过"
@@ -46,57 +40,59 @@ jobs:
     name: V2.6 Evaluation Controller Runtime Smoke
     needs: build
     runs-on: ubuntu-latest
-    services:
-      qdrant:
-        image: qdrant/qdrant:v1.15.5
-        ports:
-          - 6334:6334
-        options: >-
-          --health-cmd "bash -c 'cat < /dev/null > /dev/tcp/127.0.0.1/6334'"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 12
-      sqlserver:
-        image: mcr.microsoft.com/mssql/server:2022-latest
-        env:
-          ACCEPT_EULA: Y
-          MSSQL_SA_PASSWORD: ${{ env.TEST_SQL_PASSWORD }}
-        ports:
-          - 1433:1433
-        options: >-
-          --health-cmd "bash -c 'cat < /dev/null > /dev/tcp/127.0.0.1/1433'"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 30
-
     steps:
       - name: 检出源码
         uses: actions/checkout@v4
-
       - name: 设置 .NET 环境
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
-
-      - name: 输出 .NET 版本
-        run: dotnet --info
-
-      - name: 恢复 NuGet 依赖
-        run: dotnet restore
-
+      - name: 启动 SQL Server CI 容器
+        run: |
+          docker run -d --name superbuilder-c13-3-sqlserver \
+            -e ACCEPT_EULA=Y \
+            -e MSSQL_SA_PASSWORD="${TEST_SQL_PASSWORD}" \
+            -p 1433:1433 \
+            mcr.microsoft.com/mssql/server:2022-latest
+      - name: 启动 Qdrant CI 容器
+        run: |
+          docker run -d --name superbuilder-c13-3-qdrant \
+            -p 6334:6334 \
+            qdrant/qdrant:v1.15.5
+      - name: 等待 SQL Server Ready
+        run: |
+          for i in {1..60}; do
+            if (echo > /dev/tcp/127.0.0.1/1433) >/dev/null 2>&1; then
+              echo "SQL Server TCP 1433 已开放"
+              break
+            fi
+            sleep 2
+          done
+          if ! (echo > /dev/tcp/127.0.0.1/1433) >/dev/null 2>&1; then
+            docker logs superbuilder-c13-3-sqlserver
+            exit 1
+          fi
+      - name: 等待 Qdrant Ready
+        run: |
+          for i in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:6334/healthz >/dev/null 2>&1; then
+              echo "Qdrant 已 Ready"
+              exit 0
+            fi
+            sleep 2
+          done
+          docker logs superbuilder-c13-3-qdrant
+          exit 1
       - name: 安装 EF Core CLI
         run: dotnet tool install --global dotnet-ef --version 10.0.10
-
       - name: 初始化 CI Metadata 数据库
         env:
           ASPNETCORE_ENVIRONMENT: Development
           ConnectionStrings__DefaultConnection: "Server=127.0.0.1,1433;Database=SuperBuilder_C13_3;User Id=sa;Password=${{ env.TEST_SQL_PASSWORD }};TrustServerCertificate=True;"
         run: |
           dotnet ef database update --project SuperBulider_AI/SuperBuilder_AI.csproj --startup-project SuperBulider_AI/SuperBuilder_AI.csproj --configuration Release
-
       - name: Release 编译 Runtime 应用
         run: dotnet build --configuration Release --no-restore
-
       - name: 启动 Web API
         env:
           ASPNETCORE_ENVIRONMENT: Development
@@ -106,7 +102,6 @@ jobs:
         run: |
           dotnet run --project SuperBulider_AI/SuperBuilder_AI.csproj --configuration Release --no-restore --no-build --urls http://127.0.0.1:5050 > /tmp/superbuilder-api.log 2>&1 &
           echo $! > /tmp/superbuilder-api.pid
-
       - name: 等待 Controller 启动
         run: |
           for i in {1..30}; do
@@ -117,12 +112,10 @@ jobs:
           done
           cat /tmp/superbuilder-api.log
           exit 1
-
       - name: 导入 C.13.3 Metadata CSV Fixture
         run: |
           curl --fail --silent --show-error http://127.0.0.1:5050/evaluation/diagnostics/metadata-fixture/import | tee /tmp/metadata-fixture.json
           grep -q '"passed":true' /tmp/metadata-fixture.json
-
       - name: 通过现有 Controller 重建 Metadata Vector
         run: |
           curl --fail --silent --show-error http://127.0.0.1:5050/api/metadata-vector/rebuild | tee /tmp/metadata-rebuild.json
@@ -130,23 +123,19 @@ jobs:
           test "$(jq '.tableCount' /tmp/metadata-rebuild.json)" -gt 0
           test "$(jq '.columnVectorCount' /tmp/metadata-rebuild.json)" -gt 0
           test "$(jq '.semanticVectorCount' /tmp/metadata-rebuild.json)" -gt 0
-
       - name: Controller Serialization Contract
         run: |
           curl --fail --silent --show-error http://127.0.0.1:5050/evaluation/diagnostics/serialization-roundtrip | tee /tmp/serialization.json
           grep -q '"passed":true' /tmp/serialization.json
-
       - name: Controller Three-State Contract
         run: |
           curl --fail --silent --show-error http://127.0.0.1:5050/evaluation/diagnostics/three-state | tee /tmp/three-state.json
           grep -q '"missingMetricsIsNull":true' /tmp/three-state.json
           grep -q '"emptyMetricsIsNotNull":true' /tmp/three-state.json
-
       - name: Controller Golden Dataset Contract
         run: |
           curl --fail --silent --show-error http://127.0.0.1:5050/evaluation/diagnostics/golden-dataset | tee /tmp/golden-dataset.json
           grep -q '"passed":true' /tmp/golden-dataset.json
-
       - name: Controller C.13.3 Multi-Metric Evaluation
         run: |
           curl --fail --silent --show-error "http://127.0.0.1:5050/evaluation/diagnostics/query-plan-evaluation?caseId=GQ-007" | tee /tmp/gq007.json
@@ -155,29 +144,28 @@ jobs:
           test "$(jq -r '.evaluation.metrics.details[0].semanticText' /tmp/gq007.json)" = "入库数量"
           test "$(jq -r '.evaluation.metrics.details[1].semanticText' /tmp/gq007.json)" = "入库金额"
           test "$(jq '.runtimePlan.Metrics | length' /tmp/gq007.json)" -eq 2
-
       - name: Controller Golden Coverage
         run: |
           curl --fail --silent --show-error http://127.0.0.1:5050/evaluation/diagnostics/golden-dataset-coverage | tee /tmp/golden-coverage.json
           test "$(jq '.missingDimensions | length' /tmp/golden-coverage.json)" -eq 0
-
       - name: Controller Golden Quality
         run: |
           curl --fail --silent --show-error http://127.0.0.1:5050/evaluation/diagnostics/golden-dataset-quality | tee /tmp/golden-quality.json
           grep -q '"passed":true' /tmp/golden-quality.json
-
       - name: Controller Golden Release Gate
         run: |
           curl --fail --silent --show-error http://127.0.0.1:5050/evaluation/diagnostics/golden-dataset-release-gate | tee /tmp/golden-release-gate.json
           grep -q '"passed":true' /tmp/golden-release-gate.json
-
       - name: 输出 API 日志
         if: always()
         run: cat /tmp/superbuilder-api.log || true
-
-      - name: 停止 Web API
+      - name: 输出容器日志
         if: always()
         run: |
-          if [ -f /tmp/superbuilder-api.pid ]; then
-            kill $(cat /tmp/superbuilder-api.pid) || true
-          fi
+          docker logs superbuilder-c13-3-sqlserver || true
+          docker logs superbuilder-c13-3-qdrant || true
+      - name: 清理 CI 容器
+        if: always()
+        run: |
+          docker rm -f superbuilder-c13-3-sqlserver superbuilder-c13-3-qdrant || true
+          if [ -f /tmp/superbuilder-api.pid ]; then kill $(cat /tmp/superbuilder-api.pid) || true; fi
