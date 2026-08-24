@@ -53,6 +53,9 @@ jobs:
       - name: 恢复 NuGet 依赖
         run: dotnet restore
 
+      - name: Release 编译 Runtime 应用
+        run: dotnet build --configuration Release --no-restore
+
       - name: 启动 Web API
         env:
           ASPNETCORE_ENVIRONMENT: Development
