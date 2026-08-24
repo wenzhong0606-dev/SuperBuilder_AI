@@ -96,6 +96,15 @@ jobs:
           curl --fail --silent --show-error http://127.0.0.1:5050/evaluation/diagnostics/golden-dataset | tee /tmp/golden-dataset.json
           grep -q '"passed":true' /tmp/golden-dataset.json
 
+      - name: Controller C.13.3 Multi-Metric Evaluation
+        run: |
+          curl --fail --silent --show-error "http://127.0.0.1:5050/evaluation/diagnostics/query-plan-evaluation?caseId=GQ-007" | tee /tmp/gq007.json
+          test "$(jq -r '.passed' /tmp/gq007.json)" = "true"
+          test "$(jq '.evaluation.metrics.details | length' /tmp/gq007.json)" -eq 2
+          test "$(jq -r '.evaluation.metrics.details[0].semanticText' /tmp/gq007.json)" = "入库数量"
+          test "$(jq -r '.evaluation.metrics.details[1].semanticText' /tmp/gq007.json)" = "入库金额"
+          test "$(jq -r '.runtimePlan.Metrics | length' /tmp/gq007.json)" -eq 2
+
       - name: Controller Golden Coverage
         run: |
           curl --fail --silent --show-error http://127.0.0.1:5050/evaluation/diagnostics/golden-dataset-coverage | tee /tmp/golden-coverage.json
