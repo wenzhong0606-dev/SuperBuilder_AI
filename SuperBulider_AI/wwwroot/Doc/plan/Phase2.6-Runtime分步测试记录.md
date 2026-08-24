@@ -66,31 +66,66 @@ http://localhost:5032/evaluation/local-runtime/sqlserver
 
 ## STEP-02 — Qdrant Runtime
 
-**CURRENT / PENDING**
-
-唯一测试地址：
+### 地址
 
 ```text
 http://localhost:5032/evaluation/local-runtime/qdrant
 ```
 
-收到 STEP-02 原始 JSON 后，先记录并判定，再进入 STEP-03。
+### 原始返回 JSON
+
+```json
+{"passed":true,"stage":"Qdrant","message":"Qdrant HTTP healthz 通过。","elapsedMs":2056,"details":{"host":"localhost","httpPort":6333,"grpcPort":6334,"httpHealthUrl":"http://localhost:6333/healthz","statusCode":200,"responseBody":"healthz check passed"}}
+```
+
+### 判定
+
+**PASS / COMPLETE**
+
+### 验收事实
+
+- `passed = true`
+- Qdrant host = `localhost`
+- HTTP port = `6333`
+- gRPC port = `6334`
+- health URL = `http://localhost:6333/healthz`
+- HTTP status code = `200`
+- response body = `healthz check passed`
+- elapsedMs = `2056`
+
+### 结论
+
+当前本地 Qdrant HTTP Healthz 检查通过，HTTP 服务可访问，健康状态正常。本步骤证明 Qdrant Runtime 基础连通性，不代表 Semantic Search、Vector Retrieval 或 Golden Evaluation 已完成。
+
+---
+
+## STEP-03 — 本地基础设施汇总
+
+**CURRENT / PENDING**
+
+唯一测试地址：
+
+```text
+http://localhost:5032/evaluation/local-runtime/infrastructure
+```
+
+收到 STEP-03 原始 JSON 后，先记录并判定，再进入 STEP-04。
 
 ---
 
 ## 当前进度
 
 ```text
-已完成：1
-PASS：1
+已完成：2
+PASS：2
 FAIL：0
 BLOCK：0
-当前：STEP-02 Qdrant Runtime
+当前：STEP-03 本地基础设施汇总
 ```
 
 ### 强制规则
 
-1. 不重复 STEP-01。
+1. 不重复已通过步骤。
 2. 不跳过失败步骤。
 3. 不一次提供多个待测试地址。
 4. 每一步完成后必须记录原始 JSON、判定和结论。
