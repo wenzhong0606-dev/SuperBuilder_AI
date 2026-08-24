@@ -1,6 +1,6 @@
 namespace SuperBuilder_AI.Models.BI.Evaluation;
 
-public sealed class SemanticApplicabilityResult
+public sealed record SemanticApplicabilityResult
 {
     public string CaseId { get; init; } = string.Empty;
     public string Question { get; init; } = string.Empty;
