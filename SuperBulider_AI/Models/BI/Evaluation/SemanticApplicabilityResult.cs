@@ -1,9 +1,7 @@
 namespace SuperBuilder_AI.Models.BI.Evaluation;
 
 /// <summary>
-/// Phase 2.6.3.5-C.2 Semantic Applicability Evaluation Result。
-/// 描述当前 Golden Case 在运行时 Metadata + Semantic Search 环境中的语义适用性。
-/// 当 State=Resolved 时，Resolution 是允许 QueryPlanBuilder 消费的稳定物理绑定。
+/// Phase 2.6 C.13.2 Semantic Applicability：Resolved 表示所有 Golden 语义断言均已获得稳定物理绑定。
 /// </summary>
 public sealed class SemanticApplicabilityResult
 {
@@ -15,20 +13,10 @@ public sealed class SemanticApplicabilityResult
     public string? Reason { get; init; }
     public SemanticApplicabilityCandidate? SearchCandidate { get; init; }
     public SemanticApplicabilityResolution? Resolution { get; init; }
-
-    /// <summary>
-    /// 已解析的 Filter 物理绑定。操作符和值仍由 QueryIntent 保留，
-    /// 这里只负责把业务语义稳定绑定到 MetadataColumn。
-    /// </summary>
-    public IReadOnlyList<SemanticApplicabilityFilterResolution> FilterResolutions { get; init; }
-        = Array.Empty<SemanticApplicabilityFilterResolution>();
-
-    /// <summary>
-    /// Golden 明确要求多表 Join 时，Dimension 必须有稳定的物理语义绑定。
-    /// </summary>
-    public IReadOnlyList<SemanticApplicabilityDimensionResolution> DimensionResolutions { get; init; }
-        = Array.Empty<SemanticApplicabilityDimensionResolution>();
-
+    public IReadOnlyList<SemanticApplicabilityMetricResolution> MetricResolutions { get; init; } = Array.Empty<SemanticApplicabilityMetricResolution>();
+    public IReadOnlyList<SemanticApplicabilityFilterResolution> FilterResolutions { get; init; } = Array.Empty<SemanticApplicabilityFilterResolution>();
+    public IReadOnlyList<SemanticApplicabilityDimensionResolution> DimensionResolutions { get; init; } = Array.Empty<SemanticApplicabilityDimensionResolution>();
+    public IReadOnlyList<SemanticApplicabilityTableResolution> TableResolutions { get; init; } = Array.Empty<SemanticApplicabilityTableResolution>();
     public SemanticApplicabilityEvidence Evidence { get; init; } = new();
 }
 
@@ -43,26 +31,15 @@ public sealed class SemanticApplicabilityResolution
     public double? Score { get; init; }
 }
 
-public sealed class SemanticApplicabilityFilterResolution
+public sealed class SemanticApplicabilityMetricResolution : SemanticApplicabilityResolution { public string SemanticText { get; init; } = string.Empty; }
+public sealed class SemanticApplicabilityFilterResolution : SemanticApplicabilityMetricResolution { }
+public sealed class SemanticApplicabilityDimensionResolution : SemanticApplicabilityMetricResolution { }
+public sealed class SemanticApplicabilityTableResolution
 {
     public long TableId { get; init; }
     public long DataSourceId { get; init; }
-    public long ColumnId { get; init; }
     public string SemanticText { get; init; } = string.Empty;
     public string? Table { get; init; }
-    public string? Column { get; init; }
-    public string? BusinessMeaning { get; init; }
-    public double? Score { get; init; }
-}
-
-public sealed class SemanticApplicabilityDimensionResolution
-{
-    public long TableId { get; init; }
-    public long DataSourceId { get; init; }
-    public long ColumnId { get; init; }
-    public string SemanticText { get; init; } = string.Empty;
-    public string? Table { get; init; }
-    public string? Column { get; init; }
     public string? BusinessMeaning { get; init; }
     public double? Score { get; init; }
 }
