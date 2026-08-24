@@ -28,9 +28,14 @@ public class SemanticApplicabilityResolution
     public double? Score { get; init; }
 }
 
-public sealed class SemanticApplicabilityMetricResolution : SemanticApplicabilityResolution { public string SemanticText { get; init; } = string.Empty; }
+public class SemanticApplicabilityMetricResolution : SemanticApplicabilityResolution
+{
+    public string SemanticText { get; init; } = string.Empty;
+}
+
 public sealed class SemanticApplicabilityFilterResolution : SemanticApplicabilityMetricResolution { }
 public sealed class SemanticApplicabilityDimensionResolution : SemanticApplicabilityMetricResolution { }
+
 public sealed class SemanticApplicabilityTableResolution
 {
     public long TableId { get; init; }
