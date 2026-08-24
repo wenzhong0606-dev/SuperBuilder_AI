@@ -50,6 +50,7 @@ builder.Services.AddScoped<IQueryJoinInferenceService>(sp => sp.GetRequiredServi
 builder.Services.AddScoped<QueryPlanValidator>();
 builder.Services.AddScoped<QueryPlanBuilder>();
 builder.Services.AddScoped<IQueryPlanBuilder>(sp => sp.GetRequiredService<QueryPlanBuilder>());
+builder.Services.AddScoped<QuerySemanticValidator>();
 builder.Services.AddScoped<IQueryPlanRepairService, QueryPlanRepairService>();
 builder.Services.AddScoped<IQueryPlanValidationPipeline, QueryPlanValidationPipeline>();
 builder.Services.AddScoped<QueryPlanEvaluationGate>();
