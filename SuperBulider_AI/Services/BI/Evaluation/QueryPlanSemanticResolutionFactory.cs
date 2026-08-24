@@ -3,82 +3,27 @@ using SuperBuilder_AI.Models.BI.Evaluation;
 
 namespace SuperBuilder_AI.Services.BI.Evaluation;
 
-/// <summary>
-/// 将 Semantic Applicability 的稳定物理绑定转换为 QueryPlanBuilder 使用的绑定契约。
-/// </summary>
 public static class QueryPlanSemanticResolutionFactory
 {
     public static QueryPlanSemanticResolution From(SemanticApplicabilityResult applicability)
     {
         ArgumentNullException.ThrowIfNull(applicability);
-
         if (!string.Equals(applicability.State, "Resolved", StringComparison.OrdinalIgnoreCase))
-        {
-            throw new InvalidOperationException(
-                $"只有 State=Resolved 的 Semantic Applicability 才允许创建 QueryPlanSemanticResolution，当前状态为“{applicability.State}”。");
-        }
+            throw new InvalidOperationException($"只有 State=Resolved 的 Semantic Applicability 才允许创建 QueryPlanSemanticResolution，当前状态为“{applicability.State}”。");
 
-        if (applicability.Resolution is null)
-        {
-            throw new InvalidOperationException(
-                "Semantic Applicability 已标记为 Resolved，但没有提供 Resolution，禁止继续构建 QueryPlan。");
-        }
+        var source = applicability.MetricResolutions.Count > 0
+            ? applicability.MetricResolutions
+            : applicability.Resolution is null ? Array.Empty<SemanticApplicabilityMetricResolution>() : new[] { new SemanticApplicabilityMetricResolution { TableId = applicability.Resolution.TableId, DataSourceId = applicability.Resolution.DataSourceId, ColumnId = applicability.Resolution.ColumnId, SemanticText = applicability.MetricSemanticText, Table = applicability.Resolution.Table, Column = applicability.Resolution.Column, BusinessMeaning = applicability.Resolution.BusinessMeaning, Score = applicability.Resolution.Score } };
+        if (source.Count == 0) throw new InvalidOperationException("Semantic Applicability 已标记为 Resolved，但没有 Metric Resolution。");
 
-        var resolution = applicability.Resolution;
+        var metrics = source.Select(x => new QueryPlanMetricResolution { TableId = x.TableId, DataSourceId = x.DataSourceId, ColumnId = x.ColumnId, SemanticText = x.SemanticText, Table = x.Table ?? string.Empty, Column = x.Column ?? string.Empty, BusinessMeaning = x.BusinessMeaning, Score = x.Score }).ToList();
+        foreach (var metric in metrics)
+            if (metric.TableId <= 0 || metric.DataSourceId <= 0 || metric.ColumnId <= 0 || string.IsNullOrWhiteSpace(metric.Table) || string.IsNullOrWhiteSpace(metric.Column))
+                throw new InvalidOperationException($"Metric Semantic Resolution 不完整：SemanticText={metric.SemanticText}。");
 
-        if (resolution.TableId <= 0
-            || resolution.DataSourceId <= 0
-            || resolution.ColumnId <= 0
-            || string.IsNullOrWhiteSpace(resolution.Table)
-            || string.IsNullOrWhiteSpace(resolution.Column))
-        {
-            throw new InvalidOperationException(
-                "Semantic Applicability Resolution 不完整：TableId、DataSourceId、ColumnId、Table、Column 均必须有效。");
-        }
-
-        var filters = applicability.FilterResolutions
-            .Select(filter => new QueryPlanFilterResolution
-            {
-                TableId = filter.TableId,
-                DataSourceId = filter.DataSourceId,
-                ColumnId = filter.ColumnId,
-                SemanticText = filter.SemanticText,
-                Table = filter.Table ?? string.Empty,
-                Column = filter.Column ?? string.Empty,
-                BusinessMeaning = filter.BusinessMeaning,
-                Score = filter.Score
-            })
-            .ToList();
-
-        var dimensions = applicability.DimensionResolutions
-            .Select(dimension => new QueryPlanDimensionResolution
-            {
-                TableId = dimension.TableId,
-                DataSourceId = dimension.DataSourceId,
-                ColumnId = dimension.ColumnId,
-                SemanticText = dimension.SemanticText,
-                Table = dimension.Table ?? string.Empty,
-                Column = dimension.Column ?? string.Empty,
-                BusinessMeaning = dimension.BusinessMeaning,
-                Score = dimension.Score
-            })
-            .ToList();
-
-        return new QueryPlanSemanticResolution
-        {
-            Metric = new QueryPlanMetricResolution
-            {
-                TableId = resolution.TableId,
-                DataSourceId = resolution.DataSourceId,
-                ColumnId = resolution.ColumnId,
-                SemanticText = applicability.MetricSemanticText,
-                Table = resolution.Table,
-                Column = resolution.Column,
-                BusinessMeaning = resolution.BusinessMeaning,
-                Score = resolution.Score
-            },
-            Filters = filters,
-            Dimensions = dimensions
-        };
+        var filters = applicability.FilterResolutions.Select(x => new QueryPlanFilterResolution { TableId = x.TableId, DataSourceId = x.DataSourceId, ColumnId = x.ColumnId, SemanticText = x.SemanticText, Table = x.Table ?? string.Empty, Column = x.Column ?? string.Empty, BusinessMeaning = x.BusinessMeaning, Score = x.Score }).ToList();
+        var dimensions = applicability.DimensionResolutions.Select(x => new QueryPlanDimensionResolution { TableId = x.TableId, DataSourceId = x.DataSourceId, ColumnId = x.ColumnId, SemanticText = x.SemanticText, Table = x.Table ?? string.Empty, Column = x.Column ?? string.Empty, BusinessMeaning = x.BusinessMeaning, Score = x.Score }).ToList();
+        var tables = applicability.TableResolutions.Select(x => new QueryPlanTableResolution { TableId = x.TableId, DataSourceId = x.DataSourceId, SemanticText = x.SemanticText, Table = x.Table ?? string.Empty, BusinessMeaning = x.BusinessMeaning, Score = x.Score }).ToList();
+        return new QueryPlanSemanticResolution { Metrics = metrics, Filters = filters, Dimensions = dimensions, Tables = tables };
     }
 }
