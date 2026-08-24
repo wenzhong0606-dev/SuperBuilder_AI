@@ -21,7 +21,6 @@ builder.Services.AddHttpClient();
 builder.Services.AddDbContext<SuperBIContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-builder.Services.Configure<QwenOptions>(builder.Configuration.GetSection("Qwen"));
 builder.Services.Configure<QdrantOptions>(builder.Configuration.GetSection("Qdrant"));
 builder.Services.AddScoped<IDataSourceMetadataReader, MySqlMetadataReader>();
 builder.Services.AddScoped<MetadataScannerService>();
