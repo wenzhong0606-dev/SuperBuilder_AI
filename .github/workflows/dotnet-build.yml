@@ -1,0 +1,37 @@
+name: SuperBuilder AI - .NET CI
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: 编译检查
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 检出源码
+        uses: actions/checkout@v4
+
+      - name: 设置 .NET 环境
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: 恢复 NuGet 依赖
+        run: dotnet restore
+
+      - name: Release 编译
+        run: dotnet build --configuration Release --no-restore
+
+      - name: 输出编译完成信息
+        if: success()
+        run: echo "SuperBuilder AI Release 编译通过"
