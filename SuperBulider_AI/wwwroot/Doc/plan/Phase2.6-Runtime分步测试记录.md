@@ -101,26 +101,66 @@ http://localhost:5032/evaluation/local-runtime/qdrant
 
 ## STEP-03 — 本地基础设施汇总
 
-**CURRENT / PENDING**
-
-唯一测试地址：
+### 地址
 
 ```text
 http://localhost:5032/evaluation/local-runtime/infrastructure
 ```
 
-收到 STEP-03 原始 JSON 后，先记录并判定，再进入 STEP-04。
+### 原始返回 JSON
+
+```json
+{"passed":true,"sqlServer":{"passed":true,"stage":"SqlServer","message":"SQL Server 认证与 SELECT 1 均通过。","elapsedMs":101,"details":{"connected":true,"select1":1,"database":"SuperBuilder_Platform","server":"localhost"}},"qdrant":{"passed":true,"stage":"Qdrant","message":"Qdrant HTTP healthz 通过。","elapsedMs":2046,"details":{"host":"localhost","httpPort":6333,"grpcPort":6334,"httpHealthUrl":"http://localhost:6333/healthz","statusCode":200,"responseBody":"healthz check passed"}}}
+```
+
+### 判定
+
+**PASS / COMPLETE**
+
+### 验收事实
+
+- 汇总 `passed = true`
+- SQL Server `passed = true`
+- SQL Server `connected = true`
+- SQL Server `SELECT 1 = 1`
+- database = `SuperBuilder_Platform`
+- server = `localhost`
+- SQL Server elapsedMs = `101`
+- Qdrant `passed = true`
+- Qdrant HTTP status code = `200`
+- Qdrant response body = `healthz check passed`
+- Qdrant elapsedMs = `2046`
+
+### 结论
+
+本地基础设施汇总检查通过。SQL Server 与 Qdrant 两项基础 Runtime 均通过，当前本地 BI Evaluation Runtime 所依赖的数据库与向量基础设施健康。
+
+> 注意：该结果仍只代表基础设施层 PASS，不代表 Golden Dataset、QueryPlan Evaluator、Coverage、Quality Gate 或 Release Gate 已通过。
+
+---
+
+## STEP-04 — Golden Dataset Cases 加载
+
+**CURRENT / PENDING**
+
+唯一测试地址：
+
+```text
+http://localhost:5032/evaluation/golden-runtime/cases?topK=10
+```
+
+收到 STEP-04 原始 JSON 后，先记录并判定，再进入 STEP-05。
 
 ---
 
 ## 当前进度
 
 ```text
-已完成：2
-PASS：2
+已完成：3
+PASS：3
 FAIL：0
 BLOCK：0
-当前：STEP-03 本地基础设施汇总
+当前：STEP-04 Golden Dataset Cases 加载
 ```
 
 ### 强制规则
