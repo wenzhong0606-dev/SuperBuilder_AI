@@ -16,6 +16,7 @@ public class QueryIntentNormalizer
         NormalizeCollection(intent);
         NormalizeLimit(intent);
         NormalizeRanking(intent);
+        NormalizeMetricOnlyAggregate(intent);
         NormalizeAggregation(intent);
         NormalizeYearFilters(intent);
 
@@ -26,6 +27,12 @@ public class QueryIntentNormalizer
     {
         if (intent.Filters == null)
             intent.Filters = new List<QueryFilter>();
+
+        if (intent.Metrics == null)
+            intent.Metrics = new List<QueryMetric>();
+
+        if (intent.Dimensions == null)
+            intent.Dimensions = new List<string>();
     }
 
     private static void NormalizeLimit(QueryIntent intent)
@@ -50,6 +57,107 @@ public class QueryIntentNormalizer
                     metric.Aggregation = "COUNT";
             }
         }
+    }
+
+    /// <summary>
+    /// 对“查询入库数量”这一类无维度、无排序、无Limit的指标查询进行确定性归一化。
+    /// 
+    /// Qwen 是 QueryIntent 的语义理解器，但 IntentType / Aggregation 是后续
+    /// QueryPlan Evaluation 的 Contract 字段，不能因为模型偶发输出 Detail/NONE
+    /// 就让同一个 Golden Case 在 Runtime 中漂移。
+    /// 
+    /// 仅处理明显的指标查询：
+    /// - 没有维度
+    /// - 没有排序
+    /// - 没有 Limit
+    /// - 至少存在一个 Metric
+    /// - 问题没有要求“明细/记录/列表/哪些”等实体明细结果
+    /// 
+    /// Ranking / Detail Ranking 不在本规则范围内。
+    /// </summary>
+    private static void NormalizeMetricOnlyAggregate(QueryIntent intent)
+    {
+        if (intent.Metrics == null || intent.Metrics.Count == 0)
+            return;
+
+        if (string.Equals(intent.IntentType, "Ranking", StringComparison.OrdinalIgnoreCase))
+            return;
+
+        if (intent.Dimensions != null && intent.Dimensions.Count > 0)
+            return;
+
+        if (!string.IsNullOrWhiteSpace(intent.OrderBy) ||
+            !string.IsNullOrWhiteSpace(intent.OrderDirection) ||
+            intent.Limit.GetValueOrDefault() > 0)
+            return;
+
+        var question = intent.OriginalQuestion?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(question))
+            return;
+
+        if (ContainsDetailResultMarker(question))
+            return;
+
+        if (!ContainsMetricQueryMarker(question))
+            return;
+
+        intent.IntentType = "Aggregate";
+
+        foreach (var metric in intent.Metrics)
+        {
+            if (string.IsNullOrWhiteSpace(metric.Aggregation) ||
+                string.Equals(metric.Aggregation, "NONE", StringComparison.OrdinalIgnoreCase))
+            {
+                metric.Aggregation = InferMetricAggregation(metric.Name);
+            }
+        }
+    }
+
+    private static bool ContainsDetailResultMarker(string question)
+    {
+        string[] markers =
+        {
+            "明细", "记录", "列表", "哪些", "哪几条", "具体记录", "详情"
+        };
+
+        return markers.Any(question.Contains);
+    }
+
+    private static bool ContainsMetricQueryMarker(string question)
+    {
+        string[] markers =
+        {
+            "数量", "金额", "金额", "总额", "销量", "销售额", "总数", "平均", "平均值", "最大", "最小", "最高", "最低"
+        };
+
+        return markers.Any(question.Contains);
+    }
+
+    private static string InferMetricAggregation(string? metricName)
+    {
+        var text = metricName?.Trim() ?? string.Empty;
+
+        // “入库单数量 / 订单数量 / 供应商数量”等是实体数量，默认 COUNT。
+        if (text.Contains("单数量", StringComparison.OrdinalIgnoreCase) ||
+            text.Contains("单据数量", StringComparison.OrdinalIgnoreCase) ||
+            text.Contains("订单数量", StringComparison.OrdinalIgnoreCase) ||
+            text.Contains("供应商数量", StringComparison.OrdinalIgnoreCase) ||
+            text.Contains("客户数量", StringComparison.OrdinalIgnoreCase))
+        {
+            return "COUNT";
+        }
+
+        // 普通业务数量/金额指标默认 SUM。
+        if (text.Contains("数量", StringComparison.OrdinalIgnoreCase) ||
+            text.Contains("金额", StringComparison.OrdinalIgnoreCase) ||
+            text.Contains("总额", StringComparison.OrdinalIgnoreCase) ||
+            text.Contains("销量", StringComparison.OrdinalIgnoreCase) ||
+            text.Contains("销售额", StringComparison.OrdinalIgnoreCase))
+        {
+            return "SUM";
+        }
+
+        return "SUM";
     }
 
     private static void NormalizeAggregation(QueryIntent intent)
