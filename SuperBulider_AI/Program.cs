@@ -22,6 +22,7 @@ builder.Services.AddDbContext<SuperBIContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 builder.Services.Configure<QdrantOptions>(builder.Configuration.GetSection("Qdrant"));
+builder.Services.Configure<EmbeddingOptions>(builder.Configuration.GetSection("Embedding"));
 builder.Services.AddScoped<IDataSourceMetadataReader, MySqlMetadataReader>();
 builder.Services.AddScoped<MetadataScannerService>();
 builder.Services.AddScoped<MetadataSearchTextBuilder>();
@@ -30,8 +31,8 @@ builder.Services.AddScoped<MetadataPromptBuilder>();
 builder.Services.AddScoped<MetadataContextBuilder>();
 builder.Services.AddScoped<IMetadataContextBuilder>(sp => sp.GetRequiredService<MetadataContextBuilder>());
 builder.Services.AddScoped<IQueryPlanContextBuilder, QueryPlanContextBuilder>();
-builder.Services.AddScoped<FakeEmbeddingService>();
-builder.Services.AddScoped<IEmbeddingService>(sp => sp.GetRequiredService<FakeEmbeddingService>());
+builder.Services.AddHttpClient<QwenEmbeddingService>();
+builder.Services.AddScoped<IEmbeddingService>(sp => sp.GetRequiredService<QwenEmbeddingService>());
 builder.Services.AddScoped<QwenService>();
 builder.Services.AddScoped<IQwenService>(sp => sp.GetRequiredService<QwenService>());
 builder.Services.AddScoped<MetadataSemanticService>();
