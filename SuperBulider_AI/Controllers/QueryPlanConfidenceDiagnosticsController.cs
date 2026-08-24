@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using SuperBuilder_AI.Interfaces.BI;
 using SuperBuilder_AI.Models.BI;
@@ -55,7 +54,6 @@ public sealed class QueryPlanConfidenceDiagnosticsController : ControllerBase
     {
         if (string.IsNullOrWhiteSpace(caseId))
             return BadRequest(new { passed = false, message = "caseId is required." });
-
         if (topK < 1 || topK > 100)
             return BadRequest(new { passed = false, message = "topK must be between 1 and 100." });
 
@@ -65,17 +63,9 @@ public sealed class QueryPlanConfidenceDiagnosticsController : ControllerBase
 
         var applicability = await _semanticApplicabilityEvaluator.EvaluateAsync(goldenCase, topK);
         var gate = _queryPlanEvaluationGate.Evaluate(applicability);
-
         if (gate.Blocking)
         {
-            return Ok(new
-            {
-                passed = false,
-                stage = "SemanticApplicabilityGate",
-                decision = gate,
-                applicability,
-                confidence = (object?)null
-            });
+            return Ok(new { passed = false, stage = "SemanticApplicabilityGate", decision = gate, applicability, confidence = (object?)null });
         }
 
         cancellationToken.ThrowIfCancellationRequested();
@@ -86,18 +76,10 @@ public sealed class QueryPlanConfidenceDiagnosticsController : ControllerBase
 
         var evaluation = _queryPlanEvaluator.Evaluate(goldenCase.Id, goldenCase.Expected, runtimePlan);
         var validationContext = await _queryPlanContextBuilder.BuildAsync(runtimePlan);
-        var validationResult = await _queryPlanValidationPipeline
-            .ValidateAsync(runtimePlan, validationContext, goldenCase.Question);
-
+        var validationResult = await _queryPlanValidationPipeline.ValidateAsync(runtimePlan, validationContext, goldenCase.Question);
         cancellationToken.ThrowIfCancellationRequested();
 
-        var confidence = await _queryPlanConfidenceService.EvaluateAsync(
-            runtimePlan,
-            validationResult,
-            validationResult.RepairTrace,
-            goldenCase.Question,
-            cancellationToken);
-
+        var confidence = await _queryPlanConfidenceService.EvaluateAsync(runtimePlan, validationResult, validationResult.RepairTrace, goldenCase.Question, cancellationToken);
         var decision = _queryPlanDecisionGate.Evaluate(confidence);
 
         return Ok(new
@@ -178,120 +160,100 @@ public sealed class QueryPlanConfidenceDiagnosticsController : ControllerBase
             var metric = intent.Metrics.FirstOrDefault(x =>
                 string.Equals(x.Name, resolution.Metric.SemanticText, StringComparison.OrdinalIgnoreCase)
                 || string.Equals(x.Field, resolution.Metric.Column, StringComparison.OrdinalIgnoreCase));
-
             metric ??= new QueryMetric
             {
                 Name = resolution.Metric.SemanticText,
+                SemanticText = resolution.Metric.SemanticText,
                 Field = resolution.Metric.Column,
                 Aggregation = "SUM"
             };
-
+            metric.SemanticText = resolution.Metric.SemanticText;
             metric.Field = resolution.Metric.Column;
             plan.Metrics.Add(metric);
-            plan.Fields.Add(new QueryField
-            {
-                MetadataColumnId = resolution.Metric.ColumnId,
-                ColumnName = resolution.Metric.Column,
-                Aggregation = metric.Aggregation
-            });
-
+            plan.Fields.Add(new QueryField { MetadataColumnId = resolution.Metric.ColumnId, ColumnName = resolution.Metric.Column, Aggregation = metric.Aggregation });
             EnsureTable(plan, resolution.Metric.TableId, resolution.Metric.DataSourceId, resolution.Metric.Table);
         }
 
         foreach (var binding in resolution.Filters)
         {
             EnsureTable(plan, binding.TableId, binding.DataSourceId, binding.Table);
-            var filter = intent.Filters.FirstOrDefault(x => string.Equals(x.Field, binding.Column, StringComparison.OrdinalIgnoreCase));
-            if (filter is not null)
-                filter.Field = binding.Column;
-
-            plan.Fields.Add(new QueryField
-            {
-                MetadataColumnId = binding.ColumnId,
-                ColumnName = binding.Column,
-                Aggregation = "NONE"
-            });
+            var filter = intent.Filters.FirstOrDefault(x => string.Equals(x.SemanticText, binding.SemanticText, StringComparison.OrdinalIgnoreCase) || string.Equals(x.Field, binding.Column, StringComparison.OrdinalIgnoreCase));
+            if (filter is not null) filter.Field = binding.Column;
+            plan.Filters.Add(filter ?? new QueryFilter { SemanticText = binding.SemanticText, Field = binding.Column });
+            plan.Fields.Add(new QueryField { MetadataColumnId = binding.ColumnId, ColumnName = binding.Column, Aggregation = "NONE" });
         }
 
         foreach (var binding in resolution.Dimensions)
         {
             EnsureTable(plan, binding.TableId, binding.DataSourceId, binding.Table);
-            var index = intent.Dimensions.FindIndex(x => string.Equals(x, binding.Column, StringComparison.OrdinalIgnoreCase));
-            if (index >= 0)
-                intent.Dimensions[index] = binding.Column;
-
-            plan.Dimensions.Add(new QueryDimension
-            {
-                MetadataColumnId = binding.ColumnId,
-                ColumnName = binding.Column
-            });
-
-            plan.Fields.Add(new QueryField
-            {
-                MetadataColumnId = binding.ColumnId,
-                ColumnName = binding.Column,
-                Aggregation = "NONE"
-            });
+            var index = intent.Dimensions.FindIndex(x => string.Equals(x, binding.SemanticText, StringComparison.OrdinalIgnoreCase) || string.Equals(x, binding.Column, StringComparison.OrdinalIgnoreCase));
+            if (index >= 0) intent.Dimensions[index] = binding.Column;
+            plan.Dimensions.Add(new QueryDimension { MetadataColumnId = binding.ColumnId, ColumnName = binding.Column, SemanticText = binding.SemanticText });
+            plan.Fields.Add(new QueryField { MetadataColumnId = binding.ColumnId, ColumnName = binding.Column, Aggregation = "NONE" });
         }
 
         foreach (var binding in resolution.Orders)
         {
             EnsureTable(plan, binding.TableId, binding.DataSourceId, binding.Table);
-            if (string.Equals(intent.OrderBy, binding.Column, StringComparison.OrdinalIgnoreCase))
-                intent.OrderBy = binding.Column;
-
-            plan.Orders.Add(new QueryOrder
-            {
-                MetadataColumnId = binding.ColumnId,
-                Field = binding.Column,
-                Direction = intent.OrderDirection ?? "ASC"
-            });
-
-            plan.Fields.Add(new QueryField
-            {
-                MetadataColumnId = binding.ColumnId,
-                ColumnName = binding.Column,
-                Aggregation = "NONE"
-            });
+            plan.Orders.Add(new QueryOrder { MetadataColumnId = binding.ColumnId, Field = binding.Column, Direction = intent.OrderDirection ?? "ASC" });
+            plan.Fields.Add(new QueryField { MetadataColumnId = binding.ColumnId, ColumnName = binding.Column, Aggregation = "NONE" });
         }
+
+        var aggregateRanking = intent.IsRanking
+            && plan.Dimensions.Count > 0
+            && plan.Metrics.Any(x => x.GetAggregation() != QueryAggregation.None);
+        plan.IsAggregateRanking = aggregateRanking;
+        plan.IsDetailRanking = intent.IsRanking && !aggregateRanking;
+        if (intent.IsRanking)
+            plan.IsAggregate = aggregateRanking;
 
         return plan;
     }
 
     private static void EnsureTable(QueryPlan plan, long tableId, long dataSourceId, string tableName)
     {
-        if (plan.Tables.Any(x => x.MetadataTableId == tableId))
-            return;
-
-        plan.Tables.Add(new QueryTable
-        {
-            MetadataTableId = tableId,
-            DataSourceId = dataSourceId,
-            TableName = tableName
-        });
+        if (plan.Tables.Any(x => x.MetadataTableId == tableId)) return;
+        plan.Tables.Add(new QueryTable { MetadataTableId = tableId, DataSourceId = dataSourceId, TableName = tableName });
     }
 
     private static QueryIntent BuildIntentFromGoldenCase(GoldenQueryCase goldenCase)
     {
+        var expected = goldenCase.Expected;
         var intent = new QueryIntent
         {
             OriginalQuestion = goldenCase.Question,
-            IntentType = goldenCase.Expected.IntentType ?? string.Empty,
-            Limit = goldenCase.Expected.Limit ?? 0
+            IntentType = expected.IntentType ?? string.Empty,
+            Limit = expected.Limit ?? 0,
+            OrderDirection = expected.Orders?.FirstOrDefault()?.Direction
         };
 
-        if (goldenCase.Expected.Metrics is not null)
+        if (expected.Metrics is not null)
         {
-            foreach (var metricExpectation in goldenCase.Expected.Metrics)
+            foreach (var metricExpectation in expected.Metrics)
             {
                 intent.Metrics.Add(new QueryMetric
                 {
                     Name = metricExpectation.SemanticText,
+                    SemanticText = metricExpectation.SemanticText,
                     Field = metricExpectation.Field ?? string.Empty,
-                    Aggregation = metricExpectation.Aggregation.ToString().ToUpperInvariant()
+                    Aggregation = metricExpectation.Aggregation.ToString().ToUpperInvariant(),
+                    IsOrderingMetric = expected.Orders?.Any(x => x.IsMetric && string.Equals(x.MetricSemanticText, metricExpectation.SemanticText, StringComparison.OrdinalIgnoreCase)) == true
                 });
             }
         }
+
+        if (expected.Dimensions is not null)
+            intent.Dimensions.AddRange(expected.Dimensions.Select(x => x.SemanticText));
+
+        if (expected.Filters is not null)
+        {
+            foreach (var filter in expected.Filters)
+                intent.Filters.Add(new QueryFilter { SemanticText = filter.SemanticText, Operator = filter.Operator, Value = filter.Value });
+        }
+
+        var order = expected.Orders?.FirstOrDefault();
+        if (order is not null)
+            intent.OrderBy = order.IsMetric ? order.MetricSemanticText : order.SemanticText;
 
         return intent;
     }
@@ -299,9 +261,7 @@ public sealed class QueryPlanConfidenceDiagnosticsController : ControllerBase
     private GoldenQueryCase? LoadGoldenCase(string caseId)
     {
         var path = Path.Combine(_environment.ContentRootPath, "Evaluation", "Golden", "query-plan-golden-v1.json");
-        if (!System.IO.File.Exists(path))
-            return null;
-
+        if (!System.IO.File.Exists(path)) return null;
         var dataset = _serializer.Deserialize(System.IO.File.ReadAllText(path));
         return dataset.Cases.SingleOrDefault(x => string.Equals(x.Id, caseId, StringComparison.OrdinalIgnoreCase));
     }
