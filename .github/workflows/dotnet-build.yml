@@ -57,8 +57,9 @@ jobs:
       - name: 启动 Qdrant CI 容器
         run: |
           docker run -d --name superbuilder-c13-3-qdrant \
+            -p 6333:6333 \
             -p 6334:6334 \
-            qdrant/qdrant:v1.15.5
+            qdrant/qdrant:v1.19.0
       - name: 等待 SQL Server Ready
         run: |
           for i in {1..60}; do
@@ -75,8 +76,8 @@ jobs:
       - name: 等待 Qdrant Ready
         run: |
           for i in {1..30}; do
-            if curl --fail --silent http://127.0.0.1:6334/healthz >/dev/null 2>&1; then
-              echo "Qdrant 已 Ready"
+            if curl --fail --silent http://127.0.0.1:6333/healthz >/dev/null 2>&1; then
+              echo "Qdrant HTTP 6333 已 Ready"
               exit 0
             fi
             sleep 2
