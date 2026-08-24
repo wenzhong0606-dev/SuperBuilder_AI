@@ -13,7 +13,6 @@ public sealed class QueryPlanSemanticEvidenceResult
     public string GoldenSemanticText { get; init; } = string.Empty;
     public string ApplicabilityState { get; init; } = string.Empty;
 
-    // 兼容既有 C.4.8 单 Metric Evidence 字段；新实现同时提供集合式 Evidence。
     public bool ResolutionExists { get; init; }
     public bool RuntimeMetricExists { get; init; }
     public bool MetricFieldMatchesResolution { get; init; }
@@ -21,17 +20,10 @@ public sealed class QueryPlanSemanticEvidenceResult
     public bool DataSourceBindingMatchesResolution { get; init; }
     public double? ResolutionScore { get; init; }
 
-    public IReadOnlyList<QueryPlanSemanticBindingEvidence> Metrics { get; init; }
-        = Array.Empty<QueryPlanSemanticBindingEvidence>();
-
-    public IReadOnlyList<QueryPlanSemanticBindingEvidence> Dimensions { get; init; }
-        = Array.Empty<QueryPlanSemanticBindingEvidence>();
-
-    public IReadOnlyList<QueryPlanSemanticBindingEvidence> Filters { get; init; }
-        = Array.Empty<QueryPlanSemanticBindingEvidence>();
-
-    public IReadOnlyList<QueryPlanSemanticBindingEvidence> Tables { get; init; }
-        = Array.Empty<QueryPlanSemanticBindingEvidence>();
+    public IReadOnlyList<QueryPlanSemanticBindingEvidence> Metrics { get; init; } = Array.Empty<QueryPlanSemanticBindingEvidence>();
+    public IReadOnlyList<QueryPlanSemanticBindingEvidence> Dimensions { get; init; } = Array.Empty<QueryPlanSemanticBindingEvidence>();
+    public IReadOnlyList<QueryPlanSemanticBindingEvidence> Filters { get; init; } = Array.Empty<QueryPlanSemanticBindingEvidence>();
+    public IReadOnlyList<QueryPlanSemanticBindingEvidence> Tables { get; init; } = Array.Empty<QueryPlanSemanticBindingEvidence>();
 }
 
 /// <summary>
@@ -46,7 +38,7 @@ public sealed record QueryPlanSemanticBindingEvidence
     public string? ResolvedColumn { get; init; }
     public long ResolvedTableId { get; init; }
     public string? ResolvedTable { get; init; }
-    public long ResolvedDataSourceId { get; init; }
+    public long? ResolvedDataSourceId { get; init; }
     public long? RuntimeColumnId { get; init; }
     public string? RuntimeColumn { get; init; }
     public long? RuntimeTableId { get; init; }
