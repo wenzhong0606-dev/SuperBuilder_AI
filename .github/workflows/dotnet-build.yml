@@ -62,20 +62,23 @@ jobs:
             -p 6333:6333 \
             -p 6334:6334 \
             qdrant/qdrant:v1.19.0
-      - name: 等待 SQL Server Ready
+      - name: 等待 SQL Server 协议级 Ready
         run: |
           for i in {1..60}; do
-            if (echo > /dev/tcp/127.0.0.1/1433) >/dev/null 2>&1; then
-              echo "SQL Server TCP 1433 已开放"
-              break
+            if docker exec superbuilder-c13-3-sqlserver /opt/mssql-tools18/bin/sqlcmd \
+              -C -S localhost -U sa -P "${TEST_SQL_PASSWORD}" -Q "SELECT 1" \
+              -b -o /tmp/sqlserver-ready.txt >/dev/null 2>&1; then
+              echo "SQL Server 已完成协议级 Ready，并通过 sa 身份认证"
+              exit 0
             fi
             sleep 2
           done
-          if ! (echo > /dev/tcp/127.0.0.1/1433) >/dev/null 2>&1; then
-            docker logs superbuilder-c13-3-sqlserver
-            exit 1
-          fi
-      - name: 等待 Qdrant Ready
+          echo "SQL Server 未能在限定时间内完成协议级 Ready"
+          docker exec superbuilder-c13-3-sqlserver /opt/mssql-tools18/bin/sqlcmd \
+            -C -S localhost -U sa -P "${TEST_SQL_PASSWORD}" -Q "SELECT 1" -b || true
+          docker logs superbuilder-c13-3-sqlserver
+          exit 1
+      - name: 等待 Qdrant 协议级 Ready
         run: |
           for i in {1..30}; do
             if curl --fail --silent http://127.0.0.1:6333/healthz >/dev/null 2>&1; then
