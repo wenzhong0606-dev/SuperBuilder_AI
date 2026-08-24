@@ -35,3 +35,80 @@ jobs:
       - name: 输出编译完成信息
         if: success()
         run: echo "SuperBuilder AI Release 编译通过"
+
+  controller-runtime:
+    name: C.13.2 Controller Runtime Smoke
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 检出源码
+        uses: actions/checkout@v4
+
+      - name: 设置 .NET 环境
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: 恢复 NuGet 依赖
+        run: dotnet restore
+
+      - name: 启动 Web API
+        env:
+          ASPNETCORE_ENVIRONMENT: Development
+        run: |
+          dotnet run --project SuperBulider_AI/SuperBuilder_AI.csproj --configuration Release --no-restore --no-build --urls http://127.0.0.1:5050 > /tmp/superbuilder-api.log 2>&1 &
+          echo $! > /tmp/superbuilder-api.pid
+
+      - name: 等待 Controller 启动
+        run: |
+          for i in {1..30}; do
+            if curl --fail --silent --show-error http://127.0.0.1:5050/evaluation/diagnostics/serialization-roundtrip > /tmp/serialization.json; then
+              exit 0
+            fi
+            sleep 2
+          done
+          cat /tmp/superbuilder-api.log
+          exit 1
+
+      - name: Controller Serialization Contract
+        run: |
+          curl --fail --silent --show-error http://127.0.0.1:5050/evaluation/diagnostics/serialization-roundtrip | tee /tmp/serialization.json
+          grep -q '"passed":true' /tmp/serialization.json
+
+      - name: Controller Three-State Contract
+        run: |
+          curl --fail --silent --show-error http://127.0.0.1:5050/evaluation/diagnostics/three-state | tee /tmp/three-state.json
+          grep -q '"missingMetricsIsNull":true' /tmp/three-state.json
+          grep -q '"emptyMetricsIsNotNull":true' /tmp/three-state.json
+
+      - name: Controller Golden Dataset Contract
+        run: |
+          curl --fail --silent --show-error http://127.0.0.1:5050/evaluation/diagnostics/golden-dataset | tee /tmp/golden-dataset.json
+          grep -q '"passed":true' /tmp/golden-dataset.json
+
+      - name: Controller Golden Coverage
+        run: |
+          curl --fail --silent --show-error http://127.0.0.1:5050/evaluation/diagnostics/golden-dataset-coverage | tee /tmp/golden-coverage.json
+          grep -q '"passed":true' /tmp/golden-coverage.json
+
+      - name: Controller Golden Quality
+        run: |
+          curl --fail --silent --show-error http://127.0.0.1:5050/evaluation/diagnostics/golden-dataset-quality | tee /tmp/golden-quality.json
+          grep -q '"passed":true' /tmp/golden-quality.json
+
+      - name: Controller Golden Release Gate
+        run: |
+          curl --fail --silent --show-error http://127.0.0.1:5050/evaluation/diagnostics/golden-dataset-release-gate | tee /tmp/golden-release-gate.json
+          grep -q '"passed":true' /tmp/golden-release-gate.json
+
+      - name: 输出 API 日志
+        if: always()
+        run: cat /tmp/superbuilder-api.log || true
+
+      - name: 停止 Web API
+        if: always()
+        run: |
+          if [ -f /tmp/superbuilder-api.pid ]; then
+            kill $(cat /tmp/superbuilder-api.pid) || true
+          fi
