@@ -33,21 +33,44 @@ public sealed class DimensionResolutionEvidenceService : IDimensionResolutionEvi
         var fact = await _context.MetadataTables.Include(x => x.Columns).AsNoTracking().FirstOrDefaultAsync(x => x.Id == factTableId && x.DataSourceId == factDataSourceId, cancellationToken);
         if (fact?.Columns is null) return null;
 
+        var factColumnIds = fact.Columns.Select(x => x.Id).ToHashSet();
         var factSearch = await _semanticSearchService.SearchAsync(dimensionSemanticText, 20);
-        var factCandidates = factSearch.Where(x => x.IsSemanticVector && x.Table?.Id == fact.Id && x.Column is not null).Where(x => HasDimensionEvidence(x, dimensionSemanticText)).GroupBy(x => x.Column!.Id).Select(g => g.OrderByDescending(x => x.Score).First()).OrderByDescending(x => ScoreFactCandidate(x, dimensionSemanticText)).ToList();
+
+        // D14：以当前 Metadata Snapshot 的 Column.Id 作为事实表物理边界。
+        // 不依赖 SemanticSearchResult.Table.Id 的对象映射，避免同名/重复 Metadata Table
+        // 导致事实表候选被错误过滤为空；仍严格要求候选 Column 属于当前 fact.Columns。
+        var factCandidates = factSearch
+            .Where(x => x.IsSemanticVector && x.Column is not null && factColumnIds.Contains(x.Column.Id))
+            .Where(x => HasDimensionEvidence(x, dimensionSemanticText))
+            .GroupBy(x => x.Column!.Id)
+            .Select(g => g.OrderByDescending(x => x.Score).First())
+            .OrderByDescending(x => ScoreFactCandidate(x, dimensionSemanticText))
+            .ToList();
+
         if (factCandidates.Count == 0) return null;
 
-        var bestFact = preferredColumnId > 0 ? factCandidates.FirstOrDefault(x => x.Column!.Id == preferredColumnId) ?? factCandidates[0] : factCandidates[0];
+        var bestFact = preferredColumnId > 0
+            ? factCandidates.FirstOrDefault(x => x.Column!.Id == preferredColumnId) ?? factCandidates[0]
+            : factCandidates[0];
         var secondFact = factCandidates.Where(x => x.Column!.Id != bestFact.Column!.Id).FirstOrDefault();
         var bestFactScore = ScoreFactCandidate(bestFact, dimensionSemanticText);
         var secondFactScore = secondFact is null ? 0d : ScoreFactCandidate(secondFact, dimensionSemanticText);
         if (secondFact is not null && bestFactScore - secondFactScore <= AmbiguityGap)
             return new DimensionResolutionEvidence { ResolutionType = "Ambiguous", ExecutionCapability = "NotExecutable", FactTableId = fact.Id, FactDataSourceId = fact.DataSourceId, FactKeyColumnId = bestFact.Column!.Id, FactTable = fact.TableName ?? string.Empty, FactKeyColumn = bestFact.Column.ColumnName ?? string.Empty, Score = bestFactScore, Reason = "当前事实表存在多个分差不足的 Dimension Key 候选，禁止猜测。" };
         if (bestFactScore < DirectKeyThreshold)
-            return new DimensionResolutionEvidence { ResolutionType = "NotResolved", ExecutionCapability = "NotExecutable", FactTableId = fact.Id, FactDataSourceId = fact.DataSourceId, FactKeyColumnId = bestFact.Column!.Id, FactTable = fact.TableName ?? string.Empty, FactKeyColumn = bestFact.Column.ColumnName ?? string.Empty, Score = bestFactScore, Reason = "当前事实表没有足够稳定的 Dimension Key Evidence。" };
+            return new DimensionResolutionEvidence { ResolutionType = "NotResolved", ExecutionCapability = "NotExecutable", FactTableId = fact.Id, FactDataSourceId = fact.DataSourceId, FactKeyColumnId = bestFact.Column!.Id, FactTable = fact.TableName ?? string.Empty, FactKeyColumn = bestFact.Column.ColumnName ?? string.Empty, Score = bestFactScore, Reason = "当前 Metadata Snapshot 没有足够稳定的 Dimension Key Evidence。" };
 
         var masterSearch = await _semanticSearchService.SearchAsync(dimensionSemanticText, 20);
-        var masterCandidates = masterSearch.Where(x => x.IsSemanticVector && x.Table is not null && x.Column is not null).Where(x => x.Table!.Id != fact.Id && x.Table.TenantId == fact.TenantId).Where(x => x.Column!.IsPrimaryKey == true).Where(x => HasDimensionEvidence(x, dimensionSemanticText)).GroupBy(x => $"{x.Table!.Id}:{x.Column!.Id}", StringComparer.OrdinalIgnoreCase).Select(g => g.OrderByDescending(x => x.Score).First()).Select(x => new { Candidate = x, Score = ScoreMasterCandidate(x, bestFact.Column!, dimensionSemanticText) }).OrderByDescending(x => x.Score).ToList();
+        var masterCandidates = masterSearch
+            .Where(x => x.IsSemanticVector && x.Table is not null && x.Column is not null)
+            .Where(x => x.Table!.Id != fact.Id && x.Table.TenantId == fact.TenantId)
+            .Where(x => x.Column!.IsPrimaryKey == true)
+            .Where(x => HasDimensionEvidence(x, dimensionSemanticText))
+            .GroupBy(x => $"{x.Table!.Id}:{x.Column!.Id}", StringComparer.OrdinalIgnoreCase)
+            .Select(g => g.OrderByDescending(x => x.Score).First())
+            .Select(x => new { Candidate = x, Score = ScoreMasterCandidate(x, bestFact.Column!, dimensionSemanticText) })
+            .OrderByDescending(x => x.Score)
+            .ToList();
         var bestMaster = masterCandidates.FirstOrDefault();
         var secondMaster = masterCandidates.Skip(1).FirstOrDefault();
 
