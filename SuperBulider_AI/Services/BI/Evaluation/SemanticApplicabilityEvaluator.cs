@@ -1,4 +1,5 @@
 using SuperBuilder_AI.Interfaces;
+using SuperBuilder_AI.Interfaces.BI;
 using SuperBuilder_AI.Models.AI;
 using SuperBuilder_AI.Models.BI;
 using SuperBuilder_AI.Models.BI.Evaluation;
