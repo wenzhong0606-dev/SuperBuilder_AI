@@ -1,6 +1,6 @@
 # SuperBuilder AI Native BI Phase开发计划
 
-> 文档版本：v2.17  
+> 文档版本：v2.18  
 > 文档性质：项目正式开发基线 + Phase 开发测试管理总计划  
 > **唯一源码基线：GitHub `master`**
 
@@ -8,11 +8,11 @@
 
 - 当前 Phase：**Phase 2.7 — DimensionAware QueryPlan**
 - Phase 状态：**IN_PROGRESS**
-- 当前工作单元：**D12 — Contract / DI / Namespace 全量源码审计已冻结**
-- 当前状态：**D12 FROZEN / 功能实现 NOT IMPLEMENTED**
-- 下一步：**D13 — Release Build / 首轮实现前 Build 基线验证**
-- D05-D11：全部 FROZEN
-- 本轮未修改业务源码。
+- 当前工作单元：**D13 — Release Build / 首轮实现前 Build 基线验证已冻结**
+- 当前状态：**D13 FROZEN / 功能实现 NOT IMPLEMENTED**
+- 下一步：**D14 — 首轮源码实现 / Controller / Runtime**
+- D05-D12：全部 FROZEN
+- D13：Build PASS + Startup PASS
 
 ## 二、Phase 2.7 当前冻结链
 
@@ -33,73 +33,103 @@ D11 SQL Builder 双路径              FROZEN
         ↓
 D12 Contract / DI / Namespace       FROZEN
         ↓
-D13 Release Build / 首轮实现前基线   NEXT
+D13 Release Build / 实现前基线       FROZEN
+        ↓
+D14 首轮源码实现 / Runtime           NEXT
 ```
 
-## 三、D12 冻结结论
+## 三、D13 冻结结论
 
-D12 已完成 Model、Interface、Implementation、Caller、Constructor、DI、Namespace、Controller、Golden / Runtime 边界全链路审计，未修改业务源码。
+用户已确认当前 `master` 对应本地代码完成同步后：
 
-当前 master 的核心状态是：新版 D07-D11 Contract 尚未落地，DI 仍绑定旧职责链。`Program.cs` 当前注册 `QueryPlanBuilder`、`IQueryPlanBuilder`、`QueryJoinInferenceService`、`IQueryJoinInferenceService`、`QueryPlanValidator`、`SemanticApplicabilityEvaluator`、`ISqlQueryBuilder/SqlQueryBuilder` 等服务。fileciteturn443file0L2-L6
+- 编译通过；
+- 应用正常启动。
 
-`QueryPlanBuilder` 当前仍依赖 `IMetadataSemanticSearchService`、`IQueryJoinInferenceService`、`QueryPlanValidator`；后续实现必须隔离 JoinInference 的 Executable Join 权限。fileciteturn448file0L2-L5
+因此 D13 的目标——确认首轮实现前当前 master 具备稳定的 Build / Startup 基线——已通过并冻结。
 
-`IQueryPlanBuilder` 已存在，不需要新建平行 Builder；QueryPlanBuilder 使用多个 partial 文件，应沿现有职责边界修改。fileciteturn452file0L2-L5
+**D13 = FROZEN。**
 
-## 四、D12 冻结后的首轮实现边界
+本 STEP 未修改业务源码。D13 冻结只代表 Build / Startup 基线通过，不代表 D07-D12 的功能 Contract 已实现。
+
+## 四、D14 首轮源码实现边界
+
+D14 是 Phase 2.7 首次进入业务源码实现的 STEP。实现必须严格消费 D09-D12 已冻结的范围，不重新设计已冻结 Contract。
 
 ```text
-QueryIntent
-   ↓
-Semantic Applicability / Resolution
-   ├── MasterJoin
-   ├── DirectKey
-   ├── Ambiguous
-   └── NotResolved
-   ↓
-QueryPlan Binding
-   ↓
-SqlQueryBuilder
+Models / Contract
+ ↓
+Interfaces
+ ↓
+Resolution / Factory
+ ↓
+QueryPlan Dimension Binding
+ ↓
+QueryPlanBuilder 旧 JOIN 旁路隔离
+ ↓
+SqlQueryBuilder 双路径
+ ↓
+Validator
+ ↓
+Program.cs DI
+ ↓
+Build
+ ↓
+Controller Runtime
 ```
 
-- Models / Contract：扩展现有 QueryPlan / Dimension Binding Contract，不新建平行模型体系。
-- Interfaces：复用 `IQueryPlanBuilder`、`ISqlQueryBuilder`；Relation Service 只提供 Evidence。
-- Resolution / Factory：形成单一 Resolution 真相源，不重新搜索。
-- QueryPlanBuilder：只装配已确认 Resolution，隔离旧自动 JOIN 旁路。
-- SqlQueryBuilder：只消费 QueryPlan；MasterJoin 才生成 JOIN，DirectKey 永不生成 JOIN。
-- Validator：只验证，不推理。
-- Program.cs：只做必要 DI 注册 / 替换，并保持现有 Scoped 生命周期原则。
-- Namespace：统一 `SuperBuilder_AI.Models.*`、`SuperBuilder_AI.Interfaces.*`、`SuperBuilder_AI.Services.BI.*`、`SuperBuilder_AI.Services.BI.Evaluation.*`。
+首轮实现目标：建立唯一 Resolution 真相源，让 Dimension 能在当前 Metadata Snapshot 下选择：
 
-## 五、D12 禁止修改范围
+```text
+MasterJoin
+DirectKey
+Ambiguous
+NotResolved
+```
 
+并保证：
+
+- MasterJoin 才产生 `QueryPlan.Joins`；
+- DirectKey 永不产生 `QueryJoin`；
+- Builder 不重新 Semantic Search / Relation Inference；
+- SQL Builder 只消费 QueryPlan；
+- Validator 只验证，不推理；
+- 不硬编码业务主表、字段或跨库关系。
+
+如果 D14 实现过程中发现实际 master 与 D09-D12 冻结 Contract 不一致，必须立即停止实现并重新进行对应 Contract 审计，不得临时扩大修改范围。
+
+## 五、D14 禁止修改范围
+
+- 不修改 Golden Dataset。
+- 不修改 GQ-011 Ranking Contract。
+- 不修改 Evaluator / Coverage / Gate 来规避实现问题。
+- 不扩大 DirectKey / MasterJoin 的业务范围。
+- 不硬编码物料、供应商主表或字段。
+- 不跨 DataSource / Tenant Federation。
+- 不新建独立 Test Project。
 - 不新建平行 QueryPlanBuilder / Interface。
-- 不复制 Metadata Semantic Search。
+- 不复制 Metadata Semantic Search Service。
 - 不让 SQL Builder 调用 Resolver。
 - 不让 Builder 自行推理 Relation。
-- 不把 QueryJoinCandidate 当 Executable Join。
+- 不把 QueryJoinCandidate 直接当 Executable Join。
 - 不把 DirectKey 转成 QueryJoin。
-- 不修改 GQ-011、Evaluator、Golden、Coverage、Gate 来掩盖能力缺失。
-- 不跨 DataSource / Tenant Federation。
-- 不硬编码物料 / 供应商主表或字段。
-- 不新建独立 Test Project。
 
-## 六、D12 兼容性 Gate
+## 六、D14 兼容性 Gate
 
-| 范围 | 强制要求 |
+| Case | D14 强制要求 |
 |---|---|
-| GQ-001 | 保持 PASS |
+| GQ-001 | 原 PASS 必须保持 |
 | GQ-002 | EntityCount Contract 不变 |
 | GQ-003/005/009 | Metric / Filter 不漂移 |
-| GQ-006 | 稳定 DirectKey 才执行，无证据仍 BLOCK |
+| GQ-006 | 当前无 Master + 稳定 DirectKey → 可执行；无证据 → BLOCK |
 | GQ-010 | DirectKey 不破坏 Ranking / Order / Limit |
-| **GQ-011** | **完全绕过 Dimension Resolution，继续 PASS** |
+| **GQ-011** | **继续 PASS，完全绕过 Dimension Resolution** |
 | MasterJoin | 仅由 Resolution 产生 QueryPlan.Joins |
 | DirectKey | 不产生 Joins |
-| Ambiguous / NotResolved | BLOCK，不猜测 |
-| 新 Metadata Snapshot | 允许 DirectKey → MasterJoin 重新解析 |
+| Ambiguous | BLOCK，不猜测 |
+| NotResolved | BLOCK，不猜测 |
+| Future Snapshot | 新增主表 / Relation 后允许 DirectKey → MasterJoin 重新解析 |
 
-任何既有 PASS Case 回归，立即停止当前实现验证并先修复兼容性问题。
+任一既有 PASS Case 出现回归，立即停止 D14 当前实现验证，先定位并修复兼容性问题，再继续。
 
 ## 七、项目强制开发规则
 
@@ -148,7 +178,7 @@ Dynamic Resolution
 ## 九、下一步
 
 ```text
-D12 FROZEN
+D13 FROZEN
  ↓
 阶段计划已同步
  ↓
@@ -156,7 +186,7 @@ D12 FROZEN
  ↓
 确认 master
  ↓
-D13 — Release Build / 首轮实现前 Build 基线验证
+D14 — 首轮源码实现 / Controller / Runtime
 ```
 
-D13 仍不得自行扩大 D09-D12 已冻结的源码修改范围。
+D14 不得自行扩大 D09-D13 已冻结的源码修改范围。
