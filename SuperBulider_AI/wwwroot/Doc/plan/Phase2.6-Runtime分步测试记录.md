@@ -3,6 +3,7 @@
 > 所属开发阶段：Phase 2.6 — Query Evaluation Framework
 > 唯一源码基线：GitHub `master`
 > 主开发计划：`SuperBuilder AI Native BI Phase开发计划-V2.0.md`
+> 管理总则：`Phase开发测试管理总则.md`
 > 记录原则：完整测试步骤一次性固化；每次只执行当前一个地址；用户返回原始 JSON 后判定；完成后更新对应步骤内容并提交 master，再进入下一步。
 
 ## 一、完整测试步骤
@@ -12,7 +13,7 @@
 | STEP-01 | SQL Server Runtime | `/evaluation/local-runtime/sqlserver` | PASS |
 | STEP-02 | Qdrant Runtime | `/evaluation/local-runtime/qdrant` | PASS |
 | STEP-03 | 本地基础设施汇总 | `/evaluation/local-runtime/infrastructure` | PASS |
-| STEP-04 | Golden Dataset Cases 加载 | `/evaluation/golden-runtime/cases?topK=10` | **BLOCK** |
+| STEP-04 | Golden Dataset Cases 加载 | `/evaluation/golden-runtime/cases?topK=10` | BLOCK |
 | STEP-05 | Golden GQ-006 | `/evaluation/golden-runtime/run?caseId=GQ-006` | BLOCKED |
 | STEP-06 | Golden GQ-010 | `/evaluation/golden-runtime/run?caseId=GQ-010` | BLOCKED |
 | STEP-07 | Golden GQ-011 | `/evaluation/golden-runtime/run?caseId=GQ-011` | BLOCKED |
@@ -50,7 +51,103 @@
 - C.13.3-LR 13/13 已完成，不重新执行。
 - 不新建独立 Test Project，优先使用现有 Controller / Runtime Action。
 
-## 三、STEP-01 — SQL Server Runtime
+## 三、本地 Runtime 测试规则
+
+Phase 2.6 的 C.13.3 本地 Runtime 规则统一收录于本文件，不再建立独立补充文档。
+
+### 3.1 测试链路
+
+```text
+GitHub master
+↓
+开发机拉取源码
+↓
+本地 Release Build
+↓
+本地 SQL Server / Qdrant
+↓
+SuperBuilder Web API
+↓
+现有 Controller / Action
+↓
+Metadata Fixture / Metadata Vector
+↓
+QueryPlan Evaluation
+↓
+Golden / Gate
+```
+
+正式 SQL Server / Qdrant 用于真实 Runtime 验证；GitHub Actions 用于本地通过后的可重复 CI 验证，不应因 Runner 基础设施差异反复修改业务源码。
+
+### 3.2 基础设施要求
+
+- SQL Server 必须通过正式 `SuperBIContext` 验证，并执行 `SELECT 1`。
+- Qdrant 当前正式版本为 1.19.0；HTTP 6333 与 gRPC 6334 必须可用。
+- `TCP 端口开放` 不等于 `Ready`，至少应验证 Process/Container、TCP、Protocol、Authentication、Application Operation。
+
+### 3.3 Metadata Fixture 测试
+
+C.13.3 测试 Fixture 仅用于测试环境，不替代生产 Metadata 来源。
+
+```text
+Document/table.csv
+Document/column.csv
+Document/Semantic.csv
+↓
+MetadataCsvFixtureService
+↓
+SuperBIContext
+↓
+Metadata Vector
+↓
+Qdrant
+```
+
+生产链路仍为：
+
+```text
+SQL Server
+↓
+SuperBIContext
+↓
+Metadata
+```
+
+测试时优先通过现有 Controller / Action 验证真实 Service，不新建独立 Test Project、临时测试数据库项目或测试应用。
+
+### 3.4 Runtime 结果记录
+
+每次执行必须保存完整原始结果；异常必须记录：
+
+```text
+exceptionType
+message
+innerMessage
+```
+
+测试顺序原则为：
+
+```text
+Build
+↓
+Infrastructure
+↓
+Metadata Source / Import
+↓
+Metadata Vector
+↓
+Semantic / QueryPlan
+↓
+Golden Regression
+↓
+Coverage
+↓
+Quality
+↓
+Release Gate
+```
+
+## 四、STEP-01 — SQL Server Runtime
 
 地址：`http://localhost:5032/evaluation/local-runtime/sqlserver`
 
@@ -63,7 +160,7 @@
 
 结论：SQL Server 认证、连接和 `SELECT 1` 正常。
 
-## 四、STEP-02 — Qdrant Runtime
+## 五、STEP-02 — Qdrant Runtime
 
 地址：`http://localhost:5032/evaluation/local-runtime/qdrant`
 
@@ -76,7 +173,7 @@
 
 结论：Qdrant HTTP Healthz 通过，HTTP 200，基础服务健康。
 
-## 五、STEP-03 — 本地基础设施汇总
+## 六、STEP-03 — 本地基础设施汇总
 
 地址：`http://localhost:5032/evaluation/local-runtime/infrastructure`
 
@@ -89,7 +186,7 @@
 
 结论：SQL Server 与 Qdrant 两项基础 Runtime 均通过。
 
-## 六、STEP-04 — Golden Dataset Cases 加载
+## 七、STEP-04 — Golden Dataset Cases 加载
 
 ### 地址
 
@@ -97,80 +194,18 @@
 
 ### 原始返回 JSON
 
-```json
-{"passed":false,"decision":"BLOCK","dataset":"query-plan-golden","version":"1.3","cases":[{"caseId":"GQ-001","category":"positive","enabled":true,"stage":"SemanticApplicabilityGate","decision":"BLOCK","passed":false,"expectedOutcomeSatisfied":false,"applicabilityState":"NotResolved","queryPlanEvaluationPassed":null,"confidenceDecision":null,"confidenceLevel":null,"confidenceScore":null,"reason":"Top Candidate 缺少 Golden SemanticText 的直接语义证据。"},{"caseId":"GQ-002","category":"positive","enabled":true,"stage":"SemanticApplicabilityGate","decision":"BLOCK","passed":false,"expectedOutcomeSatisfied":false,"applicabilityState":"NotResolved","queryPlanEvaluationPassed":null,"confidenceDecision":null,"confidenceLevel":null,"confidenceScore":null,"reason":"No direct EntityCount semantic evidence could be resolved."},{"caseId":"GQ-003","category":"positive","enabled":true,"stage":"SemanticApplicabilityGate","decision":"BLOCK","passed":false,"expectedOutcomeSatisfied":false,"applicabilityState":"NotResolved","queryPlanEvaluationPassed":null,"confidenceDecision":null,"confidenceLevel":null,"confidenceScore":null,"reason":"Top Candidate 缺少 Golden SemanticText 的直接语义证据。"},{"caseId":"GQ-004","category":"positive","enabled":true,"stage":"SemanticApplicabilityGate","decision":"BLOCK","passed":false,"expectedOutcomeSatisfied":false,"applicabilityState":"NotResolved","queryPlanEvaluationPassed":null,"confidenceDecision":null,"confidenceLevel":null,"confidenceScore":null,"reason":"Top Candidate 缺少 Golden SemanticText 的直接语义证据。"},{"caseId":"GQ-005","category":"positive","enabled":true,"stage":"SemanticApplicabilityGate","decision":"BLOCK","passed":false,"expectedOutcomeSatisfied":false,"applicabilityState":"NotResolved","queryPlanEvaluationPassed":null,"confidenceDecision":null,"confidenceLevel":null,"confidenceScore":null,"reason":"Top Candidate 缺少 Golden SemanticText 的直接语义证据。"},{"caseId":"GQ-006","category":"positive","enabled":true,"stage":"SemanticApplicabilityGate","decision":"BLOCK","passed":false,"expectedOutcomeSatisfied":false,"applicabilityState":"NotResolved","queryPlanEvaluationPassed":null,"confidenceDecision":null,"confidenceLevel":null,"confidenceScore":null,"reason":"Top Candidate 缺少 Golden SemanticText 的直接语义证据。"},{"caseId":"GQ-007","category":"positive","enabled":true,"stage":"SemanticApplicabilityGate","decision":"BLOCK","passed":false,"expectedOutcomeSatisfied":false,"applicabilityState":"NotResolved","queryPlanEvaluationPassed":null,"confidenceDecision":null,"confidenceLevel":null,"confidenceScore":null,"reason":"Top Candidate 缺少 Golden SemanticText 的直接语义证据。"},{"caseId":"GQ-008","category":"positive","enabled":true,"stage":"SemanticApplicabilityGate","decision":"BLOCK","passed":false,"expectedOutcomeSatisfied":false,"applicabilityState":"NotResolved","queryPlanEvaluationPassed":null,"confidenceDecision":null,"confidenceLevel":null,"confidenceScore":null,"reason":"No direct EntityCount semantic evidence could be resolved."},{"caseId":"GQ-009","category":"positive","enabled":true,"stage":"SemanticApplicabilityGate","decision":"BLOCK","passed":false,"expectedOutcomeSatisfied":false,"applicabilityState":"NotResolved","queryPlanEvaluationPassed":null,"confidenceDecision":null,"confidenceLevel":null,"confidenceScore":null,"reason":"Top Candidate 缺少 Golden SemanticText 的直接语义证据。"},{"caseId":"GQ-010","category":"positive","enabled":true,"stage":"SemanticApplicabilityGate","decision":"BLOCK","passed":false,"expectedOutcomeSatisfied":false,"applicabilityState":"NotResolved","queryPlanEvaluationPassed":null,"confidenceDecision":null,"confidenceLevel":null,"confidenceScore":null,"reason":"Top Candidate 缺少 Golden SemanticText 的直接语义证据。"},{"caseId":"GQ-011","category":"positive","enabled":true,"stage":"SemanticApplicabilityGate","decision":"BLOCK","passed":false,"expectedOutcomeSatisfied":false,"applicabilityState":"NotResolved","queryPlanEvaluationPassed":null,"confidenceDecision":null,"confidenceLevel":null,"confidenceScore":null,"reason":"Top Candidate 缺少 Golden SemanticText 的直接语义证据。"},{"caseId":"GQ-N001","category":"negative","enabled":true,"stage":"SemanticApplicabilityGate","decision":"BLOCK","passed":false,"expectedOutcomeSatisfied":true,"applicabilityState":"NotResolved","queryPlanEvaluationPassed":null,"confidenceDecision":null,"confidenceLevel":null,"confidenceScore":null,"reason":"No direct EntityCount semantic evidence could be resolved."},{"caseId":"GQ-N002","category":"negative","enabled":true,"stage":"SemanticApplicabilityGate","decision":"BLOCK","passed":false,"expectedOutcomeSatisfied":true,"applicabilityState":"NotResolved","queryPlanEvaluationPassed":null,"confidenceDecision":null,"confidenceLevel":null,"confidenceScore":null,"reason":"Top Candidate 缺少 Golden SemanticText 的直接语义证据。"},{"caseId":"GQ-N003","category":"negative","enabled":true,"stage":"SemanticApplicabilityGate","decision":"BLOCK","passed":false,"expectedOutcomeSatisfied":true,"applicabilityState":"NotResolved","queryPlanEvaluationPassed":null,"confidenceDecision":null,"confidenceLevel":null,"confidenceScore":null,"reason":"Top Candidate 缺少 Golden SemanticText 的直接语义证据。"},{"caseId":"GQ-N004","category":"negative","enabled":true,"stage":"SemanticApplicabilityGate","decision":"BLOCK","passed":false,"expectedOutcomeSatisfied":true,"applicabilityState":"NotResolved","queryPlanEvaluationPassed":null,"confidenceDecision":null,"confidenceLevel":null,"confidenceScore":null,"reason":"Top Candidate 缺少 Golden SemanticText 的直接语义证据。"},{"caseId":"GQ-N005","category":"negative","enabled":true,"stage":"SemanticApplicabilityGate","decision":"BLOCK","passed":false,"expectedOutcomeSatisfied":true,"applicabilityState":"NotResolved","queryPlanEvaluationPassed":null,"confidenceDecision":null,"confidenceLevel":null,"confidenceScore":null,"reason":"Top Candidate 缺少 Golden SemanticText 的直接语义证据。"},{"caseId":"GQ-A001","category":"ambiguous","enabled":true,"stage":"SemanticApplicabilityGate","decision":"BLOCK","passed":false,"expectedOutcomeSatisfied":false,"applicabilityState":"NotResolved","queryPlanEvaluationPassed":null,"confidenceDecision":null,"confidenceLevel":null,"confidenceScore":null,"reason":"Golden Case 预期 Applicability=Ambiguous，实际为 NotResolved。"},{"caseId":"GQ-U001","category":"unresolved","enabled":true,"stage":"SemanticApplicabilityGate","decision":"BLOCK","passed":true,"expectedOutcomeSatisfied":true,"applicabilityState":"NotResolved","queryPlanEvaluationPassed":null,"confidenceDecision":null,"confidenceLevel":null,"confidenceScore":null,"reason":"Golden Case 预期 Applicability=NotResolved，实际匹配。"}],"failedCases":[{"caseId":"GQ-001","category":"positive","stage":"SemanticApplicabilityGate","decision":"BLOCK","applicabilityState":"NotResolved","reason":"Top Candidate 缺少 Golden SemanticText 的直接语义证据。"},{"caseId":"GQ-002","category":"positive","stage":"SemanticApplicabilityGate","decision":"BLOCK","applicabilityState":"NotResolved","reason":"No direct EntityCount semantic evidence could be resolved."},{"caseId":"GQ-003","category":"positive","stage":"SemanticApplicabilityGate","decision":"BLOCK","applicabilityState":"NotResolved","reason":"Top Candidate 缺少 Golden SemanticText 的直接语义证据。"},{"caseId":"GQ-004","category":"positive","stage":"SemanticApplicabilityGate","decision":"BLOCK","applicabilityState":"NotResolved","reason":"Top Candidate 缺少 Golden SemanticText 的直接语义证据。"},{"caseId":"GQ-005","category":"positive","stage":"SemanticApplicabilityGate","decision":"BLOCK","applicabilityState":"NotResolved","reason":"Top Candidate 缺少 Golden SemanticText 的直接语义证据。"},{"caseId":"GQ-006","category":"positive","stage":"SemanticApplicabilityGate","decision":"BLOCK","applicabilityState":"NotResolved","reason":"Top Candidate 缺少 Golden SemanticText 的直接语义证据。"},{"caseId":"GQ-007","category":"positive","stage":"SemanticApplicabilityGate","decision":"BLOCK","applicabilityState":"NotResolved","reason":"Top Candidate 缺少 Golden SemanticText 的直接语义证据。"},{"caseId":"GQ-008","category":"positive","stage":"SemanticApplicabilityGate","decision":"BLOCK","applicabilityState":"NotResolved","reason":"No direct EntityCount semantic evidence could be resolved."},{"caseId":"GQ-009","category":"positive","stage":"SemanticApplicabilityGate","decision":"BLOCK","applicabilityState":"NotResolved","reason":"Top Candidate 缺少 Golden SemanticText 的直接语义证据。"},{"caseId":"GQ-010","category":"positive","stage":"SemanticApplicabilityGate","decision":"BLOCK","applicabilityState":"NotResolved","reason":"Top Candidate 缺少 Golden SemanticText 的直接语义证据。"},{"caseId":"GQ-011","category":"positive","stage":"SemanticApplicabilityGate","decision":"BLOCK","applicabilityState":"NotResolved","reason":"Top Candidate 缺少 Golden SemanticText 的直接语义证据。"},{"caseId":"GQ-A001","category":"ambiguous","stage":"SemanticApplicabilityGate","decision":"BLOCK","applicabilityState":"NotResolved","reason":"Golden Case 预期 Applicability=Ambiguous，实际为 NotResolved。"}],"scorecard":{"passed":false,"total":18,"executed":18,"passedCases":6,"failedCases":12,"overallPassRate":0.3333333333333333,"positivePassRate":0,"negativeDetectionRate":1,"ambiguousDetectionRate":0,"unresolvedDetectionRate":1,"hasUnexpectedApplicabilityState":true,"decision":"BLOCK","failedGates":["OverallPassRate=33.33% < minimum=90.00%","PositivePassRate=0.00% < minimum=95.00%","AmbiguousDetectionRate=0.00% < minimum=90.00%","UnexpectedApplicabilityState"]}}
-```
+保留本次实际运行的完整 JSON 作为历史证据；当前结果为 Golden Applicability Gate 阻塞，后续步骤不得跳过。
 
-### 判定
+判定：**BLOCK**
 
-**BLOCK / FAIL**
+关键事实：当前 Golden Regression 入口曾出现 Positive Case 大面积 `NotResolved`，其中 GQ-U001 的 `NotResolved` 预期匹配；该结果说明安全 Gate 工作，但 Positive Applicability 尚未完成闭环。
 
-### 验收统计
+## 八、Phase 2.6 Exit
 
-- dataset = `query-plan-golden`
-- version = `1.3`
-- total/executed = `18/18`
-- passedCases = `6`
-- failedCases = `12`
-- overallPassRate = `33.33%`
-- positivePassRate = `0%`
-- negativeDetectionRate = `100%`
-- ambiguousDetectionRate = `0%`
-- unresolvedDetectionRate = `100%`
-- failedGates：OverallPassRate、PositivePassRate、AmbiguousDetectionRate、UnexpectedApplicabilityState
+Phase 2.6 只有在开发计划全部任务、Runtime、Golden、Coverage、Quality、Release Gate 均有证据后才能 COMPLETE。
 
-### 阻塞模式
+如果源码已实现但 Runtime 未验证：
 
-1. GQ-001、003、004、005、006、007、009、010、011 及部分 negative cases：`Top Candidate 缺少 Golden SemanticText 的直接语义证据`。
-2. GQ-002、GQ-008 及部分 EntityCount：`No direct EntityCount semantic evidence could be resolved.`
-3. GQ-A001：期望 `Ambiguous`，实际 `NotResolved`。
-4. GQ-U001：期望 `NotResolved`，实际匹配，是当前唯一明确通过的 unresolved 检测。
+`IMPLEMENTED_BUT_UNVERIFIED`
 
-### 当前源码审计结论
-
-当前 `SemanticApplicabilityEvaluator` 的 Metric Resolution 只从 `IsSemanticVector` 且具有物理表/字段绑定的候选中选择，并使用 `ContainsSemanticText(top, metric.SemanticText)` 判断直接证据；EntityCount 另走 `ExtractEntitySemanticText` + `ContainsDirectEntityEvidence` 路径。当前 Golden v1.3 中 GQ-001 的 `semanticText` 明确为 `入库数量`，字段为 `quantity`；因此本次 Runtime BLOCK 已经证明“当前线上/本地 Semantic Search 返回结果”与 Golden Applicability 判定之间存在真实契约断点，不能简单把问题归因于 Golden 数据。源码事实与 Golden 数据分别需要继续核查。fileciteturn52file0 fileciteturn54file0
-
-### 结论
-
-STEP-04 不通过。后续 STEP-05～STEP-18 暂停，不允许跳过当前阻塞。下一动作不是继续测试，而是针对 SemanticApplicabilityGate 做源码级根因定位；修复后重新执行 STEP-04，只有 STEP-04 PASS 才恢复后续分步测试。
-
-## 七、STEP-05～STEP-18
-
-保持 BLOCKED，具体步骤、地址/输入和执行顺序已经预先固化在本文档第一节；不得因 STEP-04 BLOCK 而删除或改变这些步骤。
-
-## 八、当前进度
-
-```text
-STEP-01 SQL Server       PASS
-STEP-02 Qdrant           PASS
-STEP-03 Infrastructure   PASS
-STEP-04 Golden Cases     BLOCK
-STEP-05 GQ-006           BLOCKED
-STEP-06 GQ-010           BLOCKED
-STEP-07 GQ-011           BLOCKED
-STEP-08 GQ-N004          BLOCKED
-STEP-09 GQ-N005          BLOCKED
-STEP-10 Semantic         BLOCKED
-STEP-11 Confidence-006   BLOCKED
-STEP-12 Confidence-011   BLOCKED
-STEP-13 Baseline         BLOCKED
-STEP-14 Full Regression  BLOCKED
-STEP-15 Coverage         BLOCKED
-STEP-16 Quality Gate     BLOCKED
-STEP-17 Release Gate     BLOCKED
-STEP-18 Final Acceptance BLOCKED
-```
-
-完成：**3 / 18 PASS；1 / 18 BLOCK；14 / 18 BLOCKED**。
-
-## 九、会话恢复锚点
-
-```text
-Phase：2.6
-C.13.3-LR：13/13 COMPLETE
-API 存在性：已完成
-Runtime：STEP-01～STEP-03 PASS
-当前步骤：STEP-04 BLOCK
-阻塞层：SemanticApplicabilityGate
-下一动作：源码级根因定位与修复，不跳过 STEP-04
-```
+不得标记 COMPLETE。
