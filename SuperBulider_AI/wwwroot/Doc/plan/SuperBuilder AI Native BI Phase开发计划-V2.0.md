@@ -1,6 +1,6 @@
 # SuperBuilder AI Native BI Phase开发计划
 
-> 文档版本：v2.10
+> 文档版本：v2.11
 > 文档性质：项目正式开发基线 + Phase 开发测试管理总计划
 > **唯一源码基线：GitHub `master`**
 > 主计划职责：**仅记录项目当前进度、当前工作单元、当前 STEP、状态、Commit、阻塞与下一步**
@@ -46,6 +46,8 @@
 34. **D05 审计结论：Dimension Entity Key Resolver 已冻结。** D05 只负责从当前有效 Metadata Snapshot 产生 Entity Key Evidence，不负责 JOIN、QueryPlan、SQL、Ranking、Evaluator、Metadata 扫描、Semantic 生成或 Vector 生成。
 35. **Metadata Lifecycle 为独立后续任务。** 当前 `MetadataScannerService` 已确认具备 DataSource → 数据库结构扫描 → MetadataTable/MetadataColumn → SearchText → AI Semantic → Vector 基础链路，但当前主要是新增/更新/缺失补齐型同步，尚未形成完整 Snapshot Reconciliation、Stale Metadata Invalidation、Semantic Refresh、Vector Refresh Contract；不得将该问题临时塞入 D05 Resolver。
 36. **D05 冻结后必须先更新阶段计划、同步主计划并确认 master，才能进入 D06。**
+37. **D06 审计结论：Dynamic Master Table / Relation Detection 已冻结。** `QueryJoinInferenceService` 保留为 Relation Evidence Provider；新增 Dynamic Relation Resolution 层；QueryPlanBuilder 只消费已解析 Relation；SqlQueryBuilder 只消费 QueryPlan.Joins 并负责 JOIN SQL 落地；Relation Resolution 与 Executable SQL Join 必须分离；Phase 2.7 不实现跨独立 DataSource Federation；无 Dimension 的既有正确 Case（包括 GQ-011）保持原路径。
+38. **D06 冻结后的强制入口：** 必须先更新 Phase 2.7 阶段计划、同步本主计划、确认 GitHub `master` 文档一致，才能进入 D07；D07 必须以 D05 Entity Key Contract + D06 Dynamic Relation Contract 为正式输入。
 
 ---
 
@@ -110,8 +112,8 @@
 - Runtime / Build / Gate 结果变化
 - 下一 STEP 变化
 - Exit Criteria 变化
-- **项目长期产品目标或平台级架构约束变化**
-- **Metadata Lifecycle / Snapshot / Semantic Refresh / Vector Refresh 等平台级 Contract 变化**
+- 项目长期产品目标或平台级架构约束变化
+- Metadata Lifecycle / Snapshot / Semantic Refresh / Vector Refresh 等平台级 Contract 变化
 
 若阶段计划已更新而主计划未同步，则当前 STEP **不得继续**。
 
@@ -127,11 +129,13 @@
 
 **当前状态：IN_PROGRESS**
 
-**当前工作单元：D06 — Dynamic Master Table / Relation Detection 全量源码 / Contract 审计**
+**当前工作单元：D07 — Dynamic Dimension Resolution 全量源码 / Contract 审计**
 
 **D05：FROZEN**
 
-D05 冻结依据：当前 master 已完成 Dimension Entity Key Resolver 责任链审计，并确认 D05 与 Metadata Scanner、Semantic、Vector、Relation、QueryPlan、SQL Builder 的职责边界。D05 不承担 JOIN 推理；Dynamic Metadata Lifecycle 缺口作为独立后续任务记录。
+**D06：FROZEN**
+
+D06 冻结摘要：当前 `QueryJoinInferenceService` 定位为 Relation Evidence Provider，不承担平台级最终 Relation Resolution；新增 Dynamic Relation Resolution Contract；QueryPlanBuilder 只消费已解析 Relation；SqlQueryBuilder 负责 QueryPlan.Joins 的 SQL 落地；Relation 与 Executable SQL Join 分离；跨独立 DataSource Federation 不纳入 Phase 2.7；无 Dimension 的既有正确 Case（包括 GQ-011）保持原路径。
 
 ### 当前已确认 Runtime 基线
 
@@ -163,8 +167,20 @@ BLOCK
 
 禁止通过修改 Evaluator、Golden、Ranking Contract 或业务硬编码消除 BLOCK。
 
+### D06 冻结后的正式入口
+
+D06 已完成全量源码 / Contract 审计并冻结，阶段计划已同步更新，主计划已同步更新；因此满足进入 D07 的文档 Gate。
+
 ### 下一步
 
-**D06 — Dynamic Master Table / Relation Detection 全量源码 / Contract 审计。**
+**D07 — Dynamic Dimension Resolution 全量源码 / Contract 审计。**
 
-D06 仍遵循：完整源码审计 → 最终结论 → 冻结 → 更新阶段计划 → 同步主计划 → 确认 GitHub `master` → 才能进入 D07。
+D07 必须严格执行：完整源码 / Contract 审计 → 一次性形成最终修改范围 → 冻结 → 更新阶段计划 → 同步主计划 → 确认 GitHub `master` → 才允许进入下一 STEP。
+
+---
+
+# 四、Phase 2.7 当前关联文档
+
+- Phase 2.7 开发测试计划：`SuperBulider_AI/wwwroot/Doc/plan/Phase 2.7 开发测试计划.md`
+- 主开发计划：本文件
+- D06 冻结提交：`2e41eb6cf96a3604e51a0bade77c269fd3aec051`
