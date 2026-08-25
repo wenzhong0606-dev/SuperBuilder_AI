@@ -200,6 +200,134 @@ dotnet build
 
 不得跳步、降低 Gate、删除失败 Case 或硬编码业务答案制造 PASS。
 
+## 8.1 全链路源码审计后再修改规则（新增正式规则）
+
+所有涉及已有 Contract、QueryPlan、Semantic Resolution、Ranking、Evaluation、Runtime、Controller、DI 或跨文件调用链的修复，必须遵守：
+
+```text
+锁定 master
+↓
+完整读取相关调用链
+↓
+完整读取相关 Model / DTO / Contract
+↓
+完整读取 Producer / Mapper / Consumer
+↓
+完整读取 Controller / Action / Runtime 调用方
+↓
+完整读取 DI / Constructor Dependency
+↓
+完整读取 Golden / Evaluator / Regression 影响面
+↓
+形成字段级数据流与调用链
+↓
+闭合根因
+↓
+一次性冻结唯一修改范围
+↓
+才允许修改源码
+```
+
+禁止在完整审计完成前根据单个文件、单个类名或局部现象提前确定修改点。
+
+禁止出现：
+
+```text
+边读源码
+↓
+先改 A
+↓
+发现不对
+↓
+改 B
+↓
+再改 C
+```
+
+如果完整审计后发现原先判断错误，必须明确废弃旧判断，重新基于 `master` 全链路源码形成唯一方案后再修改。
+
+## 8.2 单 Case 修复的全 GQ 兼容性规则（新增正式规则）
+
+任何针对单个 `GQ-***` Case 的修复，禁止只验证该 Case PASS 后即认为修复完成。
+
+必须首先识别该 Contract 所覆盖的全部相关 Golden Case，并建立兼容性影响矩阵：
+
+```text
+目标 Case
+↓
+同 Contract / 同字段 / 同执行路径 Case
+↓
+已有正确 Positive Case
+↓
+Ranking / DetailRanking / AggregateRanking 相关 Case
+↓
+Negative / Ambiguous / Unresolved Safety Case
+↓
+全 Golden Regression
+```
+
+修复验收必须同时证明：
+
+1. 目标 Case 达到预期 Contract；
+2. 已经正确的 GQ-*** 不出现回归；
+3. 同一 Contract 的其他 Positive Case 不被破坏；
+4. Negative Case 仍保持预期的 FAIL / BLOCK / Safety 行为；
+5. Ambiguous / NotResolved Case 不因修复被错误放行；
+6. 不通过修改 Coverage Analyzer、Gate、Golden Expected 或删除 Case 制造 PASS。
+
+对于 Ranking 修复，至少必须覆盖：
+
+```text
+GQ-006
+GQ-010
+GQ-011
+GQ-N004
+GQ-N005
+```
+
+以及当前 Golden Dataset 中所有新增或后续发现的 Ranking / DetailRanking / AggregateRanking Case。
+
+## 8.3 兼容性风险必须先报告
+
+如果源码审计无法证明某项修改对其他正确 GQ-*** 无副作用，或者发现存在以下情况之一：
+
+- Contract 行为改变会影响多个既有 Case；
+- 公共 Model / Interface / Factory 签名变化存在未审计调用方；
+- Ranking 修复可能改变非 Ranking QueryPlan；
+- Semantic Resolution 修改可能改变已有 Metric / Dimension / Filter Resolution；
+- Controller / Runtime 与内部调用链存在不同 Contract；
+- Golden Regression 结果出现无法解释的回归；
+
+必须先将风险标记为 `COMPATIBILITY_RISK`，明确告知当前风险与受影响范围，**在风险未闭合前不得直接宣布修复完成**。
+
+## 8.4 修复后的验证顺序
+
+目标 Case 修复完成后，固定执行：
+
+```text
+源码重新读取
+↓
+Static Contract / Namespace / DI 检查
+↓
+Build
+↓
+目标 Case Runtime
+↓
+同 Contract Positive Regression
+↓
+Negative / Ambiguous / Unresolved Safety Regression
+↓
+Full Golden Regression
+↓
+Coverage
+↓
+Quality
+↓
+Release Gate
+```
+
+任何一层出现 FAIL / BLOCK / REVIEW，都必须停止后续依赖步骤并回到根因审计。
+
 ## 9. Golden / Regression 规则
 
 Golden Dataset 是测试契约，不是为了通过测试而修改的目标。
@@ -276,7 +404,7 @@ AND 主开发计划同步
 
 1. 主开发计划；
 2. 当前 Phase 开发测试计划；
-3. 当前 Phase Runtime 分步测试记录；
+3. 当前 Phase Runtime 测试记录；
 4. 最近源码 Commit；
 5. 当前 FAIL / BLOCK / REVIEW。
 
