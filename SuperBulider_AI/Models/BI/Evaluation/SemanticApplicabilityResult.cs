@@ -34,7 +34,23 @@ public class SemanticApplicabilityMetricResolution : SemanticApplicabilityResolu
 }
 
 public sealed class SemanticApplicabilityFilterResolution : SemanticApplicabilityMetricResolution { }
-public sealed class SemanticApplicabilityDimensionResolution : SemanticApplicabilityMetricResolution { }
+
+public sealed class SemanticApplicabilityDimensionResolution : SemanticApplicabilityMetricResolution
+{
+    /// <summary>Resolution strategy: MasterJoin / DirectKey / Ambiguous / NotResolved.</summary>
+    public string ResolutionType { get; init; } = "NotResolved";
+
+    /// <summary>Whether the evidence is executable by the QueryPlan layer.</summary>
+    public string ExecutionCapability { get; init; } = "NotExecutable";
+
+    /// <summary>Fact-side dimension key selected by the evidence resolver.</summary>
+    public long? DimensionKeyColumnId { get; init; }
+    public string? DimensionKeyColumn { get; init; }
+
+    /// <summary>Optional master-side display/label column for MasterJoin.</summary>
+    public long? DimensionLabelColumnId { get; init; }
+    public string? DimensionLabelColumn { get; init; }
+}
 
 public sealed class SemanticApplicabilityTableResolution
 {
