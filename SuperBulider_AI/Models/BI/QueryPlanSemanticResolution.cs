@@ -48,26 +48,10 @@ public sealed class QueryPlanDimensionResolution
     public string Column { get; init; } = string.Empty;
     public string? BusinessMeaning { get; init; }
     public double? Score { get; init; }
-
-    /// <summary>
-    /// 当前 Metadata Snapshot 下的 Dimension 执行路径。
-    /// </summary>
-    public DimensionResolutionType ResolutionType { get; init; } = DimensionResolutionType.NotResolved;
-
-    /// <summary>
-    /// Resolution 是否已经形成可执行绑定。
-    /// </summary>
-    public DimensionExecutionCapability ExecutionCapability { get; init; } = DimensionExecutionCapability.NotExecutable;
-
-    /// <summary>
-    /// DirectKey 模式下事实表中的稳定 Key。
-    /// </summary>
+    public string ResolutionType { get; init; } = "NotResolved";
+    public string ExecutionCapability { get; init; } = "NotExecutable";
     public long? DimensionKeyColumnId { get; init; }
     public string? DimensionKeyColumn { get; init; }
-
-    /// <summary>
-    /// DirectKey 模式下可直接展示 / GROUP BY 的 Label，可为空。
-    /// </summary>
     public long? DimensionLabelColumnId { get; init; }
     public string? DimensionLabelColumn { get; init; }
 }
