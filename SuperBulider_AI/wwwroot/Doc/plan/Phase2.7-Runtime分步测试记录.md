@@ -108,7 +108,79 @@ NotResolved → BLOCK
 
 不能为了提高 Positive Pass Rate 而将 Ambiguous / NotResolved 强制改为 Resolved。
 
-## 四、每个 STEP 的记录模板
+### D. 兼容性规则（2026-08-25 新增冻结）
+
+```text
+已有正确 MasterJoin
+        ↓
+增加 DirectKey
+        ↓
+不得改变既有 MasterJoin 行为
+
+无主表 + 稳定 Fact Dimension Key / Label
+        ↓
+DirectKey
+        ↓
+不得因“没有主表”直接 BLOCK
+
+无主表 + 无稳定 DirectKey
+        ↓
+NotResolved
+        ↓
+BLOCK
+
+多候选无法消歧
+        ↓
+Ambiguous
+        ↓
+REVIEW / BLOCK
+```
+
+GQ-006 当前因“物料”不存在独立主表而 `NotResolved` 的 Runtime 结果，归档为该新 Contract 尚未实现的能力缺口，不归因于 GQ-011 Ranking Order Resolution 修复；在 GQ-011 修复验证期间不得通过修改 Ranking Contract 绕过该问题。
+
+## 四、当前 Phase 2.6 兼容性验证记录
+
+### Runtime-01 — GQ-011 Ranking Order Resolution
+
+状态：**PASS**
+
+关键事实：
+
+- `IsRanking=true`；
+- `IsDetailRanking=true`；
+- `Limit=10`；
+- `Orders.Count=1`；
+- Order 使用 `columnId=6054 / quantity`，与 Metric Resolution 完全一致；
+- `Direction=DESC`；
+- `Aggregation=NONE`；
+- QueryShape `Orders Expected=1 / Actual=1`；
+- Overall Evaluation Score = 100。
+
+结论：GQ-011 原始 `Orders.Count=0` 根因已闭合，Ranking Order Resolution 修复有效。
+
+### Runtime-02 — GQ-006 Aggregate Ranking 兼容性
+
+状态：**BLOCK / Compatibility Finding**
+
+原始 Runtime：
+
+```json
+{
+  "caseId": "GQ-006",
+  "decision": "BLOCK",
+  "blocking": true,
+  "applicabilityState": "NotResolved",
+  "reason": "Dimension 语义“物料”无法解析为稳定的 Metadata 物理绑定。"
+}
+```
+
+归因：当前 Metadata 中不存在独立“物料”主表；旧 Dimension Resolution 逻辑在缺少主表时直接 `NotResolved`。根据 2026-08-25 新冻结 Contract，正确目标应是：继续检查事实表是否存在稳定 `material_id/material_name/material_code` 等 DirectKey / Label；存在则走 `DirectKey`，不产生 JOIN；不存在才保持 `NotResolved`。
+
+该 BLOCK **不归因于 GQ-011 Ranking Order Resolution 修复**，也不允许通过修改 GQ-011 修复代码消除。
+
+因此 GQ-006 后续进入 Phase 2.7 `STEP-D16 / Runtime STEP-06 DirectKey Resolution` 的正式验证范围。
+
+## 五、每个 STEP 的记录模板
 
 ### STEP-XX — <名称>
 
@@ -138,7 +210,7 @@ Commit：
 
 - 待执行
 
-## 五、阶段 Exit
+## 六、阶段 Exit
 
 STEP-01~18 全部完成后，执行 STEP-19。
 
