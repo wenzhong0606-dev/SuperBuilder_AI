@@ -37,19 +37,19 @@ public sealed class SemanticApplicabilityFilterResolution : SemanticApplicabilit
 
 public sealed class SemanticApplicabilityDimensionResolution : SemanticApplicabilityMetricResolution
 {
-    /// <summary>Resolution strategy: MasterJoin / DirectKey / Ambiguous / NotResolved.</summary>
     public string ResolutionType { get; init; } = "NotResolved";
-
-    /// <summary>Whether the evidence is executable by the QueryPlan layer.</summary>
     public string ExecutionCapability { get; init; } = "NotExecutable";
-
-    /// <summary>Fact-side dimension key selected by the evidence resolver.</summary>
     public long? DimensionKeyColumnId { get; init; }
     public string? DimensionKeyColumn { get; init; }
-
-    /// <summary>Optional master-side display/label column for MasterJoin.</summary>
     public long? DimensionLabelColumnId { get; init; }
     public string? DimensionLabelColumn { get; init; }
+
+    // Master-side physical binding returned by DimensionResolutionEvidenceService.
+    public long? MasterTableId { get; init; }
+    public long? MasterDataSourceId { get; init; }
+    public string? MasterTable { get; init; }
+    public long? MasterKeyColumnId { get; init; }
+    public string? MasterKeyColumn { get; init; }
 }
 
 public sealed class SemanticApplicabilityTableResolution
