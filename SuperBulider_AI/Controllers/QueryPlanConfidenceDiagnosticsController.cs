@@ -7,10 +7,6 @@ using SuperBuilder_AI.Services.BI.Evaluation;
 
 namespace SuperBuilder_AI.Controllers;
 
-/// <summary>
-/// Phase 2.4-E QueryPlan Confidence 诊断入口。
-/// 使用 Semantic Resolution 已确认的物理绑定构造确定性的 Runtime QueryPlan。
-/// </summary>
 [ApiController]
 [Route("evaluation/diagnostics")]
 public sealed class QueryPlanConfidenceDiagnosticsController : ControllerBase
@@ -25,284 +21,81 @@ public sealed class QueryPlanConfidenceDiagnosticsController : ControllerBase
     private readonly IQueryPlanConfidenceService _queryPlanConfidenceService;
     private readonly IQueryPlanDecisionGate _queryPlanDecisionGate;
 
-    public QueryPlanConfidenceDiagnosticsController(
-        GoldenQueryDatasetSerializer serializer,
-        IWebHostEnvironment environment,
-        SemanticApplicabilityEvaluator semanticApplicabilityEvaluator,
-        QueryPlanEvaluationGate queryPlanEvaluationGate,
-        QueryPlanEvaluator queryPlanEvaluator,
-        IQueryPlanContextBuilder queryPlanContextBuilder,
-        IQueryPlanValidationPipeline queryPlanValidationPipeline,
-        IQueryPlanConfidenceService queryPlanConfidenceService,
-        IQueryPlanDecisionGate queryPlanDecisionGate)
+    public QueryPlanConfidenceDiagnosticsController(GoldenQueryDatasetSerializer serializer, IWebHostEnvironment environment, SemanticApplicabilityEvaluator semanticApplicabilityEvaluator, QueryPlanEvaluationGate queryPlanEvaluationGate, QueryPlanEvaluator queryPlanEvaluator, IQueryPlanContextBuilder queryPlanContextBuilder, IQueryPlanValidationPipeline queryPlanValidationPipeline, IQueryPlanConfidenceService queryPlanConfidenceService, IQueryPlanDecisionGate queryPlanDecisionGate)
     {
-        _serializer = serializer;
-        _environment = environment;
-        _semanticApplicabilityEvaluator = semanticApplicabilityEvaluator;
-        _queryPlanEvaluationGate = queryPlanEvaluationGate;
-        _queryPlanEvaluator = queryPlanEvaluator;
-        _queryPlanContextBuilder = queryPlanContextBuilder;
-        _queryPlanValidationPipeline = queryPlanValidationPipeline;
-        _queryPlanConfidenceService = queryPlanConfidenceService;
-        _queryPlanDecisionGate = queryPlanDecisionGate;
+        _serializer = serializer; _environment = environment; _semanticApplicabilityEvaluator = semanticApplicabilityEvaluator; _queryPlanEvaluationGate = queryPlanEvaluationGate; _queryPlanEvaluator = queryPlanEvaluator; _queryPlanContextBuilder = queryPlanContextBuilder; _queryPlanValidationPipeline = queryPlanValidationPipeline; _queryPlanConfidenceService = queryPlanConfidenceService; _queryPlanDecisionGate = queryPlanDecisionGate;
     }
 
     [HttpGet("query-plan-confidence")]
-    public async Task<ActionResult<object>> QueryPlanConfidence(
-        [FromQuery] string caseId,
-        [FromQuery] int topK = 10,
-        CancellationToken cancellationToken = default)
+    public async Task<ActionResult<object>> QueryPlanConfidence([FromQuery] string caseId, [FromQuery] int topK = 10, CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(caseId))
-            return BadRequest(new { passed = false, message = "caseId is required." });
-
-        if (topK < 1 || topK > 100)
-            return BadRequest(new { passed = false, message = "topK must be between 1 and 100." });
-
+        if (string.IsNullOrWhiteSpace(caseId)) return BadRequest(new { passed = false, message = "caseId is required." });
+        if (topK < 1 || topK > 100) return BadRequest(new { passed = false, message = "topK must be between 1 and 100." });
         var goldenCase = LoadGoldenCase(caseId);
-        if (goldenCase is null)
-            return NotFound(new { passed = false, message = $"Golden Case '{caseId}' was not found." });
-
+        if (goldenCase is null) return NotFound(new { passed = false, message = $"Golden Case '{caseId}' was not found." });
         var applicability = await _semanticApplicabilityEvaluator.EvaluateAsync(goldenCase, topK);
         var gate = _queryPlanEvaluationGate.Evaluate(applicability);
-
-        if (gate.Blocking)
-        {
-            return Ok(new
-            {
-                passed = false,
-                stage = "SemanticApplicabilityGate",
-                decision = gate,
-                applicability,
-                confidence = (object?)null
-            });
-        }
-
+        if (gate.Blocking) return Ok(new { passed = false, stage = "SemanticApplicabilityGate", decision = gate, applicability, confidence = (object?)null });
         cancellationToken.ThrowIfCancellationRequested();
-
         var intent = BuildIntentFromGoldenCase(goldenCase);
-        var resolution = QueryPlanSemanticResolutionFactory.From(applicability);
+        var resolution = QueryPlanSemanticResolutionFactory.From(applicability, intent);
         var runtimePlan = BuildRuntimePlanFromResolution(intent, resolution);
-
         var evaluation = _queryPlanEvaluator.Evaluate(goldenCase.Id, goldenCase.Expected, runtimePlan);
         var validationContext = await _queryPlanContextBuilder.BuildAsync(runtimePlan);
-        var validationResult = await _queryPlanValidationPipeline
-            .ValidateAsync(runtimePlan, validationContext, goldenCase.Question);
-
+        var validationResult = await _queryPlanValidationPipeline.ValidateAsync(runtimePlan, validationContext, goldenCase.Question);
         cancellationToken.ThrowIfCancellationRequested();
-
-        var confidence = await _queryPlanConfidenceService.EvaluateAsync(
-            runtimePlan,
-            validationResult,
-            validationResult.RepairTrace,
-            goldenCase.Question,
-            cancellationToken);
-
+        var confidence = await _queryPlanConfidenceService.EvaluateAsync(runtimePlan, validationResult, validationResult.RepairTrace, goldenCase.Question, cancellationToken);
         var decision = _queryPlanDecisionGate.Evaluate(confidence);
-
-        return Ok(new
-        {
-            passed = evaluation.Passed && decision.ShouldExecute,
-            stage = "QueryPlanConfidence",
-            caseId = goldenCase.Id,
-            question = goldenCase.Question,
-            applicability,
-            resolution,
-            gate,
-            runtimePlan = new
-            {
-                intentType = runtimePlan.Intent?.IntentType,
-                dataSourceId = runtimePlan.DataSourceId,
-                metrics = runtimePlan.Metrics,
-                dimensions = runtimePlan.Dimensions.Count,
-                filters = runtimePlan.Filters.Count,
-                orders = runtimePlan.Orders.Count,
-                tables = runtimePlan.Tables.Count,
-                joins = runtimePlan.Joins.Count,
-                fields = runtimePlan.Fields.Count,
-                isAggregate = runtimePlan.IsAggregate,
-                distinct = runtimePlan.Distinct,
-                limit = runtimePlan.Limit,
-                isRanking = runtimePlan.IsRanking,
-                isDetailRanking = runtimePlan.IsDetailRanking,
-                isAggregateRanking = runtimePlan.IsAggregateRanking
-            },
-            evaluation,
-            validation = new
-            {
-                passed = validationResult.ValidationResult?.IsValid ?? false,
-                errors = validationResult.ValidationResult?.ErrorItems.Count() ?? 0,
-                warnings = validationResult.ValidationResult?.WarningItems.Count() ?? 0,
-                repairStatus = validationResult.RepairTrace?.Status.ToString()
-            },
-            confidence = new
-            {
-                confidence.Score,
-                level = confidence.Level.ToString(),
-                confidence.CanProceed,
-                confidence.Evidence,
-                confidence.Reasons,
-                confidence.BlockingReasons
-            },
-            decision = new
-            {
-                decision = decision.Decision.ToString(),
-                decision.ShouldExecute,
-                decision.RequiresConfirmation,
-                decision.Reason,
-                decision.Trace
-            }
-        });
+        return Ok(new { passed = evaluation.Passed && decision.ShouldExecute, stage = "QueryPlanConfidence", caseId = goldenCase.Id, question = goldenCase.Question, applicability, resolution, gate, runtimePlan = new { intentType = runtimePlan.Intent?.IntentType, dataSourceId = runtimePlan.DataSourceId, metrics = runtimePlan.Metrics, dimensions = runtimePlan.Dimensions.Count, filters = runtimePlan.Filters.Count, orders = runtimePlan.Orders.Count, tables = runtimePlan.Tables.Count, joins = runtimePlan.Joins.Count, fields = runtimePlan.Fields.Count, isAggregate = runtimePlan.IsAggregate, distinct = runtimePlan.Distinct, limit = runtimePlan.Limit, isRanking = runtimePlan.IsRanking, isDetailRanking = runtimePlan.IsDetailRanking, isAggregateRanking = runtimePlan.IsAggregateRanking }, evaluation, validation = new { passed = validationResult.ValidationResult?.IsValid ?? false, errors = validationResult.ValidationResult?.ErrorItems.Count() ?? 0, warnings = validationResult.ValidationResult?.WarningItems.Count() ?? 0, repairStatus = validationResult.RepairTrace?.Status.ToString() }, confidence = new { confidence.Score, level = confidence.Level.ToString(), confidence.CanProceed, confidence.Evidence, confidence.Reasons, confidence.BlockingReasons }, decision = new { decision = decision.Decision.ToString(), decision.ShouldExecute, decision.RequiresConfirmation, decision.Reason, decision.Trace } });
     }
 
     private static QueryPlan BuildRuntimePlanFromResolution(QueryIntent intent, QueryPlanSemanticResolution resolution)
     {
-        var plan = new QueryPlan
-        {
-            Intent = intent,
-            DataSourceId = resolution.Metric?.DataSourceId
-                ?? resolution.Filters.FirstOrDefault()?.DataSourceId
-                ?? resolution.Dimensions.FirstOrDefault()?.DataSourceId
-                ?? resolution.Orders.FirstOrDefault()?.DataSourceId
-                ?? 0,
-            IsAggregate = intent.IsAggregate,
-            Distinct = false,
-            Limit = intent.Limit,
-            IsRanking = intent.IsRanking,
-            IsDetailRanking = false,
-            IsAggregateRanking = false
-        };
-
+        var orderAggregation = ResolveOrderingAggregation(intent);
+        var plan = new QueryPlan { Intent = intent, DataSourceId = resolution.Metric?.DataSourceId ?? resolution.Filters.FirstOrDefault()?.DataSourceId ?? resolution.Dimensions.FirstOrDefault()?.DataSourceId ?? resolution.Orders.FirstOrDefault()?.DataSourceId ?? 0, IsAggregate = intent.IsAggregate, Distinct = false, Limit = intent.Limit, IsRanking = intent.IsRanking, IsDetailRanking = intent.IsRanking && !intent.IsAggregate, IsAggregateRanking = intent.IsRanking && intent.IsAggregate };
         if (resolution.Metric is not null)
         {
-            var metric = intent.Metrics.FirstOrDefault(x =>
-                string.Equals(x.Name, resolution.Metric.SemanticText, StringComparison.OrdinalIgnoreCase)
-                || string.Equals(x.Field, resolution.Metric.Column, StringComparison.OrdinalIgnoreCase));
-
-            metric ??= new QueryMetric
-            {
-                Name = resolution.Metric.SemanticText,
-                Field = resolution.Metric.Column,
-                Aggregation = "SUM"
-            };
-
+            var metric = intent.Metrics.FirstOrDefault(x => string.Equals(x.Name, resolution.Metric.SemanticText, StringComparison.OrdinalIgnoreCase) || string.Equals(x.Field, resolution.Metric.Column, StringComparison.OrdinalIgnoreCase));
+            metric ??= new QueryMetric { Name = resolution.Metric.SemanticText, SemanticText = resolution.Metric.SemanticText, Field = resolution.Metric.Column, Aggregation = "SUM" };
             metric.Field = resolution.Metric.Column;
             plan.Metrics.Add(metric);
-            plan.Fields.Add(new QueryField
-            {
-                MetadataColumnId = resolution.Metric.ColumnId,
-                ColumnName = resolution.Metric.Column,
-                Aggregation = metric.Aggregation
-            });
-
+            plan.Fields.Add(new QueryField { MetadataColumnId = resolution.Metric.ColumnId, ColumnName = resolution.Metric.Column, Aggregation = metric.Aggregation });
             EnsureTable(plan, resolution.Metric.TableId, resolution.Metric.DataSourceId, resolution.Metric.Table);
         }
-
-        foreach (var binding in resolution.Filters)
-        {
-            EnsureTable(plan, binding.TableId, binding.DataSourceId, binding.Table);
-            var filter = intent.Filters.FirstOrDefault(x => string.Equals(x.Field, binding.Column, StringComparison.OrdinalIgnoreCase));
-            if (filter is not null)
-                filter.Field = binding.Column;
-
-            plan.Fields.Add(new QueryField
-            {
-                MetadataColumnId = binding.ColumnId,
-                ColumnName = binding.Column,
-                Aggregation = "NONE"
-            });
-        }
-
-        foreach (var binding in resolution.Dimensions)
-        {
-            EnsureTable(plan, binding.TableId, binding.DataSourceId, binding.Table);
-            var index = intent.Dimensions.FindIndex(x => string.Equals(x, binding.Column, StringComparison.OrdinalIgnoreCase));
-            if (index >= 0)
-                intent.Dimensions[index] = binding.Column;
-
-            plan.Dimensions.Add(new QueryDimension
-            {
-                MetadataColumnId = binding.ColumnId,
-                ColumnName = binding.Column
-            });
-
-            plan.Fields.Add(new QueryField
-            {
-                MetadataColumnId = binding.ColumnId,
-                ColumnName = binding.Column,
-                Aggregation = "NONE"
-            });
-        }
-
-        foreach (var binding in resolution.Orders)
-        {
-            EnsureTable(plan, binding.TableId, binding.DataSourceId, binding.Table);
-            if (string.Equals(intent.OrderBy, binding.Column, StringComparison.OrdinalIgnoreCase))
-                intent.OrderBy = binding.Column;
-
-            plan.Orders.Add(new QueryOrder
-            {
-                MetadataColumnId = binding.ColumnId,
-                Field = binding.Column,
-                Direction = intent.OrderDirection ?? "ASC"
-            });
-
-            plan.Fields.Add(new QueryField
-            {
-                MetadataColumnId = binding.ColumnId,
-                ColumnName = binding.Column,
-                Aggregation = "NONE"
-            });
-        }
-
+        foreach (var binding in resolution.Filters) { EnsureTable(plan, binding.TableId, binding.DataSourceId, binding.Table); var filter = intent.Filters.FirstOrDefault(x => string.Equals(x.Field, binding.Column, StringComparison.OrdinalIgnoreCase)); if (filter is not null) filter.Field = binding.Column; plan.Fields.Add(new QueryField { MetadataColumnId = binding.ColumnId, ColumnName = binding.Column, Aggregation = "NONE" }); }
+        foreach (var binding in resolution.Dimensions) { EnsureTable(plan, binding.TableId, binding.DataSourceId, binding.Table); var index = intent.Dimensions.FindIndex(x => string.Equals(x, binding.Column, StringComparison.OrdinalIgnoreCase)); if (index >= 0) intent.Dimensions[index] = binding.Column; plan.Dimensions.Add(new QueryDimension { MetadataColumnId = binding.ColumnId, ColumnName = binding.Column }); plan.Fields.Add(new QueryField { MetadataColumnId = binding.ColumnId, ColumnName = binding.Column, Aggregation = "NONE" }); }
+        foreach (var binding in resolution.Orders) { EnsureTable(plan, binding.TableId, binding.DataSourceId, binding.Table); plan.Orders.Add(new QueryOrder { MetadataColumnId = binding.ColumnId, Field = binding.Column, Direction = intent.OrderDirection ?? "ASC", IsMetric = true, MetricName = intent.OrderBy, Aggregation = orderAggregation }); plan.Fields.Add(new QueryField { MetadataColumnId = binding.ColumnId, ColumnName = binding.Column, Aggregation = orderAggregation.ToString().ToUpperInvariant() }); }
         return plan;
+    }
+
+    private static QueryAggregation ResolveOrderingAggregation(QueryIntent intent)
+    {
+        if (string.IsNullOrWhiteSpace(intent.OrderBy)) return QueryAggregation.None;
+        var metric = intent.Metrics.FirstOrDefault(x => string.Equals(x.Name, intent.OrderBy, StringComparison.OrdinalIgnoreCase) || string.Equals(x.SemanticText, intent.OrderBy, StringComparison.OrdinalIgnoreCase) || string.Equals(x.Field, intent.OrderBy, StringComparison.OrdinalIgnoreCase) || x.IsOrderingMetric);
+        return metric?.GetAggregation() ?? QueryAggregation.None;
     }
 
     private static void EnsureTable(QueryPlan plan, long tableId, long dataSourceId, string tableName)
     {
-        if (plan.Tables.Any(x => x.MetadataTableId == tableId))
-            return;
-
-        plan.Tables.Add(new QueryTable
-        {
-            MetadataTableId = tableId,
-            DataSourceId = dataSourceId,
-            TableName = tableName
-        });
+        if (plan.Tables.Any(x => x.MetadataTableId == tableId)) return;
+        plan.Tables.Add(new QueryTable { MetadataTableId = tableId, DataSourceId = dataSourceId, TableName = tableName });
     }
 
     private static QueryIntent BuildIntentFromGoldenCase(GoldenQueryCase goldenCase)
     {
-        var intent = new QueryIntent
-        {
-            OriginalQuestion = goldenCase.Question,
-            IntentType = goldenCase.Expected.IntentType ?? string.Empty,
-            Limit = goldenCase.Expected.Limit ?? 0
-        };
-
+        var intent = new QueryIntent { OriginalQuestion = goldenCase.Question, IntentType = goldenCase.Expected.IntentType ?? string.Empty, Limit = goldenCase.Expected.Limit ?? 0 };
         if (goldenCase.Expected.Metrics is not null)
-        {
             foreach (var metricExpectation in goldenCase.Expected.Metrics)
-            {
-                intent.Metrics.Add(new QueryMetric
-                {
-                    Name = metricExpectation.SemanticText,
-                    Field = metricExpectation.Field ?? string.Empty,
-                    Aggregation = metricExpectation.Aggregation.ToString().ToUpperInvariant()
-                });
-            }
-        }
-
+                intent.Metrics.Add(new QueryMetric { Name = metricExpectation.SemanticText, SemanticText = metricExpectation.SemanticText, Field = metricExpectation.Field ?? string.Empty, Aggregation = metricExpectation.Aggregation.ToString().ToUpperInvariant(), IsOrderingMetric = goldenCase.Expected.Orders?.Any(x => x.IsMetric && string.Equals(x.MetricSemanticText, metricExpectation.SemanticText, StringComparison.OrdinalIgnoreCase)) == true });
+        var order = goldenCase.Expected.Orders?.FirstOrDefault();
+        if (order is not null) { intent.OrderBy = order.IsMetric ? order.MetricSemanticText : order.SemanticText; intent.OrderDirection = order.Direction; }
         return intent;
     }
 
     private GoldenQueryCase? LoadGoldenCase(string caseId)
     {
         var path = Path.Combine(_environment.ContentRootPath, "Evaluation", "Golden", "query-plan-golden-v1.json");
-        if (!System.IO.File.Exists(path))
-            return null;
-
-        var dataset = _serializer.Deserialize(System.IO.File.ReadAllText(path));
-        return dataset.Cases.SingleOrDefault(x => string.Equals(x.Id, caseId, StringComparison.OrdinalIgnoreCase));
+        if (!System.IO.File.Exists(path)) return null;
+        return _serializer.Deserialize(System.IO.File.ReadAllText(path)).Cases.SingleOrDefault(x => string.Equals(x.Id, caseId, StringComparison.OrdinalIgnoreCase));
     }
 }
