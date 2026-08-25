@@ -1,151 +1,153 @@
 # Phase 2.7 — DimensionAware QueryPlan 开发测试计划
 
-## D08 最终源码 / Contract 审计结论（2026-08-25）
+## D09 最终源码 / Contract 审计结论（2026-08-25）
 
-### 一、D08 状态：FROZEN
+### 一、D09 状态：FROZEN
 
-D08 — QueryPlan Dimension Binding 全量源码 / Contract 审计已完成。本次审计以 GitHub `master` 为唯一源码基线，覆盖：QueryPlan、QueryDimension、QueryTable、QueryJoin、QueryPlanBuilder、QueryPlanBuilder.SemanticResolution、QueryPlanSemanticResolutionFactory、SemanticApplicabilityEvaluator、QueryPlanValidator、SqlQueryBuilder，以及 D05 EntityKey / D06 Relation / D07 Dimension Resolution 的输入边界。
+D09 — MasterJoin QueryPlan 全量源码 / Contract 审计已完成。本次以 GitHub `master` 为唯一源码基线，覆盖 QueryJoin、QueryJoinCandidate、QueryJoinInferenceService、QueryPlanBuilder、QueryPlanBuilder.SemanticResolution、QueryPlan / QueryDimension / QueryTable / QueryJoin、QueryPlanValidator、SqlQueryBuilder，以及 D07 Dimension Resolution、D08 QueryPlan Dimension Binding 的输入边界。
 
-本次未修改任何源码；冻结的是审计结论、Contract 边界、最终修改范围、禁止修改范围与兼容性要求。
+本次未修改源码；冻结的是 D09 审计结论、最终修改范围、禁止修改范围、兼容性要求以及 D09/D10/D11 的职责边界。
 
-### 二、D08 最终结论
+### 二、D09 最终结论
 
-当前 QueryPlan Dimension Binding 仍是“单物理 Column Binding”模型：
+当前源码存在两套 JOIN 责任路径：
 
 ```text
-QueryPlanSemanticResolution.Dimensions
-        ↓
-ApplyDimensionResolutions()
-        ↓
-ValidateColumn()
-        ↓
-EnsureTable()
-        ↓
-QueryPlan.Dimensions[i]
-        ↓
-MetadataColumnId + ColumnName + SemanticText
+旧路径
+QueryPlanBuilder
+    ↓
+BuildJoinsAsync
+    ↓
+QueryJoinInferenceService
+    ↓
+QueryJoinCandidate
+    ↓
+QueryPlan.Joins
 ```
 
-`QueryDimension` 当前只有 `MetadataColumnId / SemanticText / ColumnName / Alias / SemanticType`，无法表达 D07 冻结的 `MasterJoin / DirectKey / ResolutionState / ExecutionCapability / FactTable / DimensionTable / Key / Label / Relation Evidence`。
+以及 Phase 2.6 C.13.2 的 Resolution 单一真相路径：
 
-`QueryPlanSemanticResolutionFactory` 当前只是把 `SemanticApplicabilityResult.DimensionResolutions` 映射成简单 Column Resolution，没有保存 D07 的动态 Dimension Resolution Contract；因此 D08 必须补齐“Resolution → QueryPlan Binding”的正式模型边界，而不是让 QueryPlanBuilder 自行重新推理。
+```text
+Semantic Applicability
+    ↓
+Dimension Resolution
+    ↓
+QueryPlanBuilder.BuildAsync(intent, resolution)
+    ↓
+QueryPlan
+```
 
-`QueryPlanBuilder.BuildAsync(intent, resolution)` 已正确遵守 C.13.2：只消费 Resolution，不重新进行 Metric / Filter / Dimension Semantic Search。这个 Contract 必须保留。`NormalizeToResolvedTables` 会根据 Resolution 的 TableId 收敛 QueryPlan.Tables，并清理不属于 Resolution 的 Joins，因此新的 Dimension Binding 必须能够稳定提供所属 Fact / Dimension Table 身份，否则后续 Normalize 会产生 Binding 漂移。
+`QueryJoinInferenceService` 当前应保留为 Relation Evidence Provider，而不能继续作为本次 QueryPlan 的最终 JOIN 决策者。它当前根据字段名称、表名称、数据类型和 MetadataSemantic 计算 Candidate，并采用高阈值“宁可少 JOIN，也不能错误 JOIN”的安全策略；其结果属于 Relation Evidence，不等于本次查询的 Executable MasterJoin。
 
-当前 `QueryPlanBuilder.BuildResolvedPlanSkeleton` 没有从 Resolution 设置 `QueryPlan.DataSourceId`；这与 `QueryPlanValidator.ValidateBasicStructure` 要求的 `DataSourceId > 0`、且所有 QueryTable.DataSourceId 必须与 QueryPlan.DataSourceId 一致存在潜在 Contract 冲突。该问题属于 D08 的 QueryPlan Binding 基础一致性缺陷，必须在实现阶段修复，不能留到运行期。
+当前 `QueryJoinCandidate` 仅表达左右表/字段、Confidence、Reason，缺少本次 Dimension Resolution 所需的 FactTable、DimensionTable、FactKey、DimensionKey、Label、ResolutionType、ExecutionCapability、Evidence 等正式 Binding Contract。
 
-当前 `QueryJoin` 已具备左右 Table / Column 的物理连接描述，但它只是 QueryPlan 的 JOIN 模型；D08 不负责决定何时产生 JOIN。MasterJoin 的 QueryPlan 装配属于 D09，DirectKey QueryPlan 路径属于 D10。
+因此 D09 的核心不是增强 JOIN 评分算法，而是消除“Candidate 直接进入 QueryPlan.Joins”的旧双路径，建立：
 
-当前 `SqlQueryBuilder` 明确拒绝 `QueryPlan.Tables.Count > 1`，并要求多表关系先在 QueryPlan.Joins 中明确建立；因此 D08 不修改 SQL Builder。SQL JOIN 落地属于 D11。
+```text
+Relation Evidence
+        ↓
+D07 Dimension Resolution
+        ↓
+ResolutionType = MasterJoin
+        ↓
+MasterJoin Binding
+        ↓
+QueryPlan.Joins
+```
 
-### 三、D08 最终修改范围：FROZEN
+QueryPlanBuilder 不得再次自行推理 MasterJoin。
 
-#### 3.1 必须修改
+### 三、动态数据库原则
 
-1. **QueryPlan Dimension Binding Contract / Model**
-   - 扩展 Dimension Binding 所需的正式 Contract；
-   - 至少能够表达 `ResolutionType`、`ResolutionState`、`ExecutionCapability`、Fact Table、Dimension Table、Key Column、Label Column、Relation Evidence 引用；
-   - 不把 Vector Score 直接等同于物理 Relation。
+业务数据库是动态接入的，Relation 不允许永久预绑定。当前 Metadata Snapshot 中没有 Master 时，本次查询不得强制 JOIN；若存在稳定 Fact Dimension Key，则由 D10 DirectKey 路径处理。未来新增 DataSource 并重新扫描 Metadata 后，如果形成稳定 Master Relation，同一业务问题可以重新解析为 MasterJoin。
 
-2. **QueryPlanSemanticResolution / QueryPlanSemanticResolutionFactory**
-   - 从 D07 Dimension Resolution 完整传递 Binding Contract；
-   - 禁止在 Factory 中重新进行 Semantic Search 或 Relation 推理；
-   - 保留现有 Metric / Filter / Order Resolution 行为。
+D09 不允许跨独立 DataSource Federation，不允许硬编码 `material_master`、`supplier_master` 等业务主表。
 
-3. **QueryDimension / QueryPlan Dimension Binding**
-   - 从“单 Column”升级为可表达 DirectKey / MasterJoin 的 Binding；
-   - 保留现有 `MetadataColumnId / SemanticText / ColumnName` 兼容字段，避免既有 Case 的直接序列化 / Evaluator 行为漂移；
-   - 新字段必须允许后续 D09 / D10 消费，而不要求 D08 自己创建 JOIN。
+### 四、D09 最终修改范围：FROZEN
 
-4. **QueryPlanBuilder.SemanticResolution**
-   - 只消费已经冻结的 Dimension Resolution；
-   - 将 Binding 正确写入 QueryPlan；
-   - 保证 Fact Table / Dimension Table 的 Table Identity 不被 `NormalizeToResolvedTables` 丢失；
-   - 修复 Resolved Plan 的 `QueryPlan.DataSourceId` 来源，使其与当前 Resolution / Execution Context 一致；
-   - 不增加第二套 Dimension Resolver。
+1. **MasterJoin Binding Contract / Model**
+   - 增加正式 MasterJoin Binding；
+   - 至少表达 ResolutionType、ResolutionState、ExecutionCapability、FactTable、DimensionTable、FactKey、DimensionKey、DimensionLabel、Relation Evidence。
 
-5. **QueryPlanValidator**
-   - 增加对新的 Dimension Binding Contract 的基础结构一致性验证；
-   - 验证 Dimension Column、Fact / Dimension Table、DataSource、Binding State 的物理一致性；
-   - 不在 Validator 中进行语义搜索或 Relation 推理。
+2. **D07 Dimension Resolution → D08 QueryPlan Binding**
+   - 将 `ResolutionType=MasterJoin` 及其物理关系完整传递到 QueryPlan；
+   - Factory / Builder 只消费冻结 Resolution，不重新 Semantic Search、不重新 Relation 推理。
 
-6. **Interface / DI 若因上述 Contract 扩展产生必要变化**
-   - 只做最小闭环修改；
-   - 不改变已有 Resolver / Builder 的职责边界。
+3. **QueryPlan.Joins 装配**
+   - 将已确认的 MasterJoin Binding 转换为 `QueryJoin`；
+   - 校验 Fact / Dimension Table、Key Column、DataSource、Tenant 与当前 Metadata Snapshot 一致；
+   - 防止重复 Join。
 
-#### 3.2 D08 不实现
+4. **QueryJoinCandidate**
+   - 保留作为 Relation Evidence；
+   - 必要时补充稳定 Evidence 标识/引用，但不得把 Candidate 直接升级为 Executable Join。
 
-- MasterJoin 的最终 QueryPlan JOIN 生成（D09）；
-- DirectKey 的最终 QueryPlan 聚合 / 分组路径（D10）；
+5. **QueryPlanBuilder**
+   - 移除或隔离“Resolution 路径下自动 BuildJoinsAsync → QueryPlan.Joins”的旧旁路；
+   - `BuildAsync(intent, resolution)` 中 MasterJoin 必须只来自 Resolution；
+   - 不建立第二套 MasterJoin Resolver。
+
+6. **QueryPlanValidator**
+   - 增加 MasterJoin Binding 的物理一致性验证：Table、Column、DataSource、Tenant、Join 两端完整性；
+   - 不在 Validator 中推理 Relation。
+
+7. **Interface / DI**
+   - 仅因 Contract 传递需要时进行最小闭环修改；保留 `IQueryJoinInferenceService` 的 Evidence Provider 职责，不改变其核心评分算法作为 D09 的必要前提。
+
+### 五、D09 不实现
+
+- DirectKey 最终 QueryPlan 路径（D10）；
 - SqlQueryBuilder 多表 JOIN SQL 落地（D11）；
 - 跨独立 DataSource Federation；
-- EntityKey Resolver 本身的业务推理；
-- Relation Evidence Provider 的核心算法；
+- EntityKey Resolver 核心算法；
+- Relation Evidence Provider 核心评分算法重写；
 - Ranking / DetailRanking / AggregateRanking；
-- QueryPlanEvaluator 评分规则；
-- Golden 正向 Case 为通过而修改；
-- material_master / supplier_master 等业务主表硬编码。
+- QueryPlanEvaluator；
+- Golden 为通过而修改；
+- `material_master` / `supplier_master` 等业务主表硬编码。
 
-### 四、D08 禁止修改范围：FROZEN
+### 六、D09 禁止修改范围：FROZEN
 
-1. 禁止在 QueryPlanBuilder 中重新执行 Metadata Semantic Search。
+1. 禁止在 QueryPlanBuilder 中重新进行 Metadata Semantic Search 以决定 MasterJoin。
 2. 禁止在 QueryPlanBuilder 中重新判断 MasterJoin / DirectKey。
-3. 禁止让 QueryPlanEvaluator 代替 Dimension Resolver。
-4. 禁止让 SqlQueryBuilder 自行猜测 Relation。
-5. 禁止删除 `QueryDimension.MetadataColumnId / ColumnName / SemanticText` 等既有字段。
-6. 禁止通过修改 GQ-011、Golden Contract、Coverage 或 Gate 来掩盖 Binding 缺陷。
-7. 禁止把 Vector / Semantic Score 直接作为 Executable JOIN 依据。
-8. 禁止跨 Tenant 或 Disabled DataSource 绑定。
-9. 禁止让无 Dimension 的 Case 进入 Dynamic Dimension Binding 新路径。
+3. 禁止把 `QueryJoinCandidate` 直接当作 Executable MasterJoin。
+4. 禁止让 SqlQueryBuilder 自行猜 Relation。
+5. 禁止跨 DataSource / Tenant 绑定。
+6. 禁止修改 GQ-011、Golden Contract、Coverage 或 Gate 以掩盖 JOIN 缺陷。
+7. 禁止硬编码业务主表。
+8. 禁止为了 D09 修改 Ranking / Order / Limit Contract。
+9. 禁止删除现有 QueryJoin 物理模型；应在其上建立正式 Binding 来源。
 
-### 五、D08 兼容性影响矩阵：FROZEN
+### 七、D09 兼容性影响矩阵：FROZEN
 
-| Case | 当前 | D08 预期 | 兼容性要求 |
-|---|---|---|---|
-| GQ-001 | PASS | PASS | 无 Dimension，原路径保持 |
-| GQ-002 | 正常 EntityCount | 保持 | EntityCount 不受影响 |
-| GQ-003 | BLOCK | 进入冻结 Dimension Binding | Metric Contract 不漂移 |
-| GQ-004 | 正常 | 保持 | Filter Contract 不漂移 |
-| GQ-005 | BLOCK | 进入 MasterJoin / DirectKey 前的 Binding | Date / Metric 不漂移 |
-| GQ-006 | BLOCK | 进入 DirectKey / MasterJoin | 不硬编码物料主表 |
-| GQ-007 | 正常 Multi-Metric | PASS | Metric 数量 / Binding 不漂移 |
-| GQ-008 | 正常 Distinct EntityCount | PASS | EntityCount 不漂移 |
-| GQ-009 | BLOCK | 进入 Dimension Binding | Date Filter 不漂移 |
-| GQ-010 | BLOCK | 进入 Dimension Binding | Ranking / Order / Limit 不漂移 |
-| **GQ-011** | **PASS** | **PASS** | **无 Dimension，完全不进入新 Binding 路径** |
-| GQ-N001 | Negative | Negative | Aggregation 不漂移 |
-| GQ-N002 | Negative | Negative | Filter 不漂移 |
-| GQ-N003 | Negative / BLOCK | Negative / BLOCK | 错误 JOIN 不得被放宽 |
-| GQ-N004 | Negative / BLOCK | Negative / BLOCK | Ranking Direction 不漂移 |
-| GQ-N005 | Negative / BLOCK | Negative / BLOCK | Limit 不漂移 |
-| GQ-A001 | Ambiguous | Ambiguous / BLOCK | Ambiguity Contract 不漂移 |
-| GQ-U001 | BLOCK | BLOCK | 不得绕过 Applicability Gate |
+| Case | D09 预期 | 兼容性要求 |
+|---|---|---|
+| GQ-001 | 保持原路径 | PASS，不产生 MasterJoin |
+| GQ-002 | 保持 EntityCount | 不改变 EntityCount Contract |
+| GQ-003 | Dimension 解析后决定路径 | Metric / Filter 不漂移 |
+| GQ-005 | MasterJoin 或 DirectKey | Date / Metric 不漂移 |
+| GQ-006 | 当前无物料主表时不强制 JOIN | 后续可因新 Metadata Snapshot 升级 MasterJoin |
+| GQ-009 | Dimension + Date Filter | Date Filter 不漂移 |
+| GQ-010 | Dimension + Ranking | Ranking / Order / Limit 必须保持 |
+| **GQ-011** | **完全不进入 MasterJoin** | **必须继续 PASS** |
+| Negative Cases | 保持安全阻断 | 错误 Relation 不得被放宽 |
+| Ambiguous | BLOCK | 不得自动猜测 JOIN |
 
-任何既有 PASS Case 因 D08 出现回归，必须立即停止实现验证，先解决兼容性问题，再重新进行完整回归。
+任何既有 PASS Case 因 D09 实现产生回归，立即停止实现验证，先解决兼容性问题，再重新执行受影响 Case 和完整 Golden Regression。
 
-### 六、D08 Contract 边界
+### 八、D09 Contract 边界
 
 ```text
 D07
-Dimension Semantic
-   ↓
-EntityKey / Master / DirectKey Resolution
-   ↓
-Frozen Dimension Resolution
-
+Dimension Resolution
+    ↓
 D08
-Frozen Dimension Resolution
-   ↓
 QueryPlan Dimension Binding
-   ↓
-QueryPlan.Dimensions
-   ↓
-Fact / Dimension Table Identity
-   ↓
-供 D09 / D10 消费
-
+    ↓
 D09
-MasterJoin QueryPlan
+MasterJoin Binding
+    ↓
+QueryPlan.Joins
 
 D10
 DirectKey QueryPlan
@@ -154,29 +156,38 @@ D11
 SqlQueryBuilder JOIN / SQL Runtime
 ```
 
-D08 不提前实现 D09 / D10 / D11。
+D09 负责“已确认 MasterJoin 如何进入 QueryPlan”，不负责决定 SQL 如何执行。
 
-### 七、D08 冻结规则
+### 九、D09 冻结规则
 
-**D08：FROZEN。**
+**D09：FROZEN。**
 
-冻结内容：
-- 全量源码 / Contract 审计结论；
-- 最终修改范围；
-- 禁止修改范围；
-- 兼容性影响矩阵；
-- D09 / D10 / D11 职责边界。
+冻结内容：全量源码 / Contract 审计结论、最终修改范围、禁止修改范围、兼容性矩阵以及 D10 / D11 职责边界。
 
-功能实现状态仍为：**NOT IMPLEMENTED**。不得把 D08 FROZEN 解释为 D08 功能已完成。
+功能实现状态仍为：**NOT IMPLEMENTED**。D09 FROZEN 仅表示审计方案冻结，不表示 MasterJoin 功能已经开发完成。
 
-### 八、下一步
+### 十、下一步
 
-D08 冻结后，必须先同步本阶段计划、主开发计划，并确认 GitHub `master` 文档一致；确认完成后才进入：
+D09 冻结后，必须完成：
 
-**D09 — MasterJoin QueryPlan 全量源码 / Contract 审计。**
+```text
+更新阶段开发计划
+    ↓
+同步主开发计划
+    ↓
+确认 GitHub master
+    ↓
+进入 D10
+```
+
+下一步：**D10 — DirectKey QueryPlan 全量源码 / Contract 审计。**
 
 ---
 
+## D08 历史冻结摘要
+
+D08 — QueryPlan Dimension Binding 全量源码 / Contract 审计已冻结。当前 QueryPlan Dimension 为单 Column Binding；D08 冻结了 Resolution → QueryPlan Binding Model、QueryDimension、QueryPlanBuilder Semantic Resolution、DataSource 一致性、Validator 以及最小 DI / Interface 修改范围，并明确 D09 负责 MasterJoin、D10 负责 DirectKey、D11 负责 SQL JOIN。
+
 ## D07 历史冻结摘要
 
-D07 — Dynamic Dimension Resolution 全量源码 / Contract 审计已冻结。当前 Dimension Applicability 仍是“语义 → 单物理 Column”，必须通过 D05 EntityKey + D06 Relation + MasterJoin / DirectKey 双路径完成动态 Dimension Resolution。D07 已冻结 EntityKey / Relation / ResolutionState / ExecutionCapability 边界、兼容性 Gate 和禁止修改范围。
+D07 — Dynamic Dimension Resolution 全量源码 / Contract 审计已冻结。Dimension Resolution 必须支持动态 MasterJoin / DirectKey 双路径，Relation 基于当前 Metadata Snapshot 动态计算，不允许硬编码业务主表或跨独立 DataSource Federation。
