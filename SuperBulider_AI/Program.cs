@@ -47,7 +47,7 @@ builder.Services.AddScoped<MetadataCsvFixtureService>();
 builder.Services.AddScoped<IMetadataCsvFixtureService>(sp => sp.GetRequiredService<MetadataCsvFixtureService>());
 builder.Services.AddScoped<MetadataSemanticSearchService>();
 builder.Services.AddScoped<IMetadataSemanticSearchService>(sp => sp.GetRequiredService<MetadataSemanticSearchService>());
-builder.Services.AddScoped<IDimensionResolutionEvidenceService, DimensionResolutionEvidenceService>();
+builder.Services.AddScoped<SuperBuilder_AI.Interfaces.BI.IDimensionResolutionEvidenceService, DimensionResolutionEvidenceService>();
 builder.Services.AddScoped<QueryIntentNormalizer>();
 builder.Services.AddScoped<QueryUnderstandingService>();
 builder.Services.AddScoped<IQueryUnderstandingService>(sp => sp.GetRequiredService<QueryUnderstandingService>());
