@@ -22,7 +22,47 @@ public static class QueryPlanSemanticResolutionFactory
                 throw new InvalidOperationException($"Metric Semantic Resolution 不完整：SemanticText={metric.SemanticText}。");
 
         var filters = applicability.FilterResolutions.Select(x => new QueryPlanFilterResolution { TableId = x.TableId, DataSourceId = x.DataSourceId, ColumnId = x.ColumnId, SemanticText = x.SemanticText, Table = x.Table ?? string.Empty, Column = x.Column ?? string.Empty, BusinessMeaning = x.BusinessMeaning, Score = x.Score }).ToList();
-        var dimensions = applicability.DimensionResolutions.Select(x => new QueryPlanDimensionResolution { TableId = x.TableId, DataSourceId = x.DataSourceId, ColumnId = x.ColumnId, SemanticText = x.SemanticText, Table = x.Table ?? string.Empty, Column = x.Column ?? string.Empty, BusinessMeaning = x.BusinessMeaning, Score = x.Score }).ToList();
+
+        var dimensions = applicability.DimensionResolutions.Select(x =>
+        {
+            if (string.IsNullOrWhiteSpace(x.ResolutionType) ||
+                string.Equals(x.ResolutionType, "NotResolved", StringComparison.OrdinalIgnoreCase) ||
+                !string.Equals(x.ExecutionCapability, "Executable", StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException($"Dimension Semantic Resolution 不可执行：SemanticText={x.SemanticText}，ResolutionType={x.ResolutionType}，ExecutionCapability={x.ExecutionCapability}。");
+
+            if (x.TableId <= 0 || x.DataSourceId <= 0 || x.ColumnId <= 0 || string.IsNullOrWhiteSpace(x.Table) || string.IsNullOrWhiteSpace(x.Column))
+                throw new InvalidOperationException($"Dimension Semantic Resolution 物理绑定不完整：SemanticText={x.SemanticText}。");
+
+            var isMasterJoin = string.Equals(x.ResolutionType, "MasterJoin", StringComparison.OrdinalIgnoreCase);
+            var isDirectKey = string.Equals(x.ResolutionType, "DirectKey", StringComparison.OrdinalIgnoreCase);
+            if (!isMasterJoin && !isDirectKey)
+                throw new InvalidOperationException($"Dimension Semantic Resolution 类型非法：SemanticText={x.SemanticText}，ResolutionType={x.ResolutionType}。");
+
+            if (!x.DimensionKeyColumnId.HasValue || string.IsNullOrWhiteSpace(x.DimensionKeyColumn))
+                throw new InvalidOperationException($"Dimension Semantic Resolution 缺少稳定 Dimension Key：SemanticText={x.SemanticText}。");
+
+            if (isMasterJoin && (!x.DimensionLabelColumnId.HasValue || string.IsNullOrWhiteSpace(x.DimensionLabelColumn)))
+                throw new InvalidOperationException($"MasterJoin Dimension Resolution 缺少 Master Label Column：SemanticText={x.SemanticText}。");
+
+            return new QueryPlanDimensionResolution
+            {
+                TableId = x.TableId,
+                DataSourceId = x.DataSourceId,
+                ColumnId = x.ColumnId,
+                SemanticText = x.SemanticText,
+                Table = x.Table ?? string.Empty,
+                Column = x.Column ?? string.Empty,
+                BusinessMeaning = x.BusinessMeaning,
+                Score = x.Score,
+                ResolutionType = x.ResolutionType,
+                ExecutionCapability = x.ExecutionCapability,
+                DimensionKeyColumnId = x.DimensionKeyColumnId,
+                DimensionKeyColumn = x.DimensionKeyColumn,
+                DimensionLabelColumnId = x.DimensionLabelColumnId,
+                DimensionLabelColumn = x.DimensionLabelColumn
+            };
+        }).ToList();
+
         var tables = applicability.TableResolutions.Select(x => new QueryPlanTableResolution { TableId = x.TableId, DataSourceId = x.DataSourceId, SemanticText = x.SemanticText, Table = x.Table ?? string.Empty, BusinessMeaning = x.BusinessMeaning, Score = x.Score }).ToList();
 
         return new QueryPlanSemanticResolution
