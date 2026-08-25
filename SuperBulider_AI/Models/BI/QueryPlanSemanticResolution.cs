@@ -54,6 +54,13 @@ public sealed class QueryPlanDimensionResolution
     public string? DimensionKeyColumn { get; init; }
     public long? DimensionLabelColumnId { get; init; }
     public string? DimensionLabelColumn { get; init; }
+
+    // Master-side physical binding supplied by DimensionResolutionEvidence.
+    public long? MasterTableId { get; init; }
+    public long? MasterDataSourceId { get; init; }
+    public string? MasterTable { get; init; }
+    public long? MasterKeyColumnId { get; init; }
+    public string? MasterKeyColumn { get; init; }
 }
 
 public sealed class QueryPlanTableResolution
