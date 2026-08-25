@@ -1,15 +1,15 @@
 # Phase 2.7 — DimensionAware QueryPlan 开发测试计划
 
-> 所属项目：SuperBuilder AI Native BI
-> 唯一源码基线：GitHub `master`
-> 主开发计划：`SuperBuilder AI Native BI Phase开发计划-V2.0.md`
-> 管理总则：`Phase开发测试管理总则.md`
-> Runtime 记录：`Phase2.7-Runtime分步测试记录.md`
-> 状态：PLANNED
+> 所属项目：SuperBuilder AI Native BI  
+> 唯一源码基线：GitHub `master`  
+> 主开发计划：`SuperBuilder AI Native BI Phase开发计划-V2.0.md`  
+> 管理总则：`Phase开发测试管理总则.md`  
+> Runtime 记录：`Phase2.7-Runtime分步测试记录.md`  
+> 状态：IN_PROGRESS
 
 ## 一、阶段入口与切换依据
 
-Phase 2.7 进入执行前，必须完成当前 `master` 全量源码、调用链、Golden、Runtime、Build、Gate 与文档审计。审计结论必须先写入本计划，再开始 STEP-01。
+Phase 2.7 进入执行前，必须完成当前 `master` 全量源码、调用链、Golden、Runtime、Build、Gate 与文档审计。审计结论必须先写入本计划，再开始编码。
 
 Phase 2.6 已明确：Dimension 不应以“必须存在独立主表”作为 Resolution 前提。真实 Metadata 可以由业务事实表直接承载 `material_id/material_name/material_code`、`company_id/company_name` 等 Dimension 信息。
 
@@ -98,7 +98,7 @@ ResolutionMode = DirectKey
 
 既无法 MasterJoin，又无法稳定 DirectKey 时，保持 `NotResolved`，禁止继续构建可执行 QueryPlan。
 
-### 规则 7：统一 Dimension Resolution Contract（2026-08-25 新增冻结规则）
+### 规则 7：统一 Dimension Resolution Contract（2026-08-25 冻结）
 
 本规则来源于 Phase 2.6 GQ-006 真实 Runtime：Metadata 中不存在“物料”独立主表时，旧逻辑直接 `NotResolved`。经业务规则确认，这不是“必须存在主表”的前提，而必须进入 DirectKey 判断。
 
@@ -135,7 +135,66 @@ Ambiguous / NotResolved
 
 如果发现兼容性问题，必须停止后续依赖步骤，完成源码根因审计后再修改；不得以“修复一个 Golden Case”为理由破坏其他已正确 Case。
 
-## 五、核心 Contract
+## 五、D03 / STEP-03 最终审计结论（2026-08-25）
+
+### 5.1 `wms_storage_receipt_info` 真实 Fact Dimension 证据
+
+当前 master Metadata 已确认入库事实表承载：
+
+- `material_id`：物料实体 ID；
+- `material_code`：物料编码；
+- `material_name`：物料名称；
+- `quantity`：入库数量 Metric。
+
+因此 GQ-006、GQ-010 的 Metric Fact Context 已具备稳定的 Fact Dimension Key / Code / Label 承载条件。
+
+### 5.2 当前 Relation Contract 边界
+
+当前 `QueryJoinInferenceService` 是 QueryPlan 层的 JOIN 候选推断能力，其输入/证据包括字段名称、表名称、数据类型、Metadata Semantic 等；它不是数据库真实 ForeignKey / Metadata Relation Contract。
+
+当前 `QueryJoin` 也只是“本次 QueryPlan 认为应该如何连接两个表”的执行 Contract，不能反向作为真实 Metadata Relation/FK 证据。
+
+因此当前源码不能证明“物料”必须通过某个独立 Material Master 走 `MasterJoin`。
+
+### 5.3 GQ-006 / GQ-010 最终 Resolution 分类
+
+在当前真实 Metadata 证据下：
+
+```text
+GQ-006 / GQ-010
+        ↓
+Dimension = 物料
+        ↓
+未证明稳定独立 Master Relation
+        ↓
+Fact 已存在 material_id / material_code / material_name
+        ↓
+目标 ResolutionMode = DirectKey
+```
+
+DirectKey 应直接使用事实表 Dimension Key / Label 完成 Dimension Grouping，不生成 JOIN；随后按 Metric 聚合并支持 Ranking / Limit。
+
+### 5.4 当前明确不修改对象
+
+D03 审计冻结以下边界：
+
+- `QueryPlanEvaluator`：不修改；
+- GQ-011 Ranking Order Binding 修复：不修改；
+- GQ-011 Golden Contract：不修改；
+- `QueryJoin` Model：不因 DirectKey 重写；
+- `QueryJoinInferenceService`：不改造成 DirectKey Resolver；
+- SQL Builder：不得自行推理 Dimension / JOIN。
+
+### 5.5 后续 Contract 必须满足的兼容性条件
+
+- 有稳定真实 Master Relation 的 Dimension 继续走 `MasterJoin`；
+- 没有稳定 Master Relation、但事实表存在稳定 Dimension Key / Code / Name 的 Dimension 才进入 `DirectKey`；
+- 两者都不存在则 `NotResolved → BLOCK`；
+- 多候选无法消歧则 `Ambiguous → BLOCK/REVIEW`；
+- GQ-011 必须保持 PASS；
+- 已 PASS 的其他 GQ Case 必须执行回归，不允许为了 GQ-006/GQ-010 改坏已有正确行为。
+
+## 六、核心 Contract
 
 统一形成：
 
@@ -143,17 +202,23 @@ Ambiguous / NotResolved
 DimensionResolution
 ├── SemanticText
 ├── ResolutionMode
+├── ResolutionState
 ├── FactTable
 ├── FactKeyColumn
+├── FactCodeColumn
+├── FactLabelColumn
 ├── DimensionTable
 ├── DimensionKeyColumn
 ├── DimensionLabelColumn
 ├── JoinRequired
 ├── JoinCondition
-└── Confidence
+├── Confidence
+└── Evidence
 ```
 
-## 六、完整开发任务与步骤
+D03 完成后，D04 必须以本节作为 Contract 设计输入；不得重新发明 MasterJoin / DirectKey 判断规则。
+
+## 七、完整开发任务与步骤
 
 ### STEP-D01 — Phase 2.6 Exit / master 基线审计
 确认上一阶段 Exit 状态、当前源码、文档、Golden、Runtime、Gate 与风险。
@@ -161,11 +226,11 @@ DimensionResolution
 ### STEP-D02 — Metadata Dimension Entity Key 审计
 确认真实 Metadata 中 Dimension Key / Code / Name / Relation，不虚构主表。
 
-### STEP-D03 — Master Table / Relation 审计
-确定哪些 Dimension 能走 MasterJoin，哪些只能 DirectKey。
+### STEP-D03 — Master Table / Relation 审计 ✅
+完成真实 Fact Dimension Key / Code / Label 与 QueryJoin / Relation Contract 边界审计；GQ-006 / GQ-010 正式确定为 DirectKey 目标路径。
 
-### STEP-D04 — Contract / Model 设计
-定义 `DimensionResolution`、`ResolutionMode`、Key / Label / Join 信息。
+### STEP-D04 — Contract / Model 设计 ← CURRENT
+定义 `DimensionResolution`、`ResolutionMode`、Key / Code / Label / Join / Evidence 信息；必须兼容 D03 结论。
 
 ### STEP-D05 — Dimension Entity Key Resolver 实现
 实现稳定 Dimension Entity Key / Business Key 识别，并排除事实明细主键误识别。
@@ -174,7 +239,7 @@ DimensionResolution
 根据 Metadata Relation / Column / Table Semantic 判断关联主表。
 
 ### STEP-D07 — Dimension Resolution 实现
-形成 MasterJoin / DirectKey / NotResolved 三种明确结果。
+形成 MasterJoin / DirectKey / NotResolved / Ambiguous 明确结果。
 
 ### STEP-D08 — QueryPlan Dimension Binding
 QueryPlan 消费 DimensionResolution，不再进行无上下文全库 Semantic Search。
@@ -218,7 +283,7 @@ QueryPlan 消费 DimensionResolution，不再进行无上下文全库 Semantic S
 ### STEP-D21 — Phase 2.7 Exit Review
 确认所有任务、Runtime、Golden、Gate、文档、Commit 均闭环。
 
-## 七、开发任务与 Runtime STEP 对应
+## 八、开发任务与 Runtime STEP 对应
 
 | 开发步骤 | Runtime 验证 |
 |---|---|
@@ -237,7 +302,7 @@ QueryPlan 消费 DimensionResolution，不再进行无上下文全库 Semantic S
 
 每个开发步骤开始/完成必须同步主开发计划与本文件；Runtime 结果必须同步 Runtime 分步测试记录。
 
-## 八、Golden 验收矩阵
+## 九、Golden 验收矩阵
 
 | 类型 | 目标 |
 |---|---|
@@ -250,7 +315,7 @@ QueryPlan 消费 DimensionResolution，不再进行无上下文全库 Semantic S
 
 重点使用当前真实 Metadata，不虚构 supplier/material 主表。
 
-## 九、恢复锚点
+## 十、恢复锚点
 
 任何会话恢复时，按以下顺序读取：
 
@@ -266,7 +331,7 @@ QueryPlan 消费 DimensionResolution，不再进行无上下文全库 Semantic S
 
 然后从 Runtime 记录中最后一个未 PASS 的 STEP 继续，不重复已有正式证据。
 
-## 十、Exit Criteria
+## 十一、Exit Criteria
 
 必须全部满足：
 
