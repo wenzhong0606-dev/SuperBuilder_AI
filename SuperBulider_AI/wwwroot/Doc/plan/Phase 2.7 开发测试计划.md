@@ -1,29 +1,12 @@
 # Phase 2.7 — DimensionAware QueryPlan 开发测试计划
 
-## STEP-01 / STEP-02 / D05 审计结论与最终修改范围（2026-08-25）
+## STEP-01 / STEP-02 / D05 / D06 审计结论与最终修改范围（2026-08-25）
 
 ### 一、审计结论
 
-当前 master 已完成 STEP-01 全量相关源码 / Contract 基线审计及 STEP-02 真实 Metadata Dimension Entity Key 审计，并完成 D05 Dimension Entity Key Resolver 的完整责任链审计。
+当前 master 已完成 STEP-01 全量相关源码 / Contract 基线审计、STEP-02 真实 Metadata Dimension Entity Key 审计、D05 Dimension Entity Key Resolver 完整责任链审计，以及 D06 Dynamic Master Table / Relation Detection 全量源码 / Contract 审计。
 
-当前 GQ-011 已 PASS；GQ-006、GQ-010 均在 SemanticApplicabilityGate 因“物料”无法建立稳定 Dimension 物理绑定而 BLOCK。该 BLOCK 不是 GQ-011 Ranking Order 修复产生的回归，而是当前 Dimension Resolution 能力缺口。
-
-当前代码已经确认具备：
-- Metric Semantic Resolution；
-- 基础 Dimension Column Binding；
-- QueryPlan.Dimensions；
-- QueryPlan.Joins / QueryJoin Contract；
-- 单表 DirectKey 所需的 GROUP BY 基础能力；
-- DataSource → 数据库结构扫描 → MetadataTable / MetadataColumn → SearchText → AI Semantic → Vector 的基础链路；
-- Metadata 按 TenantId + DataSourceId 隔离的基础能力。
-
-当前代码缺少：
-- DimensionResolution 统一 Contract；
-- MasterJoin / DirectKey Resolution；
-- 基于真实 Metadata Relation / Entity Key 证据的稳定 Dimension 绑定；
-- MasterJoin QueryPlan → SQL Builder 的完整 JOIN 闭环；
-- 完整的 Metadata Snapshot Reconciliation / Stale Metadata Invalidation；
-- Metadata 内容变化后的 Semantic Refresh / Vector Refresh 生命周期 Contract。
+当前 GQ-011 已 PASS；GQ-006、GQ-010 当前仍在 SemanticApplicabilityGate 因“物料”无法建立稳定 Dimension 物理绑定而 BLOCK。该 BLOCK 不是 GQ-011 Ranking Order 修复产生的回归，而是当前 Dimension Resolution 双路径尚未实现的能力缺口。
 
 ### 二、冻结业务规则
 
@@ -37,7 +20,7 @@ Dimension Semantic
   └─ NO
        ↓
 是否存在事实表稳定 Dimension Key / Label？
-  ├─ YES → DirectKey → 不 JOIN，按事实表 Dimension Key/Label 汇总
+  ├─ YES → DirectKey → 不 JOIN，按事实表 Dimension Key / Label 汇总
   └─ NO → NotResolved → BLOCK
 ```
 
@@ -54,6 +37,12 @@ Dimension Semantic
 10. Vector / Semantic 相似度只能作为语义候选证据，不得单独作为物理 Relation / MasterJoin 证据。
 11. MasterJoin / DirectKey 是当前 Metadata Snapshot 下的动态 Resolution 结果，不是永久业务事实；新增或失效 DataSource / Table / Column / Relation Evidence 后必须允许重新解析。
 12. DataSource 失效后，其 Metadata 不得继续作为有效 Dimension / Relation Candidate。
+13. Metadata Relation 与 Executable SQL Join 必须分离建模；Relation Resolved 不等于 SQL Join 可执行。
+14. QueryJoinInferenceService 保留为 Relation Evidence Provider，不升级为“大而全”的最终 Relation Resolver。
+15. QueryPlanBuilder 只消费已经解析完成的 Relation，不得再次自行猜测 JOIN。
+16. SQL Builder 只消费 QueryPlan.Joins 并负责 SQL JOIN 落地，不负责 Relation 推理。
+17. 当前 Phase 2.7 不实现跨独立 DataSource 的 Federation；不同 DataSource 即使存在 Metadata Relation，也必须明确记录 ExecutionCapability，不得伪装成普通 SQL JOIN。
+18. 无 Dimension 的既有正确 Case 不进入 Dynamic Relation Resolution，确保 GQ-011 等既有 Ranking / Order Contract 保持原路径。
 
 ### 三、D05 最终结论：FROZEN
 
@@ -69,31 +58,7 @@ Dimension Entity Key Evidence
 DimensionEntityKeyResolution
 ```
 
-D05 输入至少包含：
-- TenantId；
-- DataSourceId；
-- Dimension Semantic；
-- 当前有效 Metadata Snapshot / Candidate。
-
-D05 输出至少表达：
-- Dimension Semantic；
-- Candidate Fact Table；
-- Candidate Entity Key Column；
-- Candidate Label Column（如存在）；
-- DataSource；
-- Key Evidence；
-- Semantic Evidence；
-- Confidence / Evidence Trace。
-
-D05 明确不负责：
-- JOIN 推理；
-- QueryPlan 生成；
-- SQL 生成；
-- Ranking / Order；
-- QueryPlanEvaluator；
-- Metadata 扫描；
-- Semantic 生成；
-- Vector 生成。
+D05 不负责 JOIN、QueryPlan、SQL、Ranking、Evaluator、Metadata 扫描、Semantic 生成或 Vector 生成。
 
 ### 四、D05 新增发现：Metadata Lifecycle 独立缺口
 
@@ -123,58 +88,141 @@ Vector
 - Semantic / SearchText 变化后的 Vector 不具备完整内容版本感知刷新 Contract；
 - 因此未来 Dynamic Relation 必须依赖“当前有效 Metadata Snapshot”，不能直接把现有 Metadata 表中所有历史记录都视为有效候选。
 
-该缺口不并入 D05 Resolver 实现，新增为后续独立 Metadata Lifecycle / Snapshot Reconciliation 任务；不得为了 GQ-006 / GQ-010 通过而把生命周期逻辑临时塞入 Dimension Resolver。
+该缺口不并入 D05 Resolver 实现，新增为后续独立 Metadata Lifecycle / Snapshot Reconciliation 任务。
 
-### 五、D05 最终源码责任边界
+### 五、D06 最终审计结论：FROZEN
 
-#### D05 允许修改
+D06 — Dynamic Master Table / Relation Detection 已完成 Metadata Scanner、Semantic / Vector、Relation Inference、QueryPlan JOIN、SQL Builder、SQL Runtime、DataSource Execution Context 的全量源码 / Contract 审计，正式冻结。
 
-- Dimension Entity Key Resolution Contract；
-- Dimension Entity Key Resolver Interface / Service；
-- Semantic Applicability 的 Dimension Resolution 接入点；
-- 必要的 Resolution Evidence DTO / Model；
-- 必要 DI 注册。
+#### D06 根因结论
 
-#### D05 禁止修改
+当前 `QueryJoinInferenceService` 本质是 Query-scoped Relation Candidate / Evidence Provider：输入是当前问题召回的 Metadata Search Results，通过 DataType、ColumnName、TableName、Semantic 等证据产生 `QueryJoinCandidate`。它不是平台级 Dynamic Relation Registry，也不能直接承担 MasterJoin / DirectKey 最终决策。
 
-- MetadataScannerService 的业务职责边界；
+当前 QueryPlanBuilder 已存在 `QueryPlan.Joins` 与 QueryJoin 组装能力，但 SQL Builder 当前只接受已经形成的单表安全路径，多表 QueryPlan 尚未形成完整 JOIN SQL 落地闭环；因此必须补齐 QueryPlan.Joins → SQL JOIN 的明确 Contract。
+
+当前 SQL Runtime 以单 `dataSourceId` / 单 `DbConnection` 执行一条 SQL；因此跨独立 DataSource 的 Metadata Relation 与可执行 SQL JOIN 必须分离，本 Phase 不实现 Federation。
+
+#### D06 冻结架构
+
+```text
+Current Metadata Snapshot
+        ↓
+Relation Evidence
+        ↓
+Dynamic Relation Resolution
+        ↓
+┌──────────────────────────┐
+│                          │
+MasterJoin              DirectKey
+│                          │
+稳定 Master +              无稳定 Master +
+当前 Execution Context     稳定 Fact Dimension Key / Label
+可执行 JOIN                │
+│                          │
+└────────────┬─────────────┘
+             ↓
+         QueryPlan
+             ↓
+       SqlQueryBuilder
+             ↓
+         SQL Runtime
+```
+
+#### D06 最终职责边界
+
+**保留：**
+- `QueryJoinInferenceService`：Relation Evidence Provider；
+- `QueryJoinCandidate`：候选证据模型；
+- `QueryJoin`：QueryPlan JOIN 基础模型；
+- Metadata Scanner、Semantic、Vector 现有基础链路。
+
+**新增 / 调整方向：**
+- Dynamic Relation Evidence Contract；
+- Dynamic Relation Resolver；
+- Relation Resolution State：Resolved / Ambiguous / NotResolved；
+- Execution Capability：Executable / NotExecutable；
+- QueryPlanBuilder 的已解析 Relation 接入；
+- QueryPlan.Joins → SQL Builder 的 JOIN 落地 Contract。
+
+**明确不做：**
+- 不将 `QueryJoinInferenceService` 改造成“大而全 Resolver”；
+- 不修改 QueryPlanEvaluator；
+- 不修改 Ranking / Order Contract；
+- 不修改 GQ-011 Golden Contract；
+- 不为 material / supplier / customer 等业务实体增加硬编码主表；
+- 不在 Phase 2.7 实现跨独立 DataSource Federation。
+
+#### D06 最终修改范围
+
+**必须修改：**
+1. Relation Resolution Model / Contract；
+2. Dynamic Relation Resolver；
+3. QueryPlanBuilder Relation 接入；
+4. QueryJoin Contract；
+5. SqlQueryBuilder JOIN 落地。
+
+**需在实现前根据最终 Contract 确认：**
+6. Metadata Relation Model；
+7. Current Metadata Snapshot / Provider。
+
+**禁止修改：**
 - QueryPlanEvaluator；
-- GQ-011 Ranking / Order Contract；
-- Golden Contract；
-- SQL Builder 的关系推理职责；
-- 针对 material / supplier / customer 的硬编码。
+- Ranking / DetailRanking / AggregateRanking；
+- Ranking Order Binding；
+- GQ-011 Golden；
+- Metric Semantic Resolution。
 
-### 六、兼容性 Gate
+#### D06 兼容性 Gate
 
-任何后续修改必须证明：
-- GQ-011 Ranking Order Binding 继续 PASS；
-- 已 PASS 的既有 GQ Case 不出现行为漂移；
-- 新增 DirectKey 不改变无 Dimension 的 QueryPlan；
+后续任何 D07+ 修改必须证明：
+
+```text
+既有无 Dimension PASS Case
+        ↓
+不进入 Dynamic Relation Resolution
+        ↓
+原 QueryPlan 路径保持不变
+```
+
+特别要求：
+- GQ-011 必须继续 PASS；
+- 已 PASS 的 Metric / Filter / Ranking Case 不得行为漂移；
+- DirectKey 不得改变无 Dimension QueryPlan；
 - MasterJoin 只对明确解析为 MasterJoin 的 Dimension 生效；
 - Ambiguous / NotResolved 继续 BLOCK；
-- DataSource / Tenant 边界不发生跨租户、跨数据源错误绑定。
+- Tenant / DataSource 边界不得发生错误绑定；
+- 发现兼容性问题必须停止当前 STEP，定位根因并修复后重新执行完整受影响验证链，不得修改既有正确 Contract 或放宽 Gate。
 
-如出现任何兼容性问题，立即停止后续 STEP，定位回归根因并修复后重新执行受影响的完整验证链；不得以修改既有正确 Case Contract 的方式消除回归。
+### 六、D06 冻结后的强制文档流程
 
-### 七、实施前置 Gate
+D06 已满足“完整审计 → 最终结论 → 冻结”条件。进入 D07 前必须严格执行：
 
-D05 已满足“审计 → 最终结论 → 冻结”条件。正式进入下一 STEP 前必须完成：
-1. 更新本阶段开发计划；
-2. 同步更新主开发计划；
-3. 如 Runtime 记录受影响，同步 Runtime 记录；
-4. 确认 GitHub `master` 上阶段计划、主计划、Runtime 记录状态一致；
-5. 完成后才进入 D06。
+```text
+D06 FROZEN
+   ↓
+更新本 Phase 开发测试计划
+   ↓
+同步更新主开发计划
+   ↓
+同步 Runtime 记录（如受影响）
+   ↓
+确认 GitHub master 上三类文档状态一致
+   ↓
+才允许进入 D07
+```
 
-### 八、后续顺序
+任何一步未完成，D07 不得开始。
 
-D05 冻结后，下一步进入：
+### 七、D07 入口
 
-**D06 — Dynamic Master Table / Relation Detection 全量源码 / Contract 审计。**
+文档同步完成后，正式进入：
 
-D06 必须继续遵守：先完整审计当前 master → 形成一次性最终修改方案 → 冻结 → 更新阶段计划 → 同步主计划 → 确认 master → 再进入下一步。
+**D07 — Dynamic Dimension Resolution 全量源码 / Contract 审计。**
+
+D07 必须以 D05 Entity Key Contract + D06 Dynamic Relation Contract 为正式输入，先审计完整源码与调用链，再一次性形成修改范围；不得边审边临时修改 Factory / Builder / Resolver。
 
 ---
 
 ## 原 Phase 2.7 开发计划
 
-Phase 2.7 继续按 D01～D21 / STEP-01～STEP-19 的顺序执行；上述 STEP-01 / STEP-02 / D05 审计结果作为后续 D06 Master Detection、D07 Dimension Resolution、D08 QueryPlan Binding、D09/D10 双路径、D11 SQL Builder 的正式输入。
+Phase 2.7 继续按 D01～D21 / STEP-01～STEP-19 的顺序执行；上述 STEP-01 / STEP-02 / D05 / D06 审计结果作为后续 D07 Dimension Resolution、D08 QueryPlan Binding、D09/D10 双路径、D11 SQL Builder 的正式输入。
