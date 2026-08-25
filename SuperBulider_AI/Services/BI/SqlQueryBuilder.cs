@@ -6,873 +6,419 @@ using SuperBuilder_AI.Models.BI;
 namespace SuperBuilder_AI.Services.BI;
 
 /// <summary>
-/// 动态SQL生成服务。
+/// 根据 QueryPlan 和数据库方言生成动态 SQL。
 ///
-/// Phase 1.6.1
-///
-/// 根据:
-///
-/// QueryPlan
-///     ↓
-/// ISqlDialect
-///     ↓
-/// SqlQuery
-///
-/// 支持:
-///
-/// SQL Server
-/// MySQL
-/// PostgreSQL
-///
-/// 注意:
-///
-/// 当前系统是动态数据库平台。
-///
-/// 不假设数据库存在:
-///
-/// Foreign Key
-/// Navigation
-/// Relationship
-///
-/// 因此本服务不会自动生成JOIN。
-///
-/// 多表JOIN必须在QueryPlan中明确建立关系后
-/// 才能进入SQL生成阶段。
+/// D14 Runtime JOIN Contract：
+/// 只有 QueryPlan 明确提供 Joins 时才生成 JOIN；
+/// 不根据“物料”“供应商”等业务词硬编码任何表或字段。
+/// Metadata 中不存在可验证关系时，QueryPlan 不应包含 Join，
+/// 此处保持单表 SQL，不主动推断关系。
 /// </summary>
-public class SqlQueryBuilder
-	: ISqlQueryBuilder
+public class SqlQueryBuilder : ISqlQueryBuilder
 {
-	/// <summary>
-	/// 根据QueryPlan和数据库方言生成SQL。
-	/// </summary>
-	/// <param name="plan">
-	/// 查询执行计划。
-	/// </param>
-	/// <param name="dialect">
-	/// 数据库SQL方言。
-	/// </param>
-	/// <returns>
-	/// 包含SQL和参数的SqlQuery。
-	/// </returns>
-	public Task<SqlQuery> BuildAsync(
-		QueryPlan plan,
-		ISqlDialect dialect)
-	{
-		if (plan == null)
-		{
-			throw new ArgumentNullException(
-				nameof(plan));
-		}
-
-		if (dialect == null)
-		{
-			throw new ArgumentNullException(
-				nameof(dialect));
-		}
-
-		/*
-		 * ============================================================
-		 * 1.
-		 * 验证QueryPlan
-		 * ============================================================
-		 */
-
-		if (plan.Tables.Count == 0)
-		{
-			throw new InvalidOperationException(
-				"QueryPlan没有查询表。");
-		}
-
-		/*
-		 * 当前QueryPlan尚未包含JOIN关系模型。
-		 *
-		 * 因此禁止直接对多个表生成SQL。
-		 */
-
-		if (plan.Tables.Count > 1)
-		{
-			throw new InvalidOperationException(
-				"当前QueryPlan包含多个数据表，但QueryPlan尚未定义表之间的动态关系，无法安全生成JOIN SQL。");
-		}
-
-		var table =
-			plan.Tables[0];
-
-		if (string.IsNullOrWhiteSpace(
-			table.TableName))
-		{
-			throw new InvalidOperationException(
-				"QueryPlan中的TableName不能为空。");
-		}
-
-		/*
-		 * ============================================================
-		 * 2.
-		 * 创建SQL
-		 * ============================================================
-		 */
-
-		var sql =
-			new StringBuilder();
-
-		var parameters =
-			new Dictionary<string, object?>();
-
-		/*
-		 * ============================================================
-		 * 3.
-		 * SELECT
-		 * ============================================================
-		 */
-
-		sql.Append(
-			"SELECT ");
-
-		var selectFields =
-			BuildSelectFields(
-				plan,
-				dialect);
-
-		/*
-		 * 如果没有明确字段，
-		 * 使用 *。
-		 *
-		 * 但QueryPlanBuilder正常情况下应该已经有Fields。
-		 */
-
-		if (selectFields.Count == 0)
-		{
-			selectFields.Add("*");
-		}
-
-		sql.Append(
-			string.Join(
-				", ",
-				selectFields));
-
-		/*
-		 * ============================================================
-		 * 4.
-		 * FROM
-		 * ============================================================
-		 */
-
-		sql.Append(
-			" FROM ");
-
-		sql.Append(
-			dialect.EscapeIdentifier(
-				table.TableName));
-
-		/*
-		 * ============================================================
-		 * 5.
-		 * WHERE
-		 * ============================================================
-		 */
-
-		BuildWhere(
-			sql,
-			parameters,
-			plan,
-			dialect);
-
-		/*
-		 * ============================================================
-		 * 6.
-		 * GROUP BY
-		 * ============================================================
-		 */
-
-		BuildGroupBy(
-			sql,
-			plan,
-			dialect);
-
-		/*
-		 * ============================================================
-		 * 7.
-		 * ORDER BY
-		 * ============================================================
-		 */
-
-		BuildOrderBy(
-			sql,
-			plan,
-			dialect);
-
-		/*
-		 * ============================================================
-		 * 8.
-		 * LIMIT
-		 * ============================================================
-		 */
-
-		var finalSql = sql.ToString();
-
-		var limit = ResolveLimit(plan);
-
-		if (limit.HasValue)
-		{
-			if (limit.Value <= 0)
-			{
-				throw new InvalidOperationException(
-					"查询Limit必须大于0。");
-			}
-
-			finalSql =
-				dialect.ApplyLimit(
-					finalSql,
-					limit.Value);
-		}
-
-		/*
-		 * ============================================================
-		 * 9.
-		 * 返回SqlQuery
-		 * ============================================================
-		 */
-
-		return Task.FromResult(
-			new SqlQuery
-			{
-				Sql =
-					finalSql,
-
-				Parameters =
-					parameters
-			});
-	}
-
-	/// <summary>
-	/// 构建SELECT字段。
-	/// </summary>
-	private static List<string> BuildSelectFields(
-		QueryPlan plan,
-		ISqlDialect dialect)
-	{
-		var result =
-			new List<string>();
-
-		foreach (var field in plan.Fields)
-		{
-			if (string.IsNullOrWhiteSpace(
-				field.ColumnName))
-			{
-				continue;
-			}
-
-			var column =
-				dialect.EscapeIdentifier(
-					field.ColumnName);
-
-			var aggregation =
-				NormalizeAggregation(
-					field.Aggregation);
-
-			if (aggregation == "NONE")
-			{
-				result.Add(
-					column);
-
-				continue;
-			}
-
-			/*
-			 * COUNT(*)特殊处理。
-			 *
-			 * 如果AI以后将Field映射为*，
-			 * 则允许:
-			 *
-			 * COUNT(*)
-			 */
-
-			if (aggregation == "COUNT"
-				&&
-				field.ColumnName == "*")
-			{
-				result.Add(
-					"COUNT(*)");
-
-				continue;
-			}
-
-			result.Add(
-				$"{aggregation}({column})");
-		}
-
-		/*
-		 * 如果没有SELECT字段，
-		 * 返回空集合，由调用方决定是否使用*。
-		 */
-
-		return result;
-	}
-
-	/// <summary>
-	/// 构建WHERE条件。
-	/// </summary>
-	private static void BuildWhere(
-		StringBuilder sql,
-		Dictionary<string, object?> parameters,
-		QueryPlan plan,
-		ISqlDialect dialect)
-	{
-		if (plan.Filters.Count == 0)
-		{
-			return;
-		}
-
-		var conditions =
-			new List<string>();
-
-		for (
-			var i = 0;
-			i < plan.Filters.Count;
-			i++)
-		{
-			var filter =
-				plan.Filters[i];
-
-			if (string.IsNullOrWhiteSpace(
-				filter.Field))
-			{
-				continue;
-			}
-
-			var field =
-				dialect.EscapeIdentifier(
-					filter.Field);
-
-			var operation =
-				NormalizeOperator(
-					filter.Operator);
-
-			/*
-			 * IS NULL / IS NOT NULL
-			 * 不需要参数。
-			 */
-
-			if (operation == "IS NULL"
-				||
-				operation == "IS NOT NULL")
-			{
-				conditions.Add(
-					$"{field} {operation}");
-
-				continue;
-			}
-
-			var parameterName =
-				dialect.GetParameterName(i);
-
-			// 尝试根据 QueryPlan 中对应字段的数据类型，将参数转换为合适的 CLR 类型，
-			// 避免将数值或日期等字段当作字符串传入导致比较不准确。
-			var fieldDataType =
-				plan.Fields.FirstOrDefault(f =>
-					string.Equals(f.ColumnName, filter.Field, StringComparison.OrdinalIgnoreCase))
-					?.DataType;
-
-			/*
-			 * IN需要特殊处理。
-			 *
-			 * 当前QueryFilter.Value仍然是string，
-			 * 因此这里暂时按照逗号分隔值处理。
-			 */
-
-			if (operation == "IN")
-			{
-				var values =
-					ParseInValues(
-						filter.Value);
-
-				if (values.Count == 0)
-				{
-					continue;
-				}
-
-				var parameterNames =
-					new List<string>();
-
-				for (
-					var valueIndex = 0;
-					valueIndex < values.Count;
-					valueIndex++)
-				{
-					var name =
-						dialect.GetParameterName(
-							i * 1000 + valueIndex);
-
-					parameterNames.Add(
-						name);
-
-					parameters[name] =
-						values[valueIndex];
-				}
-
-				conditions.Add(
-					$"{field} IN ({string.Join(", ", parameterNames)})");
-
-				continue;
-			}
-
-			conditions.Add(
-				$"{field} {operation} {parameterName}");
-
-			parameters[parameterName] =
-				ConvertParameterValue(filter.Value, fieldDataType);
-		}
-
-		if (conditions.Count == 0)
-		{
-			return;
-		}
-
-		sql.Append(
-			" WHERE ");
-
-		sql.Append(
-			string.Join(
-				" AND ",
-				conditions));
-	}
-
-	/// <summary>
-	/// 构建GROUP BY。
-	///
-	/// V2.0:
-	///
-	/// 优先使用 QueryPlan.Dimensions。
-	///
-	/// Legacy fallback:
-	///
-	/// 当 QueryPlan.Dimensions 为空时，
-	/// 回退到 QueryIntent.Dimensions。
-	/// </summary>
-	private static void BuildGroupBy(
-		StringBuilder sql,
-		QueryPlan plan,
-		ISqlDialect dialect)
-	{
-		var groups =
-			new List<string>();
-
-		/*
-		 * ============================================================
-		 * V2.0
-		 *
-		 * QueryPlan.Dimensions
-		 * ============================================================
-		 */
-
-		if (plan.Dimensions.Count > 0)
-		{
-			foreach (var dimension in plan.Dimensions)
-			{
-				if (dimension == null)
-				{
-					continue;
-				}
-
-				if (string.IsNullOrWhiteSpace(
-					dimension.ColumnName))
-				{
-					continue;
-				}
-
-				groups.Add(
-					dialect.EscapeIdentifier(
-						dimension.ColumnName));
-			}
-		}
-
-		/*
-		 * ============================================================
-		 * Legacy fallback
-		 *
-		 * QueryIntent.Dimensions
-		 * ============================================================
-		 */
-
-		if (groups.Count == 0
-			&&
-			plan.Intent?.Dimensions != null)
-		{
-			foreach (var dimension in plan.Intent.Dimensions)
-			{
-				if (string.IsNullOrWhiteSpace(
-					dimension))
-				{
-					continue;
-				}
-
-				groups.Add(
-					dialect.EscapeIdentifier(
-						dimension));
-			}
-		}
-
-		if (groups.Count == 0)
-		{
-			return;
-		}
-
-		sql.Append(
-			" GROUP BY ");
-
-		sql.Append(
-			string.Join(
-				", ",
-				groups.Distinct(
-					StringComparer.OrdinalIgnoreCase)));
-	}
-
-	/// <summary>
-	/// 构建ORDER BY。
-	///
-	/// V2.0:
-	///
-	/// 优先使用 QueryPlan.Orders。
-	///
-	/// 支持:
-	///
-	/// 1. 普通字段排序
-	/// 2. 指标排序
-	/// 3. 聚合指标排序
-	///
-	/// 例如:
-	///
-	/// quantity DESC
-	///
-	/// SUM(quantity) DESC
-	///
-	/// COUNT(id) DESC
-	///
-	/// Legacy fallback:
-	///
-	/// 当 QueryPlan.Orders 为空时，
-	/// 回退到 QueryIntent.OrderBy。
-	/// </summary>
-	private static void BuildOrderBy(
-		StringBuilder sql,
-		QueryPlan plan,
-		ISqlDialect dialect)
-	{
-		/*
-		 * ============================================================
-		 * V2.0
-		 *
-		 * QueryPlan.Orders
-		 * ============================================================
-		 */
-
-		if (plan.Orders.Count > 0)
-		{
-			var orderExpressions =
-				new List<string>();
-
-			foreach (var order in plan.Orders)
-			{
-				if (order == null)
-				{
-					continue;
-				}
-
-				if (string.IsNullOrWhiteSpace(
-					order.Field))
-				{
-					continue;
-				}
-
-				var direction =
-					NormalizeOrderDirection(
-						order.Direction);
-
-				var field =
-					dialect.EscapeIdentifier(
-						order.Field);
-
-				/*
-				 * ----------------------------------------------------
-				 * 指标排序
-				 *
-				 * 例如：
-				 *
-				 * 数量最多
-				 *
-				 * SUM(quantity) DESC
-				 * ----------------------------------------------------
-				 */
-
-				if (order.IsMetric
-					&&
-					order.Aggregation
-						!= QueryAggregation.None)
-				{
-					var aggregation =
-						NormalizeAggregation(
-							order.Aggregation.ToString());
-
-					if (aggregation != "NONE")
-					{
-						if (aggregation == "COUNT"
-							&&
-							order.Field == "*")
-						{
-							orderExpressions.Add(
-								$"COUNT(*) {direction}");
-						}
-						else
-						{
-							orderExpressions.Add(
-								$"{aggregation}({field}) {direction}");
-						}
-
-						continue;
-					}
-				}
-
-				/*
-				 * ----------------------------------------------------
-				 * 普通字段排序
-				 *
-				 * 例如：
-				 *
-				 * receipt_date DESC
-				 * ----------------------------------------------------
-				 */
-
-				orderExpressions.Add(
-					$"{field} {direction}");
-			}
-
-			if (orderExpressions.Count > 0)
-			{
-				sql.Append(
-					" ORDER BY ");
-
-				sql.Append(
-					string.Join(
-						", ",
-						orderExpressions));
-
-				return;
-			}
-		}
-
-		/*
-		 * ============================================================
-		 * Legacy fallback
-		 *
-		 * QueryIntent.OrderBy
-		 * ============================================================
-		 */
-
-		if (plan.Intent == null
-			||
-			string.IsNullOrWhiteSpace(
-				plan.Intent.OrderBy))
-		{
-			return;
-		}
-
-		var legacyOrderBy =
-			plan.Intent.OrderBy;
-
-		var legacyDirection =
-			NormalizeOrderDirection(
-				plan.Intent.OrderDirection);
-
-		sql.Append(
-			" ORDER BY ");
-
-		sql.Append(
-			dialect.EscapeIdentifier(
-				legacyOrderBy));
-
-		sql.Append(
-			" ");
-
-		sql.Append(
-			legacyDirection);
-	}
-
-	/// <summary>
-	/// 标准化聚合类型。
-	/// </summary>
-	private static string NormalizeAggregation(
-		string? aggregation)
-	{
-		if (string.IsNullOrWhiteSpace(
-			aggregation))
-		{
-			return "NONE";
-		}
-
-		return aggregation
-			.Trim()
-			.ToUpperInvariant() switch
-		{
-			"SUM" => "SUM",
-			"COUNT" => "COUNT",
-			"AVG" => "AVG",
-			"MAX" => "MAX",
-			"MIN" => "MIN",
-			"NONE" => "NONE",
-			_ => "NONE"
-		};
-	}
-
-	/// <summary>
-	/// 标准化过滤操作符。
-	///
-	/// 防止AI直接注入SQL片段。
-	/// </summary>
-	private static string NormalizeOperator(
-		string? value)
-	{
-		if (string.IsNullOrWhiteSpace(
-			value))
-		{
-			return "=";
-		}
-
-		return value
-			.Trim()
-			.ToUpperInvariant() switch
-		{
-			"=" => "=",
-			">" => ">",
-			"<" => "<",
-			">=" => ">=",
-			"<=" => "<=",
-			"<>" => "<>",
-			"!=" => "<>",
-			"LIKE" => "LIKE",
-			"IN" => "IN",
-			"IS NULL" => "IS NULL",
-			"IS NOT NULL" => "IS NOT NULL",
-			_ => "="
-		};
-	}
-
-	/// <summary>
-	/// 标准化排序方向。
-	/// </summary>
-	private static string NormalizeOrderDirection(
-		string? direction)
-	{
-		if (string.Equals(
-			direction,
-			"DESC",
-			StringComparison.OrdinalIgnoreCase))
-		{
-			return "DESC";
-		}
-
-		return "ASC";
-	}
-
-	/// <summary>
-	/// 解析IN条件值。
-	///
-	/// 例如:
-	///
-	/// 1,2,3
-	///
-	/// 转换为:
-	///
-	/// @p1
-	/// @p2
-	/// @p3
-	/// </summary>
-	private static List<string> ParseInValues(
-		string? value)
-	{
-		if (string.IsNullOrWhiteSpace(
-			value))
-		{
-			return new List<string>();
-		}
-
-		return value
-			.Split(
-				',',
-				StringSplitOptions.RemoveEmptyEntries)
-			.Select(x =>
-				x.Trim())
-			.Where(x =>
-				!string.IsNullOrWhiteSpace(x))
-			.ToList();
-	}
-
-	/// <summary>
-	/// 根据字段的数据类型将参数字符串转换为合适的 CLR 值。
-	/// 支持常见的数值、布尔和日期类型。
-	/// </summary>
-	private static object? ConvertParameterValue(string? value, string? dataType)
-	{
-		if (string.IsNullOrWhiteSpace(value))
-		{
-			return null;
-		}
-
-		if (string.IsNullOrWhiteSpace(dataType))
-		{
-			// 没有类型信息时，直接返回原始字符串
-			return value;
-		}
-
-		switch (dataType.Trim().ToLowerInvariant())
-		{
-			case "int":
-			case "integer":
-			case "smallint":
-			case "mediumint":
-			case "bigint":
-				if (long.TryParse(value, out var l)) return l;
-				break;
-			case "decimal":
-			case "numeric":
-			case "float":
-			case "double":
-				if (decimal.TryParse(value, out var d)) return d;
-				break;
-			case "bit":
-			case "bool":
-			case "boolean":
-				if (bool.TryParse(value, out var b)) return b;
-				break;
-			case "date":
-			case "datetime":
-			case "timestamp":
-				if (DateTime.TryParse(value, out var dt)) return dt;
-				break;
-			default:
-				// 对于非数值类型，保留原字符串
-				return value;
-		}
-
-		return value;
-	}
-
-	/// <summary>
-	/// 获取最终Limit。
-	///
-	/// V2.0 优先使用 QueryPlan.Limit。
-	///
-	/// 为兼容旧版 QueryIntent，
-	/// 当 QueryPlan.Limit 没有值时，
-	/// 回退到 QueryIntent.Limit。
-	/// </summary>
-	private static int? ResolveLimit(
-		QueryPlan plan)
-	{
-		if (plan.Limit.HasValue)
-		{
-			return plan.Limit.Value;
-		}
-
-		return plan.Intent?.Limit;
-	}
+    public Task<SqlQuery> BuildAsync(QueryPlan plan, ISqlDialect dialect)
+    {
+        ArgumentNullException.ThrowIfNull(plan);
+        ArgumentNullException.ThrowIfNull(dialect);
+
+        if (plan.Tables.Count == 0)
+            throw new InvalidOperationException("QueryPlan没有查询表。");
+
+        var validTables = plan.Tables
+            .Where(t => !string.IsNullOrWhiteSpace(t.TableName))
+            .ToList();
+
+        if (validTables.Count == 0)
+            throw new InvalidOperationException("QueryPlan中的TableName不能为空。");
+
+        var joins = NormalizeJoins(plan, validTables, dialect);
+        var sql = new StringBuilder("SELECT ");
+        var parameters = new Dictionary<string, object?>();
+
+        var selectFields = BuildSelectFields(plan, dialect, joins, validTables);
+        if (selectFields.Count == 0)
+            selectFields.Add("*");
+        sql.Append(string.Join(", ", selectFields));
+
+        sql.Append(" FROM ");
+        sql.Append(dialect.EscapeIdentifier(validTables[0].TableName!));
+
+        foreach (var join in joins)
+        {
+            sql.Append(' ');
+            sql.Append(join.JoinType);
+            sql.Append(" JOIN ");
+            sql.Append(dialect.EscapeIdentifier(join.RightTableName!));
+            sql.Append(" ON ");
+            sql.Append(dialect.EscapeIdentifier(join.LeftTableName!));
+            sql.Append('.');
+            sql.Append(dialect.EscapeIdentifier(join.LeftColumnName!));
+            sql.Append(" = ");
+            sql.Append(dialect.EscapeIdentifier(join.RightTableName!));
+            sql.Append('.');
+            sql.Append(dialect.EscapeIdentifier(join.RightColumnName!));
+        }
+
+        BuildWhere(sql, parameters, plan, dialect);
+        BuildGroupBy(sql, plan, dialect, joins);
+        BuildOrderBy(sql, plan, dialect, joins);
+
+        var finalSql = sql.ToString();
+        var limit = ResolveLimit(plan);
+        if (limit.HasValue)
+        {
+            if (limit.Value <= 0)
+                throw new InvalidOperationException("查询Limit必须大于0。");
+            finalSql = dialect.ApplyLimit(finalSql, limit.Value);
+        }
+
+        return Task.FromResult(new SqlQuery
+        {
+            Sql = finalSql,
+            Parameters = parameters
+        });
+    }
+
+    /// <summary>
+    /// 仅接受 QueryPlan 已明确声明、且左右表/字段均存在于本次计划中的 Join。
+    /// 绝不根据业务词或表名自动补 Join。
+    /// </summary>
+    private static List<QueryJoin> NormalizeJoins(
+        QueryPlan plan,
+        List<QueryTable> tables,
+        ISqlDialect dialect)
+    {
+        if (plan.Joins.Count == 0)
+            return new List<QueryJoin>();
+
+        var tableNames = new HashSet<string>(
+            tables.Select(t => t.TableName!),
+            StringComparer.OrdinalIgnoreCase);
+
+        var result = new List<QueryJoin>();
+        foreach (var join in plan.Joins)
+        {
+            if (join == null ||
+                string.IsNullOrWhiteSpace(join.LeftTableName) ||
+                string.IsNullOrWhiteSpace(join.LeftColumnName) ||
+                string.IsNullOrWhiteSpace(join.RightTableName) ||
+                string.IsNullOrWhiteSpace(join.RightColumnName))
+            {
+                continue;
+            }
+
+            if (!tableNames.Contains(join.LeftTableName) ||
+                !tableNames.Contains(join.RightTableName))
+            {
+                throw new InvalidOperationException(
+                    "QueryPlan中的JOIN引用了未声明的Metadata表。");
+            }
+
+            if (string.Equals(join.LeftTableName, join.RightTableName,
+                StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException(
+                    "QueryPlan中的JOIN不能连接同一张表。");
+            }
+
+            var type = (join.JoinType ?? "INNER").Trim().ToUpperInvariant();
+            if (type != "INNER" && type != "LEFT" && type != "RIGHT")
+                throw new InvalidOperationException($"不支持的JOIN类型：{join.JoinType}");
+
+            join.JoinType = type;
+            result.Add(join);
+        }
+
+        return result;
+    }
+
+    private static List<string> BuildSelectFields(
+        QueryPlan plan,
+        ISqlDialect dialect,
+        List<QueryJoin> joins,
+        List<QueryTable> tables)
+    {
+        var result = new List<string>();
+        foreach (var field in plan.Fields)
+        {
+            if (string.IsNullOrWhiteSpace(field.ColumnName))
+                continue;
+
+            var column = QualifyColumn(
+                field.MetadataColumnId,
+                field.ColumnName,
+                joins,
+                dialect);
+
+            var aggregation = NormalizeAggregation(field.Aggregation);
+            if (aggregation == "NONE")
+            {
+                result.Add(column);
+                continue;
+            }
+
+            if (aggregation == "COUNT" && field.ColumnName == "*")
+                result.Add("COUNT(*)");
+            else
+                result.Add($"{aggregation}({column})");
+        }
+
+        return result;
+    }
+
+    private static string QualifyColumn(
+        long metadataColumnId,
+        string columnName,
+        List<QueryJoin> joins,
+        ISqlDialect dialect)
+    {
+        foreach (var join in joins)
+        {
+            if (join.LeftColumnId == metadataColumnId &&
+                !string.IsNullOrWhiteSpace(join.LeftTableName))
+                return dialect.EscapeIdentifier(join.LeftTableName) + "." +
+                       dialect.EscapeIdentifier(columnName);
+
+            if (join.RightColumnId == metadataColumnId &&
+                !string.IsNullOrWhiteSpace(join.RightTableName))
+                return dialect.EscapeIdentifier(join.RightTableName) + "." +
+                       dialect.EscapeIdentifier(columnName);
+        }
+
+        return dialect.EscapeIdentifier(columnName);
+    }
+
+    private static void BuildWhere(
+        StringBuilder sql,
+        Dictionary<string, object?> parameters,
+        QueryPlan plan,
+        ISqlDialect dialect)
+    {
+        if (plan.Filters.Count == 0)
+            return;
+
+        var conditions = new List<string>();
+        for (var i = 0; i < plan.Filters.Count; i++)
+        {
+            var filter = plan.Filters[i];
+            if (string.IsNullOrWhiteSpace(filter.Field))
+                continue;
+
+            var field = dialect.EscapeIdentifier(filter.Field);
+            var operation = NormalizeOperator(filter.Operator);
+
+            if (operation == "IS NULL" || operation == "IS NOT NULL")
+            {
+                conditions.Add($"{field} {operation}");
+                continue;
+            }
+
+            if (operation == "IN")
+            {
+                var values = ParseInValues(filter.Value);
+                if (values.Count == 0)
+                    continue;
+
+                var names = new List<string>();
+                for (var j = 0; j < values.Count; j++)
+                {
+                    var name = dialect.GetParameterName(i * 1000 + j);
+                    names.Add(name);
+                    parameters[name] = values[j];
+                }
+                conditions.Add($"{field} IN ({string.Join(", ", names)})");
+                continue;
+            }
+
+            var parameterName = dialect.GetParameterName(i);
+            var dataType = plan.Fields.FirstOrDefault(f =>
+                string.Equals(f.ColumnName, filter.Field,
+                    StringComparison.OrdinalIgnoreCase))?.DataType;
+
+            conditions.Add($"{field} {operation} {parameterName}");
+            parameters[parameterName] = ConvertParameterValue(filter.Value, dataType);
+        }
+
+        if (conditions.Count > 0)
+            sql.Append(" WHERE ").Append(string.Join(" AND ", conditions));
+    }
+
+    private static void BuildGroupBy(
+        StringBuilder sql,
+        QueryPlan plan,
+        ISqlDialect dialect,
+        List<QueryJoin> joins)
+    {
+        var groups = new List<string>();
+
+        foreach (var dimension in plan.Dimensions)
+        {
+            if (dimension == null || string.IsNullOrWhiteSpace(dimension.ColumnName))
+                continue;
+
+            groups.Add(QualifyColumn(
+                dimension.MetadataColumnId,
+                dimension.ColumnName,
+                joins,
+                dialect));
+        }
+
+        if (groups.Count == 0 && plan.Intent?.Dimensions != null)
+        {
+            foreach (var dimension in plan.Intent.Dimensions)
+            {
+                if (!string.IsNullOrWhiteSpace(dimension))
+                    groups.Add(dialect.EscapeIdentifier(dimension));
+            }
+        }
+
+        if (groups.Count > 0)
+            sql.Append(" GROUP BY ").Append(
+                string.Join(", ", groups.Distinct(StringComparer.OrdinalIgnoreCase)));
+    }
+
+    private static void BuildOrderBy(
+        StringBuilder sql,
+        QueryPlan plan,
+        ISqlDialect dialect,
+        List<QueryJoin> joins)
+    {
+        var expressions = new List<string>();
+        foreach (var order in plan.Orders)
+        {
+            if (order == null || string.IsNullOrWhiteSpace(order.Field))
+                continue;
+
+            var direction = NormalizeOrderDirection(order.Direction);
+            var field = dialect.EscapeIdentifier(order.Field);
+
+            if (order.IsMetric && order.Aggregation != QueryAggregation.None)
+            {
+                var aggregation = NormalizeAggregation(order.Aggregation.ToString());
+                if (aggregation != "NONE")
+                {
+                    expressions.Add(
+                        aggregation == "COUNT" && order.Field == "*"
+                            ? $"COUNT(*) {direction}"
+                            : $"{field.AggregationFallback(aggregation)} {direction}");
+                    continue;
+                }
+            }
+
+            expressions.Add($"{field} {direction}");
+        }
+
+        if (expressions.Count > 0)
+        {
+            sql.Append(" ORDER BY ").Append(string.Join(", ", expressions));
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(plan.Intent?.OrderBy))
+            return;
+
+        sql.Append(" ORDER BY ")
+           .Append(dialect.EscapeIdentifier(plan.Intent.OrderBy))
+           .Append(' ')
+           .Append(NormalizeOrderDirection(plan.Intent.OrderDirection));
+    }
+
+    private static string NormalizeAggregation(string? aggregation)
+    {
+        if (string.IsNullOrWhiteSpace(aggregation))
+            return "NONE";
+
+        return aggregation.Trim().ToUpperInvariant() switch
+        {
+            "SUM" => "SUM",
+            "COUNT" => "COUNT",
+            "AVG" => "AVG",
+            "MAX" => "MAX",
+            "MIN" => "MIN",
+            "NONE" => "NONE",
+            _ => "NONE"
+        };
+    }
+
+    private static string NormalizeOperator(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return "=";
+
+        return value.Trim().ToUpperInvariant() switch
+        {
+            "=" => "=",
+            ">" => ">",
+            "<" => "<",
+            ">=" => ">=",
+            "<=" => "<=",
+            "<>" => "<>",
+            "!=" => "<>",
+            "LIKE" => "LIKE",
+            "IN" => "IN",
+            "IS NULL" => "IS NULL",
+            "IS NOT NULL" => "IS NOT NULL",
+            _ => "="
+        };
+    }
+
+    private static string NormalizeOrderDirection(string? direction) =>
+        string.Equals(direction, "DESC", StringComparison.OrdinalIgnoreCase)
+            ? "DESC" : "ASC";
+
+    private static List<string> ParseInValues(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return new List<string>();
+
+        return value.Split(',', StringSplitOptions.RemoveEmptyEntries)
+            .Select(x => x.Trim())
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .ToList();
+    }
+
+    private static object? ConvertParameterValue(string? value, string? dataType)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return null;
+        if (string.IsNullOrWhiteSpace(dataType))
+            return value;
+
+        switch (dataType.Trim().ToLowerInvariant())
+        {
+            case "int":
+            case "integer":
+            case "smallint":
+            case "mediumint":
+            case "bigint":
+                return long.TryParse(value, out var l) ? l : value;
+            case "decimal":
+            case "numeric":
+            case "float":
+            case "double":
+                return decimal.TryParse(value, out var d) ? d : value;
+            case "bit":
+            case "bool":
+            case "boolean":
+                return bool.TryParse(value, out var b) ? b : value;
+            case "date":
+            case "datetime":
+            case "timestamp":
+                return DateTime.TryParse(value, out var dt) ? dt : value;
+            default:
+                return value;
+        }
+    }
+
+    private static int? ResolveLimit(QueryPlan plan) =>
+        plan.Limit ?? plan.Intent?.Limit;
+}
+
+internal static class SqlQueryBuilderExtensions
+{
+    /// <summary>
+    /// 保留聚合表达式的最小构造逻辑，避免将聚合名称作为可注入 SQL 片段处理。
+    /// </summary>
+    public static string AggregationFallback(this string escapedField, string aggregation) =>
+        $"{aggregation}({escapedField})";
 }
