@@ -197,7 +197,7 @@ public sealed class EvaluationDiagnosticsController : ControllerBase
         var decision = _queryPlanEvaluationGate.Evaluate(applicability);
         if (decision.Blocking) return Ok(new { passed = false, stage = "SemanticApplicabilityGate", decision, applicability });
         var intent = await _queryUnderstandingService.UnderstandAsync(goldenCase.Question);
-        var resolution = QueryPlanSemanticResolutionFactory.From(applicability);
+        var resolution = QueryPlanSemanticResolutionFactory.From(applicability, intent);
         var runtimePlan = await _queryPlanBuilder.BuildAsync(intent, resolution);
         var evaluation = _queryPlanEvaluator.Evaluate(goldenCase.Id, goldenCase.Expected, runtimePlan);
         return Ok(new { passed = evaluation.Passed, stage = "QueryPlanEvaluation", caseId = goldenCase.Id, question = goldenCase.Question, applicability, resolution, gate = decision, runtimePlan, evaluation });
