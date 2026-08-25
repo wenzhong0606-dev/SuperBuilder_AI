@@ -1,6 +1,6 @@
 # SuperBuilder AI Native BI Phase开发计划
 
-> 文档版本：v2.9
+> 文档版本：v2.10
 > 文档性质：项目正式开发基线 + Phase 开发测试管理总计划
 > **唯一源码基线：GitHub `master`**
 > 主计划职责：**仅记录项目当前进度、当前工作单元、当前 STEP、状态、Commit、阻塞与下一步**
@@ -43,6 +43,9 @@
 31. **任何一份正式开发计划发生实质性变更后，必须检查并同步所有受影响的计划 / Runtime 记录。** 不得出现阶段计划、主计划、Runtime 记录三者描述互相矛盾的状态。
 32. **项目长期产品目标：SuperBuilder 最终建设为支持多语言、多租户、多数据库动态接入的 AI Native Low-code Platform。** 后续 Phase 的架构、Contract、Metadata、Semantic Resolution、Runtime 与测试设计必须避免锁定单一行业、单一数据库或单一语言，并为多租户隔离、多语言语义、多数据库动态发现保留扩展边界。
 33. **动态 Metadata Relation 原则：业务数据库关系不得预绑定为永久事实。** Relation Resolution 必须基于当前 Metadata Snapshot 动态计算；当前无法 JOIN 不代表未来永久不能 JOIN；新增数据库、表、字段或 Relation Evidence 后必须允许重新解析并升级为 MasterJoin；Relation Evidence 失效后也必须允许重新计算并安全降级。
+34. **D05 审计结论：Dimension Entity Key Resolver 已冻结。** D05 只负责从当前有效 Metadata Snapshot 产生 Entity Key Evidence，不负责 JOIN、QueryPlan、SQL、Ranking、Evaluator、Metadata 扫描、Semantic 生成或 Vector 生成。
+35. **Metadata Lifecycle 为独立后续任务。** 当前 `MetadataScannerService` 已确认具备 DataSource → 数据库结构扫描 → MetadataTable/MetadataColumn → SearchText → AI Semantic → Vector 基础链路，但当前主要是新增/更新/缺失补齐型同步，尚未形成完整 Snapshot Reconciliation、Stale Metadata Invalidation、Semantic Refresh、Vector Refresh Contract；不得将该问题临时塞入 D05 Resolver。
+36. **D05 冻结后必须先更新阶段计划、同步主计划并确认 master，才能进入 D06。**
 
 ---
 
@@ -108,9 +111,60 @@
 - 下一 STEP 变化
 - Exit Criteria 变化
 - **项目长期产品目标或平台级架构约束变化**
+- **Metadata Lifecycle / Snapshot / Semantic Refresh / Vector Refresh 等平台级 Contract 变化**
 
 若阶段计划已更新而主计划未同步，则当前 STEP **不得继续**。
 
 ## 2.4 主计划职责
 
 主计划只记录当前进度、当前 STEP、状态、Commit、阻塞、下一步以及必要的冻结摘要；不得复制阶段完整技术方案。阶段计划仍是 Phase 的完整执行契约。
+
+---
+
+# 三、当前项目状态
+
+## Phase 2.7 — DimensionAware QueryPlan
+
+**当前状态：IN_PROGRESS**
+
+**当前工作单元：D06 — Dynamic Master Table / Relation Detection 全量源码 / Contract 审计**
+
+**D05：FROZEN**
+
+D05 冻结依据：当前 master 已完成 Dimension Entity Key Resolver 责任链审计，并确认 D05 与 Metadata Scanner、Semantic、Vector、Relation、QueryPlan、SQL Builder 的职责边界。D05 不承担 JOIN 推理；Dynamic Metadata Lifecycle 缺口作为独立后续任务记录。
+
+### 当前已确认 Runtime 基线
+
+- GQ-011：PASS
+- GQ-006：当前 BLOCK，原因是“物料”无法建立稳定 Dimension 物理绑定
+- GQ-010：当前 BLOCK，原因是“物料”无法建立稳定 Dimension 物理绑定
+
+### 当前阻塞
+
+GQ-006 / GQ-010 的 BLOCK 必须通过 Phase 2.7 Dimension Resolution 双路径解决：
+
+```text
+稳定 Master Relation
+    ↓
+MasterJoin
+
+无稳定 Master Relation
+    ↓
+稳定 Fact Dimension Key / Label
+    ↓
+DirectKey
+
+两者均无法成立
+    ↓
+NotResolved
+    ↓
+BLOCK
+```
+
+禁止通过修改 Evaluator、Golden、Ranking Contract 或业务硬编码消除 BLOCK。
+
+### 下一步
+
+**D06 — Dynamic Master Table / Relation Detection 全量源码 / Contract 审计。**
+
+D06 仍遵循：完整源码审计 → 最终结论 → 冻结 → 更新阶段计划 → 同步主计划 → 确认 GitHub `master` → 才能进入 D07。
