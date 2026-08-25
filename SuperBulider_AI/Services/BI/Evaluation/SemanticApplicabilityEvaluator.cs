@@ -133,11 +133,81 @@ public sealed class SemanticApplicabilityEvaluator
     private async Task<SemanticApplicabilityDimensionResolution?> ResolveDimensionAsync(GoldenDimensionExpectation dimension, int topK)
     {
         if (string.IsNullOrWhiteSpace(dimension.SemanticText)) return null;
-        var candidates = (await _semanticSearchService.SearchAsync(dimension.SemanticText, topK)).Where(x => x.IsSemanticVector && x.Table is not null && x.Column is not null).GroupBy(GetCandidateBindingKey, StringComparer.OrdinalIgnoreCase).Select(g => g.OrderByDescending(x => x.Score).First()).OrderByDescending(x => x.Score).ToList();
-        var direct = candidates.Where(x => ContainsSemanticText(x, dimension.SemanticText)).ToList();
-        if (direct.Count == 0 || direct.Count > 1 && direct[0].Score - direct[1].Score <= AmbiguityScoreGapThreshold) return null;
+
+        var queries = BuildDimensionSearchQueries(dimension.SemanticText);
+        var allCandidates = new List<MetadataSemanticSearchResult>();
+        foreach (var query in queries)
+            allCandidates.AddRange(await _semanticSearchService.SearchAsync(query, topK));
+
+        var candidates = allCandidates
+            .Where(x => x.IsSemanticVector && x.Table is not null && x.Column is not null)
+            .GroupBy(GetCandidateBindingKey, StringComparer.OrdinalIgnoreCase)
+            .Select(g => g.OrderByDescending(x => x.Score).First())
+            .OrderByDescending(x => x.Score)
+            .ToList();
+
+        var direct = candidates
+            .Where(x => ContainsSemanticText(x, dimension.SemanticText) || ContainsDimensionEntityEvidence(x, dimension.SemanticText))
+            .ToList();
+
+        if (direct.Count == 0)
+            return null;
+
+        if (direct.Count > 1 && direct[0].Score - direct[1].Score <= AmbiguityScoreGapThreshold)
+            return null;
+
         var c = direct[0];
-        return new() { TableId = c.Table!.Id, DataSourceId = c.Table.DataSourceId, ColumnId = c.Column!.Id, SemanticText = dimension.SemanticText, Table = c.Table.TableName, Column = c.Column.ColumnName, BusinessMeaning = c.Semantic?.BusinessMeaning, Score = c.Score };
+        return new()
+        {
+            TableId = c.Table!.Id,
+            DataSourceId = c.Table.DataSourceId,
+            ColumnId = c.Column!.Id,
+            SemanticText = dimension.SemanticText,
+            Table = c.Table.TableName,
+            Column = c.Column.ColumnName,
+            BusinessMeaning = c.Semantic?.BusinessMeaning,
+            Score = c.Score
+        };
+    }
+
+    private static IReadOnlyList<string> BuildDimensionSearchQueries(string semanticText)
+    {
+        var normalized = NormalizeSemanticText(semanticText);
+        var queries = new List<string> { semanticText };
+        if (normalized.Length > 0)
+        {
+            foreach (var suffix in new[] { "名称", "编码", "ID" })
+            {
+                var query = normalized + suffix;
+                if (!queries.Contains(query, StringComparer.OrdinalIgnoreCase))
+                    queries.Add(query);
+            }
+        }
+        return queries;
+    }
+
+    private static bool ContainsDimensionEntityEvidence(MetadataSemanticSearchResult candidate, string dimensionText)
+    {
+        var normalized = NormalizeSemanticText(dimensionText);
+        if (normalized.Length == 0 || candidate.Table is null)
+            return false;
+
+        var values = new[]
+        {
+            candidate.Table.TableName,
+            candidate.Table.TableComment,
+            candidate.Table.SearchText,
+            candidate.Column?.ColumnName,
+            candidate.Column?.ColumnComment,
+            candidate.Semantic?.BusinessMeaning,
+            candidate.Semantic?.Keywords,
+            candidate.Semantic?.Synonyms,
+            candidate.Semantic?.SearchText,
+            candidate.Semantic?.ExampleQuestions
+        };
+
+        return values.Any(x => !string.IsNullOrWhiteSpace(x)
+            && NormalizeSemanticText(x).Contains(normalized, StringComparison.OrdinalIgnoreCase));
     }
 
     private async Task<IReadOnlyList<SemanticApplicabilityTableResolution>> ResolveTablesAsync(IReadOnlyList<GoldenTableExpectation>? expected, IReadOnlyList<SemanticApplicabilityMetricResolution> metrics, IReadOnlyList<SemanticApplicabilityFilterResolution> filters, IReadOnlyList<SemanticApplicabilityDimensionResolution> dimensions, int topK)
