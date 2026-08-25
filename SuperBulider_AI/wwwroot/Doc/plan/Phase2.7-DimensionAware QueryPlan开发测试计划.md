@@ -7,42 +7,34 @@
 > Runtime 记录：`Phase2.7-Runtime分步测试记录.md`
 > 状态：PLANNED
 
-## 一、阶段入口
+## 一、阶段入口与切换依据
 
 Phase 2.7 进入执行前，必须完成当前 `master` 全量源码、调用链、Golden、Runtime、Build、Gate 与文档审计。审计结论必须先写入本计划，再开始 STEP-01。
+
+Phase 2.6 已明确：Dimension 不应以“必须存在独立主表”作为 Resolution 前提。真实 Metadata 可以由业务事实表直接承载 `material_id/material_name/material_code`、`company_id/company_name` 等 Dimension 信息。
+
+因此 Phase 2.7 正式采用双路径：
+
+```text
+Dimension Resolution
+        ↓
+ ┌──────┴──────┐
+ ↓             ↓
+MasterJoin   DirectKey
+ ↓             ↓
+JOIN 主表     事实表直接 GROUP BY
+ └──────┬──────┘
+        ↓
+DimensionAware QueryPlan
+        ↓
+SQL Builder
+        ↓
+SQL Runtime
+```
 
 ## 二、阶段目标
 
 把 Phase 2.6 的 Semantic Applicability 能力转化为可执行 Dimension QueryPlan，并形成 SQL 闭环。
-
-核心原则：
-
-> Dimension 不要求必须存在独立主表。存在可识别关联主表时采用 `MasterJoin`；不存在关联主表时采用 `DirectKey`，直接使用业务事实表中的 Dimension Entity Key / Business Key 进行分组汇总。
-
-最终链路：
-
-```text
-User Question
-↓
-Semantic Resolution
-↓
-Metric Resolution
-↓
-Dimension Resolution
-↓
-┌───────────────────┬───────────────────┐
-│ MasterJoin        │ DirectKey         │
-│ JOIN 关联主表     │ 事实表直接聚合     │
-└───────────────────┴───────────────────┘
-↓
-DimensionAware QueryPlan
-↓
-SQL Builder
-↓
-SQL Runtime
-↓
-Correct Result
-```
 
 ## 三、阶段边界
 
@@ -76,14 +68,7 @@ Correct Result
 
 ### 规则 2：优先识别 Dimension Entity Key
 
-优先寻找：
-
-- Primary Key；
-- Foreign Key；
-- Business Key；
-- 业务实体编码 / ID。
-
-不得把事实明细表自身主键误认为 Dimension Key。
+优先寻找 Primary Key、Foreign Key、Business Key、业务实体编码 / ID。不得把事实明细表自身主键误认为 Dimension Key。
 
 ### 规则 3：存在关联主表 → MasterJoin
 
@@ -131,100 +116,69 @@ DimensionResolution
 └── Confidence
 ```
 
-`MasterJoin` 必须能解释 DimensionTable、DimensionKeyColumn、DimensionLabelColumn；`DirectKey` 必须能解释 FactTable、FactKeyColumn，Label 存在时同时保留。
-
 ## 六、完整开发任务与步骤
 
 ### STEP-D01 — Phase 2.6 Exit / master 基线审计
-
 确认上一阶段 Exit 状态、当前源码、文档、Golden、Runtime、Gate 与风险。
 
 ### STEP-D02 — Metadata Dimension Entity Key 审计
-
 确认真实 Metadata 中 Dimension Key / Code / Name / Relation，不虚构主表。
 
 ### STEP-D03 — Master Table / Relation 审计
-
 确定哪些 Dimension 能走 MasterJoin，哪些只能 DirectKey。
 
 ### STEP-D04 — Contract / Model 设计
-
 定义 `DimensionResolution`、`ResolutionMode`、Key / Label / Join 信息。
 
 ### STEP-D05 — Dimension Entity Key Resolver 实现
-
 实现稳定 Dimension Entity Key / Business Key 识别，并排除事实明细主键误识别。
 
 ### STEP-D06 — Master Table Detection 实现
-
 根据 Metadata Relation / Column / Table Semantic 判断关联主表。
 
 ### STEP-D07 — Dimension Resolution 实现
-
 形成 MasterJoin / DirectKey / NotResolved 三种明确结果。
 
 ### STEP-D08 — QueryPlan Dimension Binding
-
 QueryPlan 消费 DimensionResolution，不再进行无上下文全库 Semantic Search。
 
 ### STEP-D09 — MasterJoin QueryPlan
-
-形成：
-
-```text
-Fact → Join → Master Dimension → GroupBy → Metric Aggregation
-```
+形成 Fact → Join → Master Dimension → GroupBy → Metric Aggregation。
 
 ### STEP-D10 — DirectKey QueryPlan
-
-形成：
-
-```text
-Fact DimensionKey / Label → GroupBy → Metric Aggregation
-```
+形成 Fact DimensionKey / Label → GroupBy → Metric Aggregation。
 
 ### STEP-D11 — SQL Builder 双路径闭环
-
 分别生成 MasterJoin JOIN SQL 与 DirectKey GROUP BY SQL。
 
 ### STEP-D12 — Static Contract / DI / Namespace 审计
-
 确认 Models / Interfaces / Services / Infrastructure / DI / Controller 调用链一致。
 
 ### STEP-D13 — Build
-
 执行 Release Build，失败不得进入 Runtime。
 
 ### STEP-D14 — Controller / Runtime
-
 使用现有 Controller / Action 验证，不新建独立 Test Project。
 
 ### STEP-D15 — MasterJoin Golden
-
 验证有真实关联主表时 JOIN 正确。
 
 ### STEP-D16 — DirectKey Golden
-
 验证无关联主表时事实表直接聚合正确。
 
 ### STEP-D17 — SameTable / CrossTable Golden
-
 覆盖同表 Dimension 与跨表 Dimension。
 
 ### STEP-D18 — Ambiguous / NotResolved Safety Regression
-
 确保安全边界不因 Positive Pass 增强而回归。
 
 ### STEP-D19 — Full Golden Regression
-
 执行项目正式 Golden Regression。
 
 ### STEP-D20 — Coverage / Quality / Release Gate
-
 依次完成 Coverage、Quality、Release Gate。
 
 ### STEP-D21 — Phase 2.7 Exit Review
-
 确认所有任务、Runtime、Golden、Gate、文档、Commit 均闭环。
 
 ## 七、开发任务与 Runtime STEP 对应
@@ -259,7 +213,23 @@ Fact DimensionKey / Label → GroupBy → Metric Aggregation
 
 重点使用当前真实 Metadata，不虚构 supplier/material 主表。
 
-## 九、Exit Criteria
+## 九、恢复锚点
+
+任何会话恢复时，按以下顺序读取：
+
+```text
+主开发计划
+↓
+本 Phase 开发测试计划
+↓
+本 Phase Runtime 分步测试记录
+↓
+最新 master Commit
+```
+
+然后从 Runtime 记录中最后一个未 PASS 的 STEP 继续，不重复已有正式证据。
+
+## 十、Exit Criteria
 
 必须全部满足：
 
