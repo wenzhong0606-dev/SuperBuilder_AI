@@ -1,9 +1,9 @@
 using Microsoft.EntityFrameworkCore;
 using SuperBuilder_AI.Data;
 using SuperBuilder_AI.Interfaces;
-using SuperBuilder_AI.Interfaces.BI;
 using SuperBuilder_AI.Models.AI;
 using SuperBuilder_AI.Models.BI;
+using SuperBuilder_AI.Models.Metadata;
 
 namespace SuperBuilder_AI.Services.BI;
 
@@ -13,6 +13,10 @@ namespace SuperBuilder_AI.Services.BI;
 /// </summary>
 public sealed class DimensionResolutionEvidenceService : IDimensionResolutionEvidenceService
 {
+    private const double MasterJoinThreshold = 0.80d;
+    private const double DirectKeyThreshold = 0.65d;
+    private const double AmbiguityGap = 0.05d;
+
     private readonly SuperBIContext _context;
     private readonly IMetadataSemanticSearchService _semanticSearchService;
 
@@ -25,11 +29,10 @@ public sealed class DimensionResolutionEvidenceService : IDimensionResolutionEvi
     }
 
     public async Task<DimensionResolutionEvidence?> ResolveAsync(
+        string dimensionSemanticText,
         long factTableId,
         long factDataSourceId,
-        string dimensionSemanticText,
-        long preferredColumnId,
-        CancellationToken cancellationToken = default)
+        int topK = 20)
     {
         if (factTableId <= 0 || factDataSourceId <= 0 || string.IsNullOrWhiteSpace(dimensionSemanticText))
             return null;
@@ -37,32 +40,95 @@ public sealed class DimensionResolutionEvidenceService : IDimensionResolutionEvi
         var fact = await _context.MetadataTables
             .Include(x => x.Columns)
             .AsNoTracking()
-            .FirstOrDefaultAsync(x => x.Id == factTableId && x.DataSourceId == factDataSourceId, cancellationToken);
+            .FirstOrDefaultAsync(x => x.Id == factTableId && x.DataSourceId == factDataSourceId);
 
         if (fact?.Columns is null)
             return null;
 
-        var preferred = fact.Columns.FirstOrDefault(x => x.Id == preferredColumnId);
-        if (preferred is null)
+        // 第一步：只在当前事实表中寻找 Dimension Key Candidate。
+        // 不允许使用 Metric Column 代替 Dimension Key，也不允许硬编码 material_id/supplier_id。
+        var factSearch = await _semanticSearchService.SearchAsync(dimensionSemanticText, Math.Max(topK, 20));
+        var factCandidates = factSearch
+            .Where(x => x.IsSemanticVector && x.Table?.Id == fact.Id && x.Column is not null)
+            .Where(x => HasDimensionEvidence(x, dimensionSemanticText))
+            .GroupBy(x => x.Column!.Id)
+            .Select(g => g.OrderByDescending(x => x.Score).First())
+            .OrderByDescending(x => ScoreFactCandidate(x, dimensionSemanticText))
+            .ToList();
+
+        if (factCandidates.Count == 0)
             return null;
 
-        // DirectKey 只能建立在已经解析出的事实表候选字段上；不从字段名硬编码推导 material_id/supplier_id。
-        var masterCandidates = await _semanticSearchService.SearchAsync(dimensionSemanticText, 20);
-        var candidates = masterCandidates
+        var bestFact = factCandidates[0];
+        var secondFact = factCandidates.Skip(1).FirstOrDefault();
+        var bestFactScore = ScoreFactCandidate(bestFact, dimensionSemanticText);
+        var secondFactScore = secondFact is null ? 0d : ScoreFactCandidate(secondFact, dimensionSemanticText);
+
+        if (secondFact is not null && bestFactScore - secondFactScore <= AmbiguityGap)
+        {
+            return new DimensionResolutionEvidence
+            {
+                ResolutionType = "Ambiguous",
+                ExecutionCapability = "NotExecutable",
+                FactTableId = fact.Id,
+                FactDataSourceId = fact.DataSourceId,
+                FactKeyColumnId = bestFact.Column!.Id,
+                FactTable = fact.TableName ?? string.Empty,
+                FactKeyColumn = bestFact.Column.ColumnName ?? string.Empty,
+                Score = bestFactScore,
+                Reason = "当前事实表存在多个分差不足的 Dimension Key 候选，禁止猜测。"
+            };
+        }
+
+        if (bestFactScore < DirectKeyThreshold)
+            return new DimensionResolutionEvidence
+            {
+                ResolutionType = "NotResolved",
+                ExecutionCapability = "NotExecutable",
+                FactTableId = fact.Id,
+                FactDataSourceId = fact.DataSourceId,
+                FactKeyColumnId = bestFact.Column!.Id,
+                FactTable = fact.TableName ?? string.Empty,
+                FactKeyColumn = bestFact.Column.ColumnName ?? string.Empty,
+                Score = bestFactScore,
+                Reason = "当前事实表没有足够稳定的 Dimension Key Evidence。"
+            };
+
+        // 第二步：在当前 Tenant 的 Metadata Snapshot 中寻找 Master Evidence。
+        // Master 的判定来自 Metadata/Semantic Evidence，而不是业务表名硬编码。
+        var tenantTables = await _context.MetadataTables
+            .Include(x => x.Columns)
+                .ThenInclude(x => x.Semantic)
+            .AsNoTracking()
+            .Where(x => x.TenantId == fact.TenantId && x.Id != fact.Id)
+            .ToListAsync();
+
+        var masterSearch = await _semanticSearchService.SearchAsync(dimensionSemanticText, Math.Max(topK, 20));
+        var masterCandidates = masterSearch
             .Where(x => x.IsSemanticVector && x.Table is not null && x.Column is not null)
+            .Where(x => x.Table!.Id != fact.Id && x.Table.TenantId == fact.TenantId)
             .Where(x => x.Column!.IsPrimaryKey == true)
-            .Where(x => x.Table!.Id != fact.Id)
             .Where(x => HasDimensionEvidence(x, dimensionSemanticText))
             .GroupBy(x => $"{x.Table!.Id}:{x.Column!.Id}", StringComparer.OrdinalIgnoreCase)
             .Select(g => g.OrderByDescending(x => x.Score).First())
+            .Select(x => new
+            {
+                Candidate = x,
+                Score = ScoreMasterCandidate(x, bestFact.Column!, dimensionSemanticText)
+            })
             .OrderByDescending(x => x.Score)
             .ToList();
 
-        var master = candidates.FirstOrDefault();
-        if (master is not null)
+        var bestMaster = masterCandidates.FirstOrDefault();
+        var secondMaster = masterCandidates.Skip(1).FirstOrDefault();
+
+        if (bestMaster is not null &&
+            bestMaster.Score >= MasterJoinThreshold &&
+            (secondMaster is null || bestMaster.Score - secondMaster.Score > AmbiguityGap))
         {
+            var master = bestMaster.Candidate;
             var sameDataSource = master.Table!.DataSourceId == fact.DataSourceId;
-            var label = await FindLabelColumnAsync(master.Table.Id, master.Column!.Id, dimensionSemanticText, cancellationToken);
+            var label = await FindLabelColumnAsync(master.Table.Id, master.Column!.Id, dimensionSemanticText);
 
             return new DimensionResolutionEvidence
             {
@@ -70,9 +136,9 @@ public sealed class DimensionResolutionEvidenceService : IDimensionResolutionEvi
                 ExecutionCapability = sameDataSource ? "Executable" : "NotExecutable",
                 FactTableId = fact.Id,
                 FactDataSourceId = fact.DataSourceId,
-                FactKeyColumnId = preferred.Id,
+                FactKeyColumnId = bestFact.Column!.Id,
                 FactTable = fact.TableName ?? string.Empty,
-                FactKeyColumn = preferred.ColumnName ?? string.Empty,
+                FactKeyColumn = bestFact.Column.ColumnName ?? string.Empty,
                 MasterTableId = master.Table.Id,
                 MasterDataSourceId = master.Table.DataSourceId,
                 MasterTable = master.Table.TableName,
@@ -80,44 +146,40 @@ public sealed class DimensionResolutionEvidenceService : IDimensionResolutionEvi
                 MasterKeyColumn = master.Column.ColumnName,
                 MasterLabelColumnId = label?.Id,
                 MasterLabelColumn = label?.ColumnName,
-                Score = master.Score,
+                Score = bestMaster.Score,
                 Reason = sameDataSource
-                    ? "当前 Metadata Snapshot 存在语义稳定且目标字段为主键的 Master Evidence。"
-                    : "当前 Metadata Snapshot 存在跨 DataSource Master Evidence，但当前 SQL Runtime 未允许跨 DataSource 执行。"
+                    ? "当前 Metadata Snapshot 存在稳定的 Master Key Semantic Evidence。"
+                    : "发现跨 DataSource Master Evidence，但当前 SQL Runtime 不执行跨 DataSource Join。"
             };
         }
 
-        // 没有可执行 Master Evidence 时，保留当前事实表候选作为 DirectKey。
-        // 这里不要求 preferred 字段是主键：外键/业务键可以作为事实表上的稳定维度 Key。
+        // 没有稳定 Master 时，才允许 DirectKey。
         return new DimensionResolutionEvidence
         {
             ResolutionType = "DirectKey",
             ExecutionCapability = "Executable",
             FactTableId = fact.Id,
             FactDataSourceId = fact.DataSourceId,
-            FactKeyColumnId = preferred.Id,
+            FactKeyColumnId = bestFact.Column!.Id,
             FactTable = fact.TableName ?? string.Empty,
-            FactKeyColumn = preferred.ColumnName ?? string.Empty,
-            Score = 1d,
-            Reason = "当前 Metadata Snapshot 未发现稳定 Master Evidence，保留已解析的事实表 Dimension Key，采用 DirectKey。"
+            FactKeyColumn = bestFact.Column.ColumnName ?? string.Empty,
+            Score = bestFactScore,
+            Reason = "当前 Metadata Snapshot 未形成稳定 Master Evidence；事实表存在稳定 Dimension Key，因此采用 DirectKey。"
         };
     }
 
-    private async Task<SuperBuilder_AI.Models.Metadata.MetadataColumn?> FindLabelColumnAsync(
-        long tableId,
-        long keyColumnId,
-        string dimensionSemanticText,
-        CancellationToken cancellationToken)
+    private async Task<MetadataColumn?> FindLabelColumnAsync(long tableId, long keyColumnId, string dimensionSemanticText)
     {
         var table = await _context.MetadataTables
             .Include(x => x.Columns)
             .AsNoTracking()
-            .FirstOrDefaultAsync(x => x.Id == tableId, cancellationToken);
+            .FirstOrDefaultAsync(x => x.Id == tableId);
+
         if (table?.Columns is null)
             return null;
 
         var search = await _semanticSearchService.SearchAsync(dimensionSemanticText, 10);
-        var tableIds = search
+        var searchedIds = search
             .Where(x => x.Table?.Id == tableId && x.Column is not null && x.Column.Id != keyColumnId)
             .OrderByDescending(x => x.Score)
             .Select(x => x.Column!.Id)
@@ -125,15 +187,60 @@ public sealed class DimensionResolutionEvidenceService : IDimensionResolutionEvi
 
         return table.Columns
             .Where(x => x.Id != keyColumnId)
-            .OrderByDescending(x => tableIds.Contains(x.Id))
-            .ThenBy(x => x.IsPrimaryKey == true)
+            .OrderByDescending(x => searchedIds.Contains(x.Id))
+            .ThenBy(x => LooksLikeIdentifier(x.ColumnName))
             .FirstOrDefault();
+    }
+
+    private static double ScoreFactCandidate(MetadataSemanticSearchResult candidate, string semanticText)
+    {
+        var score = Math.Clamp(candidate.Score, 0d, 1d) * 0.65d;
+        var column = candidate.Column;
+        if (column is null) return 0d;
+
+        var normalizedSemantic = Normalize(semanticText);
+        var text = Normalize(string.Join(" ",
+            column.ColumnName,
+            column.ColumnComment,
+            column.SearchText,
+            candidate.Semantic?.BusinessMeaning,
+            candidate.Semantic?.Keywords,
+            candidate.Semantic?.Synonyms,
+            candidate.Semantic?.ExampleQuestions));
+
+        if (Contains(text, normalizedSemantic)) score += 0.20d;
+        if (LooksLikeIdentifier(column.ColumnName)) score += 0.10d;
+        if (column.IsPrimaryKey == true) score -= 0.20d; // Fact table own PK is not automatically the requested Dimension Key.
+        return Math.Clamp(score, 0d, 1d);
+    }
+
+    private static double ScoreMasterCandidate(
+        MetadataSemanticSearchResult candidate,
+        MetadataColumn factKey,
+        string dimensionSemanticText)
+    {
+        if (candidate.Table is null || candidate.Column is null)
+            return 0d;
+
+        var score = Math.Clamp(candidate.Score, 0d, 1d) * 0.55d;
+        var semantic = Normalize(dimensionSemanticText);
+        var tableText = Normalize(string.Join(" ", candidate.Table.TableName, candidate.Table.TableComment, candidate.Table.SearchText, candidate.Table.BusinessDomain));
+        var keyText = Normalize(string.Join(" ", candidate.Column.ColumnName, candidate.Column.ColumnComment, candidate.Column.SearchText, candidate.Semantic?.BusinessMeaning, candidate.Semantic?.Keywords, candidate.Semantic?.Synonyms));
+
+        if (Contains(tableText, semantic)) score += 0.20d;
+        if (Contains(keyText, semantic)) score += 0.10d;
+        if (candidate.Column.IsPrimaryKey == true) score += 0.10d;
+        if (SameIdentifier(candidate.Column.ColumnName, factKey.ColumnName)) score += 0.10d;
+        return Math.Clamp(score, 0d, 1d);
     }
 
     private static bool HasDimensionEvidence(MetadataSemanticSearchResult candidate, string semanticText)
     {
+        if (candidate.Table is null || candidate.Column is null)
+            return false;
+
         var normalized = Normalize(semanticText);
-        if (normalized.Length == 0 || candidate.Table is null || candidate.Column is null)
+        if (normalized.Length == 0)
             return false;
 
         var values = new[]
@@ -141,17 +248,38 @@ public sealed class DimensionResolutionEvidenceService : IDimensionResolutionEvi
             candidate.Table.TableName,
             candidate.Table.TableComment,
             candidate.Table.SearchText,
+            candidate.Table.BusinessDomain,
             candidate.Column.ColumnName,
             candidate.Column.ColumnComment,
+            candidate.Column.SearchText,
             candidate.Semantic?.BusinessMeaning,
             candidate.Semantic?.Keywords,
             candidate.Semantic?.Synonyms,
-            candidate.Semantic?.SearchText,
-            candidate.Semantic?.ExampleQuestions
+            candidate.Semantic?.ExampleQuestions,
+            candidate.Semantic?.SearchText
         };
 
-        return values.Any(x => !string.IsNullOrWhiteSpace(x) && Normalize(x).Contains(normalized, StringComparison.OrdinalIgnoreCase));
+        return values.Any(x => !string.IsNullOrWhiteSpace(x) && Contains(Normalize(x), normalized));
     }
 
-    private static string Normalize(string value) => value.Trim().Replace(" ", string.Empty, StringComparison.Ordinal);
+    private static bool SameIdentifier(string? left, string? right)
+        => NormalizeIdentifier(left) == NormalizeIdentifier(right) && NormalizeIdentifier(left).Length > 0;
+
+    private static bool LooksLikeIdentifier(string? name)
+    {
+        var n = NormalizeIdentifier(name);
+        return n.EndsWith("id", StringComparison.OrdinalIgnoreCase)
+            || n.EndsWith("code", StringComparison.OrdinalIgnoreCase)
+            || n.EndsWith("key", StringComparison.OrdinalIgnoreCase)
+            || n.EndsWith("no", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string NormalizeIdentifier(string? value)
+        => new((value ?? string.Empty).Where(char.IsLetterOrDigit).ToArray()).ToLowerInvariant();
+
+    private static string Normalize(string? value)
+        => (value ?? string.Empty).Trim().Replace(" ", string.Empty, StringComparison.Ordinal).ToLowerInvariant();
+
+    private static bool Contains(string text, string value)
+        => value.Length > 0 && text.Contains(value, StringComparison.OrdinalIgnoreCase);
 }
