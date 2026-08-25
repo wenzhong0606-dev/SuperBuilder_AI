@@ -25,11 +25,8 @@ public static class QueryPlanSemanticResolutionFactory
 
         var dimensions = applicability.DimensionResolutions.Select(x =>
         {
-            if (string.IsNullOrWhiteSpace(x.ResolutionType) ||
-                string.Equals(x.ResolutionType, "NotResolved", StringComparison.OrdinalIgnoreCase) ||
-                !string.Equals(x.ExecutionCapability, "Executable", StringComparison.OrdinalIgnoreCase))
+            if (string.IsNullOrWhiteSpace(x.ResolutionType) || string.Equals(x.ResolutionType, "NotResolved", StringComparison.OrdinalIgnoreCase) || !string.Equals(x.ExecutionCapability, "Executable", StringComparison.OrdinalIgnoreCase))
                 throw new InvalidOperationException($"Dimension Semantic Resolution 不可执行：SemanticText={x.SemanticText}，ResolutionType={x.ResolutionType}，ExecutionCapability={x.ExecutionCapability}。");
-
             if (x.TableId <= 0 || x.DataSourceId <= 0 || x.ColumnId <= 0 || string.IsNullOrWhiteSpace(x.Table) || string.IsNullOrWhiteSpace(x.Column))
                 throw new InvalidOperationException($"Dimension Semantic Resolution 物理绑定不完整：SemanticText={x.SemanticText}。");
 
@@ -37,12 +34,14 @@ public static class QueryPlanSemanticResolutionFactory
             var isDirectKey = string.Equals(x.ResolutionType, "DirectKey", StringComparison.OrdinalIgnoreCase);
             if (!isMasterJoin && !isDirectKey)
                 throw new InvalidOperationException($"Dimension Semantic Resolution 类型非法：SemanticText={x.SemanticText}，ResolutionType={x.ResolutionType}。");
-
             if (!x.DimensionKeyColumnId.HasValue || string.IsNullOrWhiteSpace(x.DimensionKeyColumn))
                 throw new InvalidOperationException($"Dimension Semantic Resolution 缺少稳定 Dimension Key：SemanticText={x.SemanticText}。");
-
             if (isMasterJoin && (!x.DimensionLabelColumnId.HasValue || string.IsNullOrWhiteSpace(x.DimensionLabelColumn)))
                 throw new InvalidOperationException($"MasterJoin Dimension Resolution 缺少 Master Label Column：SemanticText={x.SemanticText}。");
+            if (isMasterJoin && (!x.MasterTableId.HasValue || !x.MasterDataSourceId.HasValue || !x.MasterKeyColumnId.HasValue || string.IsNullOrWhiteSpace(x.MasterTable) || string.IsNullOrWhiteSpace(x.MasterKeyColumn)))
+                throw new InvalidOperationException($"MasterJoin Dimension Resolution 缺少完整 Master Binding：SemanticText={x.SemanticText}。");
+            if (isDirectKey && (x.MasterTableId.HasValue || x.MasterKeyColumnId.HasValue || x.MasterLabelColumnId.HasValue))
+                throw new InvalidOperationException($"DirectKey Dimension Resolution 不应携带 Master Binding：SemanticText={x.SemanticText}。");
 
             return new QueryPlanDimensionResolution
             {
@@ -59,7 +58,12 @@ public static class QueryPlanSemanticResolutionFactory
                 DimensionKeyColumnId = x.DimensionKeyColumnId,
                 DimensionKeyColumn = x.DimensionKeyColumn,
                 DimensionLabelColumnId = x.DimensionLabelColumnId,
-                DimensionLabelColumn = x.DimensionLabelColumn
+                DimensionLabelColumn = x.DimensionLabelColumn,
+                MasterTableId = x.MasterTableId,
+                MasterDataSourceId = x.MasterDataSourceId,
+                MasterTable = x.MasterTable,
+                MasterKeyColumnId = x.MasterKeyColumnId,
+                MasterKeyColumn = x.MasterKeyColumn
             };
         }).ToList();
 
@@ -74,33 +78,14 @@ public static class QueryPlanSemanticResolutionFactory
         };
     }
 
-    /// <summary>
-    /// Ranking-aware resolution：仅在 QueryIntent 明确声明 Ranking + OrderBy 时创建 Order Resolution。
-    /// 物理列必须复用已经确认的 Metric Resolution，禁止重新进行 Semantic Search。
-    /// </summary>
-    public static QueryPlanSemanticResolution From(
-        SemanticApplicabilityResult applicability,
-        QueryIntent intent)
+    public static QueryPlanSemanticResolution From(SemanticApplicabilityResult applicability, QueryIntent intent)
     {
         ArgumentNullException.ThrowIfNull(intent);
-
         var resolution = From(applicability);
-
-        if (!intent.IsRanking || string.IsNullOrWhiteSpace(intent.OrderBy))
-            return resolution;
-
-        var candidates = resolution.Metrics
-            .Where(x =>
-                string.Equals(x.SemanticText, intent.OrderBy, StringComparison.OrdinalIgnoreCase)
-                || string.Equals(x.Column, intent.OrderBy, StringComparison.OrdinalIgnoreCase))
-            .ToList();
-
-        if (candidates.Count == 0)
-            throw new InvalidOperationException($"Ranking Order 无法绑定到已确认的 Metric Resolution：OrderBy={intent.OrderBy}。");
-
-        if (candidates.Count > 1)
-            throw new InvalidOperationException($"Ranking Order 存在多个 Metric Resolution 候选，禁止猜测：OrderBy={intent.OrderBy}，Candidates={candidates.Count}。");
-
+        if (!intent.IsRanking || string.IsNullOrWhiteSpace(intent.OrderBy)) return resolution;
+        var candidates = resolution.Metrics.Where(x => string.Equals(x.SemanticText, intent.OrderBy, StringComparison.OrdinalIgnoreCase) || string.Equals(x.Column, intent.OrderBy, StringComparison.OrdinalIgnoreCase)).ToList();
+        if (candidates.Count == 0) throw new InvalidOperationException($"Ranking Order 无法绑定到已确认的 Metric Resolution：OrderBy={intent.OrderBy}。");
+        if (candidates.Count > 1) throw new InvalidOperationException($"Ranking Order 存在多个 Metric Resolution 候选，禁止猜测：OrderBy={intent.OrderBy}，Candidates={candidates.Count}。");
         var metric = candidates[0];
         return new QueryPlanSemanticResolution
         {
@@ -108,20 +93,7 @@ public static class QueryPlanSemanticResolutionFactory
             Filters = resolution.Filters,
             Dimensions = resolution.Dimensions,
             Tables = resolution.Tables,
-            Orders = new[]
-            {
-                new QueryPlanOrderResolution
-                {
-                    TableId = metric.TableId,
-                    DataSourceId = metric.DataSourceId,
-                    ColumnId = metric.ColumnId,
-                    SemanticText = metric.SemanticText,
-                    Table = metric.Table,
-                    Column = metric.Column,
-                    BusinessMeaning = metric.BusinessMeaning,
-                    Score = metric.Score
-                }
-            }
+            Orders = new[] { new QueryPlanOrderResolution { TableId = metric.TableId, DataSourceId = metric.DataSourceId, ColumnId = metric.ColumnId, SemanticText = metric.SemanticText, Table = metric.Table, Column = metric.Column, BusinessMeaning = metric.BusinessMeaning, Score = metric.Score } }
         };
     }
 }
