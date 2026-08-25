@@ -98,6 +98,43 @@ ResolutionMode = DirectKey
 
 既无法 MasterJoin，又无法稳定 DirectKey 时，保持 `NotResolved`，禁止继续构建可执行 QueryPlan。
 
+### 规则 7：统一 Dimension Resolution Contract（2026-08-25 新增冻结规则）
+
+本规则来源于 Phase 2.6 GQ-006 真实 Runtime：Metadata 中不存在“物料”独立主表时，旧逻辑直接 `NotResolved`。经业务规则确认，这不是“必须存在主表”的前提，而必须进入 DirectKey 判断。
+
+正式规则如下：
+
+1. 优先检查是否存在可由 Metadata Relation / ForeignKey / BusinessKey 证明的稳定关联主表。
+2. 存在稳定关联主表时：`ResolutionMode = MasterJoin`，使用已确认的 Entity Key 建立 JOIN；不得猜测主表。
+3. 不存在关联主表时：不得仅因缺少主表直接 `NotResolved`；必须继续检查事实表是否存在稳定 Dimension Key / Code / Name 等可直接绑定字段。
+4. 存在稳定 DirectKey 时：`ResolutionMode = DirectKey`，不产生 JOIN，直接使用事实表 Dimension Key / Label 进行 GROUP BY / Ranking。
+5. 既无稳定 MasterJoin，也无稳定 DirectKey 时：`ResolutionState = NotResolved`，安全 BLOCK。
+6. 存在多个无法消歧的 Entity Binding 候选时：`ResolutionState = Ambiguous`，安全 REVIEW / BLOCK，不得猜测。
+7. 禁止为了通过 GQ-006、GQ-010 或任何 Golden Case 硬编码 `material`、`supplier`、`customer` 等主表。
+8. `MasterJoin` 与 `DirectKey` 必须使用统一 `DimensionResolution` Contract；QueryPlan、SQL Builder、Runtime 不得各自重新进行无上下文 Semantic Search。
+9. 新增 DirectKey 能力不得改变已经正确的 MasterJoin 行为；新增 Dimension Resolution 能力必须通过兼容性 Golden Regression 验证。
+10. GQ-006 当前 `NotResolved` 记录为 Dimension Resolution 能力缺口，不归因于 GQ-011 Ranking Order Resolution 修复；不得修改 GQ-011 修复代码以绕过该缺口。
+
+### 规则 8：兼容性与回归要求
+
+任何 Dimension Resolution 修改必须证明：
+
+```text
+已有正确 MasterJoin
+        ↓
+行为不变
+
+新增 DirectKey
+        ↓
+仅覆盖原本因缺少主表而无法解析、但存在稳定事实表 Dimension Key / Label 的 Case
+
+Ambiguous / NotResolved
+        ↓
+继续安全阻断
+```
+
+如果发现兼容性问题，必须停止后续依赖步骤，完成源码根因审计后再修改；不得以“修复一个 Golden Case”为理由破坏其他已正确 Case。
+
 ## 五、核心 Contract
 
 统一形成：
