@@ -106,35 +106,39 @@ public sealed class SemanticApplicabilityEvaluator
     private async Task<SemanticApplicabilityDimensionResolution?> ResolveDimensionAsync(GoldenDimensionExpectation dimension, int topK, IReadOnlyList<SemanticApplicabilityMetricResolution> metricResolutions)
     {
         if (string.IsNullOrWhiteSpace(dimension.SemanticText)) return null;
-        var queries = BuildDimensionSearchQueries(dimension.SemanticText); var allCandidates = new List<MetadataSemanticSearchResult>();
-        foreach (var query in queries) allCandidates.AddRange(await _semanticSearchService.SearchAsync(query, topK));
-        var candidates = allCandidates.Where(x => x.IsSemanticVector && x.Table is not null && x.Column is not null).GroupBy(GetCandidateBindingKey, StringComparer.OrdinalIgnoreCase).Select(g => g.OrderByDescending(x => x.Score).First()).OrderByDescending(x => x.Score).ToList();
-        var direct = candidates.Where(x => ContainsSemanticText(x, dimension.SemanticText) || ContainsDimensionEntityEvidence(x, dimension.SemanticText)).ToList();
-        if (direct.Count == 0 || (direct.Count > 1 && direct[0].Score - direct[1].Score <= AmbiguityScoreGapThreshold)) return null;
-        var metric = metricResolutions.FirstOrDefault(); if (metric is null) return null;
-        var evidence = await _dimensionEvidenceService.ResolveAsync(metric.TableId, metric.DataSourceId, dimension.SemanticText, metric.ColumnId);
+        var metric = metricResolutions.FirstOrDefault();
+        if (metric is null) return null;
+
+        // DimensionResolutionEvidenceService 是 Dimension 的权威物理绑定判定器。
+        // 不再要求通用 Semantic Search 在 topK 中先返回包含 Dimension 文本的 Column Candidate，
+        // 否则会把“语义搜索排序失败”和“Dimension 物理绑定不存在”错误混为同一层问题。
+        var evidence = await _dimensionEvidenceService.ResolveAsync(
+            metric.TableId,
+            metric.DataSourceId,
+            dimension.SemanticText,
+            metric.ColumnId);
+
         if (evidence is null || !string.Equals(evidence.ExecutionCapability, "Executable", StringComparison.OrdinalIgnoreCase)) return null;
         if (string.Equals(evidence.ResolutionType, "Ambiguous", StringComparison.OrdinalIgnoreCase) || string.Equals(evidence.ResolutionType, "NotResolved", StringComparison.OrdinalIgnoreCase)) return null;
-        var candidate = direct[0];
+
+        var candidates = (await _semanticSearchService.SearchAsync(dimension.SemanticText, topK))
+            .Where(x => x.IsSemanticVector && x.Table is not null && x.Column is not null)
+            .GroupBy(GetCandidateBindingKey, StringComparer.OrdinalIgnoreCase)
+            .Select(g => g.OrderByDescending(x => x.Score).First())
+            .OrderByDescending(x => x.Score)
+            .ToList();
+        var candidate = candidates.FirstOrDefault(x => ContainsSemanticText(x, dimension.SemanticText) || ContainsDimensionEntityEvidence(x, dimension.SemanticText));
+
         return new SemanticApplicabilityDimensionResolution
         {
             TableId = evidence.FactTableId, DataSourceId = evidence.FactDataSourceId, ColumnId = evidence.FactKeyColumnId, SemanticText = dimension.SemanticText,
-            Table = evidence.FactTable, Column = evidence.FactKeyColumn, BusinessMeaning = candidate.Semantic?.BusinessMeaning, Score = evidence.Score,
+            Table = evidence.FactTable, Column = evidence.FactKeyColumn, BusinessMeaning = candidate?.Semantic?.BusinessMeaning, Score = evidence.Score,
             ResolutionType = evidence.ResolutionType, ExecutionCapability = evidence.ExecutionCapability,
             DimensionKeyColumnId = evidence.FactKeyColumnId, DimensionKeyColumn = evidence.FactKeyColumn,
             DimensionLabelColumnId = evidence.MasterLabelColumnId, DimensionLabelColumn = evidence.MasterLabelColumn,
             MasterTableId = evidence.MasterTableId, MasterDataSourceId = evidence.MasterDataSourceId, MasterTable = evidence.MasterTable,
             MasterKeyColumnId = evidence.MasterKeyColumnId, MasterKeyColumn = evidence.MasterKeyColumn
         };
-    }
-
-    private static IReadOnlyList<string> BuildDimensionSearchQueries(string semanticText)
-    {
-        var queries = new List<string> { semanticText };
-        var normalized = semanticText.Trim();
-        if (normalized.EndsWith("名称", StringComparison.Ordinal)) queries.Add(normalized[..^2]);
-        if (normalized.EndsWith("编码", StringComparison.Ordinal)) queries.Add(normalized[..^2]);
-        return queries.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
     }
 
     private async Task<List<SemanticApplicabilityTableResolution>> ResolveTablesAsync(IReadOnlyList<GoldenTableExpectation>? tables, IReadOnlyList<SemanticApplicabilityMetricResolution> metrics, IReadOnlyList<SemanticApplicabilityFilterResolution> filters, IReadOnlyList<SemanticApplicabilityDimensionResolution> dimensions, int topK)
@@ -191,21 +195,9 @@ public sealed class SemanticApplicabilityEvaluator
         return values.Any(x => !string.IsNullOrWhiteSpace(x) && Normalize(x).Contains(normalized, StringComparison.OrdinalIgnoreCase));
     }
 
-    private static string ExtractEntitySemanticText(string semanticText)
-    {
-        var text = semanticText.Trim();
-        if (text.StartsWith("查询", StringComparison.Ordinal)) text = text[2..];
-        if (text.EndsWith("数量", StringComparison.Ordinal)) text = text[..^2];
-        return text.Trim();
-    }
-
     private static string GetCandidateBindingKey(MetadataSemanticSearchResult result) => $"{result.Table?.Id}:{result.Column?.Id}";
-
     private static SemanticApplicabilityCandidate ToCandidate(MetadataSemanticSearchResult result) => new() { VectorType = result.VectorType, VectorId = result.VectorId, Score = result.Score, Table = result.Table?.TableName, Column = result.Column?.ColumnName, BusinessMeaning = result.Semantic?.BusinessMeaning };
-
     private static SemanticApplicabilityResolution ToResolution(MetadataSemanticSearchResult result) => new() { TableId = result.Table!.Id, DataSourceId = result.Table.DataSourceId, ColumnId = result.Column!.Id, Table = result.Table.TableName, Column = result.Column.ColumnName, BusinessMeaning = result.Semantic?.BusinessMeaning, Score = result.Score };
-
     private static SemanticApplicabilityResult CopyWithFailure(SemanticApplicabilityResult source, string reason) => source with { State = "NotResolved", Reason = reason, Resolution = null };
-
     private static string Normalize(string? value) => (value ?? string.Empty).Trim().Replace(" ", string.Empty, StringComparison.Ordinal).ToLowerInvariant();
 }
