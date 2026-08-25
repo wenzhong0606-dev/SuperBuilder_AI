@@ -201,7 +201,7 @@ public sealed class SemanticApplicabilityEvaluator
 
     private static string GetCandidateBindingKey(MetadataSemanticSearchResult result) => $"{result.Table?.Id}:{result.Column?.Id}";
 
-    private static SemanticApplicabilitySearchCandidate ToCandidate(MetadataSemanticSearchResult result) => new() { TableId = result.Table?.Id ?? 0, DataSourceId = result.Table?.DataSourceId ?? 0, ColumnId = result.Column?.Id ?? 0, Table = result.Table?.TableName, Column = result.Column?.ColumnName, Score = result.Score, BusinessMeaning = result.Semantic?.BusinessMeaning };
+    private static SemanticApplicabilityCandidate ToCandidate(MetadataSemanticSearchResult result) => new() { VectorType = result.VectorType, VectorId = result.VectorId, Score = result.Score, Table = result.Table?.TableName, Column = result.Column?.ColumnName, BusinessMeaning = result.Semantic?.BusinessMeaning };
 
     private static SemanticApplicabilityResolution ToResolution(MetadataSemanticSearchResult result) => new() { TableId = result.Table!.Id, DataSourceId = result.Table.DataSourceId, ColumnId = result.Column!.Id, Table = result.Table.TableName, Column = result.Column.ColumnName, BusinessMeaning = result.Semantic?.BusinessMeaning, Score = result.Score };
 
