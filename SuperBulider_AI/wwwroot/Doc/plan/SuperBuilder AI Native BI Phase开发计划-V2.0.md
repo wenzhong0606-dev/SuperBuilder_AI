@@ -1,6 +1,6 @@
 # SuperBuilder AI Native BI Phase开发计划
 
-> 文档版本：v2.14
+> 文档版本：v2.15
 > 文档性质：项目正式开发基线 + Phase 开发测试管理总计划
 > **唯一源码基线：GitHub `master`**
 > 主计划职责：**仅记录项目当前进度、当前工作单元、当前 STEP、状态、Commit、阻塞与下一步**
@@ -59,6 +59,10 @@
 47. **D09 最终修改范围已冻结：** MasterJoin Binding Contract / Model、D07 Dimension Resolution → D08 QueryPlan Binding → MasterJoin Binding 传递、QueryPlan.Joins 装配、QueryJoinCandidate Evidence 引用、QueryPlanBuilder Resolution 路径隔离旧自动 JOIN、QueryPlanValidator MasterJoin 物理一致性校验，以及必要的最小 Interface / DI 闭环。
 48. **D09 明确禁止修改：** DirectKey 最终 QueryPlan（D10）、SqlQueryBuilder JOIN SQL（D11）、跨独立 DataSource Federation、EntityKey / Relation 核心算法、QueryJoinInferenceService 核心评分、Ranking / Evaluator、Golden、业务主表硬编码。
 49. **D09 兼容性 Gate：** GQ-011 必须继续 PASS 且完全不进入 MasterJoin；GQ-006 / GQ-010 在无稳定 Master 时不得强制 JOIN，未来新增 Metadata Snapshot 后允许重新解析为 MasterJoin；既有 PASS Case 回归时立即停止实现验证并先解决兼容性问题。
+50. **D10 审计结论：DirectKey QueryPlan 全量源码 / Contract 审计已冻结。** 当前 `master` 不存在实际 DirectKey QueryPlan Contract / 实现路径；现有 Dimension Resolution 仍是单物理 Column Binding，未表达 DirectKey Key / Label / ResolutionType / ExecutionCapability。DirectKey 必须作为与 MasterJoin 并列、由当前 Metadata Snapshot 动态决定的第二条 Dimension Execution Path。
+51. **D10 最终修改范围已冻结：** DirectKey Binding Contract / Model、Dimension Resolution 双路径扩展、SemanticApplicabilityEvaluator 接入 D05 EntityKey + D06 Relation、QueryPlanSemanticResolutionFactory 传递 DirectKey、QueryDimension / QueryPlan Binding 扩展、QueryPlanBuilder DirectKey 装配、QueryPlanValidator DirectKey 物理一致性校验，以及必要的最小 Interface / DI 闭环。
+52. **D10 明确禁止修改：** MasterJoin 最终实现（D09）、SqlQueryBuilder JOIN SQL（D11）、跨独立 DataSource Federation、固定业务表 / 字段名、Evaluator / Golden Scoring、Ranking / Order / Limit、Metadata Scanner 全量 Snapshot Reconciliation；DirectKey 不得生成 QueryJoin，不得绕过 Metadata Evidence。
+53. **D10 兼容性 Gate：** GQ-011 必须继续 PASS 且完全不进入 DirectKey；GQ-006 / GQ-010 在当前无 Master 但存在稳定 DirectKey Evidence 时应进入 DirectKey，否则安全 BLOCK；未来新增 Master Relation 后必须允许重新解析为 MasterJoin；任何既有 PASS 回归立即停止实现验证并先解决兼容性问题。
 
 ---
 
@@ -134,9 +138,11 @@
 
 **D09：FROZEN**
 
-### D09 冻结摘要
+**D10：FROZEN**
 
-当前源码的旧自动 JOIN 路径是 `QueryPlanBuilder → BuildJoinsAsync → QueryJoinInferenceService → QueryPlan.Joins`；D09 冻结要求将 `QueryJoinInferenceService` 定位为 Relation Evidence Provider，Executable MasterJoin 必须来自 D07/D08 冻结 Resolution Contract。D09 不修改 SqlQueryBuilder，不跨 DataSource，不硬编码业务主表；D09 功能尚未实现。
+### D10 冻结摘要
+
+当前 `master` 尚未实现 DirectKey QueryPlan。D10 已冻结：DirectKey 必须由当前 Metadata Snapshot 中的稳定 Fact DimensionKey / Label Evidence 形成，不得依赖固定业务主表或字段名；DirectKey 不生成 QueryJoin；Builder 只消费 Resolution，不重新 Semantic Search / Relation 推理；DirectKey 与 MasterJoin 互斥；未来新增 Metadata 后必须允许重新解析为 MasterJoin。
 
 ### 当前 Runtime 基线
 
@@ -146,9 +152,9 @@
 
 ### 下一步
 
-**D10 — DirectKey QueryPlan 全量源码 / Contract 审计。**
+**D11 — SQL Builder 双路径（MasterJoin / DirectKey）全量源码 / Contract 审计。**
 
-D09 已完成审计并冻结，阶段计划和主计划已同步；必须确认 GitHub `master` 文档一致后才进入 D10。
+D10 已完成审计并冻结，阶段计划已更新；本主计划已同步 D10 冻结结论。完成 GitHub `master` 确认后才允许进入 D11。
 
 ---
 
@@ -156,4 +162,5 @@ D09 已完成审计并冻结，阶段计划和主计划已同步；必须确认 
 
 - Phase 2.7 开发测试计划：`SuperBulider_AI/wwwroot/Doc/plan/Phase 2.7 开发测试计划.md`
 - 主开发计划：本文件
-- D09 阶段计划冻结提交：`7e4c99daa23ca02df7826433ac3d0a7e16143822`
+- D10 阶段计划冻结提交：`1422dc0561421be30d2845cdfe8be84180c894a2`
+- 当前主计划版本：`v2.15`
