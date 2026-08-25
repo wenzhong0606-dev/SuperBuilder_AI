@@ -41,6 +41,8 @@
 29. **阶段计划与主计划必须保持状态一致。** 阶段计划已冻结或进入下一 STEP，而主计划未同步时，视为开发流程阻断条件；不得进入下一 STEP。
 30. **标准步骤必须执行“审计 → 最终结论 → 冻结 → 更新阶段计划 → 同步主计划 → 确认 GitHub `master` → 下一 STEP”。** 仅在聊天中宣布冻结或完成，不视为正式完成。
 31. **任何一份正式开发计划发生实质性变更后，必须检查并同步所有受影响的计划 / Runtime 记录。** 不得出现阶段计划、主计划、Runtime 记录三者描述互相矛盾的状态。
+32. **项目长期产品目标：SuperBuilder 最终建设为支持多语言、多租户、多数据库动态接入的 AI Native Low-code Platform。** 后续 Phase 的架构、Contract、Metadata、Semantic Resolution、Runtime 与测试设计必须避免锁定单一行业、单一数据库或单一语言，并为多租户隔离、多语言语义、多数据库动态发现保留扩展边界。
+33. **动态 Metadata Relation 原则：业务数据库关系不得预绑定为永久事实。** Relation Resolution 必须基于当前 Metadata Snapshot 动态计算；当前无法 JOIN 不代表未来永久不能 JOIN；新增数据库、表、字段或 Relation Evidence 后必须允许重新解析并升级为 MasterJoin；Relation Evidence 失效后也必须允许重新计算并安全降级。
 
 ---
 
@@ -105,6 +107,7 @@
 - Runtime / Build / Gate 结果变化
 - 下一 STEP 变化
 - Exit Criteria 变化
+- **项目长期产品目标或平台级架构约束变化**
 
 若阶段计划已更新而主计划未同步，则当前 STEP **不得继续**。
 
