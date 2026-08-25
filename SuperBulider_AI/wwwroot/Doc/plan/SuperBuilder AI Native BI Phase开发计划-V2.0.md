@@ -1,6 +1,6 @@
 # SuperBuilder AI Native BI Phase开发计划
 
-> 文档版本：v2.11
+> 文档版本：v2.12
 > 文档性质：项目正式开发基线 + Phase 开发测试管理总计划
 > **唯一源码基线：GitHub `master`**
 > 主计划职责：**仅记录项目当前进度、当前工作单元、当前 STEP、状态、Commit、阻塞与下一步**
@@ -37,25 +37,26 @@
 25. **阶段开发计划是该 Phase 的完整执行契约；新增任务必须先更新阶段计划再开发。**
 26. **每个 Phase 必须建立对应 Runtime 分步测试记录，记录真实原始 JSON 和 PASS / FAIL / BLOCK / REVIEW。**
 27. **上一 Phase 未满足 Exit Criteria 时，不得把下一 Phase 标记为 COMPLETE；允许提前建立 PLANNED 的入口文档，但不得伪装为已完成。**
-28. **阶段开发计划发生任何实质性变更时，必须同步更新本主开发计划。** 该同步不仅适用于 STEP 开始/完成，也适用于审计结论、冻结结果、修改范围、禁止修改范围、兼容性约束、Runtime / Build / Gate 结果、下一 STEP、Exit Criteria 等任何影响当前开发状态或执行契约的变化。
+28. **阶段开发计划发生任何实质性变更时，必须同步更新本主开发计划。**
 29. **阶段计划与主计划必须保持状态一致。** 阶段计划已冻结或进入下一 STEP，而主计划未同步时，视为开发流程阻断条件；不得进入下一 STEP。
 30. **标准步骤必须执行“审计 → 最终结论 → 冻结 → 更新阶段计划 → 同步主计划 → 确认 GitHub `master` → 下一 STEP”。** 仅在聊天中宣布冻结或完成，不视为正式完成。
-31. **任何一份正式开发计划发生实质性变更后，必须检查并同步所有受影响的计划 / Runtime 记录。** 不得出现阶段计划、主计划、Runtime 记录三者描述互相矛盾的状态。
-32. **项目长期产品目标：SuperBuilder 最终建设为支持多语言、多租户、多数据库动态接入的 AI Native Low-code Platform。** 后续 Phase 的架构、Contract、Metadata、Semantic Resolution、Runtime 与测试设计必须避免锁定单一行业、单一数据库或单一语言，并为多租户隔离、多语言语义、多数据库动态发现保留扩展边界。
-33. **动态 Metadata Relation 原则：业务数据库关系不得预绑定为永久事实。** Relation Resolution 必须基于当前 Metadata Snapshot 动态计算；当前无法 JOIN 不代表未来永久不能 JOIN；新增数据库、表、字段或 Relation Evidence 后必须允许重新解析并升级为 MasterJoin；Relation Evidence 失效后也必须允许重新计算并安全降级。
-34. **D05 审计结论：Dimension Entity Key Resolver 已冻结。** D05 只负责从当前有效 Metadata Snapshot 产生 Entity Key Evidence，不负责 JOIN、QueryPlan、SQL、Ranking、Evaluator、Metadata 扫描、Semantic 生成或 Vector 生成。
-35. **Metadata Lifecycle 为独立后续任务。** 当前 `MetadataScannerService` 已确认具备 DataSource → 数据库结构扫描 → MetadataTable/MetadataColumn → SearchText → AI Semantic → Vector 基础链路，但当前主要是新增/更新/缺失补齐型同步，尚未形成完整 Snapshot Reconciliation、Stale Metadata Invalidation、Semantic Refresh、Vector Refresh Contract；不得将该问题临时塞入 D05 Resolver。
-36. **D05 冻结后必须先更新阶段计划、同步主计划并确认 master，才能进入 D06。**
-37. **D06 审计结论：Dynamic Master Table / Relation Detection 已冻结。** `QueryJoinInferenceService` 保留为 Relation Evidence Provider；新增 Dynamic Relation Resolution 层；QueryPlanBuilder 只消费已解析 Relation；SqlQueryBuilder 只消费 QueryPlan.Joins 并负责 JOIN SQL 落地；Relation Resolution 与 Executable SQL Join 必须分离；Phase 2.7 不实现跨独立 DataSource Federation；无 Dimension 的既有正确 Case（包括 GQ-011）保持原路径。
-38. **D06 冻结后的强制入口：** 必须先更新 Phase 2.7 阶段计划、同步本主计划、确认 GitHub `master` 文档一致，才能进入 D07；D07 必须以 D05 Entity Key Contract + D06 Dynamic Relation Contract 为正式输入。
+31. **任何一份正式开发计划发生实质性变更后，必须检查并同步所有受影响的计划 / Runtime 记录。**
+32. **项目长期产品目标：SuperBuilder 最终建设为支持多语言、多租户、多数据库动态接入的 AI Native Low-code Platform。**
+33. **动态 Metadata Relation 原则：业务数据库关系不得预绑定为永久事实。** Relation Resolution 必须基于当前 Metadata Snapshot 动态计算；新增数据库、表、字段或 Relation Evidence 后必须允许重新解析并升级为 MasterJoin；Relation Evidence 失效后也必须允许重新计算并安全降级。
+34. **D05 审计结论：Dimension Entity Key Resolver Contract 已冻结。** D05 只负责 Entity Key Evidence 边界，不负责 JOIN、QueryPlan、SQL、Ranking、Evaluator、Metadata 扫描、Semantic 生成或 Vector 生成。
+35. **Metadata Lifecycle 为独立后续任务。** 当前 MetadataScannerService 已具备扫描、SearchText、AI Semantic、Vector 基础链路，但尚未形成完整 Snapshot Reconciliation / Stale Invalidation / Semantic Refresh / Vector Refresh Contract。
+36. **D06 审计结论：Dynamic Master Table / Relation Detection 已冻结。** `QueryJoinInferenceService` 保留为 Relation Evidence Provider；Relation Resolution 与 Executable SQL Join 分离；Phase 2.7 不实现跨独立 DataSource Federation；无 Dimension 的既有正确 Case（包括 GQ-011）保持原路径。
+37. **D07 审计结论：Dynamic Dimension Resolution 全量源码 / Contract 审计已冻结。** 当前 Dimension Applicability 仍是“语义 → 单物理 Column”，没有实际接入 D05 EntityKey + D06 Relation + MasterJoin / DirectKey 双路径；当前 master 未检索到实际 `DimensionEntityKeyResolution` / `DimensionEntityKeyResolver` 源码实体，必须在后续实现中补齐，不能把计划实体当作已实现能力。
+38. **D07 最终修改范围已冻结：** Dimension EntityKey Contract / Model、Dynamic Dimension / EntityKey Resolver、MasterJoin / DirectKey / ResolutionState / ExecutionCapability Contract、SemanticApplicabilityEvaluator Dimension 接入、Metadata Snapshot / Tenant / Enabled DataSource Resolution 边界、Interface / DI / Constructor 接入。
+39. **D07 明确禁止修改：** QueryPlanEvaluator、Dimension Scoring、Ranking / DetailRanking / AggregateRanking、GQ-011、Metric / Filter Semantic Resolution、QueryJoinInferenceService 核心评分、SqlQueryBuilder JOIN 落地、QueryPlan.Joins 最终装配、跨独立 DataSource Federation、业务主表硬编码以及为通过 Gate 修改正向 Golden。
+40. **D07 兼容性 Gate：** GQ-011 必须继续 PASS 且完全不进入 Dynamic Dimension Resolution；既有 Metric / Filter / Ranking PASS 不得漂移；Dimension 证据不足必须继续 BLOCK；任何既有 PASS Case 出现回归必须停止当前实现验证并先解决兼容性问题。
+41. **D07 冻结入口：** 阶段计划已更新、主计划已同步、GitHub `master` 已确认后，才允许进入 D08；D08 必须以 D05 EntityKey + D06 Relation + D07 Dimension Resolution 三个冻结 Contract 为正式输入。
 
 ---
 
 # 二、Phase 生命周期与文档管理规则
 
 ## 2.1 Phase 入口强制流程
-
-每进入一个新 Phase，必须执行：
 
 ```text
 上一 Phase Exit Review
@@ -103,23 +104,7 @@
 
 ## 2.3 文档一致性 Gate
 
-任何以下情况均触发同步检查：
-
-- Phase / STEP 状态变化
-- 审计结论变化
-- 修改 / 禁止修改范围变化
-- 兼容性约束变化
-- Runtime / Build / Gate 结果变化
-- 下一 STEP 变化
-- Exit Criteria 变化
-- 项目长期产品目标或平台级架构约束变化
-- Metadata Lifecycle / Snapshot / Semantic Refresh / Vector Refresh 等平台级 Contract 变化
-
-若阶段计划已更新而主计划未同步，则当前 STEP **不得继续**。
-
-## 2.4 主计划职责
-
-主计划只记录当前进度、当前 STEP、状态、Commit、阻塞、下一步以及必要的冻结摘要；不得复制阶段完整技术方案。阶段计划仍是 Phase 的完整执行契约。
+若阶段计划已更新而主计划未同步，或两份计划的当前 STEP / 冻结结论 / 修改范围不一致，则当前 STEP 不得继续。
 
 ---
 
@@ -129,53 +114,29 @@
 
 **当前状态：IN_PROGRESS**
 
-**当前工作单元：D07 — Dynamic Dimension Resolution 全量源码 / Contract 审计**
+**当前工作单元：D08 — QueryPlan Dimension Binding 全量源码 / Contract 审计**
 
 **D05：FROZEN**
 
 **D06：FROZEN**
 
-D06 冻结摘要：当前 `QueryJoinInferenceService` 定位为 Relation Evidence Provider，不承担平台级最终 Relation Resolution；新增 Dynamic Relation Resolution Contract；QueryPlanBuilder 只消费已解析 Relation；SqlQueryBuilder 负责 QueryPlan.Joins 的 SQL 落地；Relation 与 Executable SQL Join 分离；跨独立 DataSource Federation 不纳入 Phase 2.7；无 Dimension 的既有正确 Case（包括 GQ-011）保持原路径。
+**D07：FROZEN**
 
-### 当前已确认 Runtime 基线
+### D07 冻结摘要
+
+当前 SemanticApplicabilityEvaluator 仍把 Dimension 当作“语义 → 单物理 Column”解析；D07 已确认必须新增 EntityKey / Master / DirectKey Resolution 层，并把 ResolutionState 与 ExecutionCapability 分离。当前 master 尚无实际 `DimensionEntityKeyResolution` / `DimensionEntityKeyResolver` 实体，后续实现必须补齐。
+
+### 当前 Runtime 基线
 
 - GQ-011：PASS
-- GQ-006：当前 BLOCK，原因是“物料”无法建立稳定 Dimension 物理绑定
-- GQ-010：当前 BLOCK，原因是“物料”无法建立稳定 Dimension 物理绑定
-
-### 当前阻塞
-
-GQ-006 / GQ-010 的 BLOCK 必须通过 Phase 2.7 Dimension Resolution 双路径解决：
-
-```text
-稳定 Master Relation
-    ↓
-MasterJoin
-
-无稳定 Master Relation
-    ↓
-稳定 Fact Dimension Key / Label
-    ↓
-DirectKey
-
-两者均无法成立
-    ↓
-NotResolved
-    ↓
-BLOCK
-```
-
-禁止通过修改 Evaluator、Golden、Ranking Contract 或业务硬编码消除 BLOCK。
-
-### D06 冻结后的正式入口
-
-D06 已完成全量源码 / Contract 审计并冻结，阶段计划已同步更新，主计划已同步更新；因此满足进入 D07 的文档 Gate。
+- GQ-006：BLOCK（物料 Dimension 当前无法稳定物理解析）
+- GQ-010：BLOCK（物料 Dimension 当前无法稳定物理解析）
 
 ### 下一步
 
-**D07 — Dynamic Dimension Resolution 全量源码 / Contract 审计。**
+**D08 — QueryPlan Dimension Binding 全量源码 / Contract 审计。**
 
-D07 必须严格执行：完整源码 / Contract 审计 → 一次性形成最终修改范围 → 冻结 → 更新阶段计划 → 同步主计划 → 确认 GitHub `master` → 才允许进入下一 STEP。
+D08 必须执行：完整源码 / Contract 审计 → 一次性形成最终修改范围 → 冻结 → 更新阶段计划 → 同步主计划 → 确认 GitHub `master` → 才允许进入下一 STEP。
 
 ---
 
@@ -183,4 +144,4 @@ D07 必须严格执行：完整源码 / Contract 审计 → 一次性形成最�
 
 - Phase 2.7 开发测试计划：`SuperBulider_AI/wwwroot/Doc/plan/Phase 2.7 开发测试计划.md`
 - 主开发计划：本文件
-- D06 冻结提交：`2e41eb6cf96a3604e51a0bade77c269fd3aec051`
+- D07 阶段计划冻结提交：`57e36f8ee9ab985418c8b70a530e91d97405a11c`
