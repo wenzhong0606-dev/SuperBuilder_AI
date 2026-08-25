@@ -13,10 +13,14 @@ public sealed class SemanticApplicabilityEvaluator
 {
     private const double AmbiguityScoreGapThreshold = 0.05d;
     private readonly IMetadataSemanticSearchService _semanticSearchService;
+    private readonly IDimensionResolutionEvidenceService _dimensionEvidenceService;
 
-    public SemanticApplicabilityEvaluator(IMetadataSemanticSearchService semanticSearchService)
+    public SemanticApplicabilityEvaluator(
+        IMetadataSemanticSearchService semanticSearchService,
+        IDimensionResolutionEvidenceService dimensionEvidenceService)
     {
         _semanticSearchService = semanticSearchService ?? throw new ArgumentNullException(nameof(semanticSearchService));
+        _dimensionEvidenceService = dimensionEvidenceService ?? throw new ArgumentNullException(nameof(dimensionEvidenceService));
     }
 
     public async Task<SemanticApplicabilityResult> EvaluateAsync(GoldenQueryCase goldenCase, int topK = 10)
@@ -56,7 +60,7 @@ public sealed class SemanticApplicabilityEvaluator
         var dimensionResolutions = new List<SemanticApplicabilityDimensionResolution>();
         foreach (var dimension in goldenCase.Expected?.Dimensions ?? new List<GoldenDimensionExpectation>())
         {
-            var resolution = await ResolveDimensionAsync(dimension, topK);
+            var resolution = await ResolveDimensionAsync(dimension, topK, metricResolutions);
             if (resolution is null) return CopyWithFailure(firstMetricResult!, $"Dimension 语义“{dimension.SemanticText}”无法解析为稳定的 Metadata 物理绑定。");
             dimensionResolutions.Add(resolution);
         }
@@ -130,10 +134,16 @@ public sealed class SemanticApplicabilityEvaluator
         return new() { TableId = c.Table!.Id, DataSourceId = c.Table.DataSourceId, ColumnId = c.Column!.Id, SemanticText = filter.SemanticText, Table = c.Table.TableName, Column = c.Column.ColumnName, BusinessMeaning = c.Semantic?.BusinessMeaning, Score = c.Score };
     }
 
-    private async Task<SemanticApplicabilityDimensionResolution?> ResolveDimensionAsync(GoldenDimensionExpectation dimension, int topK)
+    private async Task<SemanticApplicabilityDimensionResolution?> ResolveDimensionAsync(
+        GoldenDimensionExpectation dimension,
+        int topK,
+        IReadOnlyList<SemanticApplicabilityMetricResolution> metricResolutions)
     {
-        if (string.IsNullOrWhiteSpace(dimension.SemanticText)) return null;
+        if (string.IsNullOrWhiteSpace(dimension.SemanticText))
+            return null;
 
+        // Dimension 的 Semantic Candidate 只用于确认当前语义存在；
+        // 真正的物理执行能力必须由 Evidence Service 根据当前 Metadata Snapshot 决定。
         var queries = BuildDimensionSearchQueries(dimension.SemanticText);
         var allCandidates = new List<MetadataSemanticSearchResult>();
         foreach (var query in queries)
@@ -147,26 +157,53 @@ public sealed class SemanticApplicabilityEvaluator
             .ToList();
 
         var direct = candidates
-            .Where(x => ContainsSemanticText(x, dimension.SemanticText) || ContainsDimensionEntityEvidence(x, dimension.SemanticText))
+            .Where(x => ContainsSemanticText(x, dimension.SemanticText) ||
+                        ContainsDimensionEntityEvidence(x, dimension.SemanticText))
             .ToList();
 
         if (direct.Count == 0)
             return null;
 
-        if (direct.Count > 1 && direct[0].Score - direct[1].Score <= AmbiguityScoreGapThreshold)
+        if (direct.Count > 1 &&
+            direct[0].Score - direct[1].Score <= AmbiguityScoreGapThreshold)
             return null;
 
-        var c = direct[0];
-        return new()
+        var metric = metricResolutions.FirstOrDefault();
+        if (metric is null)
+            return null;
+
+        var evidence = await _dimensionEvidenceService.ResolveAsync(
+            dimension.SemanticText,
+            metric.TableId,
+            metric.DataSourceId,
+            topK);
+
+        if (evidence is null ||
+            !string.Equals(evidence.ExecutionCapability, "Executable", StringComparison.OrdinalIgnoreCase))
+            return null;
+
+        if (string.Equals(evidence.ResolutionType, "Ambiguous", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(evidence.ResolutionType, "NotResolved", StringComparison.OrdinalIgnoreCase))
+            return null;
+
+        var candidate = direct[0];
+
+        return new SemanticApplicabilityDimensionResolution
         {
-            TableId = c.Table!.Id,
-            DataSourceId = c.Table.DataSourceId,
-            ColumnId = c.Column!.Id,
+            TableId = evidence.FactTableId,
+            DataSourceId = evidence.FactDataSourceId,
+            ColumnId = evidence.FactKeyColumnId,
             SemanticText = dimension.SemanticText,
-            Table = c.Table.TableName,
-            Column = c.Column.ColumnName,
-            BusinessMeaning = c.Semantic?.BusinessMeaning,
-            Score = c.Score
+            Table = evidence.FactTable,
+            Column = evidence.FactKeyColumn,
+            BusinessMeaning = candidate.Semantic?.BusinessMeaning,
+            Score = evidence.Score,
+            ResolutionType = evidence.ResolutionType,
+            ExecutionCapability = evidence.ExecutionCapability,
+            DimensionKeyColumnId = evidence.FactKeyColumnId,
+            DimensionKeyColumn = evidence.FactKeyColumn,
+            DimensionLabelColumnId = evidence.MasterLabelColumnId,
+            DimensionLabelColumn = evidence.MasterLabelColumn
         };
     }
 
