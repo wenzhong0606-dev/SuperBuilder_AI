@@ -1,6 +1,6 @@
 # SuperBuilder AI Native BI Phase开发计划
 
-> 文档版本：v2.16  
+> 文档版本：v2.17  
 > 文档性质：项目正式开发基线 + Phase 开发测试管理总计划  
 > **唯一源码基线：GitHub `master`**
 
@@ -8,9 +8,10 @@
 
 - 当前 Phase：**Phase 2.7 — DimensionAware QueryPlan**
 - Phase 状态：**IN_PROGRESS**
-- 当前工作单元：**D11 — SQL Builder 双路径（MasterJoin / DirectKey）审计已冻结**
-- 当前状态：**D11 FROZEN / 功能实现 NOT IMPLEMENTED**
-- 下一步：**D12 — Contract / DI / Namespace 全量源码审计**
+- 当前工作单元：**D12 — Contract / DI / Namespace 全量源码审计已冻结**
+- 当前状态：**D12 FROZEN / 功能实现 NOT IMPLEMENTED**
+- 下一步：**D13 — Release Build / 首轮实现前 Build 基线验证**
+- D05-D11：全部 FROZEN
 - 本轮未修改业务源码。
 
 ## 二、Phase 2.7 当前冻结链
@@ -30,46 +31,77 @@ D10 DirectKey QueryPlan              FROZEN
         ↓
 D11 SQL Builder 双路径              FROZEN
         ↓
-D12 Contract / DI / Namespace       NEXT
+D12 Contract / DI / Namespace       FROZEN
+        ↓
+D13 Release Build / 首轮实现前基线   NEXT
 ```
 
-## 三、D11 冻结结论
+## 三、D12 冻结结论
 
-当前 `SqlQueryBuilder` 仅支持单表 SQL；`QueryPlan.Tables.Count > 1` 当前直接阻断，因此 MasterJoin QueryPlan 尚不能进入 SQL Runtime。Builder 已有 SELECT / WHERE / GROUP BY / ORDER BY / LIMIT 能力，`QueryPlan` 已有 `Joins`，`QueryJoin` 已有两端 Table/Column 和 JoinType，但 JOIN SQL 消费路径尚未实现。fileciteturn423file0L2-L2 fileciteturn424file0L2-L2 fileciteturn427file0L2-L2
+D12 已完成 Model、Interface、Implementation、Caller、Constructor、DI、Namespace、Controller、Golden / Runtime 边界全链路审计，未修改业务源码。
 
-D11 冻结的实现边界：
+当前 master 的核心状态是：新版 D07-D11 Contract 尚未落地，DI 仍绑定旧职责链。`Program.cs` 当前注册 `QueryPlanBuilder`、`IQueryPlanBuilder`、`QueryJoinInferenceService`、`IQueryJoinInferenceService`、`QueryPlanValidator`、`SemanticApplicabilityEvaluator`、`ISqlQueryBuilder/SqlQueryBuilder` 等服务。fileciteturn443file0L2-L6
+
+`QueryPlanBuilder` 当前仍依赖 `IMetadataSemanticSearchService`、`IQueryJoinInferenceService`、`QueryPlanValidator`；后续实现必须隔离 JoinInference 的 Executable Join 权限。fileciteturn448file0L2-L5
+
+`IQueryPlanBuilder` 已存在，不需要新建平行 Builder；QueryPlanBuilder 使用多个 partial 文件，应沿现有职责边界修改。fileciteturn452file0L2-L5
+
+## 四、D12 冻结后的首轮实现边界
 
 ```text
-D09 MasterJoin Binding ─┐
-                        ├→ QueryPlan → SqlQueryBuilder
-D10 DirectKey Binding ──┘
+QueryIntent
+   ↓
+Semantic Applicability / Resolution
+   ├── MasterJoin
+   ├── DirectKey
+   ├── Ambiguous
+   └── NotResolved
+   ↓
+QueryPlan Binding
+   ↓
+SqlQueryBuilder
 ```
 
-- MasterJoin：只消费已确认 `QueryPlan.Joins`，生成受控 JOIN SQL。
-- DirectKey：不生成 JOIN，保持单表 SQL，并消费已确认 Dimension Key / Label。
-- SQL Builder 不得 Semantic Search、Relation 推理或根据字段名猜 JOIN。
-- JoinType 仅允许 `INNER / LEFT / RIGHT`。
-- 不允许跨 DataSource / Tenant Federation。
-- 不允许业务主表 / 字段硬编码。
+- Models / Contract：扩展现有 QueryPlan / Dimension Binding Contract，不新建平行模型体系。
+- Interfaces：复用 `IQueryPlanBuilder`、`ISqlQueryBuilder`；Relation Service 只提供 Evidence。
+- Resolution / Factory：形成单一 Resolution 真相源，不重新搜索。
+- QueryPlanBuilder：只装配已确认 Resolution，隔离旧自动 JOIN 旁路。
+- SqlQueryBuilder：只消费 QueryPlan；MasterJoin 才生成 JOIN，DirectKey 永不生成 JOIN。
+- Validator：只验证，不推理。
+- Program.cs：只做必要 DI 注册 / 替换，并保持现有 Scoped 生命周期原则。
+- Namespace：统一 `SuperBuilder_AI.Models.*`、`SuperBuilder_AI.Interfaces.*`、`SuperBuilder_AI.Services.BI.*`、`SuperBuilder_AI.Services.BI.Evaluation.*`。
 
-当前 `QueryPlanBuilder.PlanAssembly` 仍存在旧的 `BuildJoinsAsync → QueryJoinInferenceService → QueryPlan.Joins` 自动 JOIN 旁路；该旁路属于 D09 已冻结的待隔离实现范围，不能在 D11 中重新设计 Relation。fileciteturn429file0L2-L2
+## 五、D12 禁止修改范围
 
-D11 详细审计冻结记录：
+- 不新建平行 QueryPlanBuilder / Interface。
+- 不复制 Metadata Semantic Search。
+- 不让 SQL Builder 调用 Resolver。
+- 不让 Builder 自行推理 Relation。
+- 不把 QueryJoinCandidate 当 Executable Join。
+- 不把 DirectKey 转成 QueryJoin。
+- 不修改 GQ-011、Evaluator、Golden、Coverage、Gate 来掩盖能力缺失。
+- 不跨 DataSource / Tenant Federation。
+- 不硬编码物料 / 供应商主表或字段。
+- 不新建独立 Test Project。
 
-`wwwroot/Doc/plan/Phase 2.7-D11 SQL Builder双路径审计冻结.md`
+## 六、D12 兼容性 Gate
 
-## 四、兼容性 Gate
+| 范围 | 强制要求 |
+|---|---|
+| GQ-001 | 保持 PASS |
+| GQ-002 | EntityCount Contract 不变 |
+| GQ-003/005/009 | Metric / Filter 不漂移 |
+| GQ-006 | 稳定 DirectKey 才执行，无证据仍 BLOCK |
+| GQ-010 | DirectKey 不破坏 Ranking / Order / Limit |
+| **GQ-011** | **完全绕过 Dimension Resolution，继续 PASS** |
+| MasterJoin | 仅由 Resolution 产生 QueryPlan.Joins |
+| DirectKey | 不产生 Joins |
+| Ambiguous / NotResolved | BLOCK，不猜测 |
+| 新 Metadata Snapshot | 允许 DirectKey → MasterJoin 重新解析 |
 
-以下规则为 Phase 2.7 强制 Gate：
+任何既有 PASS Case 回归，立即停止当前实现验证并先修复兼容性问题。
 
-1. **GQ-011 必须继续 PASS**，且完全不进入 Dimension / MasterJoin / DirectKey。
-2. GQ-001 / GQ-002 等既有正确 Case 不得因为 D09-D11 产生语义漂移。
-3. GQ-006 / GQ-010 当前无 Master 时，若存在稳定 DirectKey Evidence，应走 DirectKey；Evidence 不足必须安全 BLOCK。
-4. 新增 DataSource 后必须重新扫描 Metadata、生成 Semantic / Vector 并形成新的 Metadata Snapshot；同一业务问题允许从 DirectKey 重新解析为 MasterJoin。
-5. Ambiguous / NotResolved 不得猜测 Relation，不得进入错误 SQL Runtime。
-6. 任一既有 PASS Case 回归，立即停止当前实现验证，先解决兼容性问题，再继续。
-
-## 五、开发流程强制规则
+## 七、项目强制开发规则
 
 1. GitHub `master` 是唯一源码基线。
 2. 正式源码与正式计划直接更新 `master`，使用中文 Commit 描述。
@@ -83,15 +115,13 @@ D11 详细审计冻结记录：
 10. 未完成 Runtime / Regression / Exit Criteria，不得宣布 Phase COMPLETE。
 11. 禁止通过修改 Golden、Evaluator、Coverage、Gate 或删除功能掩盖真实能力缺失。
 
-## 六、长期产品目标
+## 八、长期产品目标
 
 SuperBuilder 最终建设为：
 
 > **支持多语言、多租户、多数据库动态接入的 AI Native Low-code Platform。**
 
-业务数据库关系不得预绑定为永久事实。Metadata Relation 必须基于当前 Snapshot 动态解析；新增数据库、表、字段或 Relation Evidence 后允许重新解析并升级为 MasterJoin；关系证据失效时允许重新计算并安全降级。
-
-Metadata 生命周期的长期目标为：
+业务数据库关系不得预绑定为永久事实。Metadata Relation 必须基于当前 Snapshot 动态解析；新增数据库、表、字段或 Relation Evidence 后允许重新解析并升级为 MasterJoin；关系证据失效后允许重新计算并安全降级。
 
 ```text
 DataSource 添加
@@ -115,20 +145,18 @@ Vector Database
 Dynamic Resolution
 ```
 
-该生命周期与 D09/D10 的动态 Relation / Dimension Resolution Contract 必须保持一致。
-
-## 七、下一步
+## 九、下一步
 
 ```text
-D11 FROZEN
+D12 FROZEN
  ↓
 阶段计划已同步
  ↓
-主计划 v2.16 已同步
+主计划已同步
  ↓
 确认 master
  ↓
-D12 — Contract / DI / Namespace 全量源码审计
+D13 — Release Build / 首轮实现前 Build 基线验证
 ```
 
-D12 仍然遵守：**完整审计 → 最终结论 → 冻结 → 更新阶段计划 → 同步主计划 → 确认 master → 下一 STEP。**
+D13 仍不得自行扩大 D09-D12 已冻结的源码修改范围。
