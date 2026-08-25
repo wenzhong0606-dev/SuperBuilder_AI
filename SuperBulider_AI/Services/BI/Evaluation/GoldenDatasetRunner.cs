@@ -155,7 +155,7 @@ public sealed class GoldenDatasetRunner
             cancellationToken.ThrowIfCancellationRequested();
 
             var intent = await _queryUnderstandingService.UnderstandAsync(goldenCase.Question);
-            var resolution = QueryPlanSemanticResolutionFactory.From(applicability);
+            var resolution = QueryPlanSemanticResolutionFactory.From(applicability, intent);
             var runtimePlan = await _queryPlanBuilder.BuildAsync(intent, resolution);
 
             var validationContext = await _queryPlanContextBuilder.BuildAsync(runtimePlan);
