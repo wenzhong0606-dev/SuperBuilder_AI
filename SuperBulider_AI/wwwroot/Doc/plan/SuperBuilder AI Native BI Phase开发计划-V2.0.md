@@ -1,6 +1,6 @@
 # SuperBuilder AI Native BI Phase开发计划
 
-> 文档版本：v2.20  
+> 文档版本：v2.21  
 > 文档性质：项目正式开发基线 + Phase 开发测试管理总计划  
 > **唯一源码基线：GitHub `master`**
 
@@ -12,7 +12,7 @@
 - 当前状态：**D14 Contract Cleanup PASS；本地 Build PASS + Startup PASS；D14-05 Golden Regression BLOCK；尚未 Freeze**
 - D05-D12：全部 FROZEN
 - D13：Build PASS + Startup PASS，已 FROZEN
-- 当前 master：`1ff9db06ef915963934e7956126f4578657a182f`
+- 当前 master：`1ff9db06ef915963934e7956126f457a182f`
 
 ### D14 当前 Runtime 证据
 
@@ -209,7 +209,7 @@ Version       = 1.3
 Total         = 18
 Executed      = 18
 Passed       = 11
-Failed        = 7
+Failed       = 7
 Overall       = 61.11%
 Positive      = 36.36%
 Negative      = 100%
@@ -379,7 +379,215 @@ D14 FREEZE
 12. **开发计划必须记录每次 Runtime Regression 的实际结果、失败 Case、根因簇、禁止修改范围与下一轮审计顺序，避免后续重新读取计划时丢失上下文。**
 13. **多数据库 / Optional Master Contract 属于 Phase 2.7 D14 的一级冻结约束，不得在后续审计中退化成“单数据库 JOIN”模型。**
 
-## 十四、长期产品目标
+## 十四、D14 全量源码逐行审计标准（强制，最高优先级）
+
+为避免出现“先根据局部源码作出结论，后续重新读取完整源码又纠正”的误判，从本版本起，所有 D14 及后续全量源码审计必须执行**逐行审计（Line-by-Line Audit）**。本条属于正式开发基线，不是建议项。
+
+### 14.1 审计前置条件
+
+1. 必须锁定本次审计的 Git commit SHA；审计过程中不得混用不同 commit 的源码结论。
+2. 必须读取目标文件的**完整源码**，不得仅依赖搜索摘要、函数片段、目录结构或历史对话结论。
+3. 对跨文件 Contract，必须同时读取：Interface、Implementation、DTO/Model、Caller、Factory、DI、Builder、Evaluator、Controller/Action，以及相关 Golden / Runtime Contract。
+4. 如果文件过长，必须分段读取直至覆盖**全部行**；不得以“已读取关键函数”为理由视为全量审计完成。
+5. 必须记录每个被审计文件的实际范围：文件路径、commit SHA、起止行号、总行数、已审计行数；未覆盖的行数必须为 0。
+
+### 14.2 逐行审计要求
+
+每一行必须至少归入以下一种审计结论：
+
+```text
+Contract / Model
+Interface / Dependency
+Input / Validation
+Semantic Resolution
+Candidate / Ranking
+State Transition
+DataSource / Multi-DB
+QueryPlan Binding
+Join / DirectKey
+Evaluation / Confidence
+Error / Fallback
+DI / Runtime
+Dead / Legacy / Compatibility
+```
+
+对以下代码尤其禁止跳读：
+
+- `if / else`
+- `switch`
+- `return`
+- `null` / `NotResolved` / `Ambiguous`
+- `ExecutionCapability`
+- `DataSourceId`
+- `MasterJoin / DirectKey`
+- Candidate Score / Threshold
+- Exception / Fallback
+- Factory / DI
+- Builder / Evaluator
+
+### 14.3 跨文件调用链必须闭环
+
+逐行审计不能停留在单文件。必须形成：
+
+```text
+Input
+ ↓
+Controller / Action
+ ↓
+Service
+ ↓
+Interface
+ ↓
+Resolution / Factory
+ ↓
+QueryPlan
+ ↓
+Evaluator
+ ↓
+Confidence / Decision Gate
+ ↓
+SQL Builder
+ ↓
+Runtime
+```
+
+任何一个环节没有实际源码证据，都只能标记为 **UNVERIFIED**，不得写成 PASS 或根因结论。
+
+### 14.4 根因结论分级
+
+审计结论必须区分：
+
+```text
+CONFIRMED
+    = 已读取完整相关源码并能由明确代码路径证明
+
+PROBABLE
+    = 已有强证据，但仍缺少至少一个关键调用链/数据结构的完整源码验证
+
+HYPOTHESIS
+    = 仅基于现象或局部代码推测
+
+UNVERIFIED
+    = 尚未取得完整源码证据
+```
+
+**只有 CONFIRMED 才允许进入最终一次性修改清单。**
+
+### 14.5 Golden Case 必须逐 Case 追踪
+
+每个失败 Case 必须建立：
+
+```text
+Golden Input
+ ↓
+Expected Contract
+ ↓
+实际 Resolution
+ ↓
+实际 QueryPlan
+ ↓
+实际 Evaluation
+ ↓
+实际 Confidence
+ ↓
+实际 Decision
+ ↓
+最终 Runtime 输出
+```
+
+必须逐字段比较，不得仅根据 `reason` 文本推断根因。
+
+### 14.6 修改前强制复核
+
+形成最终修改清单前必须执行第二次复核：
+
+1. 重新读取所有拟修改文件完整源码；
+2. 重新读取所有禁止修改文件中与该 Contract 相邻的实现；
+3. 验证修改不会改变已有 PASS Case；
+4. 验证修改不会削弱 Negative / Ambiguous / Unresolved Detection；
+5. 验证修改文件不是由于之前的误判而被列入；
+6. 如果第二次完整读取推翻第一次结论，必须以第二次完整源码证据为准，并将第一次结论标记为 **RETRACTED**，不得直接实施旧方案。
+
+### 14.7 修改后再次全量审计
+
+源码修改完成后，在 Build 前必须重新逐行审计所有修改文件；Build 通过后还必须执行 Runtime + Golden Regression。
+
+因此完整闭环固定为：
+
+```text
+锁定 Commit
+ ↓
+完整源码读取
+ ↓
+逐行审计（0 行遗漏）
+ ↓
+跨文件调用链闭环
+ ↓
+Golden Case 逐 Case 对照
+ ↓
+根因分级
+ ↓
+二次完整源码复核
+ ↓
+一次性修改
+ ↓
+修改后逐行复审
+ ↓
+Build
+ ↓
+Startup
+ ↓
+Controller / Action Runtime
+ ↓
+Golden Regression
+ ↓
+兼容性矩阵
+ ↓
+Freeze / BLOCK
+```
+
+### 14.8 严禁的审计方式
+
+以下方式不得作为“全量源码审计”结论依据：
+
+- 只读取函数名或搜索摘要；
+- 只读取目录结构；
+- 只读取疑似相关的 20～50 行；
+- 根据上一轮对话记忆代替当前 commit 源码；
+- 根据 Runtime `reason` 直接反推源码根因；
+- 看到一个 `if` 就假设整个 Service 的行为；
+- 未读取 Caller / Factory / DI 就修改 Service；
+- 未读取 Builder / Evaluator 就修改 Resolution；
+- 未读取 Golden Contract 就修改 Ranking；
+- 先修改后补审计。
+
+### 14.9 审计交付物强制格式
+
+每次 D14 全量审计最终必须输出：
+
+```text
+D14-X 全量源码审计结论
+
+1. 审计 Commit SHA
+2. 全量文件清单
+3. 每个文件总行数 / 已审计行数
+4. 跨文件调用链
+5. Golden Case 逐 Case 结果
+6. CONFIRMED 根因
+7. PROBABLE / HYPOTHESIS / UNVERIFIED（如有）
+8. 唯一修改文件清单
+9. 每个文件修改原因
+10. 明确禁止修改文件
+11. 兼容性矩阵
+12. 修改前二次复核结果
+13. 修改后逐行复审结果
+14. Build / Startup / Runtime / Golden Regression 证据
+15. Freeze / BLOCK 最终判定
+```
+
+**本标准立即生效。后续任何重新读取开发计划的 AI / 开发人员必须把“逐行、全文件、跨文件、逐 Case、二次复核”视为 D14 全量源码审计的最低验收标准。**
+
+## 十五、长期产品目标
 
 SuperBuilder 最终建设为：
 
@@ -409,27 +617,41 @@ Vector Database
 Dynamic Resolution
 ```
 
-## 十五、当前下一步
+## 十六、当前下一步
 
-**现在仍然不改业务源码。**
+**当前仍不因 Build / Startup PASS 而冻结 D14。**
 
-当前进入：
+D14-05 Golden Regression 当前仍为 BLOCK；在任何源码修改进入 `master` 前，必须按照第十四章新增的“全量源码逐行审计标准”重新锁定 commit 并完成全文件、跨文件、逐 Case 审计及二次复核。
+
+后续实施固定顺序：
 
 ```text
 D14-05 Golden Regression BLOCK
         ↓
-Multi-Database / Optional Master Contract Root Cause Audit
+逐行全量源码审计
         ↓
-确认 GQ-005 / GQ-009：
-  1. 当前 Snapshot 是否存在 Master
-  2. Fact Key 是否稳定
-  3. Master Relation Evidence 是否稳定
-  4. 是否应 MasterJoin
-  5. 否则是否应 DirectKey / ID 汇总
+R1 EntityCount
+R2 Multi-Database / Optional Master
+R3 QueryPlan Evaluation / Ranking
+R4 Multi-Metric Resolution
         ↓
-继续审计 QueryPlan Builder / SQL Builder / Evaluator
+CONFIRMED 根因闭合
         ↓
-一次性形成最小修改方案
+一次性最小修改
+        ↓
+修改后逐行复审
+        ↓
+Build
+        ↓
+本地 Pull
+        ↓
+Startup
+        ↓
+Controller / Action Runtime
+        ↓
+Full Golden Regression
+        ↓
+D14 Freeze Gate
 ```
 
 **D14 当前不得宣布完成或冻结。**
