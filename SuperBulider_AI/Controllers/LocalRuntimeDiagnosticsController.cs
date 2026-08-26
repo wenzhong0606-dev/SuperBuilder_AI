@@ -46,6 +46,8 @@ public sealed class LocalRuntimeDiagnosticsController : ControllerBase
         if (string.IsNullOrWhiteSpace(table) || string.IsNullOrWhiteSpace(column))
             return BadRequest(new { passed = false, reason = "table/column 不能为空。" });
 
+        // 第一层：确认 MetadataColumn 本身，以及它的语义证据。
+        // 注意：这里绝不能把 source DB 的关系信息混进 metadata DB 查询。
         var metadataColumns = await _context.MetadataColumns
             .AsNoTracking()
             .Include(x => x.MetadataTable)
@@ -83,8 +85,8 @@ public sealed class LocalRuntimeDiagnosticsController : ControllerBase
             })
             .ToListAsync(cancellationToken);
 
-        // EF Core 无法翻译 Equals(string, StringComparison)。这里直接使用 ==，
-        // SQL Server 的大小写行为由数据库/列 Collation 决定。
+        // EF Core 不支持 Equals(string, StringComparison) 的 SQL 翻译。
+        // 当前 SQL Server collation 已经负责普通字符串比较，因此这里使用 ==。
         var relatedMetadataColumns = await _context.MetadataColumns
             .AsNoTracking()
             .Include(x => x.MetadataTable)
@@ -127,6 +129,7 @@ public sealed class LocalRuntimeDiagnosticsController : ControllerBase
             .ToListAsync(cancellationToken);
 
         var databaseRelations = await QueryDatabaseRelationsAsync(table, column, cancellationToken);
+
         var masterCandidates = relatedMetadataColumns
             .Where(x => x.isPrimaryKey == true &&
                         (!string.IsNullOrWhiteSpace(x.semantic?.businessMeaning) ||
@@ -151,8 +154,9 @@ public sealed class LocalRuntimeDiagnosticsController : ControllerBase
             {
                 databaseForeignKeys = databaseRelations.ForeignKeys,
                 referencedMasterColumns = databaseRelations.ReferencedColumns,
+                databaseRelationQueryError = databaseRelations.Error,
                 metadataRelationshipModelExists = false,
-                note = "当前代码库没有独立 Metadata Relationship 实体；数据库 FK 与 Metadata Master Candidate 分开返回。"
+                note = "当前代码库没有独立 Metadata Relationship 实体；此处只诊断当前 SuperBIContext 数据库中的 SQL Server FK。source DB 的关系需要通过 DataSourceConnectionFactory/IDataSourceMetadataReader 单独读取。"
             },
             master = new
             {
@@ -169,81 +173,125 @@ public sealed class LocalRuntimeDiagnosticsController : ControllerBase
         });
     }
 
-    private async Task<DatabaseRelationResult> QueryDatabaseRelationsAsync(string table, string column, CancellationToken cancellationToken)
+    /// <summary>
+    /// 读取当前 SuperBIContext 所连接 SQL Server 的 FK。
+    /// 这里故意不使用 REFERENCED_TABLE_NAME / REFERENCED_COLUMN_NAME 作为 SQL 别名，
+    /// 避免与 MySQL INFORMATION_SCHEMA 的字段名混淆，也避免旧代码/缓存导致的同名列解析问题。
+    /// 更重要的是：查询失败不能让诊断接口 500；关系诊断失败必须作为 evidence 返回。
+    /// </summary>
+    private async Task<DatabaseRelationResult> QueryDatabaseRelationsAsync(
+        string table,
+        string column,
+        CancellationToken cancellationToken)
     {
         var foreignKeys = new List<object>();
         var referencedColumns = new List<object>();
+        string? error = null;
 
         await using var connection = _context.Database.GetDbConnection();
         if (connection.State != ConnectionState.Open)
             await connection.OpenAsync(cancellationToken);
 
-        await using (var command = connection.CreateCommand())
+        try
         {
+            await using var command = connection.CreateCommand();
             command.CommandText = @"
-SELECT fk.name AS constraint_name,
-       sch_from.name AS table_schema,
-       t_from.name AS table_name,
-       c_from.name AS column_name,
-       sch_to.name AS referenced_table_schema,
-       t_to.name AS referenced_table_name,
-       c_to.name AS referenced_column_name
-FROM sys.foreign_key_columns fkc
-INNER JOIN sys.foreign_keys fk ON fk.object_id = fkc.constraint_object_id
-INNER JOIN sys.tables t_from ON t_from.object_id = fkc.parent_object_id
-INNER JOIN sys.schemas sch_from ON sch_from.schema_id = t_from.schema_id
-INNER JOIN sys.columns c_from ON c_from.object_id = fkc.parent_object_id AND c_from.column_id = fkc.parent_column_id
-INNER JOIN sys.tables t_to ON t_to.object_id = fkc.referenced_object_id
-INNER JOIN sys.schemas sch_to ON sch_to.schema_id = t_to.schema_id
-INNER JOIN sys.columns c_to ON c_to.object_id = fkc.referenced_object_id AND c_to.column_id = fkc.referenced_column_id
-WHERE t_from.name = @table AND c_from.name = @column
+SELECT
+    fk.name AS fk_constraint,
+    sch_from.name AS from_schema,
+    t_from.name AS from_table,
+    c_from.name AS from_column,
+    sch_to.name AS ref_schema,
+    t_to.name AS ref_table,
+    c_to.name AS ref_column
+FROM sys.foreign_key_columns AS fkc
+INNER JOIN sys.foreign_keys AS fk
+    ON fk.object_id = fkc.constraint_object_id
+INNER JOIN sys.tables AS t_from
+    ON t_from.object_id = fkc.parent_object_id
+INNER JOIN sys.schemas AS sch_from
+    ON sch_from.schema_id = t_from.schema_id
+INNER JOIN sys.columns AS c_from
+    ON c_from.object_id = fkc.parent_object_id
+   AND c_from.column_id = fkc.parent_column_id
+INNER JOIN sys.tables AS t_to
+    ON t_to.object_id = fkc.referenced_object_id
+INNER JOIN sys.schemas AS sch_to
+    ON sch_to.schema_id = t_to.schema_id
+INNER JOIN sys.columns AS c_to
+    ON c_to.object_id = fkc.referenced_object_id
+   AND c_to.column_id = fkc.referenced_column_id
+WHERE t_from.name = @table
+  AND c_from.name = @column
 ORDER BY fk.name, fkc.constraint_column_id;";
             AddParameter(command, "@table", table);
             AddParameter(command, "@column", column);
+
             await using var reader = await command.ExecuteReaderAsync(cancellationToken);
             while (await reader.ReadAsync(cancellationToken))
                 foreignKeys.Add(ReadDatabaseRelation(reader));
         }
-
-        await using (var command = connection.CreateCommand())
+        catch (Exception ex)
         {
+            error = ex.Message;
+        }
+
+        try
+        {
+            await using var command = connection.CreateCommand();
             command.CommandText = @"
-SELECT fk.name AS constraint_name,
-       sch_from.name AS table_schema,
-       t_from.name AS table_name,
-       c_from.name AS column_name,
-       sch_to.name AS referenced_table_schema,
-       t_to.name AS referenced_table_name,
-       c_to.name AS referenced_column_name
-FROM sys.foreign_key_columns fkc
-INNER JOIN sys.foreign_keys fk ON fk.object_id = fkc.constraint_object_id
-INNER JOIN sys.tables t_from ON t_from.object_id = fkc.parent_object_id
-INNER JOIN sys.schemas sch_from ON sch_from.schema_id = t_from.schema_id
-INNER JOIN sys.columns c_from ON c_from.object_id = fkc.parent_object_id AND c_from.column_id = fkc.parent_column_id
-INNER JOIN sys.tables t_to ON t_to.object_id = fkc.referenced_object_id
-INNER JOIN sys.schemas sch_to ON sch_to.schema_id = t_to.schema_id
-INNER JOIN sys.columns c_to ON c_to.object_id = fkc.referenced_object_id AND c_to.column_id = fkc.referenced_column_id
-WHERE t_to.name = @table AND c_to.name = @column
+SELECT
+    fk.name AS fk_constraint,
+    sch_from.name AS from_schema,
+    t_from.name AS from_table,
+    c_from.name AS from_column,
+    sch_to.name AS ref_schema,
+    t_to.name AS ref_table,
+    c_to.name AS ref_column
+FROM sys.foreign_key_columns AS fkc
+INNER JOIN sys.foreign_keys AS fk
+    ON fk.object_id = fkc.constraint_object_id
+INNER JOIN sys.tables AS t_from
+    ON t_from.object_id = fkc.parent_object_id
+INNER JOIN sys.schemas AS sch_from
+    ON sch_from.schema_id = t_from.schema_id
+INNER JOIN sys.columns AS c_from
+    ON c_from.object_id = fkc.parent_object_id
+   AND c_from.column_id = fkc.parent_column_id
+INNER JOIN sys.tables AS t_to
+    ON t_to.object_id = fkc.referenced_object_id
+INNER JOIN sys.schemas AS sch_to
+    ON sch_to.schema_id = t_to.schema_id
+INNER JOIN sys.columns AS c_to
+    ON c_to.object_id = fkc.referenced_object_id
+   AND c_to.column_id = fkc.referenced_column_id
+WHERE t_to.name = @table
+  AND c_to.name = @column
 ORDER BY fk.name, fkc.constraint_column_id;";
             AddParameter(command, "@table", table);
             AddParameter(command, "@column", column);
+
             await using var reader = await command.ExecuteReaderAsync(cancellationToken);
             while (await reader.ReadAsync(cancellationToken))
                 referencedColumns.Add(ReadDatabaseRelation(reader));
         }
+        catch (Exception ex)
+        {
+            error ??= ex.Message;
+        }
 
-        return new DatabaseRelationResult(foreignKeys, referencedColumns);
+        return new DatabaseRelationResult(foreignKeys, referencedColumns, error);
     }
 
     private static object ReadDatabaseRelation(DbDataReader reader) => new
     {
-        constraintName = reader["constraint_name"]?.ToString(),
-        tableSchema = reader["table_schema"]?.ToString(),
-        tableName = reader["table_name"]?.ToString(),
-        columnName = reader["column_name"]?.ToString(),
-        referencedTableSchema = reader["referenced_table_schema"]?.ToString(),
-        referencedTableName = reader["referenced_table_name"]?.ToString(),
-        referencedColumnName = reader["referenced_column_name"]?.ToString()
+        constraintName = reader["fk_constraint"]?.ToString(),
+        tableSchema = reader["from_schema"]?.ToString(),
+        tableName = reader["from_table"]?.ToString(),
+        columnName = reader["from_column"]?.ToString(),
+        referencedTableSchema = reader["ref_schema"]?.ToString(),
+        referencedTableName = reader["ref_table"]?.ToString(),
+        referencedColumnName = reader["ref_column"]?.ToString()
     };
 
     private static void AddParameter(DbCommand command, string name, object value)
@@ -295,6 +343,15 @@ ORDER BY fk.name, fkc.constraint_column_id;";
         }
     }
 
-    private sealed record DatabaseRelationResult(List<object> ForeignKeys, List<object> ReferencedColumns);
-    private sealed record LocalRuntimeCheckResult(bool Passed, string Stage, string Message, long ElapsedMs, object? Details = null);
+    private sealed record DatabaseRelationResult(
+        List<object> ForeignKeys,
+        List<object> ReferencedColumns,
+        string? Error);
+
+    private sealed record LocalRuntimeCheckResult(
+        bool Passed,
+        string Stage,
+        string Message,
+        long ElapsedMs,
+        object? Details = null);
 }
