@@ -137,7 +137,12 @@ public sealed class LocalRuntimeDiagnosticsController : ControllerBase
         var dataSourceId = metadataColumns.FirstOrDefault()?.dataSourceId;
         var sourceDatabaseRelations = dataSourceId.HasValue
             ? await QuerySourceDatabaseRelationsAsync(dataSourceId.Value, table, column, cancellationToken)
-            : new SourceDatabaseRelationResult(null, new List<object>(), new List<object>(), "MetadataColumn 未找到 dataSourceId。", null);
+            : new SourceDatabaseRelationResult(
+                Database: null,
+                DatabaseType: null,
+                ForeignKeys: new List<object>(),
+                ReferencedColumns: new List<object>(),
+                Error: "MetadataColumn 未找到 dataSourceId。");
 
         var masterCandidates = relatedMetadataColumns
             .Where(x => x.isPrimaryKey == true &&
