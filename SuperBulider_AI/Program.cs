@@ -31,8 +31,23 @@ builder.Services.AddScoped<MetadataPromptBuilder>();
 builder.Services.AddScoped<MetadataContextBuilder>();
 builder.Services.AddScoped<IMetadataContextBuilder>(sp => sp.GetRequiredService<MetadataContextBuilder>());
 builder.Services.AddScoped<IQueryPlanContextBuilder, QueryPlanContextBuilder>();
-builder.Services.AddHttpClient<QwenEmbeddingService>();
-builder.Services.AddScoped<IEmbeddingService>(sp => sp.GetRequiredService<QwenEmbeddingService>());
+
+// CI Runtime Smoke 必须验证 Metadata → Vector → Qdrant 的完整链路，
+// 但不能依赖外部 Qwen API、网络或仓库中的真实凭据。
+// 正式/本地运行仍使用 QwenEmbeddingService。
+if (string.Equals(
+        Environment.GetEnvironmentVariable("CI"),
+        "true",
+        StringComparison.OrdinalIgnoreCase))
+{
+    builder.Services.AddScoped<IEmbeddingService, FakeEmbeddingService>();
+}
+else
+{
+    builder.Services.AddHttpClient<QwenEmbeddingService>();
+    builder.Services.AddScoped<IEmbeddingService>(sp => sp.GetRequiredService<QwenEmbeddingService>());
+}
+
 builder.Services.AddScoped<QwenService>();
 builder.Services.AddScoped<IQwenService>(sp => sp.GetRequiredService<QwenService>());
 builder.Services.AddScoped<MetadataSemanticService>();
