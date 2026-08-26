@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SuperBuilder_AI.Data;
+using SuperBuilder_AI.Interfaces.Database;
 using System.Data;
 using System.Data.Common;
 
@@ -12,11 +13,16 @@ public sealed class LocalRuntimeDiagnosticsController : ControllerBase
 {
     private readonly SuperBIContext _context;
     private readonly IConfiguration _configuration;
+    private readonly IDataSourceConnectionFactory _dataSourceConnectionFactory;
 
-    public LocalRuntimeDiagnosticsController(SuperBIContext context, IConfiguration configuration)
+    public LocalRuntimeDiagnosticsController(
+        SuperBIContext context,
+        IConfiguration configuration,
+        IDataSourceConnectionFactory dataSourceConnectionFactory)
     {
         _context = context;
         _configuration = configuration;
+        _dataSourceConnectionFactory = dataSourceConnectionFactory;
     }
 
     [HttpGet("sqlserver")]
@@ -35,6 +41,10 @@ public sealed class LocalRuntimeDiagnosticsController : ControllerBase
         return Ok(new { passed = sql.Passed && qdrant.Passed, sqlServer = sql, qdrant });
     }
 
+    /// <summary>
+    /// 查询 Metadata 中的字段事实、语义证据，以及真正业务数据源中的 FK 关系。
+    /// 注意：SuperBIContext 只是 Metadata DB，不是业务 source DB。
+    /// </summary>
     [HttpGet("dimension-forensic")]
     public async Task<ActionResult<object>> DimensionForensic(
         [FromQuery] string table = "wms_storage_receipt_info",
@@ -46,8 +56,6 @@ public sealed class LocalRuntimeDiagnosticsController : ControllerBase
         if (string.IsNullOrWhiteSpace(table) || string.IsNullOrWhiteSpace(column))
             return BadRequest(new { passed = false, reason = "table/column 不能为空。" });
 
-        // 第一层：确认 MetadataColumn 本身，以及它的语义证据。
-        // 注意：这里绝不能把 source DB 的关系信息混进 metadata DB 查询。
         var metadataColumns = await _context.MetadataColumns
             .AsNoTracking()
             .Include(x => x.MetadataTable)
@@ -85,8 +93,6 @@ public sealed class LocalRuntimeDiagnosticsController : ControllerBase
             })
             .ToListAsync(cancellationToken);
 
-        // EF Core 不支持 Equals(string, StringComparison) 的 SQL 翻译。
-        // 当前 SQL Server collation 已经负责普通字符串比较，因此这里使用 ==。
         var relatedMetadataColumns = await _context.MetadataColumns
             .AsNoTracking()
             .Include(x => x.MetadataTable)
@@ -128,7 +134,10 @@ public sealed class LocalRuntimeDiagnosticsController : ControllerBase
             .Take(200)
             .ToListAsync(cancellationToken);
 
-        var databaseRelations = await QueryDatabaseRelationsAsync(table, column, cancellationToken);
+        var dataSourceId = metadataColumns.FirstOrDefault()?.dataSourceId;
+        var sourceDatabaseRelations = dataSourceId.HasValue
+            ? await QuerySourceDatabaseRelationsAsync(dataSourceId.Value, table, column, cancellationToken)
+            : new SourceDatabaseRelationResult(null, new List<object>(), new List<object>(), "MetadataColumn 未找到 dataSourceId。", null);
 
         var masterCandidates = relatedMetadataColumns
             .Where(x => x.isPrimaryKey == true &&
@@ -152,11 +161,14 @@ public sealed class LocalRuntimeDiagnosticsController : ControllerBase
             },
             relationship = new
             {
-                databaseForeignKeys = databaseRelations.ForeignKeys,
-                referencedMasterColumns = databaseRelations.ReferencedColumns,
-                databaseRelationQueryError = databaseRelations.Error,
+                dataSourceId,
+                sourceDatabase = sourceDatabaseRelations.Database,
+                sourceDatabaseType = sourceDatabaseRelations.DatabaseType,
+                databaseForeignKeys = sourceDatabaseRelations.ForeignKeys,
+                referencedMasterColumns = sourceDatabaseRelations.ReferencedColumns,
+                databaseRelationQueryError = sourceDatabaseRelations.Error,
                 metadataRelationshipModelExists = false,
-                note = "当前代码库没有独立 Metadata Relationship 实体；此处只诊断当前 SuperBIContext 数据库中的 SQL Server FK。source DB 的关系需要通过 DataSourceConnectionFactory/IDataSourceMetadataReader 单独读取。"
+                note = "关系查询现在直接读取 MetadataColumn 对应 dataSourceId 的业务 source DB，不再错误查询 SuperBIContext。"
             },
             master = new
             {
@@ -174,125 +186,267 @@ public sealed class LocalRuntimeDiagnosticsController : ControllerBase
     }
 
     /// <summary>
-    /// 读取当前 SuperBIContext 所连接 SQL Server 的 FK。
-    /// 这里故意不使用 REFERENCED_TABLE_NAME / REFERENCED_COLUMN_NAME 作为 SQL 别名，
-    /// 避免与 MySQL INFORMATION_SCHEMA 的字段名混淆，也避免旧代码/缓存导致的同名列解析问题。
-    /// 更重要的是：查询失败不能让诊断接口 500；关系诊断失败必须作为 evidence 返回。
+    /// 独立的 source DB 关系诊断 Action。
+    /// 这是本次根因追踪的关键入口。
     /// </summary>
-    private async Task<DatabaseRelationResult> QueryDatabaseRelationsAsync(
+    [HttpGet("source-database-relations")]
+    public async Task<ActionResult<object>> SourceDatabaseRelations(
+        [FromQuery] string table = "wms_storage_receipt_info",
+        [FromQuery] string column = "material_id",
+        [FromQuery] long? dataSourceId = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(table) || string.IsNullOrWhiteSpace(column))
+            return BadRequest(new { passed = false, reason = "table/column 不能为空。" });
+
+        var resolvedDataSourceId = dataSourceId;
+        if (!resolvedDataSourceId.HasValue)
+        {
+            resolvedDataSourceId = await _context.MetadataColumns
+                .AsNoTracking()
+                .Where(x => x.MetadataTable != null &&
+                            x.MetadataTable.TableName == table &&
+                            x.ColumnName == column)
+                .Select(x => (long?)x.MetadataTable!.DataSourceId)
+                .FirstOrDefaultAsync(cancellationToken);
+        }
+
+        if (!resolvedDataSourceId.HasValue)
+        {
+            return NotFound(new
+            {
+                passed = false,
+                table,
+                column,
+                reason = "无法从 MetadataColumn 解析 dataSourceId。"
+            });
+        }
+
+        var result = await QuerySourceDatabaseRelationsAsync(
+            resolvedDataSourceId.Value,
+            table,
+            column,
+            cancellationToken);
+
+        return Ok(new
+        {
+            passed = result.Error == null,
+            table,
+            column,
+            dataSourceId = resolvedDataSourceId,
+            sourceDatabase = result.Database,
+            sourceDatabaseType = result.DatabaseType,
+            foreignKeys = result.ForeignKeys,
+            referencedColumns = result.ReferencedColumns,
+            error = result.Error,
+            note = "foreignKeys 表示该字段引用其他主表；referencedColumns 表示其他表引用该字段。"
+        });
+    }
+
+    private async Task<SourceDatabaseRelationResult> QuerySourceDatabaseRelationsAsync(
+        long dataSourceId,
         string table,
         string column,
         CancellationToken cancellationToken)
     {
-        var foreignKeys = new List<object>();
-        var referencedColumns = new List<object>();
-        string? error = null;
-
-        await using var connection = _context.Database.GetDbConnection();
-        if (connection.State != ConnectionState.Open)
+        try
+        {
+            await using var connection = await _dataSourceConnectionFactory.CreateAsync(dataSourceId);
             await connection.OpenAsync(cancellationToken);
 
-        try
-        {
-            await using var command = connection.CreateCommand();
-            command.CommandText = @"
-SELECT
-    fk.name AS fk_constraint,
-    sch_from.name AS from_schema,
-    t_from.name AS from_table,
-    c_from.name AS from_column,
-    sch_to.name AS ref_schema,
-    t_to.name AS ref_table,
-    c_to.name AS ref_column
-FROM sys.foreign_key_columns AS fkc
-INNER JOIN sys.foreign_keys AS fk
-    ON fk.object_id = fkc.constraint_object_id
-INNER JOIN sys.tables AS t_from
-    ON t_from.object_id = fkc.parent_object_id
-INNER JOIN sys.schemas AS sch_from
-    ON sch_from.schema_id = t_from.schema_id
-INNER JOIN sys.columns AS c_from
-    ON c_from.object_id = fkc.parent_object_id
-   AND c_from.column_id = fkc.parent_column_id
-INNER JOIN sys.tables AS t_to
-    ON t_to.object_id = fkc.referenced_object_id
-INNER JOIN sys.schemas AS sch_to
-    ON sch_to.schema_id = t_to.schema_id
-INNER JOIN sys.columns AS c_to
-    ON c_to.object_id = fkc.referenced_object_id
-   AND c_to.column_id = fkc.referenced_column_id
-WHERE t_from.name = @table
-  AND c_from.name = @column
-ORDER BY fk.name, fkc.constraint_column_id;";
-            AddParameter(command, "@table", table);
-            AddParameter(command, "@column", column);
+            var database = connection.Database;
+            var databaseType = DetectDatabaseType(connection);
+            var foreignKeys = new List<object>();
+            var referencedColumns = new List<object>();
 
-            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-            while (await reader.ReadAsync(cancellationToken))
-                foreignKeys.Add(ReadDatabaseRelation(reader));
+            switch (databaseType)
+            {
+                case "SQLSERVER":
+                    await QuerySqlServerRelationsAsync(connection, table, column, foreignKeys, referencedColumns, cancellationToken);
+                    break;
+                case "MYSQL":
+                    await QueryMySqlRelationsAsync(connection, table, column, foreignKeys, referencedColumns, cancellationToken);
+                    break;
+                case "POSTGRESQL":
+                    await QueryPostgreSqlRelationsAsync(connection, table, column, foreignKeys, referencedColumns, cancellationToken);
+                    break;
+                default:
+                    return new SourceDatabaseRelationResult(
+                        database,
+                        databaseType,
+                        foreignKeys,
+                        referencedColumns,
+                        $"不支持的 source DB 类型: {databaseType}");
+            }
+
+            return new SourceDatabaseRelationResult(
+                database,
+                databaseType,
+                foreignKeys,
+                referencedColumns,
+                null);
         }
         catch (Exception ex)
         {
-            error = ex.Message;
+            return new SourceDatabaseRelationResult(
+                null,
+                null,
+                new List<object>(),
+                new List<object>(),
+                $"source DB 关系查询失败: {ex.GetType().Name}: {ex.Message}");
         }
-
-        try
-        {
-            await using var command = connection.CreateCommand();
-            command.CommandText = @"
-SELECT
-    fk.name AS fk_constraint,
-    sch_from.name AS from_schema,
-    t_from.name AS from_table,
-    c_from.name AS from_column,
-    sch_to.name AS ref_schema,
-    t_to.name AS ref_table,
-    c_to.name AS ref_column
-FROM sys.foreign_key_columns AS fkc
-INNER JOIN sys.foreign_keys AS fk
-    ON fk.object_id = fkc.constraint_object_id
-INNER JOIN sys.tables AS t_from
-    ON t_from.object_id = fkc.parent_object_id
-INNER JOIN sys.schemas AS sch_from
-    ON sch_from.schema_id = t_from.schema_id
-INNER JOIN sys.columns AS c_from
-    ON c_from.object_id = fkc.parent_object_id
-   AND c_from.column_id = fkc.parent_column_id
-INNER JOIN sys.tables AS t_to
-    ON t_to.object_id = fkc.referenced_object_id
-INNER JOIN sys.schemas AS sch_to
-    ON sch_to.schema_id = t_to.schema_id
-INNER JOIN sys.columns AS c_to
-    ON c_to.object_id = fkc.referenced_object_id
-   AND c_to.column_id = fkc.referenced_column_id
-WHERE t_to.name = @table
-  AND c_to.name = @column
-ORDER BY fk.name, fkc.constraint_column_id;";
-            AddParameter(command, "@table", table);
-            AddParameter(command, "@column", column);
-
-            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-            while (await reader.ReadAsync(cancellationToken))
-                referencedColumns.Add(ReadDatabaseRelation(reader));
-        }
-        catch (Exception ex)
-        {
-            error ??= ex.Message;
-        }
-
-        return new DatabaseRelationResult(foreignKeys, referencedColumns, error);
     }
 
-    private static object ReadDatabaseRelation(DbDataReader reader) => new
+    private static async Task QuerySqlServerRelationsAsync(
+        DbConnection connection,
+        string table,
+        string column,
+        List<object> foreignKeys,
+        List<object> referencedColumns,
+        CancellationToken cancellationToken)
     {
-        constraintName = reader["fk_constraint"]?.ToString(),
-        tableSchema = reader["from_schema"]?.ToString(),
-        tableName = reader["from_table"]?.ToString(),
-        columnName = reader["from_column"]?.ToString(),
-        referencedTableSchema = reader["ref_schema"]?.ToString(),
-        referencedTableName = reader["ref_table"]?.ToString(),
-        referencedColumnName = reader["ref_column"]?.ToString()
-    };
+        const string sql = @"
+SELECT
+    fk.name AS constraint_name,
+    sch_from.name AS from_schema,
+    t_from.name AS from_table,
+    c_from.name AS from_column,
+    sch_to.name AS referenced_schema,
+    t_to.name AS referenced_table,
+    c_to.name AS referenced_column
+FROM sys.foreign_key_columns AS fkc
+INNER JOIN sys.foreign_keys AS fk ON fk.object_id = fkc.constraint_object_id
+INNER JOIN sys.tables AS t_from ON t_from.object_id = fkc.parent_object_id
+INNER JOIN sys.schemas AS sch_from ON sch_from.schema_id = t_from.schema_id
+INNER JOIN sys.columns AS c_from ON c_from.object_id = fkc.parent_object_id AND c_from.column_id = fkc.parent_column_id
+INNER JOIN sys.tables AS t_to ON t_to.object_id = fkc.referenced_object_id
+INNER JOIN sys.schemas AS sch_to ON sch_to.schema_id = t_to.schema_id
+INNER JOIN sys.columns AS c_to ON c_to.object_id = fkc.referenced_object_id AND c_to.column_id = fkc.referenced_column_id
+WHERE (t_from.name = @table AND c_from.name = @column)
+   OR (t_to.name = @table AND c_to.name = @column)
+ORDER BY fk.name, fkc.constraint_column_id;";
+
+        await ReadRelationRowsAsync(connection, sql, table, column, foreignKeys, referencedColumns, cancellationToken);
+    }
+
+    private static async Task QueryMySqlRelationsAsync(
+        DbConnection connection,
+        string table,
+        string column,
+        List<object> foreignKeys,
+        List<object> referencedColumns,
+        CancellationToken cancellationToken)
+    {
+        const string sql = @"
+SELECT
+    kcu.CONSTRAINT_NAME AS constraint_name,
+    kcu.TABLE_SCHEMA AS from_schema,
+    kcu.TABLE_NAME AS from_table,
+    kcu.COLUMN_NAME AS from_column,
+    kcu.REFERENCED_TABLE_SCHEMA AS referenced_schema,
+    kcu.REFERENCED_TABLE_NAME AS referenced_table,
+    kcu.REFERENCED_COLUMN_NAME AS referenced_column
+FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE kcu
+WHERE ((kcu.TABLE_NAME = @table AND kcu.COLUMN_NAME = @column)
+    OR (kcu.REFERENCED_TABLE_NAME = @table AND kcu.REFERENCED_COLUMN_NAME = @column))
+  AND kcu.REFERENCED_TABLE_NAME IS NOT NULL
+ORDER BY kcu.CONSTRAINT_NAME, kcu.ORDINAL_POSITION;";
+
+        await ReadRelationRowsAsync(connection, sql, table, column, foreignKeys, referencedColumns, cancellationToken);
+    }
+
+    private static async Task QueryPostgreSqlRelationsAsync(
+        DbConnection connection,
+        string table,
+        string column,
+        List<object> foreignKeys,
+        List<object> referencedColumns,
+        CancellationToken cancellationToken)
+    {
+        const string sql = @"
+SELECT
+    tc.constraint_name,
+    kcu.table_schema AS from_schema,
+    kcu.table_name AS from_table,
+    kcu.column_name AS from_column,
+    ccu.table_schema AS referenced_schema,
+    ccu.table_name AS referenced_table,
+    ccu.column_name AS referenced_column
+FROM information_schema.table_constraints tc
+JOIN information_schema.key_column_usage kcu
+  ON tc.constraint_name = kcu.constraint_name
+ AND tc.table_schema = kcu.table_schema
+JOIN information_schema.constraint_column_usage ccu
+  ON ccu.constraint_name = tc.constraint_name
+ AND ccu.table_schema = tc.table_schema
+WHERE tc.constraint_type = 'FOREIGN KEY'
+  AND ((kcu.table_name = @table AND kcu.column_name = @column)
+    OR (ccu.table_name = @table AND ccu.column_name = @column))
+ORDER BY tc.constraint_name, kcu.ordinal_position;";
+
+        await ReadRelationRowsAsync(connection, sql, table, column, foreignKeys, referencedColumns, cancellationToken);
+    }
+
+    private static async Task ReadRelationRowsAsync(
+        DbConnection connection,
+        string sql,
+        string table,
+        string column,
+        List<object> foreignKeys,
+        List<object> referencedColumns,
+        CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand();
+        command.CommandText = sql;
+        AddParameter(command, "@table", table);
+        AddParameter(command, "@column", column);
+
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            var fromTable = GetString(reader, "from_table");
+            var fromColumn = GetString(reader, "from_column");
+            var referencedTable = GetString(reader, "referenced_table");
+            var referencedColumn = GetString(reader, "referenced_column");
+            var relation = new
+            {
+                constraintName = GetString(reader, "constraint_name"),
+                fromSchema = GetString(reader, "from_schema"),
+                fromTable,
+                fromColumn,
+                referencedSchema = GetString(reader, "referenced_schema"),
+                referencedTable,
+                referencedColumn
+            };
+
+            if (string.Equals(fromTable, table, StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(fromColumn, column, StringComparison.OrdinalIgnoreCase))
+            {
+                foreignKeys.Add(relation);
+            }
+
+            if (string.Equals(referencedTable, table, StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(referencedColumn, column, StringComparison.OrdinalIgnoreCase))
+            {
+                referencedColumns.Add(relation);
+            }
+        }
+    }
+
+    private static string DetectDatabaseType(DbConnection connection)
+    {
+        var typeName = connection.GetType().FullName ?? connection.GetType().Name;
+        if (typeName.Contains("SqlClient", StringComparison.OrdinalIgnoreCase)) return "SQLSERVER";
+        if (typeName.Contains("MySql", StringComparison.OrdinalIgnoreCase)) return "MYSQL";
+        if (typeName.Contains("Npgsql", StringComparison.OrdinalIgnoreCase)) return "POSTGRESQL";
+        return connection.GetType().Name.ToUpperInvariant();
+    }
+
+    private static string? GetString(DbDataReader reader, string name)
+    {
+        var ordinal = reader.GetOrdinal(name);
+        return reader.IsDBNull(ordinal) ? null : reader.GetValue(ordinal)?.ToString();
+    }
 
     private static void AddParameter(DbCommand command, string name, object value)
     {
@@ -343,7 +497,9 @@ ORDER BY fk.name, fkc.constraint_column_id;";
         }
     }
 
-    private sealed record DatabaseRelationResult(
+    private sealed record SourceDatabaseRelationResult(
+        string? Database,
+        string? DatabaseType,
         List<object> ForeignKeys,
         List<object> ReferencedColumns,
         string? Error);
