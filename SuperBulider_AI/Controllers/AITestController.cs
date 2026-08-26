@@ -25,7 +25,6 @@ public class AITestController : ControllerBase
     private readonly IQueryPlanBuilder _queryPlanBuilder;
     private readonly ISqlQueryBuilder _sqlBuilder;
     private readonly IQueryExecutionService _execution;
-    private readonly IBIConversationService _conversation;
     private readonly SqlDialectResolver _dialectResolver;
     private readonly SuperBIContext _context;
 
@@ -35,7 +34,6 @@ public class AITestController : ControllerBase
         IQueryPlanBuilder queryPlanBuilder,
         ISqlQueryBuilder sqlBuilder,
         IQueryExecutionService execution,
-        IBIConversationService conversation,
         SqlDialectResolver dialectResolver,
         SuperBIContext context)
     {
@@ -44,7 +42,6 @@ public class AITestController : ControllerBase
         _queryPlanBuilder = queryPlanBuilder;
         _sqlBuilder = sqlBuilder;
         _execution = execution;
-        _conversation = conversation;
         _dialectResolver = dialectResolver;
         _context = context;
     }
@@ -61,13 +58,6 @@ public class AITestController : ControllerBase
     {
         var result = await _metadataSearch.SearchAsync(question, 10);
         return Content(JsonSerializer.Serialize(result));
-    }
-
-    [HttpGet("test")]
-    public async Task<IActionResult> Test(string question)
-    {
-        var result = await _conversation.AskAsync(question, 1);
-        return Ok(result);
     }
 
     /// <summary>
