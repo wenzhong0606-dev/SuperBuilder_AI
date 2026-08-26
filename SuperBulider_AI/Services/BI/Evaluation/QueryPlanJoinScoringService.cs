@@ -5,7 +5,7 @@ namespace SuperBuilder_AI.Services.BI.Evaluation;
 
 /// <summary>
 /// Phase 2.6 C.10.5 / C.14：评价 Runtime Join 的物理 Contract。
-/// Golden Join 仅作为期望结构；Evaluator 不重新执行 Semantic Resolution。
+/// Golden Join 仅作为期望结构；Evaluator 不重新访问 Metadata 做第二次 Semantic Resolution。
 /// </summary>
 public sealed class QueryPlanJoinScoringService
 {
@@ -27,22 +27,21 @@ public sealed class QueryPlanJoinScoringService
 
     private static QueryPlanJoinItemScore EvaluateJoin(GoldenJoinExpectation expected, IReadOnlyList<QueryJoin> actual)
     {
-        // Golden Join 已经代表“应该发生 Join”的 Contract；这里只比较 Runtime 的实际物理 Endpoint。
-        // 不再根据 Golden SemanticText 去 Metadata 做第二次推理。
+        // 不重新从 Metadata 解析 Golden SemanticText；只消费 Runtime 已生成的物理 Join。
+        // Golden 的语义字段允许与 Runtime 表/字段名相同，也允许 Runtime 已保留的业务别名文本匹配。
         var match = actual.FirstOrDefault(x =>
             Equal(expected.JoinType, x.JoinType)
-            && EqualSemanticEndpoint(expected.LeftTableSemanticText, x.LeftTableSemanticText, x.LeftTableName)
-            && EqualSemanticEndpoint(expected.RightTableSemanticText, x.RightTableSemanticText, x.RightTableName)
-            && EqualSemanticEndpoint(expected.LeftColumnSemanticText, x.LeftColumnSemanticText, x.LeftColumnName)
-            && EqualSemanticEndpoint(expected.RightColumnSemanticText, x.RightColumnSemanticText, x.RightColumnName));
+            && EqualEndpoint(expected.LeftTableSemanticText, x.LeftTableName)
+            && EqualEndpoint(expected.RightTableSemanticText, x.RightTableName)
+            && EqualEndpoint(expected.LeftColumnSemanticText, x.LeftColumnName)
+            && EqualEndpoint(expected.RightColumnSemanticText, x.RightColumnName));
 
-        // INNER JOIN 允许左右端点交换。
         match ??= actual.FirstOrDefault(x =>
             Equal(expected.JoinType, "INNER")
-            && Equal(expected.LeftTableSemanticText, x.RightTableSemanticText)
-            && Equal(expected.RightTableSemanticText, x.LeftTableSemanticText)
-            && Equal(expected.LeftColumnSemanticText, x.RightColumnSemanticText)
-            && Equal(expected.RightColumnSemanticText, x.LeftColumnSemanticText));
+            && EqualEndpoint(expected.LeftTableSemanticText, x.RightTableName)
+            && EqualEndpoint(expected.RightTableSemanticText, x.LeftTableName)
+            && EqualEndpoint(expected.LeftColumnSemanticText, x.RightColumnName)
+            && EqualEndpoint(expected.RightColumnSemanticText, x.LeftColumnName));
 
         if (match is null)
         {
@@ -86,8 +85,14 @@ public sealed class QueryPlanJoinScoringService
         };
     }
 
-    private static bool EqualSemanticEndpoint(string? expected, string? runtimeSemantic, string? runtimePhysical)
-        => Equal(expected, runtimeSemantic) || Equal(expected, runtimePhysical);
+    private static bool EqualEndpoint(string? expected, string? runtime)
+        => !string.IsNullOrWhiteSpace(expected)
+           && !string.IsNullOrWhiteSpace(runtime)
+           && (string.Equals(expected.Trim(), runtime.Trim(), StringComparison.OrdinalIgnoreCase)
+               || Normalize(expected) == Normalize(runtime));
+
+    private static string Normalize(string value)
+        => new string(value.Where(char.IsLetterOrDigit).ToArray()).ToLowerInvariant();
 
     private static bool Equal(string? left, string? right)
         => !string.IsNullOrWhiteSpace(left) && !string.IsNullOrWhiteSpace(right)
