@@ -31,15 +31,36 @@ public partial class QueryPlanBuilder
             plan.Filters.Add(new QueryFilter { SemanticText = filter.SemanticText, Field = filter.Field, Operator = filter.Operator, Value = filter.Value });
         foreach (var dimension in intent.Dimensions)
             plan.Dimensions.Add(new QueryDimension { SemanticText = dimension });
+        var orderingMetric = ResolveOrderingMetric(intent);
         foreach (var _ in resolution.Orders)
-            plan.Orders.Add(new QueryOrder { Direction = string.IsNullOrWhiteSpace(intent.OrderDirection) ? "ASC" : intent.OrderDirection!, IsMetric = true, MetricName = intent.OrderBy, Aggregation = ResolveOrderingAggregation(intent) });
+            plan.Orders.Add(new QueryOrder
+            {
+                Direction = string.IsNullOrWhiteSpace(intent.OrderDirection) ? "ASC" : intent.OrderDirection,
+                IsMetric = true,
+                // OrderBy may be a physical Field (for example "quantity").
+                // QueryOrder.MetricName is the runtime semantic contract consumed by Evaluation.
+                // Preserve the metric SemanticText here instead of leaking the physical OrderBy token.
+                MetricName = orderingMetric?.SemanticText ?? orderingMetric?.Name ?? intent.OrderBy,
+                Aggregation = ResolveOrderingAggregation(intent)
+            });
         return plan;
+    }
+
+    private static QueryMetric? ResolveOrderingMetric(QueryIntent intent)
+    {
+        if (string.IsNullOrWhiteSpace(intent.OrderBy))
+            return intent.Metrics.FirstOrDefault(x => x.IsOrderingMetric);
+
+        return intent.Metrics.FirstOrDefault(x =>
+            string.Equals(x.Name, intent.OrderBy, StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(x.SemanticText, intent.OrderBy, StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(x.Field, intent.OrderBy, StringComparison.OrdinalIgnoreCase) ||
+            x.IsOrderingMetric);
     }
 
     private static QueryAggregation ResolveOrderingAggregation(QueryIntent intent)
     {
-        if (string.IsNullOrWhiteSpace(intent.OrderBy)) return QueryAggregation.None;
-        var metric = intent.Metrics.FirstOrDefault(x => string.Equals(x.Name, intent.OrderBy, StringComparison.OrdinalIgnoreCase) || string.Equals(x.SemanticText, intent.OrderBy, StringComparison.OrdinalIgnoreCase) || string.Equals(x.Field, intent.OrderBy, StringComparison.OrdinalIgnoreCase) || x.IsOrderingMetric);
+        var metric = ResolveOrderingMetric(intent);
         return metric?.GetAggregation() ?? QueryAggregation.None;
     }
 
