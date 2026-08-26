@@ -15,9 +15,9 @@ namespace SuperBuilder_AI.Services.BI;
 public sealed class DimensionResolutionEvidenceService : IDimensionResolutionEvidenceService
 {
     // D14-R1：Master Evidence 必须基于当前已绑定/启用 DataSource 的 Metadata。
-    // 不要求一个过高的二次评分门槛阻断已经存在的稳定 Master Evidence。
+    // D14-R2：DirectKey 不应因二次加权把已有明确语义的事实表键错误判为 NotResolved。
     private const double MasterJoinThreshold = 0.65d;
-    private const double DirectKeyThreshold = 0.65d;
+    private const double DirectKeyThreshold = 0.60d;
     private const double AmbiguityGap = 0.05d;
 
     private readonly SuperBIContext _context;
