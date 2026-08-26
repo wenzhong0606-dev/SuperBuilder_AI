@@ -17,9 +17,7 @@ public sealed class LocalRuntimeDiagnosticsController : ControllerBase
     private readonly SuperBIContext _context;
     private readonly IConfiguration _configuration;
 
-    public LocalRuntimeDiagnosticsController(
-        SuperBIContext context,
-        IConfiguration configuration)
+    public LocalRuntimeDiagnosticsController(SuperBIContext context, IConfiguration configuration)
     {
         _context = context;
         _configuration = configuration;
@@ -138,9 +136,9 @@ public sealed class LocalRuntimeDiagnosticsController : ControllerBase
         var databaseRelations = await QueryDatabaseRelationsAsync(table, column, cancellationToken);
         var masterCandidates = relatedMetadataColumns
             .Where(x => x.isPrimaryKey == true &&
-                        (!string.IsNullOrWhiteSpace(x.semantic?.BusinessMeaning) ||
-                         !string.IsNullOrWhiteSpace(x.semantic?.Keywords) ||
-                         !string.IsNullOrWhiteSpace(x.semantic?.Synonyms)))
+                        (!string.IsNullOrWhiteSpace(x.semantic?.businessMeaning) ||
+                         !string.IsNullOrWhiteSpace(x.semantic?.keywords) ||
+                         !string.IsNullOrWhiteSpace(x.semantic?.synonyms)))
             .Take(100)
             .ToList();
 
@@ -178,10 +176,7 @@ public sealed class LocalRuntimeDiagnosticsController : ControllerBase
         });
     }
 
-    private async Task<(List<object> ForeignKeys, List<object> ReferencedColumns)> QueryDatabaseRelationsAsync(
-        string table,
-        string column,
-        CancellationToken cancellationToken)
+    private async Task<(List<object> ForeignKeys, List<object> ReferencedColumns)> QueryDatabaseRelationsAsync(string table, string column, CancellationToken cancellationToken)
     {
         var foreignKeys = new List<object>();
         var referencedColumns = new List<object>();
@@ -192,17 +187,10 @@ public sealed class LocalRuntimeDiagnosticsController : ControllerBase
         await using (var command = connection.CreateCommand())
         {
             command.CommandText = @"
-SELECT
-    kcu.CONSTRAINT_NAME,
-    kcu.TABLE_SCHEMA,
-    kcu.TABLE_NAME,
-    kcu.COLUMN_NAME,
-    kcu.REFERENCED_TABLE_SCHEMA,
-    kcu.REFERENCED_TABLE_NAME,
-    kcu.REFERENCED_COLUMN_NAME
+SELECT kcu.CONSTRAINT_NAME, kcu.TABLE_SCHEMA, kcu.TABLE_NAME, kcu.COLUMN_NAME,
+       kcu.REFERENCED_TABLE_SCHEMA, kcu.REFERENCED_TABLE_NAME, kcu.REFERENCED_COLUMN_NAME
 FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE kcu
-WHERE kcu.TABLE_NAME = @table
-  AND kcu.COLUMN_NAME = @column
+WHERE kcu.TABLE_NAME = @table AND kcu.COLUMN_NAME = @column
   AND kcu.REFERENCED_TABLE_NAME IS NOT NULL
 ORDER BY kcu.CONSTRAINT_NAME;";
             AddParameter(command, "@table", table);
@@ -210,51 +198,38 @@ ORDER BY kcu.CONSTRAINT_NAME;";
             await using var reader = await command.ExecuteReaderAsync(cancellationToken);
             while (await reader.ReadAsync(cancellationToken))
             {
-                var item = new
+                foreignKeys.Add(new
                 {
-                    constraintName = reader["CONSTRAINT_NAME"]?.ToString(),
-                    tableSchema = reader["TABLE_SCHEMA"]?.ToString(),
-                    tableName = reader["TABLE_NAME"]?.ToString(),
-                    columnName = reader["COLUMN_NAME"]?.ToString(),
+                    constraintName = reader["CONSTRAINT_NAME"]?.ToString(), tableSchema = reader["TABLE_SCHEMA"]?.ToString(),
+                    tableName = reader["TABLE_NAME"]?.ToString(), columnName = reader["COLUMN_NAME"]?.ToString(),
                     referencedTableSchema = reader["REFERENCED_TABLE_SCHEMA"]?.ToString(),
                     referencedTableName = reader["REFERENCED_TABLE_NAME"]?.ToString(),
                     referencedColumnName = reader["REFERENCED_COLUMN_NAME"]?.ToString()
-                };
-                foreignKeys.Add(item);
+                });
             }
         }
 
         await using (var command = connection.CreateCommand())
         {
             command.CommandText = @"
-SELECT
-    kcu.CONSTRAINT_NAME,
-    kcu.TABLE_SCHEMA,
-    kcu.TABLE_NAME,
-    kcu.COLUMN_NAME,
-    kcu.REFERENCED_TABLE_SCHEMA,
-    kcu.REFERENCED_TABLE_NAME,
-    kcu.REFERENCED_COLUMN_NAME
+SELECT kcu.CONSTRAINT_NAME, kcu.TABLE_SCHEMA, kcu.TABLE_NAME, kcu.COLUMN_NAME,
+       kcu.REFERENCED_TABLE_SCHEMA, kcu.REFERENCED_TABLE_NAME, kcu.REFERENCED_COLUMN_NAME
 FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE kcu
-WHERE kcu.REFERENCED_TABLE_NAME = @table
-  AND kcu.REFERENCED_COLUMN_NAME = @column
+WHERE kcu.REFERENCED_TABLE_NAME = @table AND kcu.REFERENCED_COLUMN_NAME = @column
 ORDER BY kcu.CONSTRAINT_NAME;";
             AddParameter(command, "@table", table);
             AddParameter(command, "@column", column);
             await using var reader = await command.ExecuteReaderAsync(cancellationToken);
             while (await reader.ReadAsync(cancellationToken))
             {
-                var item = new
+                referencedColumns.Add(new
                 {
-                    constraintName = reader["CONSTRAINT_NAME"]?.ToString(),
-                    tableSchema = reader["TABLE_SCHEMA"]?.ToString(),
-                    tableName = reader["TABLE_NAME"]?.ToString(),
-                    columnName = reader["COLUMN_NAME"]?.ToString(),
+                    constraintName = reader["CONSTRAINT_NAME"]?.ToString(), tableSchema = reader["TABLE_SCHEMA"]?.ToString(),
+                    tableName = reader["TABLE_NAME"]?.ToString(), columnName = reader["COLUMN_NAME"]?.ToString(),
                     referencedTableSchema = reader["REFERENCED_TABLE_SCHEMA"]?.ToString(),
                     referencedTableName = reader["REFERENCED_TABLE_NAME"]?.ToString(),
                     referencedColumnName = reader["REFERENCED_COLUMN_NAME"]?.ToString()
-                };
-                referencedColumns.Add(item);
+                });
             }
         }
 
@@ -275,30 +250,14 @@ ORDER BY kcu.CONSTRAINT_NAME;";
         try
         {
             var connected = await _context.Database.CanConnectAsync(cancellationToken);
-            if (!connected)
-                return new LocalRuntimeCheckResult(false, "SqlServer", "SuperBIContext 无法连接当前配置的 SQL Server。", stopwatch.ElapsedMilliseconds);
-
+            if (!connected) return new LocalRuntimeCheckResult(false, "SqlServer", "SuperBIContext 无法连接当前配置的 SQL Server。", stopwatch.ElapsedMilliseconds);
             var result = await _context.Database.SqlQueryRaw<int>("SELECT 1 AS Value").SingleAsync(cancellationToken);
-            return new LocalRuntimeCheckResult(
-                result == 1,
-                "SqlServer",
-                result == 1 ? "SQL Server 认证与 SELECT 1 均通过。" : "SQL Server SELECT 1 返回非预期结果。",
-                stopwatch.ElapsedMilliseconds,
-                new
-                {
-                    connected = true,
-                    select1 = result,
-                    database = _context.Database.GetDbConnection().Database,
-                    server = _context.Database.GetDbConnection().DataSource
-                });
+            return new LocalRuntimeCheckResult(result == 1, "SqlServer", result == 1 ? "SQL Server 认证与 SELECT 1 均通过。" : "SQL Server SELECT 1 返回非预期结果。", stopwatch.ElapsedMilliseconds,
+                new { connected = true, select1 = result, database = _context.Database.GetDbConnection().Database, server = _context.Database.GetDbConnection().DataSource });
         }
         catch (Exception ex)
         {
-            return new LocalRuntimeCheckResult(
-                false,
-                "SqlServer",
-                ex.Message,
-                stopwatch.ElapsedMilliseconds,
+            return new LocalRuntimeCheckResult(false, "SqlServer", ex.Message, stopwatch.ElapsedMilliseconds,
                 new { connected = false, exceptionType = ex.GetType().FullName, innerMessage = ex.InnerException?.Message });
         }
     }
@@ -315,28 +274,15 @@ ORDER BY kcu.CONSTRAINT_NAME;";
             using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
             using var response = await client.GetAsync(uri, cancellationToken);
             var body = await response.Content.ReadAsStringAsync(cancellationToken);
-            return new LocalRuntimeCheckResult(
-                response.IsSuccessStatusCode,
-                "Qdrant",
-                response.IsSuccessStatusCode ? "Qdrant HTTP healthz 通过。" : "Qdrant HTTP healthz 返回失败状态。",
-                stopwatch.ElapsedMilliseconds,
+            return new LocalRuntimeCheckResult(response.IsSuccessStatusCode, "Qdrant", response.IsSuccessStatusCode ? "Qdrant HTTP healthz 通过。" : "Qdrant HTTP healthz 返回失败状态。", stopwatch.ElapsedMilliseconds,
                 new { host, httpPort, grpcPort, httpHealthUrl = uri.ToString(), statusCode = (int)response.StatusCode, responseBody = body });
         }
         catch (Exception ex)
         {
-            return new LocalRuntimeCheckResult(
-                false,
-                "Qdrant",
-                ex.Message,
-                stopwatch.ElapsedMilliseconds,
+            return new LocalRuntimeCheckResult(false, "Qdrant", ex.Message, stopwatch.ElapsedMilliseconds,
                 new { host, httpPort, grpcPort, httpHealthUrl = uri.ToString(), exceptionType = ex.GetType().FullName, innerMessage = ex.InnerException?.Message });
         }
     }
 
-    private sealed record LocalRuntimeCheckResult(
-        bool Passed,
-        string Stage,
-        string Message,
-        long ElapsedMs,
-        object? Details = null);
+    private sealed record LocalRuntimeCheckResult(bool Passed, string Stage, string Message, long ElapsedMs, object? Details = null);
 }
