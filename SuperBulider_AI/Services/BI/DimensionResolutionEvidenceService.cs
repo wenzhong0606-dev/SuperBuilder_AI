@@ -15,7 +15,7 @@ namespace SuperBuilder_AI.Services.BI;
 public sealed class DimensionResolutionEvidenceService : IDimensionResolutionEvidenceService
 {
     // D14-R1：Master Evidence 必须基于当前已绑定/启用 DataSource 的 Metadata。
-    // D14-R2：DirectKey 不应因二次加权把已有明确语义的事实表键错误判为 NotResolved。
+    // D14-R2：跨 DataSource Master 无法执行 JOIN 时必须降级为 Fact Association ID 的 DirectKey。
     // D14-R5：同一 Dimension 的“展示字段”和“稳定键字段”属于不同物理角色，不能直接互相制造 Ambiguous。
     private const double MasterJoinThreshold = 0.65d;
     private const double DirectKeyThreshold = 0.60d;
@@ -59,7 +59,7 @@ public sealed class DimensionResolutionEvidenceService : IDimensionResolutionEvi
 
         // D14-R5：事实表 Dimension Candidate 先按物理角色分层：
         // 1. Identifier/PrimaryKey：用于 MasterJoin 的事实侧连接键；
-        // 2. 非 Identifier：在没有 Master Evidence 时作为 DirectKey 的直接展示/分组字段。
+        // 2. 非 Identifier：仅作为 DirectKey 的候选展示/分组字段。
         // 两类候选不能仅因为分差接近就互相判定为 Ambiguous。
         var keyCandidates = factCandidates
             .Where(x => x.Column is not null && (x.Column.IsPrimaryKey == true || LooksLikeIdentifier(x.Column.ColumnName)))
@@ -85,13 +85,13 @@ public sealed class DimensionResolutionEvidenceService : IDimensionResolutionEvi
             .Select(x => x.Id)
             .ToHashSetAsync(cancellationToken);
 
-		// D14-R5：只有存在稳定事实侧 Key Candidate 时才尝试 Master Evidence。
-		// Master 候选同时对每个事实侧 Key 计算，避免先任意选一个 Key 再造成错误竞争。
-		var masterSearch = keyCandidates.Count == 0
-	        ? new List<MetadataSemanticSearchResult>()
-	        : await _semanticSearchService.SearchAsync(dimensionSemanticText, 20);
+        // D14-R5：只有存在稳定事实侧 Key Candidate 时才尝试 Master Evidence。
+        // Master 候选同时对每个事实侧 Key 计算，避免先任意选一个 Key 再造成错误竞争。
+        var masterSearch = keyCandidates.Count == 0
+            ? new List<MetadataSemanticSearchResult>()
+            : await _semanticSearchService.SearchAsync(dimensionSemanticText, 20);
 
-		var masterCandidates = masterSearch
+        var masterCandidates = masterSearch
             .Where(x => x.IsSemanticVector && x.Table is not null && x.Column is not null)
             .Where(x => x.Table!.Id != fact.Id && x.Table.TenantId == fact.TenantId)
             .Where(x => activeDataSourceIds.Contains(x.Table!.DataSourceId))
@@ -136,50 +136,33 @@ public sealed class DimensionResolutionEvidenceService : IDimensionResolutionEvi
             var master = bestMaster.Candidate;
             var factKey = bestMaster.FactKey;
             var sameDataSource = master.Table!.DataSourceId == fact.DataSourceId;
-            var label = await FindLabelColumnAsync(master.Table.Id, master.Column!.Id, dimensionSemanticText, cancellationToken);
-            return new DimensionResolutionEvidence
+            if (sameDataSource)
             {
-                ResolutionType = "MasterJoin",
-                ExecutionCapability = sameDataSource ? "Executable" : "NotExecutable",
-                FactTableId = fact.Id,
-                FactDataSourceId = fact.DataSourceId,
-                FactKeyColumnId = factKey.Column!.Id,
-                FactTable = fact.TableName ?? string.Empty,
-                FactKeyColumn = factKey.Column.ColumnName ?? string.Empty,
-                MasterTableId = master.Table.Id,
-                MasterDataSourceId = master.Table.DataSourceId,
-                MasterTable = master.Table.TableName,
-                MasterKeyColumnId = master.Column.Id,
-                MasterKeyColumn = master.Column.ColumnName,
-                MasterLabelColumnId = label?.Id,
-                MasterLabelColumn = label?.ColumnName,
-                Score = bestMaster.Score,
-                Reason = sameDataSource
-                    ? "当前已绑定 Metadata Snapshot 存在稳定的 Master Key Semantic Evidence。"
-                    : "已绑定 Metadata Snapshot 发现跨 DataSource Master Evidence；当前 QueryPlan/SQL Runtime 不执行跨 DataSource Join。"
-            };
-        }
-
-        // 当前 Snapshot 没有 Master Evidence：DirectKey 只在同一物理角色内部判断稳定性。
-        if (bestDisplay is not null)
-        {
-            if (displayAmbiguous)
-            {
+                var label = await FindLabelColumnAsync(master.Table.Id, master.Column!.Id, dimensionSemanticText, cancellationToken);
                 return new DimensionResolutionEvidence
                 {
-                    ResolutionType = "Ambiguous",
-                    ExecutionCapability = "NotExecutable",
+                    ResolutionType = "MasterJoin",
+                    ExecutionCapability = "Executable",
                     FactTableId = fact.Id,
                     FactDataSourceId = fact.DataSourceId,
-                    FactKeyColumnId = bestDisplay.Column!.Id,
+                    FactKeyColumnId = factKey.Column!.Id,
                     FactTable = fact.TableName ?? string.Empty,
-                    FactKeyColumn = bestDisplay.Column.ColumnName ?? string.Empty,
-                    Score = bestDisplayScore,
-                    Reason = "当前事实表存在多个竞争的直接 Dimension 展示字段，禁止猜测。"
+                    FactKeyColumn = factKey.Column.ColumnName ?? string.Empty,
+                    MasterTableId = master.Table.Id,
+                    MasterDataSourceId = master.Table.DataSourceId,
+                    MasterTable = master.Table.TableName,
+                    MasterKeyColumnId = master.Column.Id,
+                    MasterKeyColumn = master.Column.ColumnName,
+                    MasterLabelColumnId = label?.Id,
+                    MasterLabelColumn = label?.ColumnName,
+                    Score = bestMaster.Score,
+                    Reason = "当前已绑定 Metadata Snapshot 存在稳定的同 DataSource Master Key Semantic Evidence，采用 MasterJoin。"
                 };
             }
 
-            if (bestDisplayScore >= DirectKeyThreshold)
+            // D14 Multi-Database Contract：Master 存在但跨 DataSource 时，当前 Runtime 不执行跨源 JOIN。
+            // 必须保留事实表 Association ID，降级为 DirectKey；绝不能把该场景标记为 NotResolved。
+            if (bestKey is not null && !keyAmbiguous && bestKeyScore >= DirectKeyThreshold)
             {
                 return new DimensionResolutionEvidence
                 {
@@ -187,16 +170,30 @@ public sealed class DimensionResolutionEvidenceService : IDimensionResolutionEvi
                     ExecutionCapability = "Executable",
                     FactTableId = fact.Id,
                     FactDataSourceId = fact.DataSourceId,
-                    FactKeyColumnId = bestDisplay.Column!.Id,
+                    FactKeyColumnId = bestKey.Column!.Id,
                     FactTable = fact.TableName ?? string.Empty,
-                    FactKeyColumn = bestDisplay.Column.ColumnName ?? string.Empty,
-                    Score = bestDisplayScore,
-                    Reason = "当前已绑定 Metadata Snapshot 未形成 Master Evidence；事实表存在稳定的直接 Dimension 展示字段，因此采用 DirectKey。"
+                    FactKeyColumn = bestKey.Column.ColumnName ?? string.Empty,
+                    Score = bestKeyScore,
+                    Reason = "当前 Metadata Snapshot 存在跨 DataSource Master，但当前 Runtime 不执行跨源 JOIN；采用事实表 Association ID 的 DirectKey 汇总。"
                 };
             }
+
+            return new DimensionResolutionEvidence
+            {
+                ResolutionType = "NotResolved",
+                ExecutionCapability = "NotExecutable",
+                FactTableId = fact.Id,
+                FactDataSourceId = fact.DataSourceId,
+                FactKeyColumnId = bestMaster.FactKey.Column!.Id,
+                FactTable = fact.TableName ?? string.Empty,
+                FactKeyColumn = factKey.Column!.ColumnName ?? string.Empty,
+                Score = bestMaster.Score,
+                Reason = "发现跨 DataSource Master，但事实表没有稳定 Association ID，无法安全降级为 DirectKey。"
+            };
         }
 
-        // 没有直接展示字段时才退回稳定 Identifier/PrimaryKey。
+        // D14 Multi-Database / Optional Master Contract：没有 Master 时，只允许使用事实表稳定 Association ID。
+        // Display Field 不得冒充 DirectKey；它只能作为 MasterJoin 的标签/展示证据。
         if (bestKey is not null)
         {
             if (keyAmbiguous)
@@ -211,7 +208,7 @@ public sealed class DimensionResolutionEvidenceService : IDimensionResolutionEvi
                     FactTable = fact.TableName ?? string.Empty,
                     FactKeyColumn = bestKey.Column.ColumnName ?? string.Empty,
                     Score = bestKeyScore,
-                    Reason = "当前事实表存在多个分差不足的稳定 Dimension Key 候选，禁止猜测。"
+                    Reason = "当前事实表存在多个分差不足的稳定 Dimension Association ID 候选，禁止猜测。"
                 };
             }
 
@@ -227,7 +224,7 @@ public sealed class DimensionResolutionEvidenceService : IDimensionResolutionEvi
                     FactTable = fact.TableName ?? string.Empty,
                     FactKeyColumn = bestKey.Column.ColumnName ?? string.Empty,
                     Score = bestKeyScore,
-                    Reason = "当前已绑定 Metadata Snapshot 未形成 Master Evidence；事实表存在稳定 Dimension Identifier，因此采用 DirectKey。"
+                    Reason = "当前 Metadata Snapshot 未形成 Master Evidence；使用事实表稳定 Association ID 作为 DirectKey。"
                 };
             }
         }
