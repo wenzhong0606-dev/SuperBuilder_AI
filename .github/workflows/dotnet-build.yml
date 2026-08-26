@@ -14,6 +14,7 @@ permissions:
 
 env:
   TEST_SQL_PASSWORD: "SuperBuilder_C13_3!Test2026"
+  CI: "true"
 
 jobs:
   build:
