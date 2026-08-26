@@ -85,13 +85,13 @@ public sealed class DimensionResolutionEvidenceService : IDimensionResolutionEvi
             .Select(x => x.Id)
             .ToHashSetAsync(cancellationToken);
 
-        // D14-R5：只有存在稳定事实侧 Key Candidate 时才尝试 Master Evidence。
-        // Master 候选同时对每个事实侧 Key 计算，避免先任意选一个 Key 再造成错误竞争。
-        var masterSearch = keyCandidates.Count == 0
-            ? Array.Empty<MetadataSemanticSearchResult>()
-            : await _semanticSearchService.SearchAsync(dimensionSemanticText, 20);
+		// D14-R5：只有存在稳定事实侧 Key Candidate 时才尝试 Master Evidence。
+		// Master 候选同时对每个事实侧 Key 计算，避免先任意选一个 Key 再造成错误竞争。
+		var masterSearch = keyCandidates.Count == 0
+	        ? new List<MetadataSemanticSearchResult>()
+	        : await _semanticSearchService.SearchAsync(dimensionSemanticText, 20);
 
-        var masterCandidates = masterSearch
+		var masterCandidates = masterSearch
             .Where(x => x.IsSemanticVector && x.Table is not null && x.Column is not null)
             .Where(x => x.Table!.Id != fact.Id && x.Table.TenantId == fact.TenantId)
             .Where(x => activeDataSourceIds.Contains(x.Table!.DataSourceId))
