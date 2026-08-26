@@ -6,10 +6,6 @@ using System.Data.Common;
 
 namespace SuperBuilder_AI.Controllers;
 
-/// <summary>
-/// C.13.3 本地 Runtime 验证控制器。
-/// 用于开发机直接验证 SQL Server / Qdrant 的真实运行链，避免依赖 GitHub Runner 的基础设施差异。
-/// </summary>
 [ApiController]
 [Route("evaluation/local-runtime")]
 public sealed class LocalRuntimeDiagnosticsController : ControllerBase
@@ -39,11 +35,6 @@ public sealed class LocalRuntimeDiagnosticsController : ControllerBase
         return Ok(new { passed = sql.Passed && qdrant.Passed, sqlServer = sql, qdrant });
     }
 
-    /// <summary>
-    /// D14 Dimension Forensic Diagnostic。
-    /// 只读查询，不修改 Metadata，不修改 QueryPlan。
-    /// 用于闭合：Fact Column -> Metadata Semantic -> DB FK Relationship -> Master PK -> Label Candidate。
-    /// </summary>
     [HttpGet("dimension-forensic")]
     public async Task<ActionResult<object>> DimensionForensic(
         [FromQuery] string table = "wms_storage_receipt_info",
@@ -92,14 +83,16 @@ public sealed class LocalRuntimeDiagnosticsController : ControllerBase
             })
             .ToListAsync(cancellationToken);
 
+        // EF Core 无法翻译 Equals(string, StringComparison)。这里直接使用 ==，
+        // SQL Server 的大小写行为由数据库/列 Collation 决定。
         var relatedMetadataColumns = await _context.MetadataColumns
             .AsNoTracking()
             .Include(x => x.MetadataTable)
             .Include(x => x.Semantic)
             .Where(x => x.MetadataTable != null && x.ColumnName != null &&
-                        (x.ColumnName!.Equals(column, StringComparison.OrdinalIgnoreCase) ||
-                         x.ColumnName!.Equals("material_code", StringComparison.OrdinalIgnoreCase) ||
-                         x.ColumnName!.Equals("material_name", StringComparison.OrdinalIgnoreCase)))
+                        (x.ColumnName == column ||
+                         x.ColumnName == "material_code" ||
+                         x.ColumnName == "material_name"))
             .Select(x => new
             {
                 columnId = x.Id,
@@ -176,10 +169,11 @@ public sealed class LocalRuntimeDiagnosticsController : ControllerBase
         });
     }
 
-    private async Task<(List<object> ForeignKeys, List<object> ReferencedColumns)> QueryDatabaseRelationsAsync(string table, string column, CancellationToken cancellationToken)
+    private async Task<DatabaseRelationResult> QueryDatabaseRelationsAsync(string table, string column, CancellationToken cancellationToken)
     {
         var foreignKeys = new List<object>();
         var referencedColumns = new List<object>();
+
         await using var connection = _context.Database.GetDbConnection();
         if (connection.State != ConnectionState.Open)
             await connection.OpenAsync(cancellationToken);
@@ -187,54 +181,70 @@ public sealed class LocalRuntimeDiagnosticsController : ControllerBase
         await using (var command = connection.CreateCommand())
         {
             command.CommandText = @"
-SELECT kcu.CONSTRAINT_NAME, kcu.TABLE_SCHEMA, kcu.TABLE_NAME, kcu.COLUMN_NAME,
-       kcu.REFERENCED_TABLE_SCHEMA, kcu.REFERENCED_TABLE_NAME, kcu.REFERENCED_COLUMN_NAME
-FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE kcu
-WHERE kcu.TABLE_NAME = @table AND kcu.COLUMN_NAME = @column
-  AND kcu.REFERENCED_TABLE_NAME IS NOT NULL
-ORDER BY kcu.CONSTRAINT_NAME;";
+SELECT fk.name AS constraint_name,
+       sch_from.name AS table_schema,
+       t_from.name AS table_name,
+       c_from.name AS column_name,
+       sch_to.name AS referenced_table_schema,
+       t_to.name AS referenced_table_name,
+       c_to.name AS referenced_column_name
+FROM sys.foreign_key_columns fkc
+INNER JOIN sys.foreign_keys fk ON fk.object_id = fkc.constraint_object_id
+INNER JOIN sys.tables t_from ON t_from.object_id = fkc.parent_object_id
+INNER JOIN sys.schemas sch_from ON sch_from.schema_id = t_from.schema_id
+INNER JOIN sys.columns c_from ON c_from.object_id = fkc.parent_object_id AND c_from.column_id = fkc.parent_column_id
+INNER JOIN sys.tables t_to ON t_to.object_id = fkc.referenced_object_id
+INNER JOIN sys.schemas sch_to ON sch_to.schema_id = t_to.schema_id
+INNER JOIN sys.columns c_to ON c_to.object_id = fkc.referenced_object_id AND c_to.column_id = fkc.referenced_column_id
+WHERE t_from.name = @table AND c_from.name = @column
+ORDER BY fk.name, fkc.constraint_column_id;";
             AddParameter(command, "@table", table);
             AddParameter(command, "@column", column);
             await using var reader = await command.ExecuteReaderAsync(cancellationToken);
             while (await reader.ReadAsync(cancellationToken))
-            {
-                foreignKeys.Add(new
-                {
-                    constraintName = reader["CONSTRAINT_NAME"]?.ToString(), tableSchema = reader["TABLE_SCHEMA"]?.ToString(),
-                    tableName = reader["TABLE_NAME"]?.ToString(), columnName = reader["COLUMN_NAME"]?.ToString(),
-                    referencedTableSchema = reader["REFERENCED_TABLE_SCHEMA"]?.ToString(),
-                    referencedTableName = reader["REFERENCED_TABLE_NAME"]?.ToString(),
-                    referencedColumnName = reader["REFERENCED_COLUMN_NAME"]?.ToString()
-                });
-            }
+                foreignKeys.Add(ReadDatabaseRelation(reader));
         }
 
         await using (var command = connection.CreateCommand())
         {
             command.CommandText = @"
-SELECT kcu.CONSTRAINT_NAME, kcu.TABLE_SCHEMA, kcu.TABLE_NAME, kcu.COLUMN_NAME,
-       kcu.REFERENCED_TABLE_SCHEMA, kcu.REFERENCED_TABLE_NAME, kcu.REFERENCED_COLUMN_NAME
-FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE kcu
-WHERE kcu.REFERENCED_TABLE_NAME = @table AND kcu.REFERENCED_COLUMN_NAME = @column
-ORDER BY kcu.CONSTRAINT_NAME;";
+SELECT fk.name AS constraint_name,
+       sch_from.name AS table_schema,
+       t_from.name AS table_name,
+       c_from.name AS column_name,
+       sch_to.name AS referenced_table_schema,
+       t_to.name AS referenced_table_name,
+       c_to.name AS referenced_column_name
+FROM sys.foreign_key_columns fkc
+INNER JOIN sys.foreign_keys fk ON fk.object_id = fkc.constraint_object_id
+INNER JOIN sys.tables t_from ON t_from.object_id = fkc.parent_object_id
+INNER JOIN sys.schemas sch_from ON sch_from.schema_id = t_from.schema_id
+INNER JOIN sys.columns c_from ON c_from.object_id = fkc.parent_object_id AND c_from.column_id = fkc.parent_column_id
+INNER JOIN sys.tables t_to ON t_to.object_id = fkc.referenced_object_id
+INNER JOIN sys.schemas sch_to ON sch_to.schema_id = t_to.schema_id
+INNER JOIN sys.columns c_to ON c_to.object_id = fkc.referenced_object_id AND c_to.column_id = fkc.referenced_column_id
+WHERE t_to.name = @table AND c_to.name = @column
+ORDER BY fk.name, fkc.constraint_column_id;";
             AddParameter(command, "@table", table);
             AddParameter(command, "@column", column);
             await using var reader = await command.ExecuteReaderAsync(cancellationToken);
             while (await reader.ReadAsync(cancellationToken))
-            {
-                referencedColumns.Add(new
-                {
-                    constraintName = reader["CONSTRAINT_NAME"]?.ToString(), tableSchema = reader["TABLE_SCHEMA"]?.ToString(),
-                    tableName = reader["TABLE_NAME"]?.ToString(), columnName = reader["COLUMN_NAME"]?.ToString(),
-                    referencedTableSchema = reader["REFERENCED_TABLE_SCHEMA"]?.ToString(),
-                    referencedTableName = reader["REFERENCED_TABLE_NAME"]?.ToString(),
-                    referencedColumnName = reader["REFERENCED_COLUMN_NAME"]?.ToString()
-                });
-            }
+                referencedColumns.Add(ReadDatabaseRelation(reader));
         }
 
-        return (foreignKeys, referencedColumns);
+        return new DatabaseRelationResult(foreignKeys, referencedColumns);
     }
+
+    private static object ReadDatabaseRelation(DbDataReader reader) => new
+    {
+        constraintName = reader["constraint_name"]?.ToString(),
+        tableSchema = reader["table_schema"]?.ToString(),
+        tableName = reader["table_name"]?.ToString(),
+        columnName = reader["column_name"]?.ToString(),
+        referencedTableSchema = reader["referenced_table_schema"]?.ToString(),
+        referencedTableName = reader["referenced_table_name"]?.ToString(),
+        referencedColumnName = reader["referenced_column_name"]?.ToString()
+    };
 
     private static void AddParameter(DbCommand command, string name, object value)
     {
@@ -250,7 +260,8 @@ ORDER BY kcu.CONSTRAINT_NAME;";
         try
         {
             var connected = await _context.Database.CanConnectAsync(cancellationToken);
-            if (!connected) return new LocalRuntimeCheckResult(false, "SqlServer", "SuperBIContext 无法连接当前配置的 SQL Server。", stopwatch.ElapsedMilliseconds);
+            if (!connected)
+                return new LocalRuntimeCheckResult(false, "SqlServer", "SuperBIContext 无法连接当前配置的 SQL Server。", stopwatch.ElapsedMilliseconds);
             var result = await _context.Database.SqlQueryRaw<int>("SELECT 1 AS Value").SingleAsync(cancellationToken);
             return new LocalRuntimeCheckResult(result == 1, "SqlServer", result == 1 ? "SQL Server 认证与 SELECT 1 均通过。" : "SQL Server SELECT 1 返回非预期结果。", stopwatch.ElapsedMilliseconds,
                 new { connected = true, select1 = result, database = _context.Database.GetDbConnection().Database, server = _context.Database.GetDbConnection().DataSource });
@@ -284,5 +295,6 @@ ORDER BY kcu.CONSTRAINT_NAME;";
         }
     }
 
+    private sealed record DatabaseRelationResult(List<object> ForeignKeys, List<object> ReferencedColumns);
     private sealed record LocalRuntimeCheckResult(bool Passed, string Stage, string Message, long ElapsedMs, object? Details = null);
 }
