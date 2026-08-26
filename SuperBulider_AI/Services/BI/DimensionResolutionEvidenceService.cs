@@ -14,7 +14,9 @@ namespace SuperBuilder_AI.Services.BI;
 /// </summary>
 public sealed class DimensionResolutionEvidenceService : IDimensionResolutionEvidenceService
 {
-    private const double MasterJoinThreshold = 0.80d;
+    // D14-R1：Master Evidence 必须基于当前已绑定/启用 DataSource 的 Metadata。
+    // 不要求一个过高的二次评分门槛阻断已经存在的稳定 Master Evidence。
+    private const double MasterJoinThreshold = 0.65d;
     private const double DirectKeyThreshold = 0.65d;
     private const double AmbiguityGap = 0.05d;
 
@@ -30,15 +32,20 @@ public sealed class DimensionResolutionEvidenceService : IDimensionResolutionEvi
     public async Task<DimensionResolutionEvidence?> ResolveAsync(long factTableId, long factDataSourceId, string dimensionSemanticText, long preferredColumnId, CancellationToken cancellationToken = default)
     {
         if (factTableId <= 0 || factDataSourceId <= 0 || string.IsNullOrWhiteSpace(dimensionSemanticText)) return null;
-        var fact = await _context.MetadataTables.Include(x => x.Columns).AsNoTracking().FirstOrDefaultAsync(x => x.Id == factTableId && x.DataSourceId == factDataSourceId, cancellationToken);
-        if (fact?.Columns is null) return null;
+
+        var fact = await _context.MetadataTables
+            .Include(x => x.Columns)
+            .Include(x => x.DataSource)
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Id == factTableId && x.DataSourceId == factDataSourceId, cancellationToken);
+
+        // D14-R1：未绑定/已禁用 DataSource 的 Metadata 不属于当前 Snapshot。
+        if (fact?.Columns is null || fact.DataSource?.Enabled == false) return null;
 
         var factColumnIds = fact.Columns.Select(x => x.Id).ToHashSet();
         var factSearch = await _semanticSearchService.SearchAsync(dimensionSemanticText, 20);
 
         // D14：以当前 Metadata Snapshot 的 Column.Id 作为事实表物理边界。
-        // 不依赖 SemanticSearchResult.Table.Id 的对象映射，避免同名/重复 Metadata Table
-        // 导致事实表候选被错误过滤为空；仍严格要求候选 Column 属于当前 fact.Columns。
         var factCandidates = factSearch
             .Where(x => x.IsSemanticVector && x.Column is not null && factColumnIds.Contains(x.Column.Id))
             .Where(x => HasDimensionEvidence(x, dimensionSemanticText))
@@ -60,10 +67,16 @@ public sealed class DimensionResolutionEvidenceService : IDimensionResolutionEvi
         if (bestFactScore < DirectKeyThreshold)
             return new DimensionResolutionEvidence { ResolutionType = "NotResolved", ExecutionCapability = "NotExecutable", FactTableId = fact.Id, FactDataSourceId = fact.DataSourceId, FactKeyColumnId = bestFact.Column!.Id, FactTable = fact.TableName ?? string.Empty, FactKeyColumn = bestFact.Column.ColumnName ?? string.Empty, Score = bestFactScore, Reason = "当前 Metadata Snapshot 没有足够稳定的 Dimension Key Evidence。" };
 
+        var activeDataSourceIds = await _context.DataSources
+            .Where(x => x.TenantId == fact.TenantId && x.Enabled != false)
+            .Select(x => x.Id)
+            .ToHashSetAsync(cancellationToken);
+
         var masterSearch = await _semanticSearchService.SearchAsync(dimensionSemanticText, 20);
         var masterCandidates = masterSearch
             .Where(x => x.IsSemanticVector && x.Table is not null && x.Column is not null)
             .Where(x => x.Table!.Id != fact.Id && x.Table.TenantId == fact.TenantId)
+            .Where(x => activeDataSourceIds.Contains(x.Table!.DataSourceId))
             .Where(x => x.Column!.IsPrimaryKey == true)
             .Where(x => HasDimensionEvidence(x, dimensionSemanticText))
             .GroupBy(x => $"{x.Table!.Id}:{x.Column!.Id}", StringComparer.OrdinalIgnoreCase)
@@ -79,10 +92,10 @@ public sealed class DimensionResolutionEvidenceService : IDimensionResolutionEvi
             var master = bestMaster.Candidate;
             var sameDataSource = master.Table!.DataSourceId == fact.DataSourceId;
             var label = await FindLabelColumnAsync(master.Table.Id, master.Column!.Id, dimensionSemanticText, cancellationToken);
-            return new DimensionResolutionEvidence { ResolutionType = "MasterJoin", ExecutionCapability = sameDataSource ? "Executable" : "NotExecutable", FactTableId = fact.Id, FactDataSourceId = fact.DataSourceId, FactKeyColumnId = bestFact.Column!.Id, FactTable = fact.TableName ?? string.Empty, FactKeyColumn = bestFact.Column.ColumnName ?? string.Empty, MasterTableId = master.Table.Id, MasterDataSourceId = master.Table.DataSourceId, MasterTable = master.Table.TableName, MasterKeyColumnId = master.Column.Id, MasterKeyColumn = master.Column.ColumnName, MasterLabelColumnId = label?.Id, MasterLabelColumn = label?.ColumnName, Score = bestMaster.Score, Reason = sameDataSource ? "当前 Metadata Snapshot 存在稳定的 Master Key Semantic Evidence。" : "发现跨 DataSource Master Evidence，但当前 SQL Runtime 不执行跨 DataSource Join。" };
+            return new DimensionResolutionEvidence { ResolutionType = "MasterJoin", ExecutionCapability = sameDataSource ? "Executable" : "NotExecutable", FactTableId = fact.Id, FactDataSourceId = fact.DataSourceId, FactKeyColumnId = bestFact.Column!.Id, FactTable = fact.TableName ?? string.Empty, FactKeyColumn = bestFact.Column.ColumnName ?? string.Empty, MasterTableId = master.Table.Id, MasterDataSourceId = master.Table.DataSourceId, MasterTable = master.Table.TableName, MasterKeyColumnId = master.Column.Id, MasterKeyColumn = master.Column.ColumnName, MasterLabelColumnId = label?.Id, MasterLabelColumn = label?.ColumnName, Score = bestMaster.Score, Reason = sameDataSource ? "当前已绑定 Metadata Snapshot 存在稳定的 Master Key Semantic Evidence。" : "已绑定 Metadata Snapshot 发现跨 DataSource Master Evidence；当前 QueryPlan/SQL Runtime 不执行跨 DataSource Join。" };
         }
 
-        return new DimensionResolutionEvidence { ResolutionType = "DirectKey", ExecutionCapability = "Executable", FactTableId = fact.Id, FactDataSourceId = fact.DataSourceId, FactKeyColumnId = bestFact.Column!.Id, FactTable = fact.TableName ?? string.Empty, FactKeyColumn = bestFact.Column.ColumnName ?? string.Empty, Score = bestFactScore, Reason = "当前 Metadata Snapshot 未形成稳定 Master Evidence；事实表存在稳定 Dimension Key，因此采用 DirectKey。" };
+        return new DimensionResolutionEvidence { ResolutionType = "DirectKey", ExecutionCapability = "Executable", FactTableId = fact.Id, FactDataSourceId = fact.DataSourceId, FactKeyColumnId = bestFact.Column!.Id, FactTable = fact.TableName ?? string.Empty, FactKeyColumn = bestFact.Column.ColumnName ?? string.Empty, Score = bestFactScore, Reason = "当前已绑定 Metadata Snapshot 未形成稳定可执行 Master Evidence；事实表存在稳定 Dimension Key，因此采用 DirectKey。" };
     }
 
     private async Task<MetadataColumn?> FindLabelColumnAsync(long tableId, long keyColumnId, string dimensionSemanticText, CancellationToken cancellationToken)
