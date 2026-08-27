@@ -4,6 +4,7 @@ using SuperBuilder_AI.Data;
 using SuperBuilder_AI.Interfaces.BI.Entity;
 using SuperBuilder_AI.Models.BI;
 using SuperBuilder_AI.Models.BI.Entity;
+using SuperBuilder_AI.Models.Metadata;
 using System.Text;
 using System.Text.Encodings.Web;
 
