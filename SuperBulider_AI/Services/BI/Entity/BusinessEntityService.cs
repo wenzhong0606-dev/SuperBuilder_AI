@@ -11,11 +11,16 @@ public sealed class BusinessEntityService(SuperBIContext db) : IBusinessEntitySe
     public Task<BusinessEntity?> GetAsync(long tenantId, long id, CancellationToken cancellationToken = default) =>
         db.BusinessEntities
             .AsNoTracking()
-            .Include(x => x.Keys)
-            .Include(x => x.Attributes)
-            .Include(x => x.Metrics)
-            .Include(x => x.SourceRelationships)
-            .Include(x => x.TargetRelationships)
+            .Include(x => x.Keys).ThenInclude(x => x.PhysicalBindings).ThenInclude(x => x.MetadataTable)
+            .Include(x => x.Keys).ThenInclude(x => x.PhysicalBindings).ThenInclude(x => x.MetadataColumn)
+            .Include(x => x.Attributes).ThenInclude(x => x.PhysicalBindings).ThenInclude(x => x.MetadataTable)
+            .Include(x => x.Attributes).ThenInclude(x => x.PhysicalBindings).ThenInclude(x => x.MetadataColumn)
+            .Include(x => x.Metrics).ThenInclude(x => x.PhysicalBindings).ThenInclude(x => x.MetadataTable)
+            .Include(x => x.Metrics).ThenInclude(x => x.PhysicalBindings).ThenInclude(x => x.MetadataColumn)
+            .Include(x => x.SourceRelationships).ThenInclude(x => x.PhysicalBindings).ThenInclude(x => x.MetadataTable)
+            .Include(x => x.SourceRelationships).ThenInclude(x => x.PhysicalBindings).ThenInclude(x => x.MetadataColumn)
+            .Include(x => x.TargetRelationships).ThenInclude(x => x.PhysicalBindings).ThenInclude(x => x.MetadataTable)
+            .Include(x => x.TargetRelationships).ThenInclude(x => x.PhysicalBindings).ThenInclude(x => x.MetadataColumn)
             .SingleOrDefaultAsync(x => x.Id == id && x.TenantId == tenantId, cancellationToken);
 
     public async Task<IReadOnlyList<BusinessEntity>> ListAsync(long tenantId, CancellationToken cancellationToken = default) =>
