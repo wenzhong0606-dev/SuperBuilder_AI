@@ -18,6 +18,11 @@ public sealed class QueryPlanEvaluationConfidenceService
 {
     private const double EvaluationPassConfidenceBoost = 0.10;
 
+    /// <summary>
+    /// High Confidence 阈值。与 QueryPlanConfidenceService.HighConfidenceThreshold 保持一致。
+    /// </summary>
+    private const double HighConfidenceThreshold = 0.80;
+
     private readonly QueryPlanEvaluator _queryPlanEvaluator;
     private readonly QueryPlanEvaluationConfidenceEvidenceAdapter _evidenceAdapter;
     private readonly IQueryPlanConfidenceService _confidenceService;
@@ -102,9 +107,18 @@ public sealed class QueryPlanEvaluationConfidenceService
                 semanticEvidence,
                 validationResult))
         {
+            // Base Confidence +0.10 Boost，且评估全过时保底到 High 阈值：
+            // QueryPlan Evaluation 是已经针对 Golden Expected 做过的结构化验证，
+            // 比 Metadata 语义搜索证据更强、更直接。语义搜索分数容易受问句措辞
+            // 影响（例如 GQ-008 "查询不同供应商数量"中的"不同"会拉低向量相关度），
+            // 不应用这种噪声把已通过评估的 plan 压回 Medium / 决策门拦截。
+            // 因此：score = max(base + 0.10, 0.80)，至少进入 High。
+            var boostedScore =
+                confidence.Score + EvaluationPassConfidenceBoost;
+
             confidence.Score = Math.Min(
                 1.0,
-                confidence.Score + EvaluationPassConfidenceBoost);
+                Math.Max(boostedScore, HighConfidenceThreshold));
 
             confidence.Level = DetermineConfidenceLevel(confidence.Score);
             confidence.CanProceed =
@@ -116,7 +130,7 @@ public sealed class QueryPlanEvaluationConfidenceService
                 && !confidence.Evidence.MaxRepairAttemptsReached;
 
             confidence.Reasons.Add(
-                $"QueryPlan Evaluation 通过，作为 Evaluation-aware Confidence 正向证据，Confidence Boost = {EvaluationPassConfidenceBoost:F2}。");
+                $"QueryPlan Evaluation 通过，作为 Evaluation-aware Confidence 正向证据，Confidence Boost = {EvaluationPassConfidenceBoost:F2}，评估全过保底 High。");
         }
 
         // =========================================================

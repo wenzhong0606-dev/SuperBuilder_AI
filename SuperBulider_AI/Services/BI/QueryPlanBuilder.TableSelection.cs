@@ -181,27 +181,7 @@ public partial class QueryPlanBuilder
          * ============================================================
          */
 
-		try
-		{
-			foreach (var candidate in scoredCandidates)
-			{
-				Console.WriteLine(
-					"ScoredCandidate: " +
-					$"Table={candidate.Table.TableName}, " +
-					$"MatchedColumns={candidate.MatchedColumns}, " +
-					$"ColumnScore={candidate.ColumnScore}, " +
-					$"TableScore={candidate.TableScore}, " +
-					$"Boost={candidate.Boost}, " +
-					$"LocalMatch={candidate.LocalMatchCount}, " +
-					$"FinalScore={candidate.FinalScore}");
-			}
-		}
-		catch
-		{
-			/*
-             * Debug 输出不能影响 QueryPlan 生成。
-             */
-		}
+		// M5 修复：移除 Console.WriteLine 调试输出（注释本身已说明"不再打印第一轮评分"）
 
 		return scoredCandidates
 			.FirstOrDefault()

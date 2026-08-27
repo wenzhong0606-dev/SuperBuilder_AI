@@ -24,6 +24,12 @@ public sealed class QueryPlanMetricResolution
     public string Column { get; init; } = string.Empty;
     public string? BusinessMeaning { get; init; }
     public double? Score { get; init; }
+    /// <summary>
+    /// GQ-002：由 Semantic Applicability 判定的 Metric 类型（EntityCount / ColumnMetric）。
+    /// QueryPlanBuilder.ApplyMetricResolutions 依据该类型强制运行时聚合（EntityCount → COUNT），
+    /// 防止 LLM Intent 将"…数量"误生成为 SUM。
+    /// </summary>
+    public string MetricType { get; init; } = "ColumnMetric";
 }
 
 public sealed class QueryPlanFilterResolution

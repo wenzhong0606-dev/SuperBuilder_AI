@@ -31,6 +31,12 @@ public class SemanticApplicabilityResolution
 public class SemanticApplicabilityMetricResolution : SemanticApplicabilityResolution
 {
     public string SemanticText { get; init; } = string.Empty;
+    /// <summary>
+    /// GQ-002：Applicability 已判定的 Metric 类型（EntityCount / ColumnMetric）。
+    /// EntityCount 表示 Golden 契约期望 COUNT(PK)，Runtime 必须消费该类型，
+    /// 不得沿用 LLM Intent 的 SUM 等错误聚合。
+    /// </summary>
+    public string MetricType { get; init; } = "ColumnMetric";
 }
 
 public sealed class SemanticApplicabilityFilterResolution : SemanticApplicabilityMetricResolution { }

@@ -99,6 +99,8 @@ public sealed class GoldenDatasetRuntimeController : ControllerBase
                         ? BuildExpectedOutcomeReason(goldenCase)
                         : goldenCase.Reason,
                     caseResult = goldenCase,
+                    validationDiagnostics = goldenCase.ValidationDiagnostics,
+                    evaluationDiagnostics = goldenCase.EvaluationDiagnostics,
                     fullRun = new
                     {
                         total = run.Total,
@@ -324,7 +326,9 @@ public sealed class GoldenDatasetRuntimeController : ControllerBase
                 x.QueryPlanEvaluationPassed,
                 x.ConfidenceDecision,
                 x.ConfidenceLevel,
-                x.ConfidenceScore
+                x.ConfidenceScore,
+                x.ValidationDiagnostics,
+                x.EvaluationDiagnostics
             }),
             confidenceCalibration = run.ConfidenceCalibration
         };

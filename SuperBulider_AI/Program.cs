@@ -108,6 +108,22 @@ builder.Services.AddScoped<ISqlDialect, SqlServerDialect>();
 builder.Services.AddScoped<ISqlDialect, MySqlDialect>();
 builder.Services.AddScoped<ISqlDialect, PostgreSqlDialect>();
 builder.Services.AddScoped<SqlDialectResolver>();
+builder.Services.AddScoped<ISqlDialectResolver>(sp => sp.GetRequiredService<SqlDialectResolver>());
+
+// ── BI 查询主链路编排服务 (Phase 1 核心) ──────────────────
+builder.Services.AddScoped<BIConversationService>();
+builder.Services.AddScoped<IBIConversationService>(sp => sp.GetRequiredService<BIConversationService>());
+
+// ── BIConversationService 依赖链补充注册 ──────────────────
+// 接口工厂：复用已注册的具体类，确保构造函数注入可解析
+builder.Services.AddScoped<IQueryPlanExplainabilityService>(sp => sp.GetRequiredService<QueryPlanExplainabilityService>());
+builder.Services.AddScoped<IMetadataPromptBuilder>(sp => sp.GetRequiredService<MetadataPromptBuilder>());
+builder.Services.AddScoped<ResultUnderstandingService>();
+builder.Services.AddScoped<IResultUnderstandingService>(sp => sp.GetRequiredService<ResultUnderstandingService>());
+builder.Services.AddScoped<QueryPlanMetadataValidator>();
+builder.Services.AddScoped<MetadataSearchService>();
+builder.Services.AddScoped<IMetadataSearchService>(sp => sp.GetRequiredService<MetadataSearchService>());
+
 builder.Services.AddScoped<GoldenBaselineComparisonService>();
 
 var app = builder.Build();

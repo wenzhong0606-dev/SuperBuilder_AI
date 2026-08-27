@@ -22,8 +22,12 @@ public partial class QueryPlanBuilder : IQueryPlanBuilder
 		{
 			if (!string.IsNullOrWhiteSpace(metric.Field) && table?.Columns != null)
 			{
-				var nf = NormalizeText(metric.Field);
-				if (string.Equals(nf, "id", StringComparison.OrdinalIgnoreCase) || nf.EndsWith("id", StringComparison.OrdinalIgnoreCase))
+				var rawField = metric.Field.Trim();
+				// M10 修复：使用词边界感知匹配，避免 "paid"/"void" 等被误判为 ID 字段
+				var isIdField = string.Equals(rawField, "id", StringComparison.OrdinalIgnoreCase) ||
+					rawField.EndsWith("_id", StringComparison.OrdinalIgnoreCase) ||
+					(rawField.Length >= 4 && rawField.EndsWith("Id", StringComparison.Ordinal));
+				if (isIdField)
 				{
 					var pk = table.Columns.FirstOrDefault(c => c.IsPrimaryKey == true);
 					if (pk != null) return pk;

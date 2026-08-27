@@ -1,4 +1,6 @@
-﻿namespace SuperBuilder_AI.Models.BI;
+﻿using System.Text.Json.Serialization;
+
+namespace SuperBuilder_AI.Models.BI;
 
 /// <summary>
 /// 用户查询意图。
@@ -43,7 +45,11 @@ public class QueryIntent
 	///
 	/// V2.0 暂时保持 string，
 	/// 后续 Semantic Layer 稳定后再迁移成 QueryDimension。
+	///
+	/// 使用 FlexibleStringListConverter 兼容 LLM 返回
+	/// 字符串数组 ["物料"] 或对象数组 [{"semanticText":"物料"}]。
 	/// </summary>
+	[JsonConverter(typeof(FlexibleStringListConverter))]
 	public List<string> Dimensions { get; set; } = new();
 
 	/// <summary>

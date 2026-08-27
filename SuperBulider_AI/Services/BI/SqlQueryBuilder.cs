@@ -256,9 +256,17 @@ public class SqlQueryBuilder : ISqlQueryBuilder
             if (dimension == null || string.IsNullOrWhiteSpace(dimension.ColumnName))
                 continue;
 
+            // MasterJoin 维度：Runtime 的 MetadataColumnId/ColumnName 锚定事实侧 FK
+            // （稳定绑定契约，供 Evaluation 使用），SQL 分组/展示必须使用 Master 侧
+            // Label 列（如 es_supplier_code），否则会错误地按事实表 FK 分组。
+            var groupColumnId = dimension.DimensionLabelColumnId ?? dimension.MetadataColumnId;
+            var groupColumnName = !string.IsNullOrWhiteSpace(dimension.DimensionLabelColumnName)
+                ? dimension.DimensionLabelColumnName!
+                : dimension.ColumnName;
+
             groups.Add(QualifyColumn(
-                dimension.MetadataColumnId,
-                dimension.ColumnName,
+                groupColumnId,
+                groupColumnName,
                 joins,
                 dialect));
         }

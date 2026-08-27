@@ -1133,8 +1133,11 @@ public partial class QueryPlanBuilder : IQueryPlanBuilder
 							Field = orderColumn.ColumnName ?? string.Empty,
 							Direction = orderDirection,
 							IsMetric = orderingMetric != null,
-							MetricName = orderingMetric?.Name,
+							// 评估框架比对 MetricSemanticText，应使用 SemanticText 而非 Name
+							MetricName = orderingMetric?.SemanticText ?? orderingMetric?.Name,
+							// 聚合排序的 Aggregation 必须与 Metric 一致（R2 修复）
 							Aggregation =
+								orderingMetric?.GetAggregation() ??
 								QueryAggregation.None
 						});
 				}
@@ -1146,7 +1149,8 @@ public partial class QueryPlanBuilder : IQueryPlanBuilder
 					if (orderingMetric != null)
 					{
 						existingOrder.IsMetric = true;
-						existingOrder.MetricName = orderingMetric.Name;
+						existingOrder.MetricName = orderingMetric.SemanticText ?? orderingMetric.Name;
+						existingOrder.Aggregation = orderingMetric.GetAggregation();
 					}
 				}
 
@@ -1183,11 +1187,6 @@ public partial class QueryPlanBuilder : IQueryPlanBuilder
 		 * ============================================================
 		 */
 
-		plan.IsAggregate =
-			plan.Fields.Any(
-				x =>
-					IsAggregation(
-						x.Aggregation));
 		// noop: update timestamp
 
 		// 如果当前选中的字段都是非业务展示字段（例如仅返回 del_flag），则自动补充更多有意义的展示字段。
@@ -1260,6 +1259,47 @@ public partial class QueryPlanBuilder : IQueryPlanBuilder
 		}
 
 
+
+		// ------------------------------------------------------------
+		// Step 10b：最终确定聚合 / 去重语义
+		//
+		// 必须在全部 Metric / Field 的 Aggregation 完成语义解析之后计算，
+		// 否则早期 plan.Metrics 中的 Aggregation 可能尚未被解析为
+		// SUM / COUNT 等，导致 IsAggregate 误判为 false
+		// （例如“按 SUM 数量 TopN”的聚合排名场景）。
+		// ------------------------------------------------------------
+		plan.IsAggregate =
+			plan.Metrics.Any(
+				x =>
+					IsAggregation(
+						x.Aggregation))
+			|| plan.Fields.Any(
+				x =>
+					IsAggregation(
+						x.Aggregation));
+
+		// 推断 Distinct：
+		// “不同 X 数量” / “distinct X” 表示去重计数（COUNT DISTINCT）。
+		// 当前 QueryIntent 未携带 Distinct 标记，
+		// 这里基于原始问题中明确的去重语义做保守推断。
+		if (!plan.Distinct
+			&& !string.IsNullOrWhiteSpace(intent.OriginalQuestion)
+			&& (intent.OriginalQuestion.Contains("不同")
+				|| intent.OriginalQuestion.Contains("distinct", StringComparison.OrdinalIgnoreCase)))
+		{
+			plan.Distinct = true;
+		}
+
+		// [TRACE-D9] 验证 Step 10b 是否真正执行及其输入/输出
+		try
+		{
+			var aggList = string.Join(",", plan.Metrics.Select(m => m.Aggregation));
+			var fieldAggList = string.Join(",", plan.Fields.Select(f => f.Aggregation));
+			System.IO.File.AppendAllText(
+				"C:/tmp/step10b.log",
+				$"[{DateTime.Now:HH:mm:ss.fff}] Step10b question='{intent.OriginalQuestion}' metrics=[{aggList}] fieldsAgg=[{fieldAggList}] metricsAny={plan.Metrics.Any(x => IsAggregation(x.Aggregation))} fieldsAny={plan.Fields.Any(x => IsAggregation(x.Aggregation))} => IsAggregate={plan.IsAggregate} Distinct={plan.Distinct}\n");
+		}
+		catch { }
 
 		var validationResult =
 			await _validator.ValidateAsync(plan);

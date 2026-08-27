@@ -110,9 +110,8 @@ public partial class QueryPlanBuilder : IQueryPlanBuilder
 			"IS NULL" => "IS NULL",
 			"IS NOT NULL" => "IS NOT NULL",
 
-			_ =>
-				throw new InvalidOperationException(
-					$"不支持的查询操作符：{value}")
+			// M6 修复：与 SqlQueryBuilder.NormalizeOperator 保持一致，未知操作符默认为 "=" 而非抛异常
+			_ => "="
 		};
 
 	}

@@ -100,6 +100,44 @@ public class QueryJoin
 	}
 
 	/// <summary>
+	/// 左侧表语义文本（业务语义，如"入库单"）。
+	/// 物理表名仍以 LeftTableName 为准用于 SQL 生成；本字段仅供
+	/// QueryPlan Evaluation 的 Join Contract 语义匹配使用。
+	/// </summary>
+	public string? LeftTableSemanticText
+	{
+		get;
+		set;
+	}
+
+	/// <summary>
+	/// 右侧表语义文本（业务语义，如"供应商"）。
+	/// </summary>
+	public string? RightTableSemanticText
+	{
+		get;
+		set;
+	}
+
+	/// <summary>
+	/// 左侧字段语义文本（可选；缺省时 Evaluation 回退使用 LeftColumnName）。
+	/// </summary>
+	public string? LeftColumnSemanticText
+	{
+		get;
+		set;
+	}
+
+	/// <summary>
+	/// 右侧字段语义文本（可选；缺省时 Evaluation 回退使用 RightColumnName）。
+	/// </summary>
+	public string? RightColumnSemanticText
+	{
+		get;
+		set;
+	}
+
+	/// <summary>
 	/// JOIN类型。
 	///
 	/// INNER

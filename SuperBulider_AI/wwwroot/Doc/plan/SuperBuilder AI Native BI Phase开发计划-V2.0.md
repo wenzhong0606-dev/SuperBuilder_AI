@@ -1,36 +1,36 @@
 # SuperBuilder AI Native BI Phase开发计划
 
-> 文档版本：v2.21  
+> 文档版本：v2.22  
 > 文档性质：项目正式开发基线 + Phase 开发测试管理总计划  
 > **唯一源码基线：GitHub `master`**
 
 ## 一、当前项目状态
 
 - 当前 Phase：**Phase 2.7 — DimensionAware QueryPlan**
-- Phase 状态：**IN_PROGRESS**
+- Phase 状态：**IN_PROGRESS（功能达标，待提交 Freeze）**
 - 当前工作单元：**D14 — Runtime Contract Verification / Golden Regression Root Cause Audit**
-- 当前状态：**D14 Contract Cleanup PASS；本地 Build PASS + Startup PASS；D14-05 Golden Regression BLOCK；尚未 Freeze**
+- 当前状态：**D14-05 Golden Regression PASS（D18 轮：18/18 全 PASS，failedGates=[]）；本地 Build PASS + Startup PASS；修复链在本地工作区，尚未提交 master，尚未 Freeze**
 - D05-D12：全部 FROZEN
 - D13：Build PASS + Startup PASS，已 FROZEN
-- 当前 master：`1ff9db06ef915963934e7956126f457a182f`
+- 当前 master：`252cf2b`（D15-D18 修复链位于本地工作区未提交，详见《D18状态同步-20260827.md》）
 
-### D14 当前 Runtime 证据
+### D14 当前 Runtime 证据（D18 轮，2026-08-27）
 
 ```text
 Build                  PASS
 Startup                PASS
 Golden Dataset Loaded  PASS (18/18)
 All Cases Executed     PASS (18/18)
-Overall Pass Rate      61.11%  ❌ < 90%
-Positive Pass Rate     36.36%  ❌ < 95%
+Overall Pass Rate      100%    ✅ ≥ 90%
+Positive Pass Rate     100%    ✅ ≥ 95%
 Negative Detection     100%    ✅
 Ambiguous Detection    100%    ✅
 Unresolved Detection   100%    ✅
-Release Gate           BLOCK
-D14 Freeze             BLOCKED
+Release Gate           PASS（failedGates=[]）
+D14 Freeze             待提交 master 后 Freeze
 ```
 
-**重要：当前失败不是 Build / Startup / Dataset Load / Case Execution 问题，而是 7 个 Positive Case 的 Runtime Contract / Evaluation 失败。**
+**重要：D15-D18 修复链消除全部 Positive 失败，评分器断言未放宽（negative 5/5 保持）。修复以 Resolution 权威绑定为模式：LLM intent 的聚合/漏产出漂移由 QueryPlanBuilder 确定性规则覆盖，详见《D18状态同步-20260827.md》。**
 
 ## 二、Phase 2.7 当前冻结链
 
@@ -53,7 +53,7 @@ D12 Contract / DI / Namespace       FROZEN
         ↓
 D13 Release Build / 实现前基线       FROZEN
         ↓
-D14 Runtime Contract Verification   IN_PROGRESS / BLOCKED
+D14 Runtime Contract Verification   GOLDEN PASS (D18) / 待提交 Freeze
 ```
 
 ## 三、D13 冻结结论

@@ -22,15 +22,20 @@ public class QuerySemanticValidationResult
 	/// <summary>
 	/// 是否验证通过。
 	///
-	/// 当不存在 Error 级别问题时:
+	/// 仅当不存在 Error 级别问题时为 true。
 	///
-	/// true
+	/// 警告（Warning）属于建议性质，
+	/// 不应阻断 QueryPlan 进入 Repair / Evaluation 流程。
+	/// 否则一个“数值字段作为 Dimension”之类的建议性警告
+	/// 会被误判为验证失败，进而触发 Repair Pipeline，
+	/// 而 Repair 无法修复建议性警告，最终得到
+	/// RepairTrace.Failed，错误地剥夺 Evaluation-aware Confidence Boost。
 	/// </summary>
 	public bool IsValid
 	{
 		get
 		{
-			return Errors.Count == 0;
+			return ErrorItems.Count() == 0;
 		}
 	}
 

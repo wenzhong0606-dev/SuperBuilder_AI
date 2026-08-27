@@ -29,19 +29,22 @@ public sealed class QueryPlanJoinScoringService
     {
         // 不重新从 Metadata 解析 Golden SemanticText；只消费 Runtime 已生成的物理 Join。
         // Golden 的语义字段允许与 Runtime 表/字段名相同，也允许 Runtime 已保留的业务别名文本匹配。
+        // Runtime Join 同时携带物理名（LeftTableName 等，供 SQL 生成）与语义文本
+        // （LeftTableSemanticText 等，由 QueryPlanBuilder 在 resolution 应用后回填），
+        // 语义匹配时优先语义文本，缺省时回退物理名。
         var match = actual.FirstOrDefault(x =>
             Equal(expected.JoinType, x.JoinType)
-            && EqualEndpoint(expected.LeftTableSemanticText, x.LeftTableName)
-            && EqualEndpoint(expected.RightTableSemanticText, x.RightTableName)
-            && EqualEndpoint(expected.LeftColumnSemanticText, x.LeftColumnName)
-            && EqualEndpoint(expected.RightColumnSemanticText, x.RightColumnName));
+            && EqualEndpoint(expected.LeftTableSemanticText, x.LeftTableSemanticText ?? x.LeftTableName)
+            && EqualEndpoint(expected.RightTableSemanticText, x.RightTableSemanticText ?? x.RightTableName)
+            && EqualEndpoint(expected.LeftColumnSemanticText, x.LeftColumnSemanticText ?? x.LeftColumnName)
+            && EqualEndpoint(expected.RightColumnSemanticText, x.RightColumnSemanticText ?? x.RightColumnName));
 
         match ??= actual.FirstOrDefault(x =>
             Equal(expected.JoinType, "INNER")
-            && EqualEndpoint(expected.LeftTableSemanticText, x.RightTableName)
-            && EqualEndpoint(expected.RightTableSemanticText, x.LeftTableName)
-            && EqualEndpoint(expected.LeftColumnSemanticText, x.RightColumnName)
-            && EqualEndpoint(expected.RightColumnSemanticText, x.LeftColumnName));
+            && EqualEndpoint(expected.LeftTableSemanticText, x.RightTableSemanticText ?? x.RightTableName)
+            && EqualEndpoint(expected.RightTableSemanticText, x.LeftTableSemanticText ?? x.LeftTableName)
+            && EqualEndpoint(expected.LeftColumnSemanticText, x.RightColumnSemanticText ?? x.RightColumnName)
+            && EqualEndpoint(expected.RightColumnSemanticText, x.LeftColumnSemanticText ?? x.LeftColumnName));
 
         if (match is null)
         {

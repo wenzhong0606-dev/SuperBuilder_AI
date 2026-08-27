@@ -109,13 +109,39 @@ public sealed class QueryIntentNormalizer
             if (!IsQuantityMetric(metric)) continue;
             hasQuantityMetric = true;
             if (string.Equals(metric.Aggregation, "NONE", StringComparison.OrdinalIgnoreCase))
-                metric.Aggregation = "SUM";
+                metric.Aggregation = InferMetricAggregation(metric.Name);
         }
 
-        if (hasQuantityMetric && intent.Metrics.Any(x => string.Equals(x.Aggregation, "SUM", StringComparison.OrdinalIgnoreCase)))
+        if (hasQuantityMetric && intent.Metrics.Any(x => string.Equals(x.Aggregation, "SUM", StringComparison.OrdinalIgnoreCase) || string.Equals(x.Aggregation, "COUNT", StringComparison.OrdinalIgnoreCase)))
         {
             intent.IntentType = "Aggregate";
         }
+    }
+
+    /// <summary>
+    /// 根据指标名称推断聚合类型。
+    /// "入库单数量"/"供应商数量"/"客户数量"等实体数量 → COUNT；
+    /// "数量"/"金额"/"总额"/"销量"等业务度量 → SUM。
+    /// （R3 修复：从死代码版本迁移，替代原来全部默认为 SUM 的逻辑）
+    /// </summary>
+    private static string InferMetricAggregation(string? metricName)
+    {
+        var text = metricName?.Trim() ?? string.Empty;
+
+        // 实体数量 → COUNT
+        if (text.Contains("单数量", StringComparison.OrdinalIgnoreCase) ||
+            text.Contains("单据数量", StringComparison.OrdinalIgnoreCase) ||
+            text.Contains("订单数量", StringComparison.OrdinalIgnoreCase) ||
+            text.Contains("供应商数量", StringComparison.OrdinalIgnoreCase) ||
+            text.Contains("客户数量", StringComparison.OrdinalIgnoreCase) ||
+            text.Contains("不同供应商", StringComparison.OrdinalIgnoreCase) ||
+            text.Contains("不同客户", StringComparison.OrdinalIgnoreCase))
+        {
+            return "COUNT";
+        }
+
+        // 普通业务数量/金额指标 → SUM
+        return "SUM";
     }
 
     private static void NormalizeMetricFields(QueryIntent intent)
@@ -142,8 +168,8 @@ public sealed class QueryIntentNormalizer
         SetQuantity(intent.Metrics[0]); SetAmount(intent.Metrics[1]);
     }
 
-    private static void SetQuantity(QueryMetric metric) { metric.Name = "入库数量"; metric.Field = "quantity"; metric.SemanticType = "Quantity"; }
-    private static void SetAmount(QueryMetric metric) { metric.Name = "入库金额"; metric.Field = "amount"; metric.SemanticType = "Amount"; }
+    private static void SetQuantity(QueryMetric metric) { metric.Field = "quantity"; metric.SemanticType = "Quantity"; }
+    private static void SetAmount(QueryMetric metric) { metric.Field = "amount"; metric.SemanticType = "Amount"; }
     private static bool IsQuantityMetric(QueryMetric metric) => string.Equals(metric.SemanticType, "Quantity", StringComparison.OrdinalIgnoreCase) || (metric.Name?.Contains("数量", StringComparison.OrdinalIgnoreCase) ?? false) || string.Equals(metric.Field, "quantity", StringComparison.OrdinalIgnoreCase) || string.Equals(metric.Field, "qty", StringComparison.OrdinalIgnoreCase);
     private static bool IsAmountMetric(QueryMetric metric) => string.Equals(metric.SemanticType, "Amount", StringComparison.OrdinalIgnoreCase) || (metric.Name?.Contains("金额", StringComparison.OrdinalIgnoreCase) ?? false) || string.Equals(metric.Field, "amount", StringComparison.OrdinalIgnoreCase) || (metric.Field?.Contains("money", StringComparison.OrdinalIgnoreCase) ?? false) || (metric.Field?.Contains("price", StringComparison.OrdinalIgnoreCase) ?? false);
 
@@ -153,10 +179,26 @@ public sealed class QueryIntentNormalizer
         {
             if (filter == null || string.IsNullOrWhiteSpace(filter.Value)) continue;
             var value = filter.Value.Trim();
-            var match = Regex.Match(value, @"^(\d{4})年?$");
-            if (!match.Success || !int.TryParse(match.Groups[1].Value, out var year) || year < 1900 || year > 9999) continue;
-            if (!string.IsNullOrWhiteSpace(filter.Operator) && !string.Equals(filter.Operator.Trim(), "=", StringComparison.OrdinalIgnoreCase)) continue;
-            filter.Operator = ">="; filter.Value = $"{year:D4}-01-01";
+            var operatorText = filter.Operator?.Trim() ?? string.Empty;
+
+            // 模式一：Value 为纯年份（"2025" / "2025年"），Operator 为 "="
+            var plain = Regex.Match(value, @"^(\d{4})年?$");
+            if (plain.Success && int.TryParse(plain.Groups[1].Value, out var plainYear) && plainYear >= 1900 && plainYear <= 9999)
+            {
+                // Operator 为 "="（或缺省）时直接规范化；LIKE 等其余情况走模式二
+                if (string.IsNullOrWhiteSpace(operatorText) || string.Equals(operatorText, "=", StringComparison.OrdinalIgnoreCase))
+                {
+                    filter.Operator = ">="; filter.Value = $"{plainYear:D4}-01-01";
+                    continue;
+                }
+            }
+
+            // 模式二：Value 被 LIKE 模糊包裹（"%2025%" / "2025%" / "%2025"），
+            // 或 Operator 为 LIKE 且 Value 内含 4 位年份——一律规范化为日期范围过滤
+            var embedded = Regex.Match(value, @"(\d{4})年?");
+            if (!embedded.Success || !int.TryParse(embedded.Groups[1].Value, out var embeddedYear) || embeddedYear < 1900 || embeddedYear > 9999) continue;
+            if (!string.Equals(operatorText, "LIKE", StringComparison.OrdinalIgnoreCase)) continue;
+            filter.Operator = ">="; filter.Value = $"{embeddedYear:D4}-01-01";
         }
     }
 
