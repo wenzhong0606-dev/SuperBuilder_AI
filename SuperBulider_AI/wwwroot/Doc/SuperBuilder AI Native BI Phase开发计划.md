@@ -29,7 +29,8 @@ Phase 3.1 Business Entity Model
   ├── 3.1.8 QueryPlan Mapping          ✅ PASS
   ├── 3.1.9 Golden Contract            ✅ PASS
   ├── 3.1.10 Runtime Verification     ✅ PASS
-  └── 3.1.11 Source Implementation     ⏳ NEXT
+  ├── 3.1.11 Source Implementation Map ✅ PASS
+  └── 3.1.12 Source Implementation    ⏳ NEXT
 ```
 
 目标：建立稳定、可执行、可验证的 Business Entity Semantic Layer，并通过 Mapping 进入 Phase 2.7 Frozen QueryPlan。
@@ -77,150 +78,11 @@ PhysicalBinding      ≠ MetadataColumn.BusinessKey
 
 ---
 
-# 3.1.1 Current Source Audit
+# 3.1.1 ～ 3.1.10 已冻结结论
 
-**✅ PASS**
+**3.1.1 Source Audit、3.1.2～3.1.8 Contract、3.1.9 Golden Contract、3.1.10 Runtime Verification Design 全部 PASS。**
 
-确认现有 `MetadataTable / MetadataColumn / MetadataSemantic / DataSource` 是 Physical Metadata 基础；`QueryPlan / QueryDimension / QueryMetric / QueryFilter / QueryJoin / Evaluator` 是 Phase 2.7 Frozen Runtime。BusinessEntity、EntityKey、EntityAttribute、EntityMetric、EntityRelationship、PhysicalBinding、Entity Resolution 是 Phase 3 新增语义层能力。
-
----
-
-# 3.1.2 Business Entity Contract
-
-**✅ PASS**
-
-```text
-BusinessEntity
-├── Id
-├── BusinessKey
-├── Name
-├── DisplayName
-├── Description
-├── BusinessDomain
-├── SemanticText
-└── Status
-```
-
-BusinessKey 是稳定业务身份，不是物理表名；Entity 不保存 SQL，可映射多个 PhysicalBinding。
-
----
-
-# 3.1.3 Entity Key Contract
-
-**✅ PASS**
-
-```text
-BusinessEntityKey
-├── Id
-├── BusinessEntityId
-├── Name
-├── DisplayName
-├── Description
-├── IsPrimary
-├── KeyType
-└── PhysicalBindings
-```
-
-`MetadataColumn.BusinessKey` 是 Physical Field Identity；`MetadataColumn.IsPrimaryKey` 是物理 PK；均不等同业务 EntityKey。EntityKey 可以映射多个物理字段。
-
----
-
-# 3.1.4 Entity Attribute Contract
-
-**✅ PASS**
-
-```text
-BusinessEntityAttribute
-├── Id
-├── BusinessEntityId
-├── Name
-├── DisplayName
-├── Description
-├── SemanticType
-├── IsNullable
-├── IsIdentifier
-└── PhysicalBindings
-```
-
-SemanticType 是业务语义类型，不覆盖物理 DataType；IsIdentifier 不等于 EntityKey.IsPrimary，也不等于 MetadataColumn.IsPrimaryKey。通过 Mapping 进入现有 QueryDimension / QueryFilter / QueryPlan。
-
----
-
-# 3.1.5 Entity Metric Contract
-
-**✅ PASS**
-
-```text
-BusinessEntityMetric
-├── Id
-├── BusinessEntityId
-├── Name
-├── DisplayName
-├── Description
-├── SemanticType
-├── Aggregation
-├── IsCalculated
-└── PhysicalBindings
-```
-
-EntityMetric 是稳定业务指标定义；QueryMetric 是查询运行时实例。`Aggregation` 使用既有运行时聚合语义；`IsCalculated=true` 本阶段不引入公式 DSL / 任意 SQL Expression / 计算引擎。
-
----
-
-# 3.1.6 Entity Relationship Contract
-
-**✅ PASS**
-
-```text
-BusinessEntityRelationship
-├── Id
-├── SourceEntityId
-├── TargetEntityId
-├── Name
-├── DisplayName
-├── Description
-├── RelationshipType
-├── Cardinality
-├── IsRequired
-└── PhysicalBindings
-```
-
-`RelationshipType / Cardinality` 是稳定业务语义；`JoinType` 是查询执行语义。Relationship Resolution 后通过 Physical Binding 产生既有 QueryJoin，不修改 Frozen Evaluator / SQL Builder。
-
----
-
-# 3.1.7 Physical Binding Contract
-
-**✅ PASS**
-
-```text
-PhysicalBinding
-├── Id
-├── DataSourceId
-├── MetadataTableId
-├── MetadataColumnId
-├── PhysicalRole
-├── BindingType
-├── Priority
-└── IsActive
-```
-
-职责：Business Semantic → Existing Metadata Mapping。必须满足：
-
-```text
-Binding.DataSourceId == MetadataTable.DataSourceId
-Binding.MetadataColumnId → MetadataColumn.MetadataTableId == Binding.MetadataTableId
-```
-
-支持跨 DataSource 候选、Priority、IsActive、Relationship 两端 Binding；Ambiguous / Unresolved 不得随机选择。PhysicalBinding 不复制 Metadata Physical Facts、不保存 SQL。
-
-Identity 三层：`BaseEntity.Id = Persistence Identity`；`MetadataColumn.BusinessKey = Physical Field Identity`；`PhysicalBinding.Id = Semantic Mapping Identity`。
-
----
-
-# 3.1.8 QueryPlan Mapping Contract
-
-**✅ PASS**
+核心设计保持：
 
 ```text
 Business Entity Semantic
@@ -229,236 +91,272 @@ Entity Resolution
         ↓
 PhysicalBinding
         ↓
-Mapping Adapter
-        ↓
-Existing Semantic Resolution
+QueryPlan Mapping
         ↓
 Frozen QueryPlan
+        ↓
+Existing Evaluator / SQL Builder
 ```
 
-映射关系：
-
-```text
-EntityAttribute    → QueryDimension / QueryFilter
-EntityMetric       → QueryMetric
-EntityRelationship → QueryJoin
-EntityKey          → Table / Dimension / Relationship Binding
-BusinessEntity     → QueryTable
-```
-
-Mapping 必须确定性执行；不得再次自由语义搜索；Ambiguous / Unresolved / Invalid Binding / NotExecutable 必须显式失败。`QueryPlan.DataSourceId` 必须与选定 PhysicalBinding 保持一致。Entity Model 不直接生成 SQL，不绕过 Evaluator / SQL Builder。
-
----
-
-# 3.1.9 Golden Contract
-
-**✅ PASS**
-
-Golden 复用现有 `GoldenDatasetRuntimeService`、`GoldenDatasetRunner`、`GoldenDatasetRegressionEvaluator` 和 `GoldenDatasetRuntimeController`，不重新建立 Golden Engine。现有 Runner 的真实运行顺序为 Semantic Applicability → Gate → Query Understanding → QueryPlan → Validation/Repair → Evaluation-aware Confidence → Calibration，且 Runner 不生成 SQL。fileciteturn120file0
-
-Golden Contract 覆盖：
-
-```text
-Positive
-Negative
-Ambiguous
-Unresolved
-```
-
-核心验证：
-
-```text
-Input Semantic
-      ↓
-Entity Resolution
-      ↓
-Physical Binding
-      ↓
-QueryPlan Mapping
-      ↓
-Expected Outcome
-```
-
-Positive 必须满足预期 Runtime Outcome；Negative 必须被正确拒绝；Ambiguous 必须得到 `Ambiguous`；Unresolved 必须得到 `NotResolved`。不得用简单 `Passed=false` 代替 Expected Outcome 判定。
-
-Phase 2.7 Golden Expected Outcome 保持 Frozen，只作为 Regression。
-
----
-
-# 3.1.10 Runtime Verification Design
-
-**✅ PASS — Runtime Verification Contract 已确认**
-
-## 3.1.10.1 Source Audit
-
-当前 master 已有统一 Golden Runtime Pipeline：`GoldenDatasetRuntimeService.RunAsync()` 负责读取 Golden Dataset、调用 `GoldenDatasetRunner.RunAsync()`，再交给 `GoldenDatasetRegressionEvaluator.Evaluate()` 形成 Scorecard。fileciteturn118file0
-
-`GoldenDatasetRuntimeController` 只负责 HTTP 参数、Case 筛选和响应；完整 Runtime Pipeline 仍由 Service 统一编排，并提供 `run / cases / release-gate` 三类 Runtime 入口。fileciteturn116file0
-
-`GoldenDatasetRunner` 已将 Runtime 固定为：
-
-```text
-Semantic Applicability
-        ↓
-QueryPlan Evaluation Gate
-        ↓
-Query Understanding
-        ↓
-Semantic Resolution Factory
-        ↓
-QueryPlanBuilder
-        ↓
-QueryPlanContextBuilder
-        ↓
-QueryPlanValidationPipeline
-        ↓
-Evaluation-aware Confidence
-        ↓
-Calibration
-```
-
-Runner 本身不生成 SQL，因此 Phase 3.1 Runtime Verification 的责任是验证 Entity Contract 能否正确进入这一 Frozen Pipeline，而不是新建执行链。fileciteturn120file0
-
-## 3.1.10.2 Phase 3.1 Runtime 插入点
-
-```text
-Business Entity
-      ↓
-Entity Resolution
-      ↓
-Physical Binding Validation
-      ↓
-Entity → QueryPlan Mapping
-      ↓
-Existing QueryPlan / Semantic Resolution
-      ↓
-Frozen QueryPlan Validation
-      ↓
-Frozen Evaluation / Confidence
-      ↓
-Golden Regression Scorecard
-```
-
-Phase 3.1 不改变现有 Golden Runner 的总体编排，只增加/接入 Entity Resolution、Physical Binding 和 Mapping Adapter 的实际实现。
-
-## 3.1.10.3 Runtime PASS 判定
-
-一个 Phase 3.1 Positive Case 必须同时满足：
-
-1. Entity Resolution 成功；
-2. Selected PhysicalBinding 有效；
-3. DataSource / MetadataTable / MetadataColumn 三者一致；
-4. QueryPlan Mapping 成功；
-5. QueryPlan Validation 无 Contract Error；
-6. Evaluation Outcome 满足 Golden Expected Outcome；
-7. Regression Scorecard 不出现 Unexpected Applicability State；
-8. Phase 2.7 Frozen Golden Regression 不漂移。
-
-## 3.1.10.4 Runtime Negative / Ambiguous / Unresolved
-
-```text
-Invalid Binding
-    ↓
-Reject / Block
-
-Multiple valid unresolved candidates
-    ↓
-Ambiguous
-
-No valid candidate
-    ↓
-NotResolved
-```
-
-三种状态都必须保留诊断信息，不得自动降级为任意 Metadata Column。
-
-## 3.1.10.5 Runtime DataSource Boundary
-
-```text
-Selected PhysicalBinding.DataSourceId
-        ↓
-QueryTable.DataSourceId
-        ↓
-QueryPlan.DataSourceId
-```
-
-任何跨 DataSource 冲突必须显式失败或由既有 Resolution Contract 决定；Mapping Adapter 不得静默切换数据源。
-
-## 3.1.10.6 Runtime HTTP Boundary
-
-现有 Controller 已确认：HTTP 层只做参数校验、Case 选择、状态码和响应包装；Golden Runtime Pipeline 统一由 `GoldenDatasetRuntimeService` 编排。fileciteturn116file0
-
-因此 Phase 3.1 不在 Controller 中直接实现 Entity Resolution / Mapping / SQL。
-
-## 3.1.10.7 Runtime Verification Cases
-
-至少需要：
-
-```text
-R1 Positive Entity → Binding → QueryPlan
-R2 Negative Invalid Binding
-R3 Ambiguous Multiple Binding
-R4 Unresolved No Binding
-R5 Metric → QueryMetric
-R6 Attribute → QueryDimension
-R7 Attribute → QueryFilter
-R8 Relationship → QueryJoin
-R9 EntityKey → Key/Table Binding
-R10 Multi-DataSource Conflict
-R11 Phase 2.7 Golden Regression
-```
-
-## 3.1.10.8 Runtime Gate
-
-```text
-Entity Contract Verification       PASS
-Physical Binding Verification      PASS
-QueryPlan Mapping Verification     PASS
-Golden Expected Outcome            PASS
-Phase 2.7 Regression               PASS
-Runtime Exception                  0
-Unexpected Applicability State     0
-```
-
-Build / Startup 仍是最终实现阶段的运行验收，不在本 Design PASS 中提前声称已通过。
-
-## 3.1.10.9 3.1.10 最终结论
-
-**PASS。Runtime Verification Design 已冻结。**
-
-已经确认 Phase 3.1 的 Runtime 应接入现有 Golden Runtime Pipeline，而不是重新设计 Runtime：Entity Resolution → Physical Binding → QueryPlan Mapping → Frozen QueryPlan Validation → Evaluation / Confidence → Golden Regression。HTTP Controller 继续保持薄层，Golden Service 继续作为统一编排入口。
-
-> 注意：本 PASS 仅表示 Runtime Verification Design 完成；实际 Entity Runtime、Golden Case 扩展、Build、Startup 和运行结果尚未宣称完成。
+Golden Runtime 复用现有 `GoldenDatasetRuntimeService`、`GoldenDatasetRunner`、`GoldenDatasetRegressionEvaluator` 和 `GoldenDatasetRuntimeController`，不重造 Golden Engine。现有 Runtime Pipeline 为 Applicability → Gate → Query Understanding → Semantic Resolution → QueryPlanBuilder → ContextBuilder → Validation/Repair → Confidence → Calibration。Runner 不直接生成 SQL。
 
 ---
 
 # 3.1.11 Source Implementation Mapping
 
-**⏳ NEXT**
+**✅ PASS — 源码落地映射审计完成；尚未开始修改 Entity 源码。**
 
-下一步正式进入代码落地前的 Source Implementation Mapping：
+> 本项 PASS 的含义是“已经完成代码级落点设计与缺口确认”，不是“Business Entity 已实现”。真正代码实现从 3.1.12 开始。
+
+## 3.1.11.1 Source Audit 结论
+
+截至当前 `master`，源码中**尚未存在**以下 Phase 3.1 Entity Model / Resolution 实体实现：
 
 ```text
-Business Entity Models
-        ↓
-Interfaces
-        ↓
-Services / Resolution
-        ↓
-Physical Binding
-        ↓
-Mapping Adapter
-        ↓
-DI
-        ↓
-Controller / Runtime
-        ↓
-EF Core / Migration
-        ↓
-Golden Cases
+BusinessEntity
+BusinessEntityKey
+BusinessEntityAttribute
+BusinessEntityMetric
+BusinessEntityRelationship
+PhysicalBinding
+EntityResolution / Mapping Adapter
 ```
 
-必须逐项确认 Model / Interface / Service / DI / Controller / Runtime / Database Migration，禁止出现“计划已完成但源码不存在”的漂移。
+因此不能把已有 Metadata / QueryPlan 类冒充 Phase 3 Entity Model。仓库当前已有成熟的 Metadata、QueryPlan、Evaluation、Golden Runtime 基础设施，可作为 Phase 3.1 的 Frozen 下游。
+
+代码审计报告同时确认当前仓库为 206 个源文件、约 30,102 行 C#，核心 QueryPlan / Evaluation / Golden 链路已有完整实现；因此本阶段应采用增量新增，而不是重构已有核心链路。fileciteturn132file0
+
+## 3.1.11.2 Model Mapping
+
+| Contract | 目标源码位置 | 当前状态 | 3.1.12 动作 |
+|---|---|---|---|
+| BusinessEntity | `Models/BI/Entity/BusinessEntity.cs` | 不存在 | 新增 |
+| BusinessEntityKey | `Models/BI/Entity/BusinessEntityKey.cs` | 不存在 | 新增 |
+| BusinessEntityAttribute | `Models/BI/Entity/BusinessEntityAttribute.cs` | 不存在 | 新增 |
+| BusinessEntityMetric | `Models/BI/Entity/BusinessEntityMetric.cs` | 不存在 | 新增 |
+| BusinessEntityRelationship | `Models/BI/Entity/BusinessEntityRelationship.cs` | 不存在 | 新增 |
+| PhysicalBinding | `Models/BI/Entity/PhysicalBinding.cs` | 不存在 | 新增 |
+
+Model 只表达业务语义和 Mapping，不保存 SQL，不复制 Metadata Physical Facts。
+
+## 3.1.11.3 Interface Mapping
+
+建议接口边界：
+
+```text
+IBusinessEntityResolver
+IPhysicalBindingResolver
+IEntityQueryPlanMapper
+```
+
+职责分别为：
+
+```text
+IBusinessEntityResolver
+    Business Semantic → Entity Resolution
+
+IPhysicalBindingResolver
+    Entity Semantic → Valid PhysicalBinding
+
+IEntityQueryPlanMapper
+    Resolved Entity → Existing QueryPlan objects
+```
+
+接口不得把 SQL 生成、数据库执行、LLM Prompt 责任混入 Entity Model。
+
+## 3.1.11.4 Service Mapping
+
+目标新增服务边界：
+
+```text
+Services/BI/Entity/
+├── BusinessEntityResolver.cs
+├── PhysicalBindingResolver.cs
+└── EntityQueryPlanMapper.cs
+```
+
+推荐调用链：
+
+```text
+BusinessEntityResolver
+        ↓
+PhysicalBindingResolver
+        ↓
+EntityQueryPlanMapper
+        ↓
+QueryPlanBuilder / Frozen Runtime
+```
+
+不得让 `EntityQueryPlanMapper` 自己重新执行自由语义搜索；它只消费已确认 Resolution / Binding。
+
+## 3.1.11.5 Existing Source Reuse
+
+现有 `QueryPlanBuilder`、`QueryPlanEvaluator`、`QueryPlanBuilder.SemanticResolution` 是 Phase 2.7 下游，不重写。仓库已经存在这些真实源码文件。fileciteturn127file0 fileciteturn127file1 fileciteturn127file2
+
+现有 `SuperBIContext` 是 EF Core 数据上下文；因此 Entity 持久化应扩展该 Context，而不是新建第二个 DbContext。fileciteturn128file0
+
+## 3.1.11.6 DI Mapping
+
+当前 `Program.cs` 已统一注册 QueryPlan、Golden、Evaluation 等服务，并已有 `IQueryPlanBuilder → QueryPlanBuilder` 等注册模式。fileciteturn133file0
+
+3.1.12 只增加 Entity Resolver / Binding Resolver / Mapping Adapter 的 DI 注册；不改变 Frozen QueryPlan / Golden / SQL Builder 注册。
+
+## 3.1.11.7 Controller Mapping
+
+**本阶段不新增 Entity Controller 作为 Runtime 必需入口。**
+
+Entity Runtime 应由现有 Golden Runtime / BI 主链路消费。若后续需要 Entity 管理 API，应单独作为管理面设计，不得把 HTTP Controller 变成 Entity → SQL 的执行层。
+
+现有 `GoldenDatasetRuntimeController` 继续保持 HTTP 薄层。
+
+## 3.1.11.8 EF Core / Database Mapping
+
+当前仓库已有 `SuperBIContext` 和历史 Migration / ModelSnapshot。fileciteturn128file0 fileciteturn128file1
+
+3.1.12 如果确认 Entity 需要持久化，则新增单一 Migration，至少覆盖：
+
+```text
+BusinessEntity
+BusinessEntityKey
+BusinessEntityAttribute
+BusinessEntityMetric
+BusinessEntityRelationship
+PhysicalBinding
+```
+
+外键必须保持 Entity → 子对象 → Binding 的关系完整性；PhysicalBinding 到 MetadataTable / MetadataColumn / DataSource 的引用必须可验证。
+
+在没有实际 Migration 生成和 Build 验证前，不得声称数据库层完成。
+
+## 3.1.11.9 Golden Mapping
+
+新增 Golden Case 不修改 Phase 2.7 Frozen Case：
+
+```text
+Phase 3.1 Golden
+├── Entity Positive
+├── Entity Negative
+├── Entity Ambiguous
+├── Entity Unresolved
+├── Entity → Metadata Binding
+├── Entity → QueryDimension
+├── Entity → QueryFilter
+├── Entity → QueryMetric
+├── Entity → QueryJoin
+└── EntityKey → Table/Binding
+```
+
+Phase 2.7 Golden 只做 Regression。
+
+## 3.1.11.10 Source Modification Boundary
+
+**允许新增：**
+
+```text
+Models/BI/Entity/*
+Interfaces/BI/Entity/*
+Services/BI/Entity/*
+必要的 EF Core Mapping / Migration
+Phase 3.1 Golden Cases
+```
+
+**谨慎修改：**
+
+```text
+Program.cs
+SuperBIContext.cs
+现有 Golden Runtime Service
+```
+
+仅允许增加依赖接入，不改变既有 Frozen 行为。
+
+**默认禁止修改：**
+
+```text
+QueryPlan.cs
+QueryDimension.cs
+QueryMetric.cs
+QueryFilter.cs
+QueryJoin.cs
+QueryPlanEvaluator.cs
+SqlQueryBuilder.cs
+Golden Expected Outcome
+```
+
+除非后续 Source Audit 发现 Contract 编译/运行确实要求最小兼容性修改，并且必须单独记录原因与 Regression 结果。
+
+## 3.1.11.11 3.1.11 最终结论
+
+**PASS。Source Implementation Mapping 已冻结。**
+
+当前 master 的真实状态是：
+
+```text
+Phase 3.1 Entity Code
+        ❌ 尚未实现
+
+Phase 2.7 Frozen Runtime
+        ✅ 已存在
+
+Golden Runtime
+        ✅ 已存在
+
+EF Core Context
+        ✅ 已存在
+
+DI / Runtime Integration Point
+        ✅ 已明确
+```
+
+因此从现在开始，**第一次真正修改 Entity 源码的步骤是 3.1.12，而不是 3.1.11。**
+
+---
+
+# 3.1.12 Source Implementation
+
+**⏳ NEXT — 开始真正编码。**
+
+严格顺序：
+
+```text
+3.1.12.1 Models
+      ↓
+3.1.12.2 EF Core Mapping
+      ↓
+3.1.12.3 Interfaces
+      ↓
+3.1.12.4 Resolution Services
+      ↓
+3.1.12.5 QueryPlan Mapping Adapter
+      ↓
+3.1.12.6 DI
+      ↓
+3.1.12.7 Golden Cases
+      ↓
+3.1.12.8 Build
+      ↓
+3.1.12.9 Runtime
+      ↓
+3.1.12.10 Phase 2.7 Regression
+```
+
+每一步必须遵循：
+
+```text
+修改源码
+  ↓
+Build
+  ↓
+Golden
+  ↓
+Runtime
+  ↓
+记录结果
+  ↓
+更新本开发计划
+```
+
+禁止一次性修改所有层后再统一猜测问题。
 
 ---
 
@@ -467,7 +365,9 @@ Golden Cases
 只有全部满足才允许 CLOSED / FROZEN：
 
 - 3.1 Contract 全部 PASS
-- Source Mapping 完成
+- Source Mapping PASS
+- Entity Model 实际实现
+- EF Core Migration PASS（如持久化）
 - Entity Resolution Golden PASS
 - Entity → Metadata Binding Golden PASS
 - Entity → QueryPlan Golden PASS
@@ -497,7 +397,8 @@ Phase 3.1 Business Entity Model
         ├── 3.1.8 QueryPlanMapping    ✅ PASS
         ├── 3.1.9 Golden Contract     ✅ PASS
         ├── 3.1.10 Runtime Design     ✅ PASS
-        └── 3.1.11 Implementation     ⏳ NEXT
+        ├── 3.1.11 Source Mapping     ✅ PASS
+        └── 3.1.12 Implementation     ⏳ NEXT
 ```
 
-**下一动作：3.1.11 Source Implementation Mapping。**
+**当前唯一下一动作：3.1.12 Source Implementation。**
