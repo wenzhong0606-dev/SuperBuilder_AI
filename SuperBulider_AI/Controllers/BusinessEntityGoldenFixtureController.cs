@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SuperBuilder_AI.Data;
 using SuperBuilder_AI.Models.BI.Entity;
+using SuperBuilder_AI.Models.Metadata;
 using System.Text;
 using System.Text.Encodings.Web;
 
@@ -26,7 +27,7 @@ public sealed class BusinessEntityGoldenFixtureController : ControllerBase
     public async Task<IActionResult> Index(CancellationToken cancellationToken = default)
     {
         var tenants = await _db.Tenants.AsNoTracking().OrderBy(x => x.Id)
-            .Select(x => new { x.Id, x.Name }).ToListAsync(cancellationToken);
+            .Select(x => new { x.Id, x.TenantName }).ToListAsync(cancellationToken);
         var sources = await _db.DataSources.AsNoTracking().OrderBy(x => x.TenantId).ThenBy(x => x.Id)
             .Select(x => new { x.Id, x.TenantId, x.Name, x.DbType, x.Enabled }).ToListAsync(cancellationToken);
         var tables = await _db.MetadataTables.AsNoTracking()
@@ -45,7 +46,7 @@ public sealed class BusinessEntityGoldenFixtureController : ControllerBase
         }
         html.Append("<form method='post' action='/evaluation/business-entity/fixture/provision'>");
         html.Append("<label>Tenant：</label><select name='tenantId'>");
-        foreach (var t in tenants) html.Append($"<option value='{t.Id}'>{H(t.Name ?? "-")} (#{t.Id})</option>");
+        foreach (var t in tenants) html.Append($"<option value='{t.Id}'>{H(t.TenantName ?? "-")} (#{t.Id})</option>");
         html.Append("</select><label>DataSource：</label><select name='dataSourceId'>");
         foreach (var s in sources) html.Append($"<option value='{s.Id}'>{H(s.Name ?? "-")} (#{s.Id}, tenant={s.TenantId}, {H(s.DbType ?? "-")})</option>");
         html.Append("</select><label>MetadataTable：</label><select name='metadataTableId'>");
