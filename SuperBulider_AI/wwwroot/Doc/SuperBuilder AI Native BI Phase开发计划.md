@@ -23,270 +23,269 @@
 3.1.9 Golden Contract     ✅ PASS
 3.1.10 Runtime Design     ✅ PASS
 3.1.11 Source Mapping     ✅ PASS
-3.1.12.1 Models           ✅ IMPLEMENTED
-3.1.12.2 EF Core Mapping  🟡 CODED / VERIFICATION PENDING
+3.1.12.1 Models           ✅ PASS
+3.1.12.2 EF Core Mapping  ✅ PASS
+3.1.12.3 DB Migration     ✅ PASS
+3.1.12.4 Interfaces       🟡 CODED / VERIFICATION PENDING
 ```
 
-# 3.1.12.2 EF Core Mapping
+# 3.1.12.3 Database Migration / Schema Verification
 
-## 3.1.12.2.1 多动态数据库兼容性 Contract
+## 3.1.12.3.1 实际验证结果
 
-**结论：不冲突。**
+用户本地已确认：
 
-Phase 3.1 Entity Persistence 只持久化到 SuperBuilder 自己的 Metadata DB；动态业务数据库仍由 `DataSource` + Metadata Discovery + Runtime Connection Factory 动态访问。
+```text
+EF Migration              ✅ SUCCESS
+Database Update           ✅ SUCCESS
+Build                     ✅ SUCCESS
+Application Startup       ✅ SUCCESS
+```
+
+此前 SQL Server Error 1785 已通过调整 `PhysicalBinding` Owner FK 的 DeleteBehavior 修复：
+
+```text
+BusinessEntityKey        → PhysicalBinding   NoAction
+BusinessEntityAttribute  → PhysicalBinding   NoAction
+BusinessEntityMetric     → PhysicalBinding   NoAction
+BusinessEntityRelationship → PhysicalBinding NoAction
+```
+
+同时保持：
+
+```text
+BusinessEntity → Key / Attribute / Metric   Cascade
+BusinessEntity → Relationship                Restrict
+PhysicalBinding → DataSource                 Restrict
+PhysicalBinding → MetadataTable              Restrict
+PhysicalBinding → MetadataColumn             Restrict
+```
+
+## 3.1.12.3.2 Multi-DataSource Schema Boundary
+
+Migration 只更新 SuperBuilder Metadata DB。
 
 ```text
 SuperBuilder Metadata DB
- ├── BusinessEntity
- ├── BusinessEntityKey
- ├── BusinessEntityAttribute
- ├── BusinessEntityMetric
- ├── BusinessEntityRelationship
- ├── PhysicalBinding
- ├── DataSource
- ├── MetadataTable
- └── MetadataColumn
-             │
-             │ logical binding
-             ↓
-      Dynamic Business DBs
-      ├── MySQL
-      ├── PostgreSQL
-      ├── SQL Server
-      └── Oracle / other supported providers
+        │
+        ├── BusinessEntities
+        ├── BusinessEntityKeys
+        ├── BusinessEntityAttributes
+        ├── BusinessEntityMetrics
+        ├── BusinessEntityRelationships
+        └── PhysicalBindings
+
+        ↓ logical binding
+
+Dynamic Business DBs
+        ├── MySQL
+        ├── PostgreSQL
+        ├── SQL Server
+        └── Other supported providers
+```
+
+禁止 Entity Migration 修改动态业务数据库 Schema。
+
+**结论：3.1.12.3 PASS。**
+
+---
+
+# 3.1.12.4 Interfaces
+
+## 3.1.12.4.1 Existing Interface Boundary Audit
+
+当前 Phase 2.7 已存在并继续冻结的接口包括：
+
+```text
+IQueryPlanBuilder
+IQueryPlanContextBuilder
+IQueryPlanDecisionGate
+IQueryPlanConfidenceService
+IQueryPlanExplainabilityService
+IQueryPlanRepairService
+IQueryPlanValidationPipeline
+IQueryJoinInferenceService
+IDimensionResolutionEvidenceService
+IBIConversationService
+```
+
+现有 `IQueryPlanBuilder` 已经接受 `QueryPlanSemanticResolution`，这是 Phase 2.7 的下游稳定绑定入口，因此 Phase 3 不重新定义 QueryPlan Contract。fileciteturn174file0
+
+`IDimensionResolutionEvidenceService` 当前明确只提供 Dimension 物理证据，不生成 SQL、不修改 QueryPlan.Joins，因此保持 Phase 2.7 Frozen Boundary。fileciteturn178file0
+
+`IQueryJoinInferenceService` 当前已经负责动态 JOIN 候选推断，因此 Phase 3 Entity Relationship 不直接替换该接口，而通过后续 Mapping 层提供稳定语义输入。fileciteturn196file0
+
+## 3.1.12.4.2 新增接口 Contract
+
+### IBusinessEntityService
+
+路径：
+
+```text
+Interfaces/BI/Entity/IBusinessEntityService.cs
+```
+
+职责：
+
+```text
+Business Entity CRUD / Query
+        ↓
+SuperBuilder Metadata DB
 ```
 
 禁止：
 
 ```text
-Entity Migration → Dynamic Business DB
-Entity FK         → Dynamic Business DB
-Entity Model      → Customer Physical Schema
-Entity            → Direct SQL generation
-```
-
-允许：
-
-```text
-PhysicalBinding.DataSourceId
-PhysicalBinding.MetadataTableId
-PhysicalBinding.MetadataColumnId
+BusinessEntityService
         ↓
-SuperBuilder Metadata records
-        ↓
-Runtime resolves DataSource
-        ↓
-Dynamic connection
+Dynamic Business DB
 ```
 
-因此 Entity Migration 只改变 SuperBuilder Metadata DB Schema，不要求任何客户业务数据库做 Schema Migration。
-
-## 3.1.12.2.2 EF Mapping 实现
-
-新增：
+接口：
 
 ```text
-Data/Configurations/Phase31EntityModelConfiguration.cs
+GetAsync(tenantId, id)
+ListAsync(tenantId)
+CreateAsync(entity)
+UpdateAsync(entity)
+DeleteAsync(tenantId, id)
 ```
 
-并在 `SuperBIContext.OnModelCreating()` 中启用：
+### IPhysicalBindingResolver
 
-```csharp
-builder.ApplyConfigurationsFromAssembly(
-    typeof(BusinessEntityConfiguration).Assembly);
-```
-
-`SuperBIContext` 同时增加六个 `DbSet`：
+路径：
 
 ```text
-BusinessEntities
-BusinessEntityKeys
-BusinessEntityAttributes
-BusinessEntityMetrics
-BusinessEntityRelationships
-PhysicalBindings
+Interfaces/BI/Entity/IPhysicalBindingResolver.cs
 ```
 
-现有 `SuperBIContext` 本身就是平台基础数据、Metadata、AI 语义和向量索引关系的 EF Core Context，因此没有新建第二个 Context。fileciteturn151file0
-
-## 3.1.12.2.3 FK / Relationship
-
-### Tenant → BusinessEntity
-
-```text
-Tenant 1 ─── N BusinessEntity
-```
-
-`TenantId`：FK，`DeleteBehavior.Restrict`。
-
-### BusinessEntity → Key / Attribute / Metric
-
-```text
-BusinessEntity 1 ─── N BusinessEntityKey
-BusinessEntity 1 ─── N BusinessEntityAttribute
-BusinessEntity 1 ─── N BusinessEntityMetric
-```
-
-三者采用 `Cascade`，因为它们属于 Entity 的生命周期。
-
-### BusinessEntity → Relationship
-
-```text
-BusinessEntity 1 ─── N SourceRelationships
-BusinessEntity 1 ─── N TargetRelationships
-```
-
-Source / Target 两条 FK 均采用 `Restrict`，避免删除一个 Entity 时形成关系级联删除链。
-
-### PhysicalBinding → Entity Semantic Owner
-
-`PhysicalBinding` 增加四个可空 Owner FK：
-
-```text
-BusinessEntityKeyId
-BusinessEntityAttributeId
-BusinessEntityMetricId
-BusinessEntityRelationshipId
-```
-
-数据库 Check Constraint：
-
-```text
-ExactlyOneOwner = 1
-```
-
-即一条 PhysicalBinding 必须且只能属于一种 Entity Semantic Owner。
-
-对应 Owner 删除采用 `Cascade`：删除语义对象时清理其 Binding；不会删除 Metadata。
-
-## 3.1.12.2.4 Physical Metadata FK
-
-PhysicalBinding 对 SuperBuilder 自己的三类 Metadata Record 建立 FK：
-
-```text
-PhysicalBinding.DataSourceId
-        → DataSource.Id
-
-PhysicalBinding.MetadataTableId
-        → MetadataTable.Id
-
-PhysicalBinding.MetadataColumnId
-        → MetadataColumn.Id
-```
-
-全部 `DeleteBehavior.Restrict`。
-
-原因：
-
-```text
-删除 Entity
-    ↓
-删除 Binding
-    ↓
-Metadata 保留
-    ↓
-Dynamic DataSource 完全不受影响
-```
-
-而且现有 MetadataTable 已经以 `DataSourceId` 关联 DataSource，MetadataColumn 以 `MetadataTableId` 关联 MetadataTable。fileciteturn152file0 fileciteturn153file0
-
-## 3.1.12.2.5 Index
-
-已配置：
+职责：
 
 ```text
 BusinessEntity
-    (TenantId, BusinessKey) UNIQUE
-
-BusinessEntityKey
-    (BusinessEntityId, Name) UNIQUE
-    (BusinessEntityId, IsPrimary)
-
-BusinessEntityAttribute
-    (BusinessEntityId, Name) UNIQUE
-    (BusinessEntityId, IsIdentifier)
-
-BusinessEntityMetric
-    (BusinessEntityId, Name) UNIQUE
-
-BusinessEntityRelationship
-    (SourceEntityId, TargetEntityId, Name) UNIQUE
-
+        ↓
 PhysicalBinding
-    (DataSourceId, MetadataTableId, MetadataColumnId, Priority)
-    OwnerId + IsActive indexes
-    RelationshipId + PhysicalRole + IsActive
+        ↓
+DataSource / MetadataTable / MetadataColumn
 ```
 
-这些索引属于 SuperBuilder Metadata DB，不会进入动态业务数据库。
+只读取 SuperBuilder Metadata DB 中的 Binding Record，不直接建立动态数据库连接。
 
-## 3.1.12.2.6 Relationship Binding 特别说明
-
-当前 `PhysicalBinding` 每条记录只指向一个 `MetadataColumn`。因此一个 `BusinessEntityRelationship` 的物理关系可以由多条 Binding 表达，例如：
+接口：
 
 ```text
-Relationship R
- ├── Binding(SourceKey → DB_A.TableA.ColumnA)
- └── Binding(TargetKey → DB_A.TableB.ColumnB)
+ResolveAsync(
+    tenantId,
+    dataSourceId,
+    businessEntityId)
 ```
 
-通过 `PhysicalRole` 区分 Source / Target / JoinKey 等角色。
+### IEntityQueryPlanMapper
 
-因此当前模型不需要把 SourceColumnId / TargetColumnId 强行塞进 Relationship Entity，也不要求跨数据库 FK。
-
-后续如果 Golden / Runtime 证明 Join Binding 需要更强的原子 Contract，再单独进入 Relationship Binding Enhancement，不在本次偷偷扩大 Contract。
-
-## 3.1.12.2.7 当前验证状态
-
-已完成源码写入：
+路径：
 
 ```text
-Phase31EntityModelConfiguration.cs   ✅
-SuperBIContext DbSet                 ✅
-SuperBIContext ApplyConfigurations    ✅
-PhysicalBinding Owner FK              ✅
-Metadata FK                           ✅
-Indexes                               ✅
-DeleteBehavior                        ✅
-Multi-DataSource boundary             ✅
+Interfaces/BI/Entity/IEntityQueryPlanMapper.cs
 ```
 
-但当前 GitHub Commit 没有可用 CI Status，不能据此声称本机 `dotnet build` / EF Migration / Startup 已通过。当前 commit status 查询返回空状态。fileciteturn156file0
+职责：
 
-因此本步骤状态必须保持：
+```text
+Business Entity Semantic Model
+        ↓
+QueryPlanSemanticResolution
+        ↓
+现有 QueryPlanBuilder
+```
 
-> **🟡 CODED / VERIFICATION PENDING**
+它不生成 SQL、不执行 SQL、不改变 Phase 2.7 QueryPlan Contract。当前 QueryPlan 的 Resolution 模型已经明确承担 Metric / Filter / Dimension / Table / Order 的稳定物理解析结果。fileciteturn184file0
 
-而不是误报为 PASS。
+## 3.1.12.4.3 Dynamic Database Compatibility Contract
 
-## 3.1.12.2 最终结论
+三个接口均遵守：
 
-**🟡 实现完成，验证未完成。**
+```text
+Tenant Scope
+     ↓
+SuperBuilder Metadata DB
+     ↓
+Semantic Entity / Binding Resolution
+     ↓
+QueryPlanSemanticResolution
+     ↓
+Existing Phase 2.7 QueryPlan
+     ↓
+DataSourceConnectionFactory
+     ↓
+Dynamic Business DB
+```
 
-架构上已经确认与多动态数据库兼容，并且 FK、关系、索引、DeleteBehavior 已完成代码配置；但必须经过实际 `dotnet build`、EF Core Migration/ModelSnapshot 检查以及 Runtime 验证后，才能把 3.1.12.2 标记为 PASS。
+不得出现：
 
-下一步：**3.1.12.3 Build / EF Migration Verification**。
+```text
+Entity Interface
+    ↓
+EF DbContext
+    ↓
+Customer Business DB
+```
+
+现有 `DataSource` 本身保存 `TenantId`、`DbType`、`ConnectionString` 并代表业务数据库连接，因此 Entity Contract 通过 `DataSourceId` 间接进入动态数据源，而不是把连接信息塞进 Entity。fileciteturn179file0
+
+## 3.1.12.4.4 当前源码结果
+
+已写入 master：
+
+```text
+IBusinessEntityService        ✅
+IPhysicalBindingResolver      ✅
+IEntityQueryPlanMapper        ✅
+```
+
+对应提交：
+
+```text
+c25c975b3467ea363fbc1e1cb77dffad33d32380
+4d01359965de00917da960f8dd3335bf5cf76a37
+9d17cff6c6fe3727f5f6aaf99d65348117bef199
+```
+
+当前仅完成 Interface Contract，不声称已有实现、DI、Runtime 或 Golden 通过。
+
+**结论：3.1.12.4 Interface Contract 已完成源码写入，但 Verification Pending。**
+
+---
 
 # 3.1.12 后续顺序
 
 ```text
-3.1.12.1 Models           ✅ IMPLEMENTED
+3.1.12.1 Models
+        ✅ PASS
         ↓
-3.1.12.2 EF Mapping       🟡 CODED
+3.1.12.2 EF Core Mapping
+        ✅ PASS
         ↓
-3.1.12.3 Build / Migration ⏳ NEXT
+3.1.12.3 DB Migration / Schema
+        ✅ PASS
         ↓
 3.1.12.4 Interfaces
+        🟡 CODED / VERIFICATION PENDING
         ↓
 3.1.12.5 Resolution Services
+        ⏳ NEXT
         ↓
 3.1.12.6 QueryPlan Mapping
+        ⏳
         ↓
 3.1.12.7 DI
+        ⏳
         ↓
 3.1.12.8 Golden
+        ⏳
         ↓
 3.1.12.9 Runtime
+        ⏳
         ↓
 3.1.12.10 Phase 2.7 Regression
+        ⏳
 ```
