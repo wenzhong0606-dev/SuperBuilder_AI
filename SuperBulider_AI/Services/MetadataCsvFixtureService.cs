@@ -35,20 +35,29 @@ public sealed class MetadataCsvFixtureService : IMetadataCsvFixtureService
 
         await using var transaction = await _context.Database.BeginTransactionAsync();
 
-        // Clear the Phase 3.1 dependent graph before removing its Tenant/Metadata parents.
-        // PhysicalBindings use NoAction FKs to BusinessEntity owners and Metadata entities;
-        // BusinessEntityRelationships use Restrict FKs to both BusinessEntity endpoints.
-        // BusinessEntity child collections (Keys/Attributes/Metrics) cascade from the entity.
+        // SQL Server FK actions in Phase 3.1 include NoAction/Restrict relationships.
+        // Delete each dependent level and flush it before deleting its referenced owner.
         _context.PhysicalBindings.RemoveRange(_context.PhysicalBindings);
-        _context.BusinessEntityRelationships.RemoveRange(_context.BusinessEntityRelationships);
-        _context.BusinessEntities.RemoveRange(_context.BusinessEntities);
+        await _context.SaveChangesAsync();
 
-        // MetadataSemantic cascades from MetadataColumn, so it can be explicitly removed
-        // first and the remaining metadata graph can then be deleted safely.
+        _context.BusinessEntityRelationships.RemoveRange(_context.BusinessEntityRelationships);
+        await _context.SaveChangesAsync();
+
+        _context.BusinessEntities.RemoveRange(_context.BusinessEntities);
+        await _context.SaveChangesAsync();
+
         _context.MetadataSemantics.RemoveRange(_context.MetadataSemantics);
+        await _context.SaveChangesAsync();
+
         _context.MetadataColumns.RemoveRange(_context.MetadataColumns);
+        await _context.SaveChangesAsync();
+
         _context.MetadataTables.RemoveRange(_context.MetadataTables);
+        await _context.SaveChangesAsync();
+
         _context.DataSources.RemoveRange(_context.DataSources);
+        await _context.SaveChangesAsync();
+
         _context.Tenants.RemoveRange(_context.Tenants);
         await _context.SaveChangesAsync();
 
