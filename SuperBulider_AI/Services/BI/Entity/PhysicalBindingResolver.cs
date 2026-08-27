@@ -14,14 +14,17 @@ public sealed class PhysicalBindingResolver(SuperBIContext db) : IPhysicalBindin
         long businessEntityId,
         CancellationToken cancellationToken = default)
     {
+        // Tenant isolation is enforced through both the Entity and DataSource ownership.
         return await db.PhysicalBindings
             .AsNoTracking()
             .Where(x => x.DataSourceId == dataSourceId && x.IsActive)
-            .Where(x => x.BusinessEntityKey != null && x.BusinessEntityKey.BusinessEntityId == businessEntityId
-                     || x.BusinessEntityAttribute != null && x.BusinessEntityAttribute.BusinessEntityId == businessEntityId
-                     || x.BusinessEntityMetric != null && x.BusinessEntityMetric.BusinessEntityId == businessEntityId
-                     || x.BusinessEntityRelationship != null && x.BusinessEntityRelationship.SourceEntityId == businessEntityId
-                     || x.BusinessEntityRelationship != null && x.BusinessEntityRelationship.TargetEntityId == businessEntityId)
+            .Where(x => x.DataSource != null && x.DataSource.TenantId == tenantId)
+            .Where(x => x.BusinessEntityKey != null && x.BusinessEntityKey.BusinessEntityId == businessEntityId && x.BusinessEntityKey.BusinessEntity.TenantId == tenantId
+                     || x.BusinessEntityAttribute != null && x.BusinessEntityAttribute.BusinessEntityId == businessEntityId && x.BusinessEntityAttribute.BusinessEntity.TenantId == tenantId
+                     || x.BusinessEntityMetric != null && x.BusinessEntityMetric.BusinessEntityId == businessEntityId && x.BusinessEntityMetric.BusinessEntity.TenantId == tenantId
+                     || x.BusinessEntityRelationship != null && (x.BusinessEntityRelationship.SourceEntityId == businessEntityId || x.BusinessEntityRelationship.TargetEntityId == businessEntityId)
+                        && x.BusinessEntityRelationship.SourceEntity.TenantId == tenantId
+                        && x.BusinessEntityRelationship.TargetEntity.TenantId == tenantId)
             .OrderBy(x => x.Priority)
             .ThenBy(x => x.Id)
             .ToListAsync(cancellationToken);
