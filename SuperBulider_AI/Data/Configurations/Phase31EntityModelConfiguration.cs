@@ -19,7 +19,6 @@ public sealed class BusinessEntityConfiguration : IEntityTypeConfiguration<Busin
         builder.Property(x => x.BusinessKey).HasMaxLength(200).IsRequired();
         builder.Property(x => x.Name).HasMaxLength(200).IsRequired();
         builder.Property(x => x.Status).HasMaxLength(50).IsRequired();
-
         builder.HasOne<Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
         builder.HasMany(x => x.Keys).WithOne(x => x.BusinessEntity).HasForeignKey(x => x.BusinessEntityId).OnDelete(DeleteBehavior.Cascade);
         builder.HasMany(x => x.Attributes).WithOne(x => x.BusinessEntity).HasForeignKey(x => x.BusinessEntityId).OnDelete(DeleteBehavior.Cascade);
@@ -37,6 +36,7 @@ public sealed class BusinessEntityKeyConfiguration : IEntityTypeConfiguration<Bu
         builder.HasIndex(x => new { x.BusinessEntityId, x.Name }).IsUnique();
         builder.HasIndex(x => new { x.BusinessEntityId, x.IsPrimary });
         builder.Property(x => x.Name).HasMaxLength(200).IsRequired();
+        builder.HasOne(x => x.BusinessEntity).WithMany(x => x.Keys).HasForeignKey(x => x.BusinessEntityId).OnDelete(DeleteBehavior.Cascade);
     }
 }
 
@@ -48,6 +48,7 @@ public sealed class BusinessEntityAttributeConfiguration : IEntityTypeConfigurat
         builder.HasIndex(x => new { x.BusinessEntityId, x.Name }).IsUnique();
         builder.HasIndex(x => new { x.BusinessEntityId, x.IsIdentifier });
         builder.Property(x => x.Name).HasMaxLength(200).IsRequired();
+        builder.HasOne(x => x.BusinessEntity).WithMany(x => x.Attributes).HasForeignKey(x => x.BusinessEntityId).OnDelete(DeleteBehavior.Cascade);
     }
 }
 
@@ -59,6 +60,7 @@ public sealed class BusinessEntityMetricConfiguration : IEntityTypeConfiguration
         builder.HasIndex(x => new { x.BusinessEntityId, x.Name }).IsUnique();
         builder.Property(x => x.Name).HasMaxLength(200).IsRequired();
         builder.Property(x => x.Aggregation).HasMaxLength(50);
+        builder.HasOne(x => x.BusinessEntity).WithMany(x => x.Metrics).HasForeignKey(x => x.BusinessEntityId).OnDelete(DeleteBehavior.Cascade);
     }
 }
 
@@ -69,6 +71,8 @@ public sealed class BusinessEntityRelationshipConfiguration : IEntityTypeConfigu
         builder.ToTable("BusinessEntityRelationships", tb => tb.HasComment("业务实体关系"));
         builder.HasIndex(x => new { x.SourceEntityId, x.TargetEntityId, x.Name }).IsUnique();
         builder.Property(x => x.Name).HasMaxLength(200).IsRequired();
+        builder.HasOne(x => x.SourceEntity).WithMany(x => x.SourceRelationships).HasForeignKey(x => x.SourceEntityId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne(x => x.TargetEntity).WithMany(x => x.TargetRelationships).HasForeignKey(x => x.TargetEntityId).OnDelete(DeleteBehavior.Restrict);
     }
 }
 
@@ -88,17 +92,15 @@ public sealed class PhysicalBindingConfiguration : IEntityTypeConfiguration<Phys
         builder.HasIndex(x => new { x.BusinessEntityMetricId, x.IsActive });
         builder.HasIndex(x => new { x.BusinessEntityRelationshipId, x.PhysicalRole, x.IsActive });
 
-        // Semantic Owner → PhysicalBinding 使用 NoAction，避免 SQL Server 多重级联路径。
-        // Entity 删除前由应用层显式处理其 bindings。
         builder.HasOne(x => x.BusinessEntityKey).WithMany(x => x.PhysicalBindings).HasForeignKey(x => x.BusinessEntityKeyId).OnDelete(DeleteBehavior.NoAction);
         builder.HasOne(x => x.BusinessEntityAttribute).WithMany(x => x.PhysicalBindings).HasForeignKey(x => x.BusinessEntityAttributeId).OnDelete(DeleteBehavior.NoAction);
         builder.HasOne(x => x.BusinessEntityMetric).WithMany(x => x.PhysicalBindings).HasForeignKey(x => x.BusinessEntityMetricId).OnDelete(DeleteBehavior.NoAction);
         builder.HasOne(x => x.BusinessEntityRelationship).WithMany(x => x.PhysicalBindings).HasForeignKey(x => x.BusinessEntityRelationshipId).OnDelete(DeleteBehavior.NoAction);
 
-        // 这些 FK 只引用 SuperBuilder 自己的 Metadata DB 记录，不跨库指向动态业务数据库。
-        builder.HasOne<DataSource>().WithMany().HasForeignKey(x => x.DataSourceId).OnDelete(DeleteBehavior.Restrict);
-        builder.HasOne<MetadataTable>().WithMany().HasForeignKey(x => x.MetadataTableId).OnDelete(DeleteBehavior.Restrict);
-        builder.HasOne<MetadataColumn>().WithMany().HasForeignKey(x => x.MetadataColumnId).OnDelete(DeleteBehavior.Restrict);
+        // 显式绑定 dependent navigation + FK，禁止 EF 因重复关系生成 DataSourceId1/MetadataTableId1/MetadataColumnId1 shadow FK。
+        builder.HasOne(x => x.DataSource).WithMany().HasForeignKey(x => x.DataSourceId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne(x => x.MetadataTable).WithMany().HasForeignKey(x => x.MetadataTableId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne(x => x.MetadataColumn).WithMany().HasForeignKey(x => x.MetadataColumnId).OnDelete(DeleteBehavior.Restrict);
 
         builder.Property(x => x.PhysicalRole).HasMaxLength(50);
         builder.Property(x => x.BindingType).HasMaxLength(50);
