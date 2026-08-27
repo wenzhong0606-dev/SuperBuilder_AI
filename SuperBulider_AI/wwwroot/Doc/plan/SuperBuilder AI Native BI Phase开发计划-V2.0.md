@@ -1,16 +1,16 @@
 # SuperBuilder AI Native BI Phase开发计划
 
-> 文档版本：v2.23  
+> 文档版本：v2.24  
 > 文档性质：项目正式开发基线 + Phase 开发测试管理总计划  
 > **唯一源码基线：GitHub `master`**
 
 ## 一、当前项目状态
 
 - 当前 Phase：**Phase 2.7 — DimensionAware QueryPlan**
-- Phase 状态：**READY TO CLOSE（D21 Exit Review 已通过，状态收口提交进行中）**
-- 当前工作单元：**D21 — Phase 2.7 Exit Review / 状态收口**
-- 当前状态：**D14-D20 已实际完成并通过当前 Runtime / Golden / Build / Startup 验证；D21 Exit Review PASS。**
-- 当前 master 基线：`6a5f7d6`；该 commit 已包含 D15-D18 修复链。
+- Phase 状态：**CLOSED**
+- 当前工作单元：**D21 — Phase 2.7 Exit Review**
+- 当前状态：**D14-D20 已实际完成并冻结；D21 Exit Review 已通过；Phase 2.7 正式关闭。**
+- 当前 master 基线：`f96c2945`；该基线在文档收口后已由用户本地确认 Build PASS、Startup PASS。
 - Golden Dataset：`query-plan-golden` v1.3，18/18 Expected Outcome PASS。
 
 ### 当前 Runtime / Release 证据
@@ -32,13 +32,14 @@ failedGates            []
 D14                     FROZEN
 D15-D18                 FROZEN
 D19-D20                 FROZEN
-D21 Exit Review         PASS
-Phase 2.7               READY TO CLOSE
+D21 Exit Review         FROZEN
+Phase 2.7               CLOSED
+Phase 3                 READY TO START
 ```
 
-> 历史记录中的 `master=252cf2b`、D15-D18“尚未提交 master”、以及“待提交后 Freeze”均属于 2026-08-27 状态同步前的历史状态，不再作为当前基线。
+> 历史记录中的 `master=252cf2b`、`master=6a5f7d6` 以及 D15-D18“尚未提交 master”等均属于状态同步前的历史基线，不再作为当前基线。
 
-## 二、Phase 2.7 当前冻结链
+## 二、Phase 2.7 最终冻结链
 
 ```text
 D05 Entity Key Contract              FROZEN
@@ -73,39 +74,70 @@ D19 Full Golden Regression          FROZEN
         ↓
 D20 Coverage / Quality / Release    FROZEN
         ↓
-D21 Phase 2.7 Exit Review           PASS
+D21 Phase 2.7 Exit Review           FROZEN
         ↓
-Phase 2.7                           READY TO CLOSE
+Phase 2.7                           CLOSED
 ```
 
-## 三、D21 Exit Review 结论
+## 三、D21 Exit Review 最终结论
 
-D21 已基于当前 master 与已保存 Runtime / Golden 证据完成 Exit Review：
+D21 已完成三方状态收口：
 
-1. `master` 基线已推进至 `6a5f7d6`；
-2. D15-D18 修复链已经进入 master；
-3. 当前代码 Build PASS；
-4. 当前应用 Startup PASS；
-5. Golden Dataset v1.3 全部 18 Case 执行；
-6. Expected Outcome 18/18 PASS；
-7. Positive 11/11、Negative 5/5、Ambiguous 1/1、Unresolved 1/1 全部通过；
-8. Release Gate PASS，`failedGates=[]`；
-9. 本次收口不修改 QueryPlan / Evaluator / Golden Expected Outcome 等业务 Contract。
+1. 当前 master 为 `f96c2945`，包含本轮状态同步文档；
+2. D15-D18 修复链已经进入此前的 master 基线；
+3. 用户已确认当前最新 master 编译通过；
+4. 用户已确认当前最新 master 正常启动；
+5. Golden Dataset v1.3 的 18 Case Runtime / Regression 证据为 18/18 PASS；
+6. Positive 11/11、Negative 5/5、Ambiguous 1/1、Unresolved 1/1 全部通过；
+7. Release Gate PASS，`failedGates=[]`；
+8. 本次状态收口不修改 QueryPlan / Evaluator / Golden Expected Outcome / SQL Builder 业务逻辑。
 
-**D21 Exit Review = PASS。**
+**D21 Exit Review = FROZEN。**
 
-## 四、状态同步原则
+**Phase 2.7 = CLOSED。**
 
-Phase 2.7 的 STEP 管理规则仍然有效：源码 / Contract / Runtime 审计后必须冻结当前 STEP，并同步开发计划、Runtime 记录和 master。当前文档更新用于消除此前“代码已进入 master、计划仍停留在 D14 NEXT”的状态漂移。
-
-## 五、下一阶段入口
-
-Phase 3 暂不在本次文档提交中展开业务编码。Phase 2.7 完成正式关闭后，Phase 3 才作为下一正式开发阶段启动。
+## 四、三方同步基线
 
 ```text
-D21 Exit Review PASS
-        ↓
+Phase Plan
+    │
+    ├── D14-D20 FROZEN
+    └── D21 FROZEN
+             │
+             ▼
+Runtime
+    │
+    ├── Build PASS
+    ├── Startup PASS
+    ├── Golden 18/18 PASS
+    └── failedGates=[]
+             │
+             ▼
+master
+    │
+    └── f96c2945
+             │
+             ▼
+Phase 2.7 CLOSED
+             │
+             ▼
+Phase 3 READY TO START
+```
+
+## 五、Phase 3 入口
+
+Phase 3 现在具备正式启动条件。后续业务开发必须从新的 Phase / STEP 开始，不再修改已冻结的 Phase 2.7 Contract。
+
+建议 Phase 3 第一工作单元继续保持独立的 Contract → Source → Runtime → Freeze 闭环。
+
+```text
 Phase 2.7 CLOSED
         ↓
 Phase 3 START
+        ↓
+Phase 3.1 Business Entity Model
 ```
+
+## 六、变更边界
+
+本次 D21 收口只同步 Phase 状态与验证证据，不修改 QueryPlan、Evaluator、Golden Expected Outcome、SQL Builder 或其他 Phase 2.7 业务逻辑。
