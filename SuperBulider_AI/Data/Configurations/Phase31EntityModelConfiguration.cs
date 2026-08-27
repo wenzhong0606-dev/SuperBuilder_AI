@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using SuperBuilder_AI.Models.BI.Entity;
+using SuperBuilder_AI.Models.Metadata;
+using SuperBuilder_AI.Models.Organization;
 
 namespace SuperBuilder_AI.Data.Configurations;
 
@@ -18,30 +20,16 @@ public sealed class BusinessEntityConfiguration : IEntityTypeConfiguration<Busin
         builder.Property(x => x.Name).HasMaxLength(200).IsRequired();
         builder.Property(x => x.Status).HasMaxLength(50).IsRequired();
 
-        builder.HasMany(x => x.Keys)
-            .WithOne(x => x.BusinessEntity)
-            .HasForeignKey(x => x.BusinessEntityId)
-            .OnDelete(DeleteBehavior.Cascade);
-
-        builder.HasMany(x => x.Attributes)
-            .WithOne(x => x.BusinessEntity)
-            .HasForeignKey(x => x.BusinessEntityId)
-            .OnDelete(DeleteBehavior.Cascade);
-
-        builder.HasMany(x => x.Metrics)
-            .WithOne(x => x.BusinessEntity)
-            .HasForeignKey(x => x.BusinessEntityId)
-            .OnDelete(DeleteBehavior.Cascade);
-
-        builder.HasMany(x => x.SourceRelationships)
-            .WithOne(x => x.SourceEntity)
-            .HasForeignKey(x => x.SourceEntityId)
+        builder.HasOne<Tenant>()
+            .WithMany()
+            .HasForeignKey(x => x.TenantId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        builder.HasMany(x => x.TargetRelationships)
-            .WithOne(x => x.TargetEntity)
-            .HasForeignKey(x => x.TargetEntityId)
-            .OnDelete(DeleteBehavior.Restrict);
+        builder.HasMany(x => x.Keys).WithOne(x => x.BusinessEntity).HasForeignKey(x => x.BusinessEntityId).OnDelete(DeleteBehavior.Cascade);
+        builder.HasMany(x => x.Attributes).WithOne(x => x.BusinessEntity).HasForeignKey(x => x.BusinessEntityId).OnDelete(DeleteBehavior.Cascade);
+        builder.HasMany(x => x.Metrics).WithOne(x => x.BusinessEntity).HasForeignKey(x => x.BusinessEntityId).OnDelete(DeleteBehavior.Cascade);
+        builder.HasMany(x => x.SourceRelationships).WithOne(x => x.SourceEntity).HasForeignKey(x => x.SourceEntityId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasMany(x => x.TargetRelationships).WithOne(x => x.TargetEntity).HasForeignKey(x => x.TargetEntityId).OnDelete(DeleteBehavior.Restrict);
     }
 }
 
@@ -106,28 +94,16 @@ public sealed class PhysicalBindingConfiguration : IEntityTypeConfiguration<Phys
         builder.HasIndex(x => new { x.BusinessEntityMetricId, x.IsActive });
         builder.HasIndex(x => new { x.BusinessEntityRelationshipId, x.PhysicalRole, x.IsActive });
 
-        builder.HasOne(x => x.BusinessEntityKey)
-            .WithMany(x => x.PhysicalBindings)
-            .HasForeignKey(x => x.BusinessEntityKeyId)
-            .OnDelete(DeleteBehavior.Cascade);
+        builder.HasOne(x => x.BusinessEntityKey).WithMany(x => x.PhysicalBindings).HasForeignKey(x => x.BusinessEntityKeyId).OnDelete(DeleteBehavior.Cascade);
+        builder.HasOne(x => x.BusinessEntityAttribute).WithMany(x => x.PhysicalBindings).HasForeignKey(x => x.BusinessEntityAttributeId).OnDelete(DeleteBehavior.Cascade);
+        builder.HasOne(x => x.BusinessEntityMetric).WithMany(x => x.PhysicalBindings).HasForeignKey(x => x.BusinessEntityMetricId).OnDelete(DeleteBehavior.Cascade);
+        builder.HasOne(x => x.BusinessEntityRelationship).WithMany(x => x.PhysicalBindings).HasForeignKey(x => x.BusinessEntityRelationshipId).OnDelete(DeleteBehavior.Cascade);
 
-        builder.HasOne(x => x.BusinessEntityAttribute)
-            .WithMany(x => x.PhysicalBindings)
-            .HasForeignKey(x => x.BusinessEntityAttributeId)
-            .OnDelete(DeleteBehavior.Cascade);
+        // 这些 FK 只引用 SuperBuilder 自己的 Metadata DB 记录，不跨库指向动态业务数据库。
+        builder.HasOne<DataSource>().WithMany().HasForeignKey(x => x.DataSourceId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<MetadataTable>().WithMany().HasForeignKey(x => x.MetadataTableId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<MetadataColumn>().WithMany().HasForeignKey(x => x.MetadataColumnId).OnDelete(DeleteBehavior.Restrict);
 
-        builder.HasOne(x => x.BusinessEntityMetric)
-            .WithMany(x => x.PhysicalBindings)
-            .HasForeignKey(x => x.BusinessEntityMetricId)
-            .OnDelete(DeleteBehavior.Cascade);
-
-        builder.HasOne(x => x.BusinessEntityRelationship)
-            .WithMany(x => x.PhysicalBindings)
-            .HasForeignKey(x => x.BusinessEntityRelationshipId)
-            .OnDelete(DeleteBehavior.Cascade);
-
-        // 以下三个 FK 只指向 SuperBuilder 自己的 Metadata DB 记录。
-        // 不跨库建立 EF Core FK，不对动态业务数据库产生 Schema 依赖。
         builder.Property(x => x.PhysicalRole).HasMaxLength(50);
         builder.Property(x => x.BindingType).HasMaxLength(50);
     }
