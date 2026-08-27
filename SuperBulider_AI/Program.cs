@@ -37,10 +37,8 @@ builder.Services.AddScoped<IQueryPlanContextBuilder, QueryPlanContextBuilder>();
 // Phase 3.1 Entity semantic services: Metadata DB only; never connect to dynamic business DB.
 builder.Services.AddScoped<IBusinessEntityService, BusinessEntityService>();
 builder.Services.AddScoped<IPhysicalBindingResolver, PhysicalBindingResolver>();
+builder.Services.AddScoped<IEntityQueryPlanMapper, EntityQueryPlanMapper>();
 
-// CI Runtime Smoke 必须验证 Metadata → Vector → Qdrant 的完整链路，
-// 但不能依赖外部 Qwen API、网络或仓库中的真实凭据。
-// 正式/本地运行仍使用 QwenEmbeddingService。
 if (string.Equals(
         Environment.GetEnvironmentVariable("CI"),
         "true",
@@ -121,7 +119,6 @@ builder.Services.AddScoped<BIConversationService>();
 builder.Services.AddScoped<IBIConversationService>(sp => sp.GetRequiredService<BIConversationService>());
 
 // ── BIConversationService 依赖链补充注册 ──────────────────
-// 接口工厂：复用已注册的具体类，确保构造函数注入可解析
 builder.Services.AddScoped<IQueryPlanExplainabilityService>(sp => sp.GetRequiredService<QueryPlanExplainabilityService>());
 builder.Services.AddScoped<IMetadataPromptBuilder>(sp => sp.GetRequiredService<MetadataPromptBuilder>());
 builder.Services.AddScoped<ResultUnderstandingService>();
@@ -129,7 +126,6 @@ builder.Services.AddScoped<IResultUnderstandingService>(sp => sp.GetRequiredServ
 builder.Services.AddScoped<QueryPlanMetadataValidator>();
 builder.Services.AddScoped<MetadataSearchService>();
 builder.Services.AddScoped<IMetadataSearchService>(sp => sp.GetRequiredService<MetadataSearchService>());
-
 builder.Services.AddScoped<GoldenBaselineComparisonService>();
 
 var app = builder.Build();
