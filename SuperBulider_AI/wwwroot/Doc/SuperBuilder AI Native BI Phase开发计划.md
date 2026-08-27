@@ -22,8 +22,8 @@ Phase 3.1 Business Entity Model
   ├── 3.1.3 Entity Key Contract        ✅ PASS
   ├── 3.1.4 Entity Attribute Contract  ✅ PASS
   ├── 3.1.5 Entity Metric Contract     ✅ PASS
-  ├── 3.1.6 Entity Relationship        ⏳ NEXT
-  ├── 3.1.7 Physical Binding           ⏳
+  ├── 3.1.6 Entity Relationship        ✅ PASS
+  ├── 3.1.7 Physical Binding           ⏳ NEXT
   ├── 3.1.8 QueryPlan Mapping          ⏳
   ├── 3.1.9 Golden Contract             ⏳
   ├── 3.1.10 Runtime Verification      ⏳
@@ -70,8 +70,6 @@ BusinessEntity
 
 状态：**✅ PASS**
 
-确认：
-
 | 能力 | 当前状态 | Phase 3.1 动作 |
 |---|---|---|
 | MetadataTable | 已存在 | 🟢 复用 |
@@ -84,7 +82,7 @@ BusinessEntity
 | EntityAttribute | 无独立业务属性 Contract | 🔴 新增 |
 | EntityMetric | QueryMetric / Resolution 提供基础 | 🟡 新增 Entity 语义层 |
 | EntityRelationship | QueryJoin 不等价 | 🔴 新增 |
-| PhysicalBinding | 无独立 Contract | 🟡 新 Contract，复用 Metadata Identity |
+| PhysicalBinding | 无独立 Contract | 🟡 新 Contract |
 | Entity Resolution | 无独立 Entity 层 | 🔴 新增 |
 
 冻结边界：`Business Entity ≠ MetadataTable`；`Business Relationship ≠ QueryJoin`；Business Entity 不直接生成 SQL；Phase 3.1 不修改 Phase 2.7 Frozen Contract。
@@ -158,9 +156,7 @@ Attribute 复用 MetadataColumn / MetadataSemantic 的物理事实和字段语�
 
 # 8. 3.1.5 Entity Metric Contract
 
-状态：**✅ PASS — Contract 已确认**
-
-## 8.1 Contract 定义
+状态：**✅ PASS**
 
 ```text
 BusinessEntityMetric
@@ -175,159 +171,178 @@ BusinessEntityMetric
 └── PhysicalBindings
 ```
 
-## 8.2 字段职责
+EntityMetric 是稳定的业务指标定义；QueryMetric 是一次查询中的运行时指标实例。EntityMetric 提供默认聚合和业务语义，通过 Metric Resolution / Mapping 进入 Frozen QueryMetric / QueryPlan，不直接生成 SQL。
 
-| 字段 | 职责 | 规则 |
-|---|---|---|
-| Id | Metric 技术身份 | EntityMetric 自身唯一标识 |
-| BusinessEntityId | 所属实体 | 必须指向 BusinessEntity |
-| Name | 稳定指标语义名称 | 用于 Metric Resolution |
-| DisplayName | 业务展示名称 | 面向业务用户 |
-| Description | 指标业务定义 | 用于语义理解 / Explainability |
-| SemanticType | 指标业务类型 | 表达 Amount / Quantity / Count 等语义，不是物理 DataType |
-| Aggregation | 默认聚合语义 | SUM / COUNT / AVG / MAX / MIN / DISTINCTCOUNT / NONE 等；必须经过 Contract 校验 |
-| IsCalculated | 是否为业务计算指标 | true 时允许后续由 Metric Resolution 定义计算规则；本阶段不直接生成 SQL |
-| PhysicalBindings | 指标物理来源 | 可映射一个或多个物理字段 / MetadataColumn |
-
-## 8.3 与现有 QueryMetric 的边界
-
-当前 `QueryMetric` 已明确分离 `SemanticText` 与 `Field`，并通过 `Aggregation` 表达查询时聚合。现有 `GetAggregation()` 支持 SUM / COUNT / AVG / MAX / MIN / DISTINCTCOUNT 等聚合。fileciteturn75file0
-
-因此：
-
-```text
-BusinessEntityMetric
-        ↓
-Metric Resolution
-        ↓
-QueryMetric
-        ↓
-Frozen QueryPlan
-```
-
-**禁止：**
-
-```text
-BusinessEntityMetric = QueryMetric
-```
-
-EntityMetric 是稳定的业务指标定义；QueryMetric 是一次查询中的运行时指标实例。
-
-## 8.4 Aggregation 规则
-
-业务指标的默认 Aggregation 属于 Entity Contract，但运行时必须经过 Metric Resolution / Semantic Validation 后才能落入 QueryMetric。
-
-例如：
-
-```text
-BusinessEntityMetric
-  入库单数量
-       ↓
-Aggregation = COUNT
-       ↓
-QueryMetric
-       ↓
-QueryPlan
-```
-
-不得因为 LLM 对自然语言产生 `SUM(id)` 等不稳定猜测而覆盖已确认的 Entity Metric Contract。
-
-当前 master 的 Semantic Resolution 已存在根据已解析 `MetricType=EntityCount` 强制运行时使用 `COUNT` 的机制，说明 EntityMetric 应位于运行时 QueryMetric 之前，而不是取代该运行时 Contract。fileciteturn77file0
-
-## 8.5 Calculated Metric 边界
-
-`IsCalculated=true` 只表达“业务指标需要计算”，不在 3.1.5 直接引入公式 DSL、SQL 表达式或计算引擎。
-
-因此：
-
-```text
-EntityMetric
-  ↓
-Metric Resolution
-  ↓
-[未来计算定义]
-  ↓
-QueryMetric
-```
-
-本阶段禁止：
-
-- 在 EntityMetric 中直接保存任意 SQL
-- 让 EntityMetric 绕过 QueryPlan
-- 引入复杂指标编排语言
-
-## 8.6 Physical Binding 边界
-
-EntityMetric 不把单一物理字段当作唯一身份。一个业务指标可以在不同数据源 / 物理模型中拥有不同 Binding。
-
-```text
-BusinessEntityMetric
-        ↓
-PhysicalBindings
-        ├── ERP.amount_column
-        └── WMS.quantity_column
-```
-
-具体 Binding Contract 在 3.1.7 再冻结。
-
-## 8.7 与 EntityAttribute 的边界
-
-```text
-EntityAttribute
-    ↓
-描述业务对象“有什么属性”
-
-EntityMetric
-    ↓
-描述业务对象“如何度量”
-```
-
-例如：
-
-```text
-Product
-├── Attribute: ProductName
-├── Attribute: Category
-└── Metric: InventoryQuantity
-```
-
-Attribute 不因为是数值字段就自动成为 Metric；Metric 必须具有明确的业务度量语义。
-
-## 8.8 与 Phase 2.7 Frozen Contract 的关系
-
-3.1.5 不修改：
-
-- QueryMetric
-- QueryPlan
-- Metric Resolution
-- Evaluator
-- Golden Expected Outcome
-- Decision Gate
-- SQL Builder
-
-EntityMetric 通过 Metric Resolution / Mapping 进入现有 QueryMetric。
-
-## 8.9 3.1.5 最终结论
-
-**PASS。EntityMetric Contract 已冻结为“稳定业务指标定义层”，QueryMetric 继续作为 Frozen QueryPlan 的运行时指标实例。EntityMetric 提供默认聚合和业务语义，但不直接生成 SQL、不替换 QueryMetric、不侵入 Phase 2.7。**
-
-本 PASS 仅表示 Contract Design 完成，不代表 EntityMetric 已完成代码、数据库、Golden 或 Runtime 实现。
+`IsCalculated=true` 仅表达计算指标语义，本阶段不引入公式 DSL、SQL Expression 或计算引擎。
 
 ---
 
 # 9. 3.1.6 Entity Relationship Contract
 
-状态：**⏳ NEXT**
+状态：**✅ PASS — Contract 已确认**
 
-目标：定义 BusinessEntity 之间的稳定业务关系；明确与 QueryJoin 的边界。
+## 9.1 Contract 定义
+
+```text
+BusinessEntityRelationship
+├── Id
+├── SourceEntityId
+├── TargetEntityId
+├── Name
+├── DisplayName
+├── Description
+├── RelationshipType
+├── Cardinality
+├── IsRequired
+└── PhysicalBindings
+```
+
+## 9.2 字段职责
+
+| 字段 | 职责 | 规则 |
+|---|---|---|
+| Id | Relationship 技术身份 | Relationship 自身唯一标识 |
+| SourceEntityId | 源业务实体 | 必须指向 BusinessEntity |
+| TargetEntityId | 目标业务实体 | 必须指向 BusinessEntity |
+| Name | 稳定关系语义名称 | 用于 Relationship Resolution |
+| DisplayName | 业务展示名称 | 面向业务用户 |
+| Description | 关系业务定义 | 用于语义理解 / Explainability |
+| RelationshipType | 业务关系类型 | 如 BelongsTo / Has / References / Measures 等；由 Contract 校验 |
+| Cardinality | 业务基数 | 1:1 / 1:N / N:1 / N:N |
+| IsRequired | 业务关系是否必需 | 仅表达业务语义约束，不等同数据库 FK Nullable |
+| PhysicalBindings | 关系的物理实现集合 | 后续绑定到 MetadataColumn 对及 JOIN 条件 |
+
+## 9.3 与 QueryJoin 的核心边界
+
+现有 `QueryJoin` 明确是“本次 QueryPlan 中两个动态数据表之间的 JOIN”，拥有 Left/Right TableId、ColumnId、物理名称、语义文本以及 JoinType；它不是数据库真实外键关系。fileciteturn82file0
+
+因此正式冻结：
+
+```text
+BusinessEntityRelationship
+        ≠
+QueryJoin
+```
+
+两者职责：
+
+```text
+BusinessEntityRelationship
+    ↓
+稳定的业务关系知识
+    ↓
+Relationship Resolution
+
+QueryJoin
+    ↓
+一次查询的运行时物理 JOIN
+    ↓
+SQL Builder
+```
+
+Relationship 是长期业务语义；QueryJoin 是一次 QueryPlan 的执行决策。
+
+## 9.4 与 QueryPlan Join Evaluation 的关系
+
+当前 `QueryPlanJoinScoringService` 只评价 Runtime Join 的物理 Contract，并要求 Runtime 提供有效的 TableId / ColumnId / JoinType；Evaluator 不重新从 Metadata 做第二次 Semantic Resolution。fileciteturn84file0
+
+因此 Phase 3.1 Relationship 层必须在 QueryPlan 构建 / Resolution 阶段完成语义映射，然后生成既有 `QueryJoin`；不能让 Evaluator 反向读取 BusinessEntityRelationship 来修改 Frozen Evaluation Contract。
+
+```text
+BusinessEntityRelationship
+        ↓
+Relationship Resolution
+        ↓
+Physical Binding
+        ↓
+QueryJoin
+        ↓
+Frozen Evaluator
+```
+
+## 9.5 RelationshipType 与 JoinType 边界
+
+```text
+RelationshipType
+    = 业务语义
+
+JoinType
+    = 查询执行语义
+```
+
+例如：
+
+```text
+Supplier
+   ── Supplies ──>
+PurchaseOrder
+
+RelationshipType = Supplies
+
+本次查询可能选择：
+JoinType = INNER
+```
+
+不能把 `Supplies` 直接当作 `INNER / LEFT / RIGHT`。
+
+## 9.6 Cardinality 边界
+
+`Cardinality` 描述业务关系的稳定基数，不等同于一次 SQL JOIN 的执行类型。
+
+例如：
+
+```text
+Supplier 1 ─── N PurchaseOrder
+```
+
+可以在不同查询中采用 INNER 或 LEFT JOIN，具体执行由 QueryPlan 决策，不改变业务关系本身。
+
+## 9.7 Physical Binding 边界
+
+Relationship 不直接保存任意 SQL JOIN 表达式。
+
+```text
+BusinessEntityRelationship
+        ↓
+PhysicalBindings
+        ↓
+Source Entity Key / Target Entity Key
+        ↓
+MetadataColumn
+        ↓
+QueryJoin
+```
+
+具体 PhysicalBinding Contract 在 3.1.7 冻结。
+
+## 9.8 与 Phase 2.7 Frozen Contract 的关系
+
+3.1.6 不修改：
+
+- QueryJoin
+- QueryPlan
+- Join Resolution
+- QueryPlanJoinScoringService
+- Evaluator
+- Golden Expected Outcome
+- Decision Gate
+- SQL Builder
+
+BusinessEntityRelationship 只增加业务语义关系层，通过 Resolution / Mapping 产生已有 QueryJoin。
+
+## 9.9 3.1.6 最终结论
+
+**PASS。BusinessEntityRelationship Contract 已冻结为“稳定业务关系层”；QueryJoin 继续作为 QueryPlan 的运行时物理 JOIN。RelationshipType / Cardinality 属于业务语义，JoinType 属于查询执行语义。两者不得混淆。**
+
+本 PASS 仅表示 Contract Design 完成，不代表 Relationship 已完成代码、数据库、Golden 或 Runtime 实现。
 
 ---
 
 # 10. 3.1.7 Physical Binding Contract
 
-状态：**⏳**
+状态：**⏳ NEXT**
 
-目标：统一 Entity Key / Attribute / Metric / Relationship 到现有 MetadataTable / MetadataColumn 的物理映射。
+目标：统一 EntityKey / Attribute / Metric / Relationship 到现有 MetadataTable / MetadataColumn 的物理映射。
 
 ---
 
@@ -409,10 +424,11 @@ Phase 3.1
         │
         ├── 3.1.1 Source Audit       ✅ PASS
         ├── 3.1.2 BusinessEntity     ✅ PASS
-        ├── 3.1.3 EntityKey         ✅ PASS
-        ├── 3.1.4 EntityAttribute   ✅ PASS
-        ├── 3.1.5 EntityMetric      ✅ PASS
-        └── 3.1.6 EntityRelationship ⏳ NEXT
+        ├── 3.1.3 EntityKey          ✅ PASS
+        ├── 3.1.4 EntityAttribute    ✅ PASS
+        ├── 3.1.5 EntityMetric       ✅ PASS
+        ├── 3.1.6 EntityRelationship ✅ PASS
+        └── 3.1.7 PhysicalBinding    ⏳ NEXT
 ```
 
-下一动作：**3.1.6 Entity Relationship Contract**。
+下一动作：**3.1.7 Physical Binding Contract**。
