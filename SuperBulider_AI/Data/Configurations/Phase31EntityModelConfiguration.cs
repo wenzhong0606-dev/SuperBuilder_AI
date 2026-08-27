@@ -20,11 +20,7 @@ public sealed class BusinessEntityConfiguration : IEntityTypeConfiguration<Busin
         builder.Property(x => x.Name).HasMaxLength(200).IsRequired();
         builder.Property(x => x.Status).HasMaxLength(50).IsRequired();
 
-        builder.HasOne<Tenant>()
-            .WithMany()
-            .HasForeignKey(x => x.TenantId)
-            .OnDelete(DeleteBehavior.Restrict);
-
+        builder.HasOne<Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
         builder.HasMany(x => x.Keys).WithOne(x => x.BusinessEntity).HasForeignKey(x => x.BusinessEntityId).OnDelete(DeleteBehavior.Cascade);
         builder.HasMany(x => x.Attributes).WithOne(x => x.BusinessEntity).HasForeignKey(x => x.BusinessEntityId).OnDelete(DeleteBehavior.Cascade);
         builder.HasMany(x => x.Metrics).WithOne(x => x.BusinessEntity).HasForeignKey(x => x.BusinessEntityId).OnDelete(DeleteBehavior.Cascade);
@@ -83,9 +79,7 @@ public sealed class PhysicalBindingConfiguration : IEntityTypeConfiguration<Phys
         builder.ToTable("PhysicalBindings", tb =>
         {
             tb.HasComment("业务语义到物理元数据的映射");
-            tb.HasCheckConstraint(
-                "CK_PhysicalBindings_ExactlyOneOwner",
-                "((CASE WHEN BusinessEntityKeyId IS NOT NULL THEN 1 ELSE 0 END) + (CASE WHEN BusinessEntityAttributeId IS NOT NULL THEN 1 ELSE 0 END) + (CASE WHEN BusinessEntityMetricId IS NOT NULL THEN 1 ELSE 0 END) + (CASE WHEN BusinessEntityRelationshipId IS NOT NULL THEN 1 ELSE 0 END)) = 1");
+            tb.HasCheckConstraint("CK_PhysicalBindings_ExactlyOneOwner", "((CASE WHEN BusinessEntityKeyId IS NOT NULL THEN 1 ELSE 0 END) + (CASE WHEN BusinessEntityAttributeId IS NOT NULL THEN 1 ELSE 0 END) + (CASE WHEN BusinessEntityMetricId IS NOT NULL THEN 1 ELSE 0 END) + (CASE WHEN BusinessEntityRelationshipId IS NOT NULL THEN 1 ELSE 0 END)) = 1");
         });
 
         builder.HasIndex(x => new { x.DataSourceId, x.MetadataTableId, x.MetadataColumnId, x.Priority });
@@ -94,10 +88,12 @@ public sealed class PhysicalBindingConfiguration : IEntityTypeConfiguration<Phys
         builder.HasIndex(x => new { x.BusinessEntityMetricId, x.IsActive });
         builder.HasIndex(x => new { x.BusinessEntityRelationshipId, x.PhysicalRole, x.IsActive });
 
-        builder.HasOne(x => x.BusinessEntityKey).WithMany(x => x.PhysicalBindings).HasForeignKey(x => x.BusinessEntityKeyId).OnDelete(DeleteBehavior.Cascade);
-        builder.HasOne(x => x.BusinessEntityAttribute).WithMany(x => x.PhysicalBindings).HasForeignKey(x => x.BusinessEntityAttributeId).OnDelete(DeleteBehavior.Cascade);
-        builder.HasOne(x => x.BusinessEntityMetric).WithMany(x => x.PhysicalBindings).HasForeignKey(x => x.BusinessEntityMetricId).OnDelete(DeleteBehavior.Cascade);
-        builder.HasOne(x => x.BusinessEntityRelationship).WithMany(x => x.PhysicalBindings).HasForeignKey(x => x.BusinessEntityRelationshipId).OnDelete(DeleteBehavior.Cascade);
+        // Semantic Owner → PhysicalBinding 使用 NoAction，避免 SQL Server 多重级联路径。
+        // Entity 删除前由应用层显式处理其 bindings。
+        builder.HasOne(x => x.BusinessEntityKey).WithMany(x => x.PhysicalBindings).HasForeignKey(x => x.BusinessEntityKeyId).OnDelete(DeleteBehavior.NoAction);
+        builder.HasOne(x => x.BusinessEntityAttribute).WithMany(x => x.PhysicalBindings).HasForeignKey(x => x.BusinessEntityAttributeId).OnDelete(DeleteBehavior.NoAction);
+        builder.HasOne(x => x.BusinessEntityMetric).WithMany(x => x.PhysicalBindings).HasForeignKey(x => x.BusinessEntityMetricId).OnDelete(DeleteBehavior.NoAction);
+        builder.HasOne(x => x.BusinessEntityRelationship).WithMany(x => x.PhysicalBindings).HasForeignKey(x => x.BusinessEntityRelationshipId).OnDelete(DeleteBehavior.NoAction);
 
         // 这些 FK 只引用 SuperBuilder 自己的 Metadata DB 记录，不跨库指向动态业务数据库。
         builder.HasOne<DataSource>().WithMany().HasForeignKey(x => x.DataSourceId).OnDelete(DeleteBehavior.Restrict);
