@@ -13,6 +13,7 @@ public sealed class EntityQueryPlanMapper : IEntityQueryPlanMapper
     public Task<QueryPlanSemanticResolution> MapAsync(
         BusinessEntity entity,
         QueryIntent intent,
+        long dataSourceId,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(entity);
@@ -24,15 +25,18 @@ public sealed class EntityQueryPlanMapper : IEntityQueryPlanMapper
             .Concat(entity.Metrics.SelectMany(x => x.PhysicalBindings))
             .Concat(entity.SourceRelationships.SelectMany(x => x.PhysicalBindings))
             .Concat(entity.TargetRelationships.SelectMany(x => x.PhysicalBindings))
-            .Where(x => x.IsActive && x.MetadataTable != null && x.MetadataColumn != null)
+            .Where(x => x.IsActive && x.DataSourceId == dataSourceId && x.MetadataTable != null && x.MetadataColumn != null)
             .GroupBy(x => x.Id)
             .Select(x => x.First())
             .ToList();
 
+        if (bindings.Count == 0)
+            throw new InvalidOperationException($"No active PhysicalBinding found for BusinessEntity '{entity.Id}' in DataSource '{dataSourceId}'.");
+
         var metrics = intent.Metrics.Select(metric =>
         {
             var definition = FindMetric(entity, metric.SemanticText, metric.Name);
-            var binding = SelectBinding(definition.PhysicalBindings, metric.SemanticText, metric.Name);
+            var binding = SelectBinding(definition.PhysicalBindings, dataSourceId, metric.SemanticText, metric.Name);
             return new QueryPlanMetricResolution
             {
                 TableId = binding.MetadataTableId,
@@ -42,15 +46,14 @@ public sealed class EntityQueryPlanMapper : IEntityQueryPlanMapper
                 Table = binding.MetadataTable!.TableName ?? string.Empty,
                 Column = binding.MetadataColumn!.ColumnName ?? string.Empty,
                 BusinessMeaning = definition.Description ?? definition.DisplayName,
-                MetricType = string.Equals(definition.SemanticType, "EntityCount", StringComparison.OrdinalIgnoreCase)
-                    ? "EntityCount" : "ColumnMetric"
+                MetricType = string.Equals(definition.SemanticType, "EntityCount", StringComparison.OrdinalIgnoreCase) ? "EntityCount" : "ColumnMetric"
             };
         }).ToList();
 
         var dimensions = intent.Dimensions.Select(dimension =>
         {
             var definition = FindAttribute(entity, dimension);
-            var binding = SelectBinding(definition.PhysicalBindings, dimension);
+            var binding = SelectBinding(definition.PhysicalBindings, dataSourceId, dimension);
             return new QueryPlanDimensionResolution
             {
                 TableId = binding.MetadataTableId,
@@ -70,7 +73,7 @@ public sealed class EntityQueryPlanMapper : IEntityQueryPlanMapper
         var filters = intent.Filters.Select(filter =>
         {
             var definition = FindAttribute(entity, filter.SemanticText);
-            var binding = SelectBinding(definition.PhysicalBindings, filter.SemanticText);
+            var binding = SelectBinding(definition.PhysicalBindings, dataSourceId, filter.SemanticText);
             return new QueryPlanFilterResolution
             {
                 TableId = binding.MetadataTableId,
@@ -96,7 +99,7 @@ public sealed class EntityQueryPlanMapper : IEntityQueryPlanMapper
         if (!string.IsNullOrWhiteSpace(intent.OrderBy))
         {
             var definition = FindAttribute(entity, intent.OrderBy);
-            var binding = SelectBinding(definition.PhysicalBindings, intent.OrderBy);
+            var binding = SelectBinding(definition.PhysicalBindings, dataSourceId, intent.OrderBy);
             orders.Add(new QueryPlanOrderResolution
             {
                 TableId = binding.MetadataTableId,
@@ -139,12 +142,13 @@ public sealed class EntityQueryPlanMapper : IEntityQueryPlanMapper
         return matches.Count == 1 ? matches[0] : null;
     }
 
-    private static PhysicalBinding SelectBinding(IEnumerable<PhysicalBinding> bindings, string? first, string? second = null)
+    private static PhysicalBinding SelectBinding(IEnumerable<PhysicalBinding> bindings, long dataSourceId, string? first, string? second = null)
     {
-        var active = bindings.Where(x => x.IsActive && x.MetadataTable != null && x.MetadataColumn != null).OrderBy(x => x.Priority).ThenBy(x => x.Id).ToList();
+        var active = bindings.Where(x => x.IsActive && x.DataSourceId == dataSourceId && x.MetadataTable != null && x.MetadataColumn != null)
+            .OrderBy(x => x.Priority).ThenBy(x => x.Id).ToList();
         if (active.Count == 1) return active[0];
-        if (active.Count == 0) throw new InvalidOperationException($"No active PhysicalBinding found for '{first ?? second}'.");
-        throw new InvalidOperationException($"Multiple active PhysicalBindings found for '{first ?? second}'; explicit priority/selection is required.");
+        if (active.Count == 0) throw new InvalidOperationException($"No active PhysicalBinding found for '{first ?? second}' in DataSource '{dataSourceId}'.");
+        throw new InvalidOperationException($"Multiple active PhysicalBindings found for '{first ?? second}' in DataSource '{dataSourceId}'; explicit priority/selection is required.");
     }
 
     private static string Normalize(string value) => value.Trim().ToUpperInvariant();
