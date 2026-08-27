@@ -26,8 +26,8 @@ Phase 3.1 Business Entity Model
   ├── 3.1.5 Entity Metric Contract     ✅ PASS
   ├── 3.1.6 Entity Relationship        ✅ PASS
   ├── 3.1.7 Physical Binding           ✅ PASS
-  ├── 3.1.8 QueryPlan Mapping          ⏳ NEXT
-  ├── 3.1.9 Golden Contract             ⏳
+  ├── 3.1.8 QueryPlan Mapping          ✅ PASS
+  ├── 3.1.9 Golden Contract             ⏳ NEXT
   ├── 3.1.10 Runtime Verification      ⏳
   └── 3.1.11 Source Implementation     ⏳
 ```
@@ -342,27 +342,290 @@ PhysicalBinding.Id
 
 # 3.1.8 QueryPlan Mapping Contract
 
-**⏳ NEXT**
+**✅ PASS — Contract 已确认**
+
+## 3.1.8.1 Source Audit 结果
+
+当前 master 的 `QueryPlan` 已冻结为运行时执行计划，核心容器包括 `Tables / Fields / Metrics / Dimensions / Filters / Orders / Joins`，并包含 `DataSourceId`、聚合及 Ranking 状态。fileciteturn100file0
+
+当前 `QueryMetric` 明确将 `SemanticText` 与物理 `Field` 分离，并通过 `Aggregation` 进入运行时聚合。fileciteturn101file0
+
+当前 `QueryDimension` 明确要求 `MetadataColumnId`、`SemanticText`、`ColumnName` 以及 Phase 2.7 已冻结的 `ResolutionType / ResolutionState / ExecutionCapability`；DirectKey / MasterJoin 还存在对应 Key / Label Runtime Binding。fileciteturn102file0
+
+当前 `QueryFilter` 是已确认业务语义到物理字段的运行时过滤 Contract，由 `SemanticText / Field / Operator / Value` 构成。fileciteturn103file0
+
+当前 `QueryPlanBuilder.SemanticResolution` 已存在明确的“只消费已确认 Semantic Resolution、不进行二次语义搜索”的 Runtime Mapping 路径，并分别执行 Metric / Filter / Dimension / Table / Order Resolution；同时对 Dimension 的 Executable、ResolutionType、Key Binding 等 Contract 做校验。fileciteturn104file0
+
+因此 3.1.8 的结论不是重新设计 QueryPlan，而是定义：
 
 ```text
-Business Entity / Key / Attribute / Metric / Relationship
-                         ↓
-                 Entity Resolution
-                         ↓
-                  PhysicalBinding
-                         ↓
-                   Mapping Adapter
-                         ↓
-                  Frozen QueryPlan
+Business Entity Semantic
+        ↓
+Entity Resolution
+        ↓
+PhysicalBinding
+        ↓
+Mapping Adapter
+        ↓
+Existing Semantic Resolution
+        ↓
+Frozen QueryPlan Runtime
 ```
 
-目标：定义 Entity Semantic Layer 到现有 QueryDimension / QueryMetric / QueryFilter / QueryJoin 的确定性映射；禁止修改 Phase 2.7 Frozen Contract。
+## 3.1.8.2 Mapping 总 Contract
+
+```text
+BusinessEntity
+    ↓
+Entity Resolution
+    ↓
+┌────────────────────────────────────────────┐
+│ Entity → QueryPlan Runtime Mapping         │
+├────────────────────────────────────────────┤
+│ EntityAttribute → QueryDimension / Filter  │
+│ EntityMetric   → QueryMetric               │
+│ EntityRelationship → QueryJoin             │
+│ EntityKey      → Table / Dimension Binding │
+└────────────────────────────────────────────┘
+    ↓
+QueryPlan
+```
+
+原则：Business Entity 是语义源；QueryPlan 是执行目标；Mapping Adapter 是唯一桥接层。
+
+## 3.1.8.3 EntityAttribute → QueryDimension
+
+默认映射：
+
+```text
+BusinessEntityAttribute
+        ↓
+Selected PhysicalBinding
+        ↓
+MetadataColumn
+        ↓
+QueryDimension
+```
+
+字段映射：
+
+| Entity 层 | QueryPlan Runtime |
+|---|---|
+| Name / DisplayName / Description | SemanticText |
+| SemanticType | SemanticType |
+| PhysicalBinding.MetadataColumnId | MetadataColumnId |
+| Physical Metadata ColumnName | ColumnName |
+| Entity Resolution 结果 | ResolutionType / ResolutionState / ExecutionCapability |
+
+DirectKey / MasterJoin 的具体 Runtime Contract 必须继续遵守 Phase 2.7 `QueryDimension` 既有字段，不在 Mapping 层重新发明维度执行模型。
+
+## 3.1.8.4 EntityAttribute → QueryFilter
+
+当用户语义要求对 Attribute 进行过滤：
+
+```text
+EntityAttribute
+      ↓
+PhysicalBinding
+      ↓
+MetadataColumn
+      ↓
+QueryFilter
+```
+
+映射：
+
+```text
+SemanticText = Attribute Business Meaning
+Field        = Physical Column
+Operator     = Resolved Runtime Operator
+Value        = Resolved Runtime Value
+```
+
+Filter 的 Operator / Value 不由 EntityAttribute Contract 自行生成；它们属于具体查询意图和既有 Resolution Runtime Contract。
+
+## 3.1.8.5 EntityMetric → QueryMetric
+
+```text
+BusinessEntityMetric
+        ↓
+Selected PhysicalBinding
+        ↓
+MetadataColumn
+        ↓
+QueryMetric
+```
+
+映射：
+
+```text
+Name         = EntityMetric.Name
+SemanticText = EntityMetric.Description / Semantic Meaning
+Field        = PhysicalBinding → MetadataColumn.ColumnName
+Aggregation  = EntityMetric.Aggregation
+SemanticType = EntityMetric.SemanticType
+```
+
+运行时必须经过 Metric Resolution / Semantic Validation；不能把 EntityMetric 的字段直接写入 QueryPlan 而跳过 Phase 2.7 Contract。
+
+特别是 `EntityCount` 等已存在的确定性 MetricType Contract，必须继续由 Resolution 强制聚合语义，不能被 LLM Runtime Intent 随意覆盖。fileciteturn104file0
+
+## 3.1.8.6 EntityRelationship → QueryJoin
+
+```text
+BusinessEntityRelationship
+        ↓
+Source PhysicalBinding
+Target PhysicalBinding
+        ↓
+Resolved physical columns
+        ↓
+QueryJoin
+```
+
+业务层：
+
+```text
+RelationshipType
+Cardinality
+IsRequired
+```
+
+运行时层：
+
+```text
+LeftTableId
+LeftColumnId
+RightTableId
+RightColumnId
+JoinType
+```
+
+`JoinType` 由 QueryPlan Runtime 决策产生，不由 RelationshipType 直接转换。Business Relationship 只提供关系语义和候选物理绑定。
+
+## 3.1.8.7 EntityKey → QueryPlan
+
+EntityKey 不直接成为 SQL 字符串，也不强制等价于 QueryDimension。
+
+它主要承担：
+
+```text
+EntityKey
+   ↓
+PhysicalBinding
+   ↓
+MetadataColumn
+   ↓
+Table / Dimension / Relationship Binding
+```
+
+在 DirectKey Dimension 场景中，EntityKey 可以提供 `DimensionKeyColumnId / DimensionKeyColumnName` 的来源；在 Relationship 场景中，EntityKey 可以提供 Relationship 两端的物理连接候选。
+
+具体落入哪个 QueryPlan Runtime 字段，由对应 Resolution Contract 决定。
+
+## 3.1.8.8 BusinessEntity → QueryTable
+
+BusinessEntity 不等于 QueryTable。
+
+```text
+BusinessEntity
+        ↓
+PhysicalBinding
+        ↓
+MetadataTable
+        ↓
+QueryTable
+```
+
+QueryTable 是本次 QueryPlan 的执行表实例；BusinessEntity 是稳定业务对象。
+
+同一个 BusinessEntity 可以根据 DataSource / PhysicalBinding 在不同查询中映射到不同物理表。
+
+## 3.1.8.9 Mapping Determinism
+
+Mapping 必须满足：
+
+```text
+同一
+Business Entity
++ 同一 Resolution
++ 同一 Physical Binding
+        ↓
+必须产生
+同一 QueryPlan Runtime Binding
+```
+
+禁止 Mapping Adapter 再次调用自由语义搜索。
+
+如果 Resolution 返回：
+
+```text
+Ambiguous
+Unresolved
+Invalid Binding
+NotExecutable
+```
+
+则 Mapping 必须失败或显式返回对应状态，不得静默降级到任意物理字段。
+
+## 3.1.8.10 DataSource Boundary
+
+`QueryPlan.DataSourceId` 是 Runtime Contract 的一部分。当前 Resolved Build 路径会在物理表已确认后补齐 DataSourceId，保证 Runtime DataSource 与 Resolution 保持一致。fileciteturn104file0
+
+因此 Mapping 必须保证：
+
+```text
+Selected PhysicalBinding.DataSourceId
+        ↓
+QueryTable.DataSourceId
+        ↓
+QueryPlan.DataSourceId
+```
+
+出现跨 DataSource 冲突时，必须由 Resolution / Contract 显式拒绝，而不是在 Mapping 阶段偷偷切换数据源。
+
+## 3.1.8.11 Frozen QueryPlan 边界
+
+3.1.8 明确禁止：
+
+- 修改 QueryPlan 字段定义
+- 修改 QueryMetric / QueryDimension / QueryFilter / QueryJoin Contract
+- 让 Entity Model 直接生成 SQL
+- 让 Entity Model 绕过 Semantic Resolution
+- 让 Evaluator 重新执行 Entity Resolution
+- 用 Entity Contract 替换 Phase 2.7 Golden Contract
+
+正确路径：
+
+```text
+Entity Model
+    ↓
+Entity Resolution
+    ↓
+Physical Binding
+    ↓
+Mapping Adapter
+    ↓
+Existing Semantic Resolution Contract
+    ↓
+Frozen QueryPlan
+    ↓
+Frozen Evaluator / SQL Builder
+```
+
+## 3.1.8.12 3.1.8 最终结论
+
+**PASS。QueryPlan Mapping Contract 已冻结。**
+
+它正式规定 BusinessEntity / EntityKey / EntityAttribute / EntityMetric / EntityRelationship 只能通过 Entity Resolution + PhysicalBinding + Mapping Adapter 进入现有 QueryPlan Runtime；不改变 Phase 2.7 Frozen QueryPlan，不进行二次自由语义搜索，不绕过 Evaluator / SQL Builder。
+
+本 PASS 仅代表 Mapping Contract Design 完成，不代表 Golden、Runtime、代码实现已经完成。
 
 ---
 
 # 3.1.9 Golden Contract
 
-**⏳**
+**⏳ NEXT**
 
 覆盖 Entity Resolution、Entity → Metadata Binding、Entity → QueryPlan；Phase 2.7 Golden 仅 Regression，不修改既有 Expected Outcome。
 
@@ -424,7 +687,7 @@ Phase 3.1 Business Entity Model
         ├── 3.1.5 EntityMetric        ✅ PASS
         ├── 3.1.6 EntityRelationship  ✅ PASS
         ├── 3.1.7 PhysicalBinding     ✅ PASS
-        └── 3.1.8 QueryPlanMapping    ⏳ NEXT
+        └── 3.1.8 QueryPlanMapping    ✅ PASS
 ```
 
-**下一动作：3.1.8 QueryPlan Mapping Contract。**
+**下一动作：3.1.9 Golden Contract。**
