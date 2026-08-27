@@ -28,7 +28,7 @@ Phase 3.1 Business Entity Model
   ├── 3.1.1 Current Source Audit       ✅ PASS
   ├── 3.1.2 Business Entity Contract   ✅ PASS
   ├── 3.1.3 Entity Key Contract        ✅ PASS
-  ├── 3.1.4 Entity Attribute Contract  ⏳
+  ├── 3.1.4 Entity Attribute Contract  ✅ PASS
   ├── 3.1.5 Entity Metric Contract     ⏳
   ├── 3.1.6 Entity Relationship        ⏳
   ├── 3.1.7 Physical Binding           ⏳
@@ -169,24 +169,9 @@ BusinessEntityKey
 └── PhysicalBindings
 ```
 
-其中 `Id` 继承现有 `BaseEntity.Id` 的技术身份模型；现有 `MetadataColumn.BusinessKey` 与 `MetadataColumn.IsPrimaryKey` 作为 Physical Metadata 的事实来源，不被重新定义。fileciteturn61file0 fileciteturn63file0
+现有 `MetadataColumn.BusinessKey` 与 `MetadataColumn.IsPrimaryKey` 作为 Physical Metadata 事实来源，不被重新定义；EntityKey 是独立的业务身份 Contract。
 
-## 6.2 字段职责
-
-| 字段 | 职责 | 规则 |
-|---|---|---|
-| Id | Key Contract 技术身份 | EntityKey 自身唯一标识 |
-| BusinessEntityId | 所属 BusinessEntity | 必须指向稳定 Entity 身份 |
-| Name | Key 语义名称 | 如 CustomerId / SupplierCode |
-| DisplayName | 业务展示名称 | 面向业务语义层 |
-| Description | Key 业务说明 | 用于 Resolution / Explainability |
-| IsPrimary | 是否为实体主业务 Key | 同一 Entity 原则上只有一个 Primary Key Contract；复合 Key 另行表达 |
-| KeyType | Key 类型 | 区分 Identifier / Code / NaturalKey 等语义，不等同数据库类型 |
-| PhysicalBindings | 物理映射集合 | 一个业务 Key 可映射多个 MetadataColumn |
-
-## 6.3 核心设计结论
-
-### A. Business Key 与 Physical Key 分离
+## 6.2 核心边界
 
 ```text
 BusinessEntityKey
@@ -198,90 +183,150 @@ PhysicalBinding
 MetadataColumn
 ```
 
-现有 `MetadataColumn.BusinessKey` 是字段级 Physical Identity，用于跨数据源唯一定位；它**不是** Phase 3 的 BusinessEntityKey。其注释明确指出该字段不是数据库主键，`Id` 仍是 EF Core 主键。fileciteturn61file0
+`MetadataColumn.BusinessKey` 是字段级 Physical Identity；`MetadataColumn.IsPrimaryKey` 是数据库物理事实；二者都不等同 `BusinessEntityKey`。
 
-### B. 不复制 Physical Identity
+## 6.3 关键规则
 
-Phase 3 不重新设计：
+- 一个 EntityKey 可以映射多个物理字段。
+- `IsPrimary` 表示业务语义主 Key，不覆盖物理 PK。
+- 暂不引入复杂 CompositeKey / Ontology。
+- 不修改 Phase 2.7 QueryPlan / Evaluator / Golden / Decision Gate / SQL Builder。
 
-```text
-DataSourceId
-Schema
-TableName
-ColumnName
-MetadataColumn.Id
-MetadataColumn.BusinessKey
-```
-
-而是通过 PhysicalBinding 关联现有 Metadata。
-
-### C. Primary Key 语义升级但不覆盖物理 PK
-
-```text
-MetadataColumn.IsPrimaryKey
-        ↓
-Physical DB fact
-
-BusinessEntityKey.IsPrimary
-        ↓
-Business semantic fact
-```
-
-二者可以相关，但不能混为同一 Contract。
-
-### D. 支持一个 Entity 多个物理 Key 映射
-
-```text
-Customer
-  │
-  └── CustomerId
-       ├── ERP.Customer.CustomerId
-       └── CRM.Customer.CustomerCode
-```
-
-因此 EntityKey 不允许直接持有单一 `MetadataColumnId` 作为唯一映射。
-
-### E. 复合 Key 暂不引入复杂结构
-
-3.1.3 先通过 `KeyType` + 多个 PhysicalBinding 保留扩展空间；复杂 CompositeKey Contract 不在本 STEP 扩张，避免提前进入 Ontology / Knowledge Graph 范畴。
-
-## 6.4 与 Frozen Phase 2.7 的关系
-
-3.1.3 不修改 QueryPlan、QueryJoin、Evaluator、Golden、Decision Gate、SQL Builder。
-
-EntityKey 只为后续 Entity Resolution 提供稳定业务身份：
-
-```text
-User Question
-    ↓
-Entity Resolution
-    ↓
-BusinessEntity
-    ↓
-BusinessEntityKey
-    ↓
-PhysicalBinding
-    ↓
-Existing Metadata / QueryPlan
-```
-
-## 6.5 3.1.3 最终结论
-
-**PASS。EntityKey Contract 已冻结为“业务身份层”，Physical Metadata 的 `BusinessKey` / `IsPrimaryKey` 只作为物理事实来源，不与 BusinessEntityKey 混用。**
-
-注意：本 PASS 代表 Contract Design 完成，不代表 EntityKey 已实现代码、数据库迁移、Golden 或 Runtime 已完成。
+3.1.3 最终结论：**PASS。EntityKey Contract 已冻结为业务身份层。**
 
 ---
 
 # 7. 3.1.4 Entity Attribute Contract
 
-状态：**⏳ NEXT**
+状态：**✅ PASS — Contract 已确认**
+
+## 7.1 Contract 定义
+
+```text
+BusinessEntityAttribute
+├── Id
+├── BusinessEntityId
+├── Name
+├── DisplayName
+├── Description
+├── SemanticType
+├── IsNullable
+├── IsIdentifier
+└── PhysicalBindings
+```
+
+## 7.2 字段职责
+
+| 字段 | 职责 | 规则 |
+|---|---|---|
+| Id | Attribute 技术身份 | EntityAttribute 自身唯一标识 |
+| BusinessEntityId | 所属业务实体 | 必须指向 BusinessEntity |
+| Name | 稳定语义名称 | 用于 Entity Resolution / Mapping |
+| DisplayName | 业务展示名称 | 面向业务用户 |
+| Description | 属性业务说明 | 用于语义理解与解释 |
+| SemanticType | 业务语义类型 | 如 Identifier / Text / Date / Enum / Amount 等；不是数据库物理 DataType |
+| IsNullable | 业务层可空语义 | 仅作为语义约束，不覆盖具体物理字段差异 |
+| IsIdentifier | 是否承担实体识别语义 | 与 EntityKey / 物理 PK 分离；用于表达普通属性是否可作为辅助识别字段 |
+| PhysicalBindings | 物理属性映射集合 | 一个业务属性可以映射多个 MetadataColumn |
+
+## 7.3 与现有 MetadataColumn 的关系
+
+现有 `MetadataColumn` 已经提供：`ColumnName`、`ColumnComment`、`DataType`、`IsNullable`、`IsPrimaryKey`、`BusinessKey`，并关联 `MetadataSemantic`。因此 Phase 3 不复制这些 Physical Metadata 字段，而是在 EntityAttribute 层增加业务语义身份。现有 `MetadataSemantic` 负责字段级 BusinessMeaning、Keywords、Synonyms、ExampleQuestions、BusinessDomain 和 SearchText。fileciteturn68file0 fileciteturn69file0
+
+```text
+BusinessEntityAttribute
+        ↓
+PhysicalBinding
+        ↓
+MetadataColumn
+        ├── ColumnName / DataType / IsNullable / IsPrimaryKey
+        └── MetadataSemantic
+              ├── BusinessMeaning
+              ├── Keywords / Synonyms
+              └── ExampleQuestions / SearchText
+```
+
+## 7.4 Attribute 与 EntityKey 的边界
+
+```text
+EntityKey
+    ↓
+Business Identity
+
+EntityAttribute
+    ↓
+Business Property
+```
+
+`IsIdentifier` 不等于 `EntityKey.IsPrimary`，也不等于 `MetadataColumn.IsPrimaryKey`。
+
+一个 Attribute 可以辅助 Entity Resolution，但只有进入 EntityKey Contract 后才成为正式业务身份 Key。
+
+## 7.5 Attribute 与 QueryDimension 的边界
+
+现有 `QueryDimension` 已明确区分 `SemanticText` 与 `ColumnName`，并承载 Frozen Dimension Resolution / executable binding。fileciteturn67file0
+
+因此：
+
+```text
+BusinessEntityAttribute
+        ↓
+Entity Resolution / Mapping
+        ↓
+QueryDimension
+        ↓
+Frozen QueryPlan
+```
+
+Phase 3.1 不把 QueryDimension 改造成 EntityAttribute，也不修改 Dimension Resolution Contract。
+
+## 7.6 Attribute 与 QueryFilter 的边界
+
+`QueryFilter` 的 `SemanticText` 与 `Field` 已经明确分离业务语义与最终物理字段。fileciteturn70file0
+
+因此 EntityAttribute 可以成为 Filter / Dimension 的业务语义来源，但不能直接替换 Frozen QueryFilter Contract。
+
+## 7.7 物理映射规则
+
+```text
+Customer.name
+    ↓
+BusinessEntityAttribute(Name)
+    ↓
+PhysicalBindings
+    ├── ERP.Customer.CustomerName
+    └── CRM.Customer.Name
+```
+
+因此 `BusinessEntityAttribute` 不允许直接持有单一 `MetadataColumnId` 作为唯一身份。
+
+## 7.8 与 Phase 2.7 Frozen Contract 的关系
+
+3.1.4 不修改：
+
+- QueryPlan
+- QueryDimension
+- QueryFilter
+- MetadataColumn
+- MetadataSemantic
+- Evaluator
+- Golden Expected Outcome
+- Decision Gate
+- SQL Builder
+
+EntityAttribute 仅新增业务语义层，通过 Mapping Adapter 进入已有执行链路。
+
+## 7.9 3.1.4 最终结论
+
+**PASS。EntityAttribute Contract 已冻结为“业务属性层”，复用 MetadataColumn / MetadataSemantic 的物理字段事实与字段级语义，但不复制 Physical Metadata，也不侵入 Frozen QueryPlan / Dimension / Filter Contract。**
+
+注意：本 PASS 代表 Contract Design 完成，不代表 EntityAttribute 已实现代码、数据库迁移、Golden 或 Runtime 已完成。
 
 ---
 
 # 8. 3.1.5 Entity Metric Contract
 
-状态：**⏳**
+状态：**⏳ NEXT**
 
 ---
 
@@ -405,7 +450,8 @@ Phase 3.1
         ├── 3.1.1 Source Audit       ✅ PASS
         ├── 3.1.2 BusinessEntity     ✅ PASS
         ├── 3.1.3 EntityKey         ✅ PASS
-        └── 3.1.4 EntityAttribute   ⏳ NEXT
+        ├── 3.1.4 EntityAttribute   ✅ PASS
+        └── 3.1.5 EntityMetric      ⏳ NEXT
 ```
 
-下一动作：**3.1.4 Entity Attribute Contract**。
+下一动作：**3.1.5 Entity Metric Contract**。
