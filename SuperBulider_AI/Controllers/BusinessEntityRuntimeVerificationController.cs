@@ -30,21 +30,22 @@ public sealed class BusinessEntityRuntimeVerificationController : ControllerBase
     [ApiExplorerSettings(IgnoreApi = true)]
     public async Task<IActionResult> Index(CancellationToken cancellationToken = default)
     {
+        // 先让 EF 只负责 SQL 可翻译的字段投影，再在内存中构造页面 DTO。
         var entities = await _context.BusinessEntities
             .AsNoTracking()
-            .Select(x => new EntityRow(x.Id, x.TenantId, x.Name, x.DisplayName, x.Status))
             .OrderBy(x => x.TenantId).ThenBy(x => x.Id)
+            .Select(x => new { x.Id, x.TenantId, x.Name, x.DisplayName, x.Status })
             .ToListAsync(cancellationToken);
 
         var dataSources = await _context.DataSources
             .AsNoTracking()
-            .Select(x => new DataSourceRow(x.Id, x.TenantId, x.Name, x.DbType, x.Enabled))
             .OrderBy(x => x.TenantId).ThenBy(x => x.Id)
+            .Select(x => new { x.Id, x.TenantId, x.Name, x.DbType, x.Enabled })
             .ToListAsync(cancellationToken);
 
         var html = new StringBuilder();
         html.Append("<!doctype html><html><head><meta charset='utf-8'><title>Phase 3.1 Runtime Verification</title>");
-        html.Append("<style>body{font-family:Arial,sans-serif;margin:32px;max-width:1200px}select,button{padding:8px;margin:4px}table{border-collapse:collapse;width:100%;margin-top:20px}th,td{border:1px solid #ddd;padding:8px;text-align:left}.ok{font-weight:bold}.muted{color:#666}pre{white-space:pre-wrap;background:#f6f6f6;padding:12px}</style></head><body>");
+        html.Append("<style>body{font-family:Arial,sans-serif;margin:32px;max-width:1200px}select,button{padding:8px;margin:4px}table{border-collapse:collapse;width:100%;margin-top:20px}th,td{border:1px solid #ddd;padding:8px;text-align:left}.muted{color:#666}pre{white-space:pre-wrap;background:#f6f6f6;padding:12px}</style></head><body>");
         html.Append("<h1>Phase 3.1 Business Entity Runtime / Golden Verification</h1>");
         html.Append("<p class='muted'>不依赖 Swagger / Postman。数据来自当前 SuperBI Metadata DB；执行正式 Entity → PhysicalBinding → QueryPlan Resolution。</p>");
 
@@ -189,7 +190,5 @@ public sealed class BusinessEntityRuntimeVerificationController : ControllerBase
     private static string RenderError(string message) => $"<!doctype html><html><body><h1>Phase 3.1 Verification Error</h1><pre>{H(message)}</pre><a href='/evaluation/business-entity'>返回</a></body></html>";
     private static string H(string? value) => HtmlEncoder.Default.Encode(value ?? string.Empty);
 
-    private sealed record EntityRow(long Id, long TenantId, string Name, string? DisplayName, string Status);
-    private sealed record DataSourceRow(long Id, long? TenantId, string? Name, string? DbType, bool? Enabled);
     private sealed record CaseResult(string Id, string Name, bool Passed, string Detail, string? Evidence);
 }
