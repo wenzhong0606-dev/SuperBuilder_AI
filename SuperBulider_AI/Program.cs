@@ -12,6 +12,8 @@ using SuperBuilder_AI.Interfaces.BI.Evaluation;
 using SuperBuilder_AI.Interfaces.BI;
 using SuperBuilder_AI.Interfaces.Database;
 using SuperBuilder_AI.Services.Database;
+using SuperBuilder_AI.Interfaces.BI.Entity;
+using SuperBuilder_AI.Services.BI.Entity;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -31,6 +33,10 @@ builder.Services.AddScoped<MetadataPromptBuilder>();
 builder.Services.AddScoped<MetadataContextBuilder>();
 builder.Services.AddScoped<IMetadataContextBuilder>(sp => sp.GetRequiredService<MetadataContextBuilder>());
 builder.Services.AddScoped<IQueryPlanContextBuilder, QueryPlanContextBuilder>();
+
+// Phase 3.1 Entity semantic services: Metadata DB only; never connect to dynamic business DB.
+builder.Services.AddScoped<IBusinessEntityService, BusinessEntityService>();
+builder.Services.AddScoped<IPhysicalBindingResolver, PhysicalBindingResolver>();
 
 // CI Runtime Smoke 必须验证 Metadata → Vector → Qdrant 的完整链路，
 // 但不能依赖外部 Qwen API、网络或仓库中的真实凭据。
