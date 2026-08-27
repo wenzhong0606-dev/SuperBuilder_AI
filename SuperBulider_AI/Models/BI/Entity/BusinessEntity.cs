@@ -1,4 +1,5 @@
 using SuperBuilder_AI.Models;
+using SuperBuilder_AI.Models.Organization;
 
 namespace SuperBuilder_AI.Models.BI.Entity;
 
@@ -16,6 +17,7 @@ public class BusinessEntity : BaseEntity
     public string? SemanticText { get; set; }
     public string Status { get; set; } = "Active";
 
+    public Tenant? Tenant { get; set; }
     public ICollection<BusinessEntityKey> Keys { get; set; } = new List<BusinessEntityKey>();
     public ICollection<BusinessEntityAttribute> Attributes { get; set; } = new List<BusinessEntityAttribute>();
     public ICollection<BusinessEntityMetric> Metrics { get; set; } = new List<BusinessEntityMetric>();
