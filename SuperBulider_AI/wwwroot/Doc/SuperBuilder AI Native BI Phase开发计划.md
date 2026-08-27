@@ -5,17 +5,11 @@
 
 文档状态：**Phase 3.1 开发基线**
 
-当前开发阶段：
+当前开发阶段：**Phase 3.1 — Business Entity Model / Contract Design**
 
-> **Phase 3.1 — Business Entity Model / Contract Design**
+当前冻结基线：**Phase 2.7 — CLOSED / FROZEN**
 
-当前冻结基线：
-
-> **Phase 2.7 — CLOSED / FROZEN**
-
-当前源码基线：
-
-> GitHub `master`
+当前源码基线：GitHub `master`
 
 项目名称：SuperBuilder AI Native BI
 
@@ -26,8 +20,6 @@
 # 1. 项目定位
 
 SuperBuilder AI Native BI 面向企业数据智能分析，目标不是单纯生成 SQL，而是建立可靠的业务语义、查询规划、验证、决策和执行链路。
-
-总体链路：
 
 ```text
 用户自然语言问题
@@ -53,14 +45,16 @@ Result Understanding
 Business Answer
 ```
 
-Phase 3 的核心升级是：
+Phase 3 的核心升级：
 
 ```text
-“理解字段”
-        ↓
-“理解业务实体”
-        ↓
-“理解实体之间的业务关系”
+理解字段
+  ↓
+理解业务实体
+  ↓
+理解实体属性、指标与关系
+  ↓
+稳定映射到 Metadata / QueryPlan
 ```
 
 ---
@@ -118,7 +112,7 @@ Phase 3
 └── 3.1 Business Entity Model
     │
     ├── 3.1.1 Current Source Audit              ✅ PASS
-    ├── 3.1.2 Business Entity Contract            ⏳
+    ├── 3.1.2 Business Entity Contract            ✅ PASS
     ├── 3.1.3 Entity Key Contract                ⏳
     ├── 3.1.4 Entity Attribute Contract           ⏳
     ├── 3.1.5 Entity Metric Contract              ⏳
@@ -130,7 +124,7 @@ Phase 3
     └── 3.1.11 Source Implementation Mapping      ⏳
 ```
 
-**当前已完成 3.1.1；其余步骤不得提前标记完成。**
+每完成一个 STEP，必须记录实际结果并更新本开发计划；后续步骤不得提前标记完成。
 
 ---
 
@@ -142,9 +136,9 @@ Phase 3
 
 ## 4.2 Frozen 原则
 
-Phase 2.7 已经形成稳定执行基础。Phase 3 不得为了引入 Business Entity 而重新定义 Phase 2.7 已冻结的 QueryPlan、Evaluator、Golden、Decision Gate 或 SQL Builder Contract。
+Phase 2.7 已形成稳定执行基础。Phase 3 不得为了引入 Business Entity 而重新定义 Phase 2.7 已冻结的 QueryPlan、Evaluator、Golden、Decision Gate 或 SQL Builder Contract。
 
-## 4.3 Phase 推进原则
+## 4.3 推进原则
 
 ```text
 源码审计
@@ -159,7 +153,7 @@ Runtime Design
  ↓
 实现
  ↓
-编译
+Build
  ↓
 Runtime 验证
  ↓
@@ -168,11 +162,7 @@ Runtime 验证
 冻结
 ```
 
-禁止：
-
-```text
-设计完成 → 直接宣布完成
-```
+禁止：设计完成即宣布代码完成。
 
 ---
 
@@ -212,9 +202,7 @@ Database
 
 状态：**✅ CLOSED / FROZEN**
 
-Phase 2 的目标是将“能够生成查询”升级为“能够验证、修复、解释、评估并决定是否允许执行”。
-
-核心能力：
+Phase 2 将“能够生成查询”升级为“能够验证、修复、解释、评估并决定是否允许执行”。
 
 ```text
 QueryPlan
@@ -244,7 +232,7 @@ Phase 2 的既有 Contract 在 Phase 3 中视为 Frozen Foundation。
 
 状态：**✅ CLOSED / FROZEN**
 
-Phase 2.7 的 Frozen 边界包括 QueryPlan、Semantic Resolution、Dimension Resolution、Join Resolution、Evaluator、Golden Dataset、Decision Gate 和 SQL Builder 的既有执行契约。
+Frozen 边界包括 QueryPlan、Semantic Resolution、Dimension Resolution、Join Resolution、Evaluator、Golden Dataset、Decision Gate 和 SQL Builder 的既有执行契约。
 
 Phase 3 只能在这些能力之上增加 Business Semantic Layer，不得通过隐式修改破坏已有执行链路。
 
@@ -252,7 +240,7 @@ Phase 3 只能在这些能力之上增加 Business Semantic Layer，不得通过
 
 # 9. Phase 2 总体验收
 
-Phase 2 的进入 Phase 3 条件：
+Phase 2 进入 Phase 3 的条件：
 
 - D14–D20 Frozen
 - D21 Exit Review Frozen
@@ -261,7 +249,7 @@ Phase 2 的进入 Phase 3 条件：
 - Phase 2.7 CLOSED
 - 不再有未关闭的 Phase 2 Gate
 
-因此 Phase 3 从一个明确的 Frozen 基线开始。
+因此 Phase 3 从明确的 Frozen 基线开始。
 
 ---
 
@@ -269,13 +257,13 @@ Phase 2 的进入 Phase 3 条件：
 
 ## 10.1 阶段目标
 
-Phase 3 不再只解决：
+从：
 
-> “用户说的词对应哪个数据库字段？”
+> 用户说的词对应哪个数据库字段？
 
-而开始解决：
+升级到：
 
-> “用户说的业务对象是什么？它有哪些属性、指标和业务关系？这些业务语义如何稳定映射到已有 Metadata 与 QueryPlan？”
+> 用户说的业务对象是什么？它有哪些属性、指标和业务关系？这些业务语义如何稳定映射到已有 Metadata 与 QueryPlan？
 
 ## 10.2 核心演进
 
@@ -291,9 +279,7 @@ QueryPlan Mapping
 Existing Phase 2.7 Execution Foundation
 ```
 
-## 10.3 非目标
-
-Phase 3.1 暂不做：
+## 10.3 Phase 3.1 非目标
 
 - 重构 QueryPlan
 - 重构 QueryIntent
@@ -315,8 +301,6 @@ Phase 3.1 暂不做：
 
 建立第一版稳定、可执行、可验证的 Business Entity Contract。
 
-核心概念：
-
 ```text
 BusinessEntity
 ├── BusinessEntityKey
@@ -325,7 +309,7 @@ BusinessEntity
 └── BusinessEntityRelationship
 ```
 
-并统一通过 Physical Binding 映射已有 Metadata。
+统一通过 Physical Binding 映射已有 Metadata。
 
 ## 11.2 总体模型
 
@@ -354,15 +338,11 @@ flowchart TD
     E --> Q
 ```
 
-## 11.3 当前步骤状态
-
-### 3.1.1 Current Source Audit
+## 11.3 3.1.1 Current Source Audit
 
 状态：**✅ PASS**
 
 审计基线：GitHub `master` Phase 2.7 Frozen 源码。
-
-审计结论：
 
 | 能力 | master 当前状态 | Phase 3.1 动作 |
 |---|---|---|
@@ -380,28 +360,17 @@ flowchart TD
 | Entity Resolution | 当前无独立 Entity Resolution 层 | 🔴 新增 |
 | Entity → QueryPlan Mapping | 当前主要由 QueryPlan Resolution 承担 | 🟡 增加 Mapping / Adapter，不破坏 Frozen Contract |
 
-### 3.1.1 已审计源码
+已审计源码：
 
 ```text
 Models/Metadata/MetadataTable.cs
-    → 已确认物理表 Metadata，复用
-
 Models/Metadata/MetadataColumn.cs
-    → 已确认 BusinessKey / PK / Semantic，复用
-
 Models/Metadata/MetadataSemantic.cs
-    → 已确认字段业务语义，复用
-
 Models/BI/QueryPlan.cs
-    → 已确认 Metrics / Dimensions / Filters / Joins 为现有执行 Contract，Frozen
-
 Models/BI/QueryJoin.cs
-    → 已确认表示本次 QueryPlan 动态 JOIN，不等同 Business Relationship，Frozen
 ```
 
-同时确认后续 3.1.2–3.1.11 必须继续核查 QueryPlan Semantic Resolution、Metric / Dimension Resolution、Join Inference、Evaluator、Golden、DI 与 Controller / Service 调用链。
-
-### 3.1.1 冻结结论
+3.1.1 冻结结论：
 
 ```text
 Physical Metadata
@@ -417,21 +386,17 @@ Entity Resolution
 Frozen QueryPlan Foundation
 ```
 
-**3.1.1 PASS。**
-
-核心边界正式记录：
-
-> Business Entity ≠ MetadataTable；Business Relationship ≠ QueryJoin；Business Entity 不直接生成 SQL；Phase 3.1 不修改 Phase 2.7 Frozen QueryPlan / Evaluator / Golden / Decision Gate / SQL Builder Contract。
+**核心边界：Business Entity ≠ MetadataTable；Business Relationship ≠ QueryJoin；Business Entity 不直接生成 SQL；Phase 3.1 不修改 Phase 2.7 Frozen QueryPlan / Evaluator / Golden / Decision Gate / SQL Builder Contract。**
 
 ---
 
 # 12. Phase 3.1 Contract
 
-## 12.1 BusinessEntity
+## 12.1 3.1.2 Business Entity Contract
 
-状态：**⏳ 3.1.2 待正式确认**
+状态：**✅ PASS — Contract 已确认**
 
-建议 Contract：
+### 12.1.1 Contract 定义
 
 ```text
 BusinessEntity
@@ -445,11 +410,86 @@ BusinessEntity
 └── Status
 ```
 
-语义职责：描述稳定的业务对象，不等同于数据库表。
+### 12.1.2 字段职责
 
-## 12.2 BusinessEntityKey
+| 字段 | 职责 | 规则 |
+|---|---|---|
+| Id | Entity 技术身份 | Entity 层唯一标识 |
+| BusinessKey | 稳定业务身份 | 不绑定数据库表名 |
+| Name | 内部语义名称 | 稳定、可用于 Resolution |
+| DisplayName | 展示名称 | 面向业务用户 |
+| Description | 业务对象说明 | 用于语义理解与解释 |
+| BusinessDomain | 所属业务域 | 用于 Entity Resolution 范围约束 |
+| SemanticText | Entity 语义文本 | 用于检索 / Resolution，不保存 SQL |
+| Status | 生命周期状态 | 控制启用 / 停用 |
 
-状态：**⏳ 3.1.3**
+### 12.1.3 核心边界
+
+```text
+BusinessEntity
+      │
+      ├── 描述业务对象
+      ├── 提供稳定业务身份
+      ├── 承载实体级语义
+      └── 参与 Entity Resolution
+
+BusinessEntity
+      X
+      └── 不直接保存 / 生成 SQL
+```
+
+### 12.1.4 Entity 与物理表边界
+
+正式确认：
+
+```text
+BusinessEntity ≠ MetadataTable
+```
+
+一个 BusinessEntity 可以通过多个 PhysicalBinding 映射多个 MetadataTable / MetadataColumn；因此不能把 TableName 当作 BusinessKey，也不能让 Entity Contract 直接依赖某一个物理表。
+
+### 12.1.5 Entity Resolution 边界
+
+```text
+User Question
+      ↓
+Entity Resolution
+      ↓
+BusinessEntity
+      ↓
+Entity Key / Attribute / Metric / Relationship
+      ↓
+Physical Binding
+      ↓
+QueryPlan Mapping
+```
+
+BusinessEntity 只负责业务语义身份，不绕过现有 QueryPlan 直接进入 SQL Builder。
+
+### 12.1.6 与 Phase 2.7 Frozen Contract 的关系
+
+3.1.2 不修改：
+
+- QueryPlan
+- QueryPlanSemanticResolution
+- QueryPlan Evaluator
+- Golden Expected Outcome
+- Decision Gate
+- SQL Builder
+
+BusinessEntity 是 Phase 2.7 之上的新增语义层。
+
+### 12.1.7 3.1.2 最终结论
+
+**3.1.2 PASS。BusinessEntity Contract 可以作为后续 EntityKey / Attribute / Metric / Relationship Contract 的父级语义边界。**
+
+注意：PASS 仅表示 Contract Design 完成，不表示代码已经实现。
+
+---
+
+## 12.2 3.1.3 Entity Key Contract
+
+状态：**⏳ NEXT**
 
 ```text
 BusinessEntityKey
@@ -459,9 +499,11 @@ BusinessEntityKey
 └── PhysicalBinding
 ```
 
-## 12.3 BusinessEntityAttribute
+---
 
-状态：**⏳ 3.1.4**
+## 12.3 3.1.4 Entity Attribute Contract
+
+状态：**⏳**
 
 ```text
 BusinessEntityAttribute
@@ -472,9 +514,11 @@ BusinessEntityAttribute
 └── PhysicalBinding
 ```
 
-## 12.4 BusinessEntityMetric
+---
 
-状态：**⏳ 3.1.5**
+## 12.4 3.1.5 Entity Metric Contract
+
+状态：**⏳**
 
 ```text
 BusinessEntityMetric
@@ -486,9 +530,11 @@ BusinessEntityMetric
 └── PhysicalBinding / Metric Resolution
 ```
 
-## 12.5 BusinessEntityRelationship
+---
 
-状态：**⏳ 3.1.6**
+## 12.5 3.1.6 Entity Relationship Contract
+
+状态：**⏳**
 
 ```text
 BusinessEntityRelationship
@@ -499,9 +545,11 @@ BusinessEntityRelationship
 └── Physical Join Binding
 ```
 
-## 12.6 PhysicalBinding
+---
 
-状态：**⏳ 3.1.7**
+## 12.6 3.1.7 PhysicalBinding Contract
+
+状态：**⏳**
 
 ```text
 PhysicalBinding
@@ -511,9 +559,7 @@ PhysicalBinding
 └── BusinessKey
 ```
 
-原则：
-
-> Business Entity 不重新定义 Physical Identity；复用现有 Metadata Identity。
+原则：Business Entity 不重新定义 Physical Identity；复用现有 Metadata Identity。
 
 ---
 
@@ -521,7 +567,7 @@ PhysicalBinding
 
 状态：**⏳ 未完成**
 
-3.1.1 已完成基础源码审计，但完整源码映射必须完成后续 Resolution、Evaluator、Golden、DI 与调用链核查。
+3.1.1 已完成基础源码审计；完整 Mapping 仍需继续核查 QueryPlan Semantic Resolution、Metric / Dimension Resolution、Join Inference、Evaluator、Golden、DI 与 Controller / Service 调用链。
 
 目标映射：
 
@@ -530,42 +576,46 @@ PhysicalBinding
 | BusinessEntity | 当前无直接等价物 | 新增 |
 | EntityKey | MetadataColumn / Primary Key | 建立业务身份层 |
 | EntityAttribute | MetadataColumn + MetadataSemantic | 建立业务属性层 |
-| EntityMetric | QueryMetric / Metric Resolution | 建立业务指标层 |
-| EntityRelationship | QueryJoin / Join Resolution | 新增业务关系层 |
+| EntityMetric | QueryMetric / Metric Resolution | 建立实体指标层 |
+| EntityRelationship | QueryJoin / Join Resolution | 建立业务关系层 |
 | PhysicalBinding | MetadataColumn / BusinessKey | 优先复用 |
-| Entity Resolution | 当前 QueryPlan Semantic Resolution | 新增 Entity Resolution 边界 |
-| QueryPlan Mapping | QueryPlanSemanticResolution | Adapter / Mapping，不破坏 Frozen Contract |
+| Entity Resolution | 当前无独立 Entity 层 | 新增 |
+| QueryPlan Mapping | QueryPlan Resolution | Adapter / Mapping，不破坏 Frozen Contract |
 
 ---
 
 # 14. Phase 3.1 Golden 与 Runtime 验证
 
-状态：**⏳ 未完成**
+状态：**⏳ 待完成**
 
-## Golden 分层
+## Golden 路线
 
 ```text
-第一层：Natural Language → Business Entity
-第二层：Business Entity → QueryPlan
-第三层：复用 Phase 2.7 Evaluator / Frozen Execution Foundation
+Entity Resolution Golden
+        ↓
+Entity → Metadata Binding Golden
+        ↓
+Entity → QueryPlan Golden
+        ↓
+Phase 2.7 Frozen Evaluator / Golden 回归
 ```
 
-Phase 3 Golden 为新增覆盖，不修改 Phase 2.7 Frozen Golden 的既有语义。
+Phase 3 Golden 只能新增覆盖，不修改 Phase 2.7 Frozen Golden 的既有语义。
 
-## Runtime 顺序
+## Runtime 路线
 
 ```text
-Contract Verification
+Contract Unit Verification
         ↓
 Entity Resolution
         ↓
-Entity → Physical Binding
+Physical Binding
         ↓
 Entity → QueryPlan Mapping
         ↓
-Phase 2.7 Validation
+Existing Phase 2.7 Validation
         ↓
-Evaluator
+Existing Evaluator
         ↓
 Existing SQL / Runtime Path
 ```
@@ -574,7 +624,7 @@ Existing SQL / Runtime Path
 
 # 15. Phase 3.1 验收标准
 
-Phase 3.1 只有同时满足以下条件才能关闭：
+只有同时满足 Contract、Source、Golden、Runtime、Engineering 五类条件才能关闭：
 
 ### Contract
 
@@ -585,8 +635,8 @@ Phase 3.1 只有同时满足以下条件才能关闭：
 
 ### Source
 
-- 相关源码逐文件审计完成
-- 新增 / 复用 / 扩展 / 禁止修改范围明确
+- 完成相关源码逐文件审计
+- 明确新增 / 复用 / 扩展 / 禁止修改范围
 - DI、调用链和 namespace 边界明确
 
 ### Golden
@@ -622,9 +672,7 @@ Phase 3.1
 
 状态：📌 规划
 
-目标：在稳定 Business Entity Model 基础上建立企业实体、关系、事件与知识网络。
-
-不得提前侵入 Phase 3.1。
+在稳定 Business Entity Model 基础上建立企业实体、关系、事件与知识网络，不提前侵入 Phase 3.1。
 
 ---
 
@@ -632,7 +680,7 @@ Phase 3.1
 
 状态：📌 规划
 
-目标：在可靠 Query Planning 与 Business Semantic 基础上形成可执行的 BI Agent。
+在可靠 Query Planning 与 Business Semantic 基础上形成可执行的 BI Agent。
 
 ---
 
@@ -640,7 +688,7 @@ Phase 3.1
 
 状态：📌 规划
 
-目标：将 AI Query、Business Semantic、Agent 与低代码应用能力融合。
+将 AI Query、Business Semantic、Agent 与低代码应用能力融合。
 
 ---
 
@@ -694,7 +742,7 @@ Entity Resolution / Mapping
 Frozen QueryPlan Foundation
 ```
 
-不得：
+禁止：
 
 ```text
 Business Entity
@@ -720,7 +768,7 @@ STEP / Runtime 状态文档
 源码 / Golden
 ```
 
-阶段切换的第一动作必须是更新开发计划；每完成一个 3.1.x STEP，必须立即记录该 STEP 的实际结果，不得提前标记后续步骤完成。
+阶段切换或 STEP 完成的第一动作必须是更新开发计划，随后才能开始下一步骤。
 
 ---
 
@@ -742,11 +790,12 @@ Phase 3.1
     Contract Design
         │
         ├── 3.1.1 Current Source Audit  ✅ PASS
-        └── 3.1.2 Business Entity Contract ⏳ NEXT
+        ├── 3.1.2 Business Entity Contract ✅ PASS
+        └── 3.1.3+                     ⏳
 ```
 
 当前下一动作：
 
-> **3.1.2 Business Entity Contract**
+> **3.1.3 Entity Key Contract**
 
-推进规则：每完成一个 3.1.x STEP，必须记录实际结果并更新本开发计划；不得提前标记后续步骤完成。
+推进规则：每完成一个 3.1.x STEP，必须给出最终结论、立即更新本开发计划、重新从 `master` 回读验证，然后才能进入下一个 STEP。
