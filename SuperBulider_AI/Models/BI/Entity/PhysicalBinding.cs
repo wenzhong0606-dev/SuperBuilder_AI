@@ -1,4 +1,5 @@
 using SuperBuilder_AI.Models;
+using SuperBuilder_AI.Models.Metadata;
 
 namespace SuperBuilder_AI.Models.BI.Entity;
 
@@ -13,7 +14,6 @@ public class PhysicalBinding : BaseEntity
     public int Priority { get; set; }
     public bool IsActive { get; set; } = true;
 
-    // 一个 Binding 只属于一种 Entity Semantic Owner；具体 one-of 约束由 EF Core Check Constraint 强制。
     public long? BusinessEntityKeyId { get; set; }
     public long? BusinessEntityAttributeId { get; set; }
     public long? BusinessEntityMetricId { get; set; }
@@ -23,4 +23,8 @@ public class PhysicalBinding : BaseEntity
     public BusinessEntityAttribute? BusinessEntityAttribute { get; set; }
     public BusinessEntityMetric? BusinessEntityMetric { get; set; }
     public BusinessEntityRelationship? BusinessEntityRelationship { get; set; }
+
+    public DataSource? DataSource { get; set; }
+    public MetadataTable? MetadataTable { get; set; }
+    public MetadataColumn? MetadataColumn { get; set; }
 }
