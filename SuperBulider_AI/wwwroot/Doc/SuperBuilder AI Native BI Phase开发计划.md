@@ -27,9 +27,9 @@ Phase 3.1 Business Entity Model
   ├── 3.1.6 Entity Relationship        ✅ PASS
   ├── 3.1.7 Physical Binding           ✅ PASS
   ├── 3.1.8 QueryPlan Mapping          ✅ PASS
-  ├── 3.1.9 Golden Contract             ✅ PASS
-  ├── 3.1.10 Runtime Verification      ⏳ NEXT
-  └── 3.1.11 Source Implementation     ⏳
+  ├── 3.1.9 Golden Contract            ✅ PASS
+  ├── 3.1.10 Runtime Verification     ✅ PASS
+  └── 3.1.11 Source Implementation     ⏳ NEXT
 ```
 
 目标：建立稳定、可执行、可验证的 Business Entity Semantic Layer，并通过 Mapping 进入 Phase 2.7 Frozen QueryPlan。
@@ -49,7 +49,11 @@ BusinessEntity
           ↓
  QueryPlan Mapping
           ↓
- Frozen QueryPlan
+ Golden Contract
+          ↓
+ Runtime Verification
+          ↓
+ Frozen QueryPlan / Evaluator / SQL Builder
 ```
 
 禁止 Business Entity 绕过 QueryPlan 直接生成 SQL。
@@ -159,13 +163,7 @@ BusinessEntityMetric
 └── PhysicalBindings
 ```
 
-EntityMetric 是稳定业务指标定义；QueryMetric 是查询运行时实例：
-
-```text
-BusinessEntityMetric → Metric Resolution → QueryMetric → Frozen QueryPlan
-```
-
-Aggregation 使用既有运行时聚合语义；IsCalculated=true 仅表示业务计算指标，本阶段不引入公式 DSL / 任意 SQL Expression / 计算引擎。
+EntityMetric 是稳定业务指标定义；QueryMetric 是查询运行时实例。`Aggregation` 使用既有运行时聚合语义；`IsCalculated=true` 本阶段不引入公式 DSL / 任意 SQL Expression / 计算引擎。
 
 ---
 
@@ -254,30 +252,11 @@ Mapping 必须确定性执行；不得再次自由语义搜索；Ambiguous / Unr
 
 # 3.1.9 Golden Contract
 
-**✅ PASS — Golden Contract 已确认**
+**✅ PASS**
 
-## 3.1.9.1 Source Audit
+Golden 复用现有 `GoldenDatasetRuntimeService`、`GoldenDatasetRunner`、`GoldenDatasetRegressionEvaluator` 和 `GoldenDatasetRuntimeController`，不重新建立 Golden Engine。现有 Runner 的真实运行顺序为 Semantic Applicability → Gate → Query Understanding → QueryPlan → Validation/Repair → Evaluation-aware Confidence → Calibration，且 Runner 不生成 SQL。fileciteturn120file0
 
-当前 master 已存在 Golden Dataset Runtime 与 `GoldenDatasetRegressionEvaluator`。Regression Evaluator 明确按 `positive / negative / ambiguous / unresolved` 分类计算 Expected Outcome：Positive 需要 Runtime Passed；Negative 需要被正确拒绝；Ambiguous / Unresolved 需要得到预期 Applicability State。`PassedCases` 表示满足 Expected Outcome 的 Case，而不是简单统计 Runtime `Passed`。fileciteturn109file0
-
-仓库已有多个 Golden result 文件以及 `GoldenDatasetRuntimeController`，说明 Phase 2.7 已有 Golden Runtime 基础设施，本阶段应扩展 Case Contract，而不是重新建立 Golden Engine。fileciteturn108file0 fileciteturn108file12
-
-## 3.1.9.2 Golden Contract 总体结构
-
-Phase 3.1 Golden 不直接比较 SQL 字符串，而验证 Entity Semantic → Physical Binding → QueryPlan Mapping 的 Expected Outcome：
-
-```text
-GoldenCase
-├── CaseId
-├── Category
-├── InputSemantic
-├── ExpectedEntity
-├── ExpectedBinding
-├── ExpectedQueryPlanMapping
-└── ExpectedOutcome
-```
-
-Expected Outcome 至少覆盖：
+Golden Contract 覆盖：
 
 ```text
 Positive
@@ -286,158 +265,200 @@ Ambiguous
 Unresolved
 ```
 
-## 3.1.9.3 Positive Case
+核心验证：
 
 ```text
-Input
- ↓
-唯一 Entity
- ↓
-唯一有效 PhysicalBinding
- ↓
-确定 QueryPlan Mapping
- ↓
-ExpectedOutcome = PASS
-```
-
-必须验证 Entity、Binding、QueryPlan Runtime Mapping 均与 Contract 一致。
-
-## 3.1.9.4 Negative Case
-
-用于验证非法 Contract / Invalid Binding / NotExecutable 等场景：
-
-```text
-Input
- ↓
-Contract violation
- ↓
-Resolution / Validation Reject
- ↓
-ExpectedOutcome = REJECT
-```
-
-根据现有 Regression Contract，Negative Case 被正确拒绝才算 Golden PASS，而不是因为 Runtime `Passed=false` 就算失败。fileciteturn109file0
-
-## 3.1.9.5 Ambiguous Case
-
-多个有效候选且无法确定时：
-
-```text
-Candidates > 1
- ↓
-无法消歧
- ↓
-ApplicabilityState = Ambiguous
- ↓
-ExpectedOutcome = AMBIGUOUS
-```
-
-禁止随机选择物理字段。
-
-## 3.1.9.6 Unresolved Case
-
-没有可用 Entity / Binding / Mapping 时：
-
-```text
-No valid resolution
- ↓
-ApplicabilityState = NotResolved
- ↓
-ExpectedOutcome = UNRESOLVED
-```
-
-## 3.1.9.7 Entity → Metadata Golden
-
-至少验证：
-
-```text
-BusinessEntity
-   ↓
-PhysicalBinding
-   ↓
-DataSource / MetadataTable / MetadataColumn
-```
-
-必须验证 DataSourceId、MetadataTableId、MetadataColumnId 一致性，不接受幽灵 Binding。
-
-## 3.1.9.8 Entity → QueryPlan Golden
-
-至少验证：
-
-```text
-EntityAttribute    → QueryDimension / Filter
-EntityMetric       → QueryMetric
-EntityRelationship → QueryJoin
-EntityKey          → Key / Table Binding
-BusinessEntity     → QueryTable
-```
-
-Golden 不要求修改 QueryPlan Contract，只验证 Mapping 是否正确落入 Frozen Runtime。
-
-## 3.1.9.9 Phase 2.7 Regression Boundary
-
-```text
-Phase 3.1 Golden
+Input Semantic
       ↓
-验证新增 Entity Contract
+Entity Resolution
       ↓
-Phase 2.7 Golden Regression
+Physical Binding
       ↓
-验证既有 Frozen Behavior 未漂移
+QueryPlan Mapping
+      ↓
+Expected Outcome
 ```
 
-Phase 3.1 不得修改既有 Golden Expected Outcome；既有 Golden 只作为 Regression。
+Positive 必须满足预期 Runtime Outcome；Negative 必须被正确拒绝；Ambiguous 必须得到 `Ambiguous`；Unresolved 必须得到 `NotResolved`。不得用简单 `Passed=false` 代替 Expected Outcome 判定。
 
-## 3.1.9.10 Golden Gate
-
-建议正式 Gate：
-
-- Positive Expected Outcome 100%
-- Negative Detection 100%
-- Ambiguous Detection 100%
-- Unresolved Detection 100%
-- Unexpected Applicability State = 0
-- Phase 2.7 Regression = PASS
-
-最终是否达到发布门槛继续由既有 `GoldenDatasetRegressionPolicy` 决定，不在 Entity Contract 中复制另一套 Gate。fileciteturn109file0
-
-## 3.1.9.11 3.1.9 最终结论
-
-**PASS。Golden Contract 已冻结。**
-
-Phase 3.1 Golden 正式验证四类 Expected Outcome，并覆盖 Entity Resolution、Entity → Metadata Binding、Entity → QueryPlan Mapping；复用现有 Golden Runtime / Regression Evaluator，不重造 Golden Engine，不修改 Phase 2.7 Golden Expected Outcome。
-
-> 注意：本 PASS 表示 Golden Contract Design 完成，不代表 Golden Case 已全部实现并运行通过。
+Phase 2.7 Golden Expected Outcome 保持 Frozen，只作为 Regression。
 
 ---
 
 # 3.1.10 Runtime Verification Design
 
-**⏳ NEXT**
+**✅ PASS — Runtime Verification Contract 已确认**
+
+## 3.1.10.1 Source Audit
+
+当前 master 已有统一 Golden Runtime Pipeline：`GoldenDatasetRuntimeService.RunAsync()` 负责读取 Golden Dataset、调用 `GoldenDatasetRunner.RunAsync()`，再交给 `GoldenDatasetRegressionEvaluator.Evaluate()` 形成 Scorecard。fileciteturn118file0
+
+`GoldenDatasetRuntimeController` 只负责 HTTP 参数、Case 筛选和响应；完整 Runtime Pipeline 仍由 Service 统一编排，并提供 `run / cases / release-gate` 三类 Runtime 入口。fileciteturn116file0
+
+`GoldenDatasetRunner` 已将 Runtime 固定为：
 
 ```text
-Contract Verification
- ↓
-Entity Resolution
- ↓
-Physical Binding
- ↓
-Entity → QueryPlan Mapping
- ↓
-Phase 2.7 Validation / Evaluator
- ↓
-Existing SQL / Runtime Path
+Semantic Applicability
+        ↓
+QueryPlan Evaluation Gate
+        ↓
+Query Understanding
+        ↓
+Semantic Resolution Factory
+        ↓
+QueryPlanBuilder
+        ↓
+QueryPlanContextBuilder
+        ↓
+QueryPlanValidationPipeline
+        ↓
+Evaluation-aware Confidence
+        ↓
+Calibration
 ```
 
-要求：Runtime PASS + Phase 2.7 Regression PASS + Build PASS + Startup PASS。
+Runner 本身不生成 SQL，因此 Phase 3.1 Runtime Verification 的责任是验证 Entity Contract 能否正确进入这一 Frozen Pipeline，而不是新建执行链。fileciteturn120file0
+
+## 3.1.10.2 Phase 3.1 Runtime 插入点
+
+```text
+Business Entity
+      ↓
+Entity Resolution
+      ↓
+Physical Binding Validation
+      ↓
+Entity → QueryPlan Mapping
+      ↓
+Existing QueryPlan / Semantic Resolution
+      ↓
+Frozen QueryPlan Validation
+      ↓
+Frozen Evaluation / Confidence
+      ↓
+Golden Regression Scorecard
+```
+
+Phase 3.1 不改变现有 Golden Runner 的总体编排，只增加/接入 Entity Resolution、Physical Binding 和 Mapping Adapter 的实际实现。
+
+## 3.1.10.3 Runtime PASS 判定
+
+一个 Phase 3.1 Positive Case 必须同时满足：
+
+1. Entity Resolution 成功；
+2. Selected PhysicalBinding 有效；
+3. DataSource / MetadataTable / MetadataColumn 三者一致；
+4. QueryPlan Mapping 成功；
+5. QueryPlan Validation 无 Contract Error；
+6. Evaluation Outcome 满足 Golden Expected Outcome；
+7. Regression Scorecard 不出现 Unexpected Applicability State；
+8. Phase 2.7 Frozen Golden Regression 不漂移。
+
+## 3.1.10.4 Runtime Negative / Ambiguous / Unresolved
+
+```text
+Invalid Binding
+    ↓
+Reject / Block
+
+Multiple valid unresolved candidates
+    ↓
+Ambiguous
+
+No valid candidate
+    ↓
+NotResolved
+```
+
+三种状态都必须保留诊断信息，不得自动降级为任意 Metadata Column。
+
+## 3.1.10.5 Runtime DataSource Boundary
+
+```text
+Selected PhysicalBinding.DataSourceId
+        ↓
+QueryTable.DataSourceId
+        ↓
+QueryPlan.DataSourceId
+```
+
+任何跨 DataSource 冲突必须显式失败或由既有 Resolution Contract 决定；Mapping Adapter 不得静默切换数据源。
+
+## 3.1.10.6 Runtime HTTP Boundary
+
+现有 Controller 已确认：HTTP 层只做参数校验、Case 选择、状态码和响应包装；Golden Runtime Pipeline 统一由 `GoldenDatasetRuntimeService` 编排。fileciteturn116file0
+
+因此 Phase 3.1 不在 Controller 中直接实现 Entity Resolution / Mapping / SQL。
+
+## 3.1.10.7 Runtime Verification Cases
+
+至少需要：
+
+```text
+R1 Positive Entity → Binding → QueryPlan
+R2 Negative Invalid Binding
+R3 Ambiguous Multiple Binding
+R4 Unresolved No Binding
+R5 Metric → QueryMetric
+R6 Attribute → QueryDimension
+R7 Attribute → QueryFilter
+R8 Relationship → QueryJoin
+R9 EntityKey → Key/Table Binding
+R10 Multi-DataSource Conflict
+R11 Phase 2.7 Golden Regression
+```
+
+## 3.1.10.8 Runtime Gate
+
+```text
+Entity Contract Verification       PASS
+Physical Binding Verification      PASS
+QueryPlan Mapping Verification     PASS
+Golden Expected Outcome            PASS
+Phase 2.7 Regression               PASS
+Runtime Exception                  0
+Unexpected Applicability State     0
+```
+
+Build / Startup 仍是最终实现阶段的运行验收，不在本 Design PASS 中提前声称已通过。
+
+## 3.1.10.9 3.1.10 最终结论
+
+**PASS。Runtime Verification Design 已冻结。**
+
+已经确认 Phase 3.1 的 Runtime 应接入现有 Golden Runtime Pipeline，而不是重新设计 Runtime：Entity Resolution → Physical Binding → QueryPlan Mapping → Frozen QueryPlan Validation → Evaluation / Confidence → Golden Regression。HTTP Controller 继续保持薄层，Golden Service 继续作为统一编排入口。
+
+> 注意：本 PASS 仅表示 Runtime Verification Design 完成；实际 Entity Runtime、Golden Case 扩展、Build、Startup 和运行结果尚未宣称完成。
 
 ---
 
 # 3.1.11 Source Implementation Mapping
 
-**⏳**
+**⏳ NEXT**
 
-最终确认 Model / Interface / Service / DI / Controller / Runtime 调用链、数据库迁移及实际代码落地。
+下一步正式进入代码落地前的 Source Implementation Mapping：
+
+```text
+Business Entity Models
+        ↓
+Interfaces
+        ↓
+Services / Resolution
+        ↓
+Physical Binding
+        ↓
+Mapping Adapter
+        ↓
+DI
+        ↓
+Controller / Runtime
+        ↓
+EF Core / Migration
+        ↓
+Golden Cases
+```
+
+必须逐项确认 Model / Interface / Service / DI / Controller / Runtime / Database Migration，禁止出现“计划已完成但源码不存在”的漂移。
 
 ---
 
@@ -474,8 +495,9 @@ Phase 3.1 Business Entity Model
         ├── 3.1.6 EntityRelationship  ✅ PASS
         ├── 3.1.7 PhysicalBinding     ✅ PASS
         ├── 3.1.8 QueryPlanMapping    ✅ PASS
-        ├── 3.1.9 Golden Contract      ✅ PASS
-        └── 3.1.10 Runtime             ⏳ NEXT
+        ├── 3.1.9 Golden Contract     ✅ PASS
+        ├── 3.1.10 Runtime Design     ✅ PASS
+        └── 3.1.11 Implementation     ⏳ NEXT
 ```
 
-**下一动作：3.1.10 Runtime Verification Design。**
+**下一动作：3.1.11 Source Implementation Mapping。**
