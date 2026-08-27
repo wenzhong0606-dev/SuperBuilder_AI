@@ -1,7 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using SuperBuilder_AI.Interfaces.BI.Entity;
 using SuperBuilder_AI.Models.BI;
-using SuperBuilder_AI.Models.BI.Entity;
 
 namespace SuperBuilder_AI.Controllers;
 
@@ -17,39 +16,28 @@ public sealed class BusinessEntityRuntimeController : ControllerBase
     private readonly IPhysicalBindingResolver _bindingResolver;
     private readonly IEntityQueryPlanMapper _mapper;
 
-    public BusinessEntityRuntimeController(
-        IBusinessEntityService entityService,
-        IPhysicalBindingResolver bindingResolver,
-        IEntityQueryPlanMapper mapper)
+    public BusinessEntityRuntimeController(IBusinessEntityService entityService, IPhysicalBindingResolver bindingResolver, IEntityQueryPlanMapper mapper)
     {
         _entityService = entityService;
         _bindingResolver = bindingResolver;
         _mapper = mapper;
     }
 
-    /// <summary>
-    /// G-3.1.12.6-01/02/03：验证 Entity、Metric、Dimension、Filter 的物理 Resolution。
-    /// </summary>
     [HttpPost("resolve")]
-    public async Task<ActionResult<object>> Resolve(
-        [FromBody] ResolveRequest request,
-        CancellationToken cancellationToken = default)
+    public async Task<ActionResult<object>> Resolve([FromBody] ResolveRequest request, CancellationToken cancellationToken = default)
     {
         if (request.TenantId <= 0 || request.DataSourceId <= 0 || request.BusinessEntityId <= 0)
             return BadRequest(new { passed = false, message = "TenantId/DataSourceId/BusinessEntityId must be positive." });
 
-        var entity = await _entityService.GetByIdAsync(request.TenantId, request.BusinessEntityId, cancellationToken);
+        var entity = await _entityService.GetAsync(request.TenantId, request.BusinessEntityId, cancellationToken);
         if (entity is null)
             return NotFound(new { passed = false, message = "BusinessEntity not found in tenant scope." });
 
-        var bindings = await _bindingResolver.ResolveAsync(
-            request.TenantId, request.DataSourceId, request.BusinessEntityId, cancellationToken);
+        var bindings = await _bindingResolver.ResolveAsync(request.TenantId, request.DataSourceId, request.BusinessEntityId, cancellationToken);
 
         try
         {
-            var resolution = await _mapper.MapAsync(
-                entity, request.Intent, request.DataSourceId, cancellationToken);
-
+            var resolution = await _mapper.MapAsync(entity, request.Intent, request.DataSourceId, cancellationToken);
             return Ok(new
             {
                 passed = resolution.Tables.Count > 0 &&
@@ -66,79 +54,28 @@ public sealed class BusinessEntityRuntimeController : ControllerBase
         }
         catch (InvalidOperationException ex)
         {
-            return UnprocessableEntity(new
-            {
-                passed = false,
-                caseId = request.CaseId,
-                tenantId = request.TenantId,
-                dataSourceId = request.DataSourceId,
-                businessEntityId = request.BusinessEntityId,
-                bindingCount = bindings.Count,
-                error = ex.Message
-            });
+            return UnprocessableEntity(new { passed = false, caseId = request.CaseId, tenantId = request.TenantId, dataSourceId = request.DataSourceId, businessEntityId = request.BusinessEntityId, bindingCount = bindings.Count, error = ex.Message });
         }
     }
 
-    /// <summary>
-    /// G-3.1.12.6-04：同一 Entity 指定 DataSource 时只能返回该 DataSource 的 Binding。
-    /// </summary>
     [HttpGet("bindings")]
-    public async Task<ActionResult<object>> Bindings(
-        [FromQuery] long tenantId,
-        [FromQuery] long dataSourceId,
-        [FromQuery] long businessEntityId,
-        CancellationToken cancellationToken = default)
+    public async Task<ActionResult<object>> Bindings([FromQuery] long tenantId, [FromQuery] long dataSourceId, [FromQuery] long businessEntityId, CancellationToken cancellationToken = default)
     {
-        var bindings = await _bindingResolver.ResolveAsync(
-            tenantId, dataSourceId, businessEntityId, cancellationToken);
-
+        var bindings = await _bindingResolver.ResolveAsync(tenantId, dataSourceId, businessEntityId, cancellationToken);
         return Ok(new
         {
             passed = bindings.All(x => x.DataSourceId == dataSourceId),
-            tenantId,
-            dataSourceId,
-            businessEntityId,
-            count = bindings.Count,
-            bindings = bindings.Select(x => new
-            {
-                x.Id,
-                x.DataSourceId,
-                x.MetadataTableId,
-                x.MetadataColumnId,
-                x.Priority,
-                x.IsActive
-            })
+            tenantId, dataSourceId, businessEntityId, count = bindings.Count,
+            bindings = bindings.Select(x => new { x.Id, x.DataSourceId, x.MetadataTableId, x.MetadataColumnId, x.Priority, x.IsActive })
         });
     }
 
-    /// <summary>
-    /// G-3.1.12.6-05：指定错误 DataSource 时不得 fallback 到其他 DataSource。
-    /// </summary>
     [HttpGet("negative-data-source")]
-    public async Task<ActionResult<object>> NegativeDataSource(
-        [FromQuery] long tenantId,
-        [FromQuery] long dataSourceId,
-        [FromQuery] long businessEntityId,
-        CancellationToken cancellationToken = default)
+    public async Task<ActionResult<object>> NegativeDataSource([FromQuery] long tenantId, [FromQuery] long dataSourceId, [FromQuery] long businessEntityId, CancellationToken cancellationToken = default)
     {
-        var bindings = await _bindingResolver.ResolveAsync(
-            tenantId, dataSourceId, businessEntityId, cancellationToken);
-
-        return Ok(new
-        {
-            passed = bindings.Count == 0,
-            expected = "No Binding / no cross-DataSource fallback",
-            tenantId,
-            dataSourceId,
-            businessEntityId,
-            bindingCount = bindings.Count
-        });
+        var bindings = await _bindingResolver.ResolveAsync(tenantId, dataSourceId, businessEntityId, cancellationToken);
+        return Ok(new { passed = bindings.Count == 0, expected = "No Binding / no cross-DataSource fallback", tenantId, dataSourceId, businessEntityId, bindingCount = bindings.Count });
     }
 
-    public sealed record ResolveRequest(
-        string CaseId,
-        long TenantId,
-        long DataSourceId,
-        long BusinessEntityId,
-        QueryIntent Intent);
+    public sealed record ResolveRequest(string CaseId, long TenantId, long DataSourceId, long BusinessEntityId, QueryIntent Intent);
 }
