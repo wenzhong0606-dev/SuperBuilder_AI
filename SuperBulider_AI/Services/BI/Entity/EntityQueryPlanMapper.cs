@@ -124,22 +124,21 @@ public sealed class EntityQueryPlanMapper : IEntityQueryPlanMapper
 
     private static BusinessEntityMetric FindMetric(BusinessEntity entity, string? semanticText, string? name)
     {
-        var match = FindUnique(entity.Metrics, semanticText, name, x => new[] { x.Name, x.DisplayName, x.Description });
-        return match ?? throw new InvalidOperationException($"No unambiguous BusinessEntityMetric binding found for '{semanticText ?? name}'.");
+        return FindUnique(entity.Metrics, semanticText, name, x => new[] { x.Name, x.DisplayName, x.Description });
     }
 
     private static BusinessEntityAttribute FindAttribute(BusinessEntity entity, string semanticText)
     {
-        var match = FindUnique(entity.Attributes, semanticText, null, x => new[] { x.Name, x.DisplayName, x.Description });
-        return match ?? throw new InvalidOperationException($"No unambiguous BusinessEntityAttribute binding found for '{semanticText}'.");
+        return FindUnique(entity.Attributes, semanticText, null, x => new[] { x.Name, x.DisplayName, x.Description });
     }
 
-    private static T? FindUnique<T>(IEnumerable<T> items, string? first, string? second, Func<T, IEnumerable<string?>> candidates)
+    private static T FindUnique<T>(IEnumerable<T> items, string? first, string? second, Func<T, IEnumerable<string?>> candidates) where T : class
     {
-        var terms = new[] { first, second }.Where(x => !string.IsNullOrWhiteSpace(x)).Select(Normalize).Distinct().ToArray();
-        if (terms.Length == 0) return null;
-        var matches = items.Where(item => candidates(item).Where(x => !string.IsNullOrWhiteSpace(x)).Select(Normalize).Any(value => terms.Contains(value))).ToList();
-        return matches.Count == 1 ? matches[0] : null;
+        var terms = new[] { first, second }.Where(x => !string.IsNullOrWhiteSpace(x)).Select(x => Normalize(x!)).Distinct().ToArray();
+        if (terms.Length == 0) throw new InvalidOperationException("At least one semantic lookup term is required.");
+        var matches = items.Where(item => candidates(item).Where(x => !string.IsNullOrWhiteSpace(x)).Select(x => Normalize(x!)).Any(value => terms.Contains(value))).ToList();
+        if (matches.Count != 1) throw new InvalidOperationException($"Expected exactly one semantic definition match, found {matches.Count}.");
+        return matches[0];
     }
 
     private static PhysicalBinding SelectBinding(IEnumerable<PhysicalBinding> bindings, long dataSourceId, string? first, string? second = null)
