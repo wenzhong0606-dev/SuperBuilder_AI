@@ -59,15 +59,15 @@ public sealed class BusinessEntityGoldenFixtureController : ControllerBase
 
     [HttpPost("provision")]
     [ApiExplorerSettings(IgnoreApi = true)]
-    public async Task<IActionResult> Provision(long tenantId, long dataSourceId, long metadataTableId, CancellationToken cancellationToken = default)
+    public async Task<IActionResult> Provision([FromForm] long tenantId, [FromForm] long dataSourceId, [FromForm] long metadataTableId, CancellationToken cancellationToken = default)
     {
         var tenantExists = await _db.Tenants.AnyAsync(x => x.Id == tenantId, cancellationToken);
-        if (!tenantExists) return Content(Error("Tenant 不存在。"), "text/html", Encoding.UTF8);
+        if (!tenantExists) return Content(Error($"Tenant 不存在。收到 tenantId={tenantId}。"), "text/html", Encoding.UTF8);
         var source = await _db.DataSources.FirstOrDefaultAsync(x => x.Id == dataSourceId && x.TenantId == tenantId, cancellationToken);
-        if (source is null) return Content(Error("DataSource 不存在，或不属于选择的 Tenant。"), "text/html", Encoding.UTF8);
+        if (source is null) return Content(Error($"DataSource 不存在，或不属于选择的 Tenant。收到 dataSourceId={dataSourceId}, tenantId={tenantId}。"), "text/html", Encoding.UTF8);
         var table = await _db.MetadataTables.Include(x => x.Columns)
             .FirstOrDefaultAsync(x => x.Id == metadataTableId && x.TenantId == tenantId && x.DataSourceId == dataSourceId, cancellationToken);
-        if (table is null) return Content(Error("MetadataTable 不存在，或不属于选择的 Tenant/DataSource。"), "text/html", Encoding.UTF8);
+        if (table is null) return Content(Error($"MetadataTable 不存在，或不属于选择的 Tenant/DataSource。收到 metadataTableId={metadataTableId}, dataSourceId={dataSourceId}, tenantId={tenantId}。"), "text/html", Encoding.UTF8);
         var columns = table.Columns.Where(x => x.Id > 0 && !string.IsNullOrWhiteSpace(x.ColumnName)).OrderBy(x => x.Id).Take(3).ToList();
         if (columns.Count < 2) return Content(Error("Golden Fixture 至少需要同一 MetadataTable 下的 2 个有效 MetadataColumn。"), "text/html", Encoding.UTF8);
 
