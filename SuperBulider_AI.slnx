@@ -1,6 +1,3 @@
 <Solution>
   <Project Path="SuperBuilder_AI/SuperBuilder_AI.csproj" />
-  <Project Path="SuperBuilder_AI/src/Domain/SuperBuilder.Domain.csproj" />
-  <Project Path="SuperBuilder_AI/src/Application/SuperBuilder.Application.csproj" />
-  <Project Path="SuperBuilder_AI/src/Infrastructure/SuperBuilder.Infrastructure.csproj" />
 </Solution>

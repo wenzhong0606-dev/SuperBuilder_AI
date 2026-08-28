@@ -23,4 +23,7 @@ public class BusinessEntity : BaseEntity
     public ICollection<BusinessEntityMetric> Metrics { get; set; } = new List<BusinessEntityMetric>();
     public ICollection<BusinessEntityRelationship> SourceRelationships { get; set; } = new List<BusinessEntityRelationship>();
     public ICollection<BusinessEntityRelationship> TargetRelationships { get; set; } = new List<BusinessEntityRelationship>();
+
+    public long? BusinessDomainId { get; set; }
+    public BusinessDomain? Domain { get; set; }
 }

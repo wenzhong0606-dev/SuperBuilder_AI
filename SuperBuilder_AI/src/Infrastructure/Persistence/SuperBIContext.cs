@@ -29,6 +29,8 @@ public class SuperBIContext : DbContext
     public DbSet<Models.BI.Entity.BusinessEntityMetric> BusinessEntityMetrics { get; set; }
     public DbSet<Models.BI.Entity.BusinessEntityRelationship> BusinessEntityRelationships { get; set; }
     public DbSet<Models.BI.Entity.PhysicalBinding> PhysicalBindings { get; set; }
+    public DbSet<Models.BI.Entity.BusinessDomain> BusinessDomains { get; set; }
+    public DbSet<Models.BI.Entity.BusinessEntityDimension> BusinessEntityDimensions { get; set; }
     #endregion
 
     protected override void OnModelCreating(ModelBuilder builder)

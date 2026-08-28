@@ -85,6 +85,11 @@ public class QueryIntent
 	public string? Explanation { get; set; }
 
 	/// <summary>
+	/// P3 业务实体解析提示：AI 理解阶段识别出的候选业务实体及其置信度。
+	/// </summary>
+	public List<BusinessEntityHint> BusinessEntityHints { get; set; } = new();
+
+	/// <summary>
 	/// 是否属于 Ranking 查询。
 	/// </summary>
 	public bool IsRanking =>

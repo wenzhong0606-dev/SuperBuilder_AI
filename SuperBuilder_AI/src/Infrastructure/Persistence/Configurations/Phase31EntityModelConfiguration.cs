@@ -106,3 +106,33 @@ public sealed class PhysicalBindingConfiguration : IEntityTypeConfiguration<Phys
         builder.Property(x => x.BindingType).HasMaxLength(50);
     }
 }
+
+/// <summary>
+/// P3 批次2：业务域映射。
+/// </summary>
+public sealed class BusinessDomainConfiguration : IEntityTypeConfiguration<BusinessDomain>
+{
+    public void Configure(EntityTypeBuilder<BusinessDomain> builder)
+    {
+        builder.ToTable("BusinessDomains", tb => tb.HasComment("业务域"));
+        builder.HasIndex(x => new { x.TenantId, x.Name }).IsUnique();
+        builder.Property(x => x.Name).HasMaxLength(200).IsRequired();
+        builder.HasOne<Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasMany(x => x.Entities).WithOne(x => x.Domain).HasForeignKey(x => x.BusinessDomainId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasMany(x => x.Dimensions).WithOne(x => x.Domain).HasForeignKey(x => x.BusinessDomainId).OnDelete(DeleteBehavior.Cascade);
+    }
+}
+
+/// <summary>
+/// P3 批次2：业务维度映射。
+/// </summary>
+public sealed class BusinessEntityDimensionConfiguration : IEntityTypeConfiguration<BusinessEntityDimension>
+{
+    public void Configure(EntityTypeBuilder<BusinessEntityDimension> builder)
+    {
+        builder.ToTable("BusinessEntityDimensions", tb => tb.HasComment("业务实体维度"));
+        builder.HasIndex(x => new { x.TenantId, x.BusinessDomainId, x.Name }).IsUnique();
+        builder.Property(x => x.Name).HasMaxLength(200).IsRequired();
+        builder.HasOne(x => x.Domain).WithMany(x => x.Dimensions).HasForeignKey(x => x.BusinessDomainId).OnDelete(DeleteBehavior.Cascade);
+    }
+}

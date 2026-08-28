@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text.RegularExpressions;
 using SuperBuilder_AI.Interfaces;
 using SuperBuilder_AI.Models.AI;
+using SuperBuilder_AI.Models.BI;
 using SuperBuilder_AI.Models.Metadata;
 
 namespace SuperBuilder_AI.Services.BI;
