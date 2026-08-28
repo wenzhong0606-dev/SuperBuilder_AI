@@ -12,8 +12,8 @@ using SuperBuilder_AI.Data;
 namespace SuperBuilder_AI.Migrations
 {
     [DbContext(typeof(SuperBIContext))]
-    [Migration("20260827060103_Phase31BusinessEntityModel")]
-    partial class Phase31BusinessEntityModel
+    [Migration("20260828144504_P3BusinessEntityModelWithDomains")]
+    partial class P3BusinessEntityModelWithDomains
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -24,6 +24,41 @@ namespace SuperBuilder_AI.Migrations
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
+
+            modelBuilder.Entity("SuperBuilder_AI.Models.BI.Entity.BusinessDomain", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasComment("主键");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime>("CreatedTime")
+                        .HasColumnType("datetime2")
+                        .HasComment("创建时间");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<long>("TenantId")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "Name")
+                        .IsUnique();
+
+                    b.ToTable("BusinessDomains", null, t =>
+                        {
+                            t.HasComment("业务域");
+                        });
+                });
 
             modelBuilder.Entity("SuperBuilder_AI.Models.BI.Entity.BusinessEntity", b =>
                 {
@@ -36,6 +71,9 @@ namespace SuperBuilder_AI.Migrations
 
                     b.Property<string>("BusinessDomain")
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<long?>("BusinessDomainId")
+                        .HasColumnType("bigint");
 
                     b.Property<string>("BusinessKey")
                         .IsRequired()
@@ -68,12 +106,9 @@ namespace SuperBuilder_AI.Migrations
                     b.Property<long>("TenantId")
                         .HasColumnType("bigint");
 
-                    b.Property<long?>("TenantId1")
-                        .HasColumnType("bigint");
-
                     b.HasKey("Id");
 
-                    b.HasIndex("TenantId1");
+                    b.HasIndex("BusinessDomainId");
 
                     b.HasIndex("TenantId", "BusinessKey")
                         .IsUnique();
@@ -130,6 +165,46 @@ namespace SuperBuilder_AI.Migrations
                     b.ToTable("BusinessEntityAttributes", null, t =>
                         {
                             t.HasComment("业务实体属性");
+                        });
+                });
+
+            modelBuilder.Entity("SuperBuilder_AI.Models.BI.Entity.BusinessEntityDimension", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasComment("主键");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("BusinessDomainId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime>("CreatedTime")
+                        .HasColumnType("datetime2")
+                        .HasComment("创建时间");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<long>("TenantId")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BusinessDomainId");
+
+                    b.HasIndex("TenantId", "BusinessDomainId", "Name")
+                        .IsUnique();
+
+                    b.ToTable("BusinessEntityDimensions", null, t =>
+                        {
+                            t.HasComment("业务实体维度");
                         });
                 });
 
@@ -645,17 +720,31 @@ namespace SuperBuilder_AI.Migrations
                         });
                 });
 
-            modelBuilder.Entity("SuperBuilder_AI.Models.BI.Entity.BusinessEntity", b =>
+            modelBuilder.Entity("SuperBuilder_AI.Models.BI.Entity.BusinessDomain", b =>
                 {
-                    b.HasOne("SuperBuilder_AI.Models.Organization.Tenant", null)
+                    b.HasOne("SuperBuilder_AI.Models.Organization.Tenant", "Tenant")
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.Navigation("Tenant");
+                });
+
+            modelBuilder.Entity("SuperBuilder_AI.Models.BI.Entity.BusinessEntity", b =>
+                {
+                    b.HasOne("SuperBuilder_AI.Models.BI.Entity.BusinessDomain", "Domain")
+                        .WithMany("Entities")
+                        .HasForeignKey("BusinessDomainId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("SuperBuilder_AI.Models.Organization.Tenant", "Tenant")
                         .WithMany()
-                        .HasForeignKey("TenantId1");
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Domain");
 
                     b.Navigation("Tenant");
                 });
@@ -669,6 +758,17 @@ namespace SuperBuilder_AI.Migrations
                         .IsRequired();
 
                     b.Navigation("BusinessEntity");
+                });
+
+            modelBuilder.Entity("SuperBuilder_AI.Models.BI.Entity.BusinessEntityDimension", b =>
+                {
+                    b.HasOne("SuperBuilder_AI.Models.BI.Entity.BusinessDomain", "Domain")
+                        .WithMany("Dimensions")
+                        .HasForeignKey("BusinessDomainId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Domain");
                 });
 
             modelBuilder.Entity("SuperBuilder_AI.Models.BI.Entity.BusinessEntityKey", b =>
@@ -734,19 +834,19 @@ namespace SuperBuilder_AI.Migrations
                         .HasForeignKey("BusinessEntityRelationshipId")
                         .OnDelete(DeleteBehavior.NoAction);
 
-                    b.HasOne("SuperBuilder_AI.Models.Metadata.DataSource", null)
+                    b.HasOne("SuperBuilder_AI.Models.Metadata.DataSource", "DataSource")
                         .WithMany()
                         .HasForeignKey("DataSourceId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("SuperBuilder_AI.Models.Metadata.MetadataColumn", null)
+                    b.HasOne("SuperBuilder_AI.Models.Metadata.MetadataColumn", "MetadataColumn")
                         .WithMany()
                         .HasForeignKey("MetadataColumnId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("SuperBuilder_AI.Models.Metadata.MetadataTable", null)
+                    b.HasOne("SuperBuilder_AI.Models.Metadata.MetadataTable", "MetadataTable")
                         .WithMany()
                         .HasForeignKey("MetadataTableId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -759,6 +859,12 @@ namespace SuperBuilder_AI.Migrations
                     b.Navigation("BusinessEntityMetric");
 
                     b.Navigation("BusinessEntityRelationship");
+
+                    b.Navigation("DataSource");
+
+                    b.Navigation("MetadataColumn");
+
+                    b.Navigation("MetadataTable");
                 });
 
             modelBuilder.Entity("SuperBuilder_AI.Models.Metadata.DataSource", b =>
@@ -798,6 +904,13 @@ namespace SuperBuilder_AI.Migrations
                         .IsRequired();
 
                     b.Navigation("DataSource");
+                });
+
+            modelBuilder.Entity("SuperBuilder_AI.Models.BI.Entity.BusinessDomain", b =>
+                {
+                    b.Navigation("Dimensions");
+
+                    b.Navigation("Entities");
                 });
 
             modelBuilder.Entity("SuperBuilder_AI.Models.BI.Entity.BusinessEntity", b =>

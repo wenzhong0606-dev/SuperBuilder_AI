@@ -6,11 +6,34 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace SuperBuilder_AI.Migrations
 {
     /// <inheritdoc />
-    public partial class Phase31BusinessEntityModel : Migration
+    public partial class P3BusinessEntityModelWithDomains : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.CreateTable(
+                name: "BusinessDomains",
+                columns: table => new
+                {
+                    Id = table.Column<long>(type: "bigint", nullable: false, comment: "主键")
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    TenantId = table.Column<long>(type: "bigint", nullable: false),
+                    Name = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: false),
+                    Description = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    CreatedTime = table.Column<DateTime>(type: "datetime2", nullable: false, comment: "创建时间")
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_BusinessDomains", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_BusinessDomains_Tenants_TenantId",
+                        column: x => x.TenantId,
+                        principalTable: "Tenants",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                },
+                comment: "业务域");
+
             migrationBuilder.CreateTable(
                 name: "BusinessEntities",
                 columns: table => new
@@ -25,25 +48,50 @@ namespace SuperBuilder_AI.Migrations
                     BusinessDomain = table.Column<string>(type: "nvarchar(max)", nullable: true),
                     SemanticText = table.Column<string>(type: "nvarchar(max)", nullable: true),
                     Status = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: false),
-                    TenantId1 = table.Column<long>(type: "bigint", nullable: true),
+                    BusinessDomainId = table.Column<long>(type: "bigint", nullable: true),
                     CreatedTime = table.Column<DateTime>(type: "datetime2", nullable: false, comment: "创建时间")
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_BusinessEntities", x => x.Id);
                     table.ForeignKey(
+                        name: "FK_BusinessEntities_BusinessDomains_BusinessDomainId",
+                        column: x => x.BusinessDomainId,
+                        principalTable: "BusinessDomains",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
                         name: "FK_BusinessEntities_Tenants_TenantId",
                         column: x => x.TenantId,
                         principalTable: "Tenants",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Restrict);
-                    table.ForeignKey(
-                        name: "FK_BusinessEntities_Tenants_TenantId1",
-                        column: x => x.TenantId1,
-                        principalTable: "Tenants",
-                        principalColumn: "Id");
                 },
                 comment: "业务实体");
+
+            migrationBuilder.CreateTable(
+                name: "BusinessEntityDimensions",
+                columns: table => new
+                {
+                    Id = table.Column<long>(type: "bigint", nullable: false, comment: "主键")
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    TenantId = table.Column<long>(type: "bigint", nullable: false),
+                    BusinessDomainId = table.Column<long>(type: "bigint", nullable: false),
+                    Name = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: false),
+                    Description = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    CreatedTime = table.Column<DateTime>(type: "datetime2", nullable: false, comment: "创建时间")
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_BusinessEntityDimensions", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_BusinessEntityDimensions_BusinessDomains_BusinessDomainId",
+                        column: x => x.BusinessDomainId,
+                        principalTable: "BusinessDomains",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                },
+                comment: "业务实体维度");
 
             migrationBuilder.CreateTable(
                 name: "BusinessEntityAttributes",
@@ -224,15 +272,21 @@ namespace SuperBuilder_AI.Migrations
                 comment: "业务语义到物理元数据的映射");
 
             migrationBuilder.CreateIndex(
+                name: "IX_BusinessDomains_TenantId_Name",
+                table: "BusinessDomains",
+                columns: new[] { "TenantId", "Name" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_BusinessEntities_BusinessDomainId",
+                table: "BusinessEntities",
+                column: "BusinessDomainId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_BusinessEntities_TenantId_BusinessKey",
                 table: "BusinessEntities",
                 columns: new[] { "TenantId", "BusinessKey" },
                 unique: true);
-
-            migrationBuilder.CreateIndex(
-                name: "IX_BusinessEntities_TenantId1",
-                table: "BusinessEntities",
-                column: "TenantId1");
 
             migrationBuilder.CreateIndex(
                 name: "IX_BusinessEntityAttributes_BusinessEntityId_IsIdentifier",
@@ -243,6 +297,17 @@ namespace SuperBuilder_AI.Migrations
                 name: "IX_BusinessEntityAttributes_BusinessEntityId_Name",
                 table: "BusinessEntityAttributes",
                 columns: new[] { "BusinessEntityId", "Name" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_BusinessEntityDimensions_BusinessDomainId",
+                table: "BusinessEntityDimensions",
+                column: "BusinessDomainId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_BusinessEntityDimensions_TenantId_BusinessDomainId_Name",
+                table: "BusinessEntityDimensions",
+                columns: new[] { "TenantId", "BusinessDomainId", "Name" },
                 unique: true);
 
             migrationBuilder.CreateIndex(
@@ -313,6 +378,9 @@ namespace SuperBuilder_AI.Migrations
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropTable(
+                name: "BusinessEntityDimensions");
+
+            migrationBuilder.DropTable(
                 name: "PhysicalBindings");
 
             migrationBuilder.DropTable(
@@ -329,6 +397,9 @@ namespace SuperBuilder_AI.Migrations
 
             migrationBuilder.DropTable(
                 name: "BusinessEntities");
+
+            migrationBuilder.DropTable(
+                name: "BusinessDomains");
         }
     }
 }

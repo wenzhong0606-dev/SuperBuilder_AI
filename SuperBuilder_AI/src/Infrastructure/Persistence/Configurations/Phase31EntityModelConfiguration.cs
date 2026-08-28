@@ -19,7 +19,8 @@ public sealed class BusinessEntityConfiguration : IEntityTypeConfiguration<Busin
         builder.Property(x => x.BusinessKey).HasMaxLength(200).IsRequired();
         builder.Property(x => x.Name).HasMaxLength(200).IsRequired();
         builder.Property(x => x.Status).HasMaxLength(50).IsRequired();
-        builder.HasOne<Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne(x => x.Tenant).WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne(x => x.Domain).WithMany(x => x.Entities).HasForeignKey(x => x.BusinessDomainId).OnDelete(DeleteBehavior.Restrict);
         builder.HasMany(x => x.Keys).WithOne(x => x.BusinessEntity).HasForeignKey(x => x.BusinessEntityId).OnDelete(DeleteBehavior.Cascade);
         builder.HasMany(x => x.Attributes).WithOne(x => x.BusinessEntity).HasForeignKey(x => x.BusinessEntityId).OnDelete(DeleteBehavior.Cascade);
         builder.HasMany(x => x.Metrics).WithOne(x => x.BusinessEntity).HasForeignKey(x => x.BusinessEntityId).OnDelete(DeleteBehavior.Cascade);
@@ -117,8 +118,7 @@ public sealed class BusinessDomainConfiguration : IEntityTypeConfiguration<Busin
         builder.ToTable("BusinessDomains", tb => tb.HasComment("业务域"));
         builder.HasIndex(x => new { x.TenantId, x.Name }).IsUnique();
         builder.Property(x => x.Name).HasMaxLength(200).IsRequired();
-        builder.HasOne<Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
-        builder.HasMany(x => x.Entities).WithOne(x => x.Domain).HasForeignKey(x => x.BusinessDomainId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne(x => x.Tenant).WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
         builder.HasMany(x => x.Dimensions).WithOne(x => x.Domain).HasForeignKey(x => x.BusinessDomainId).OnDelete(DeleteBehavior.Cascade);
     }
 }
