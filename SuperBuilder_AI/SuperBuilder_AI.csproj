@@ -33,10 +33,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="Migrations\" />
-    <Folder Include="Services\BI\Planning\Metadata\" />
-    <Folder Include="Services\BI\Planning\Planning\" />
-    <Folder Include="Services\BI\Planning\Sql\" />
+    <Folder Include="src\Infrastructure\Persistence\Migrations\" />
   </ItemGroup>
 
 </Project>

@@ -16,14 +16,31 @@ AI Native BI 平台 — 自然语言 → AI理解 → 语义分析 → 查询计
 - Models: 78 文件 / ~4,912 行
 - Controllers: 15 文件 / ~2,259 行
 
-## 当前 Phase 状态 (2026-08-28)
-- Phase 0 (基础架构): Done
-- Phase 1 (AI BI查询核心链 1.1-1.5): Done
-- Phase 2 (QueryPlan可靠性): In Progress
-  - 2.1/2.2/2.2.5/2.4/2.5: Done
-  - 2.7 DimensionAware: Golden Regression 已达标（D18: 18/18 全 PASS，overall/positive/negative 均 100%，failedGates=[]），Gate 解除
-- Phase 3.1 (Golden Runtime + CSV Fixture): 已实现并修复回归（2026-08-28 恢复 18/18）
-- Phase 4-6: 未开始
+## 当前阶段状态 — 主阶段脊柱（2026-08-28 统一）
+> 旧"Phase 0-6"工程分类与用户"10阶段产品路线"已合并为**单一事实来源**：`docs/DevelopmentPlan.md`（§0 主阶段脊柱）。避免 Phase 编号冲突（旧 Phase3=BusinessEntity已done ≠ 用户 Phase3=Business Semantic Model=下一步）。
+
+- **Stage 0 基础与 AI Native BI 运行时**：✅ 全部完成
+  - Phase 0/1/2(2.1-2.5)/2.7(D14-D21 FROZEN, Phase2.7 READY TO CLOSE)/3.1 Golden Runtime+回归恢复
+  - Golden 18/18 PASS（11+5+1+1, overall/pos/neg 100%, failedGates=[]）
+- **Stage 1 架构治理（A-track，并行）**：🟡 A1/A2 完成，A3-A5 待做
+  - A1(4.1) 目标文档/骨架/删40冗余/归档13计划: ✅
+  - A2(4.2) 单项目内 src/ 四层物理迁移(234 .cs, 命名空间保留, build 0 error, Golden 18/18): ✅
+  - A3(4.3) 抽独立项目 Domain/Application/Infrastructure/Api: ⬜（随 P3 启动）
+  - A4(4.4) 上帝类拆分+依赖倒置(I*端口): ⬜ **必须在 P6 前完成**（QueryPlanBuilder 4308行/8 partial）
+  - A5(4.5) 限界上下文解耦/合并重复模型: ⬜
+- **Stage 2 产品演进（P-track，用户10阶段路线）**：⬜ P3 为当前起点
+  - P3 Business Semantic Model / P4 Multi-Tenant Core / P5 Multi-Language / P6 Low-code BI / P7 Theme / P8 AI App Builder / P9 AI Agent / P10 Enterprise SaaS
+  - 每个 P 阶段退出门槛 = Golden 18/18（硬约束，来自 Phase3 回归事故教训）
+- 主交付文档：`docs/DevelopmentPlan.md`(唯一事实来源) + `docs/PhaseChecklist.md`(可执行清单) + `docs/ARCHITECTURE.md`(目标结构)
+
+## 架构治理 Phase 4 (2026-08-28)
+- 全量盘点: 236 C# 文件 / ~36,676 行（含 obj 生成件），核心 5 文件 QueryPlan* 约 6.2k 行；16 控制器中 12 个为诊断/测试
+- 目标架构: 四层(Domain/Application/Infrastructure/Api) + 5 限界上下文(Organization/Metadata/BI Query/Business Entity/Golden) + 可选多项目拆分
+- 设计文档: `docs/ARCHITECTURE.md`（目标树/映射/冗余）；`docs/DevelopmentPlan.md`（阶段+完成情况+路线）
+- 历史计划文档归档: `docs/plans/archive/`（原 `wwwroot/Doc/plan/*`，13 份）
+- 本次已删冗余: `Evaluation/DebugOutputs/*`(38 调试产物) + `Models/BI/QueryRepairAction.cs`/`QueryRepairResult.cs`(遗留死代码)；`dotnet build` 仍 0 error
+- Phase 4.2 已落地: 234 .cs 全部迁至 `src/` 四层（Domain 79 / Application 109 / Infrastructure 29 / Api 17），旧顶层目录(Data/Models/Services/Interfaces/Controllers/Configuration/Infrastructure)已清空删除；git 跟踪为 247 个 rename；Golden 18/18 未破
+- 待 Phase 4.5 合并重复: GoldenBaseline↔GoldenBaselinePersistenceRecord；QueryPlanSemanticResolution↔SemanticApplicabilityResult/*Resolution
 
 ## D18 达标结论 (2026-08-27)
 - Golden Dataset 18 cases: 11 positive + 5 negative + 1 ambiguous + 1 unresolved，全部 expectedOutcome 满足
