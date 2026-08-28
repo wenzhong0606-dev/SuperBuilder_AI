@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using Microsoft.EntityFrameworkCore;
 using SuperBuilder_AI.Data;
 using SuperBuilder_AI.Interfaces;
 using SuperBuilder_AI.Models.Metadata;
@@ -35,31 +36,85 @@ public sealed class MetadataCsvFixtureService : IMetadataCsvFixtureService
 
         await using var transaction = await _context.Database.BeginTransactionAsync();
 
-        // SQL Server FK actions in Phase 3.1 include NoAction/Restrict relationships.
-        // Delete each dependent level and flush it before deleting its referenced owner.
-        _context.PhysicalBindings.RemoveRange(_context.PhysicalBindings);
-        await _context.SaveChangesAsync();
+        // Phase 3.1 regression fix (SuperBuilder_AI issue):
+        // The previous implementation used a GLOBAL RemoveRange on every table with NO
+        // tenant filter. That wiped ALL tenants — including the WMS golden tenant
+        // (Tenant 1 / DataSource 1) that the 18-case golden regression depends on — whenever
+        // the C.13.3 CSV fixture was imported, breaking the golden environment.
+        // We now scope every delete to the C.13.3 CSV Fixture tenant ONLY and never touch
+        // other tenants. SQL Server FK actions in Phase 3.1 include NoAction/Restrict
+        // relationships, so we delete each dependent level and flush before its owner.
+        const string FixtureTenantCode = "C13_3_CSV_FIXTURE";
+        // NOTE: use ToListAsync() + synchronous FirstOrDefault to avoid the
+        // FirstOrDefaultAsync overload ambiguity with System.Linq.Async.
+        var fixtureTenant = (await _context.Tenants.ToListAsync())
+            .FirstOrDefault(t => t.TenantCode == FixtureTenantCode);
 
-        _context.BusinessEntityRelationships.RemoveRange(_context.BusinessEntityRelationships);
-        await _context.SaveChangesAsync();
+        if (fixtureTenant is not null)
+        {
+            var fixtureDataSourceIds = await _context.DataSources
+                .Where(d => d.TenantId == fixtureTenant.Id)
+                .Select(d => d.Id)
+                .ToListAsync();
 
-        _context.BusinessEntities.RemoveRange(_context.BusinessEntities);
-        await _context.SaveChangesAsync();
+            if (fixtureDataSourceIds.Count > 0)
+            {
+                // PhysicalBindings are scoped by DataSource.
+                _context.PhysicalBindings.RemoveRange(
+                    _context.PhysicalBindings.Where(p => fixtureDataSourceIds.Contains(p.DataSourceId)));
+                await _context.SaveChangesAsync();
+            }
 
-        _context.MetadataSemantics.RemoveRange(_context.MetadataSemantics);
-        await _context.SaveChangesAsync();
+            // BusinessEntityRelationships reference fixture BusinessEntities on either side.
+            var fixtureEntityIds = await _context.BusinessEntities
+                .Where(b => b.TenantId == fixtureTenant.Id)
+                .Select(b => b.Id)
+                .ToListAsync();
+            if (fixtureEntityIds.Count > 0)
+            {
+                _context.BusinessEntityRelationships.RemoveRange(
+                    _context.BusinessEntityRelationships.Where(r =>
+                        fixtureEntityIds.Contains(r.SourceEntityId) ||
+                        fixtureEntityIds.Contains(r.TargetEntityId)));
+                await _context.SaveChangesAsync();
+            }
 
-        _context.MetadataColumns.RemoveRange(_context.MetadataColumns);
-        await _context.SaveChangesAsync();
+            _context.BusinessEntities.RemoveRange(
+                _context.BusinessEntities.Where(b => b.TenantId == fixtureTenant.Id));
+            await _context.SaveChangesAsync();
 
-        _context.MetadataTables.RemoveRange(_context.MetadataTables);
-        await _context.SaveChangesAsync();
+            // Semantics depend on Columns, which depend on Tables — delete in FK order.
+            var fixtureTableIds = await _context.MetadataTables
+                .Where(t => t.TenantId == fixtureTenant.Id)
+                .Select(t => t.Id)
+                .ToListAsync();
+            if (fixtureTableIds.Count > 0)
+            {
+                var fixtureColumnIds = await _context.MetadataColumns
+                    .Where(c => c.MetadataTableId != null && fixtureTableIds.Contains(c.MetadataTableId.Value))
+                    .Select(c => c.Id)
+                    .ToListAsync();
+                if (fixtureColumnIds.Count > 0)
+                {
+                    _context.MetadataSemantics.RemoveRange(
+                        _context.MetadataSemantics.Where(s => s.MetadataColumnId != null && fixtureColumnIds.Contains(s.MetadataColumnId.Value)));
+                    await _context.SaveChangesAsync();
+                    _context.MetadataColumns.RemoveRange(
+                        _context.MetadataColumns.Where(c => c.MetadataTableId != null && fixtureTableIds.Contains(c.MetadataTableId.Value)));
+                    await _context.SaveChangesAsync();
+                }
+                _context.MetadataTables.RemoveRange(
+                    _context.MetadataTables.Where(t => t.TenantId == fixtureTenant.Id));
+                await _context.SaveChangesAsync();
+            }
 
-        _context.DataSources.RemoveRange(_context.DataSources);
-        await _context.SaveChangesAsync();
+            _context.DataSources.RemoveRange(
+                _context.DataSources.Where(d => d.TenantId == fixtureTenant.Id));
+            await _context.SaveChangesAsync();
 
-        _context.Tenants.RemoveRange(_context.Tenants);
-        await _context.SaveChangesAsync();
+            _context.Tenants.Remove(fixtureTenant);
+            await _context.SaveChangesAsync();
+        }
 
         var tenant = new Tenant
         {
