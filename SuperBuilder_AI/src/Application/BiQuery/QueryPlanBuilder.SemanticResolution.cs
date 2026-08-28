@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Text.RegularExpressions;
 using SuperBuilder_AI.Models.BI;
 
@@ -174,26 +175,98 @@ public partial class QueryPlanBuilder
             return;
         }
 
-        // Phase D9 健壮性修正：LLM 意图（Runtime）与语义解析（Resolution）的 Filter 数量可能不一致
-        // （典型场景：LLM 对"2025年"等时间约束理解不稳定，漏产出 Filter）。
-        // 原先硬抛 InvalidOperationException 会直接打断 QueryPlan 构建，导致 Golden Regression 500
-        // （GQ-009/GQ-010 的 "QueryPlan Semantic Binding Drift：Filter 数量不一致"）。
-        // 这里改为优雅降级：能匹配几条就应用几条，剩余忽略；
-        // 数量不一致的后果由 Evaluation 的 Filters 评分（0 分）体现，不再中断流程。
-        var n = Math.Min(plan.Filters.Count, bindings.Count);
-        for (var i = 0; i < n; i++)
+        // Phase D9 健壮性修正：LLM 意图（Runtime）与语义解析（Resolution）的 Filter 数量/顺序
+        // 可能不一致（典型场景：flash 模型对"2025年"等时间约束理解不稳定，多产出或漏产出 Filter）。
+        // 原先的硬抛 InvalidOperationException 会直接打断 QueryPlan 构建（Golden Regression 500，
+        // 即 GQ-009/GQ-010 的 "QueryPlan Semantic Binding Drift：Filter 数量不一致"）。
+        // 后来的"按索引取 min 个重写、其余忽略"又会在 Runtime 多产出 Filter 时残留未重写的语义名
+        // （如"入库日期"），导致 Validation 报 FilterFieldNotFound（GQ-010 确定性回归）。
+        //
+        // 这里改为 **按 SemanticText 语义对齐 + 丢弃无绑定幻影 Filter**：
+        //   1) 对每个 Runtime Filter，优先按 SemanticText（回退 Field 同名）匹配一条未使用的 Resolution 绑定；
+        //      匹配成功则用其物理 Column 重写 Field，并标记该绑定已消费。
+        //   2) 匹配失败的 Runtime Filter 视为 LLM 幻影（无物理落点、无法被 Resolution 覆盖），
+        //      直接从 plan.Filters 移除——它既无法通过 Validation，也不是 Golden 期望约束。
+        // 该策略对 1:1、Runtime 少于 Resolution、Runtime 多于 Resolution 三种漂移均安全，
+        // 且严格遵循 C.13.2 "只消费已确认 Semantic Resolution" 的原则。
+        var usedBindings = new HashSet<int>();
+        var dropIndexes = new List<int>();
+
+        for (var i = 0; i < plan.Filters.Count; i++)
         {
-            var b = bindings[i];
+            var bindingIndex = MatchFilterBinding(bindings, plan.Filters[i], usedBindings, i);
+            if (bindingIndex < 0)
+            {
+                dropIndexes.Add(i);
+                continue;
+            }
+
+            usedBindings.Add(bindingIndex);
+            var b = bindings[bindingIndex];
             ValidateColumn(b.ColumnId, b.Column, $"Filter[{i}]");
             EnsureTable(plan, b.TableId, b.DataSourceId, b.Table, $"Filter[{i}]");
             plan.Filters[i].SemanticText = b.SemanticText;
             plan.Filters[i].Field = b.Column;
         }
+
+        // 逆序移除幻影 Filter，保证索引有效。
+        for (var k = dropIndexes.Count - 1; k >= 0; k--)
+            plan.Filters.RemoveAt(dropIndexes[k]);
+    }
+
+    /// <summary>
+    /// 为单个 Runtime Filter 在 Resolution 绑定集合中寻找最佳匹配。
+    /// 匹配优先级：SemanticText 精确匹配 → Runtime Field 与绑定 SemanticText/物理列同名 → 位置回退（1:1 常见情形）。
+    /// 返回绑定的索引；找不到未使用绑定时返回 -1（调用方据此丢弃该幻影 Filter）。
+    /// </summary>
+    private static int MatchFilterBinding(
+        IReadOnlyList<QueryPlanFilterResolution> bindings,
+        QueryFilter runtime,
+        HashSet<int> used,
+        int positional)
+    {
+        // 1) SemanticText 精确匹配（首选）。
+        for (var j = 0; j < bindings.Count; j++)
+        {
+            if (used.Contains(j)) continue;
+            if (!string.IsNullOrWhiteSpace(runtime.SemanticText)
+                && string.Equals(runtime.SemanticText, bindings[j].SemanticText, StringComparison.OrdinalIgnoreCase))
+                return j;
+        }
+
+        // 2) Runtime Field 既可能是语义名也可能是物理列：与绑定的 SemanticText / 物理 Column 同名即视为对应。
+        for (var j = 0; j < bindings.Count; j++)
+        {
+            if (used.Contains(j)) continue;
+            if (!string.IsNullOrWhiteSpace(runtime.Field)
+                && (string.Equals(runtime.Field, bindings[j].SemanticText, StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(runtime.Field, bindings[j].Column, StringComparison.OrdinalIgnoreCase)))
+                return j;
+        }
+
+        // 3) 位置回退（1:1 常见情形）。
+        if (positional < bindings.Count && !used.Contains(positional))
+            return positional;
+
+        return -1;
     }
 
     private static void ApplyDimensionResolutions(QueryPlan plan, IReadOnlyList<QueryPlanDimensionResolution> bindings)
     {
-        if (bindings.Count == 0) return;
+        // Phase A4 加固（GQ-008 幽灵维度）：
+        // BuildResolvedPlanSkeleton 只把 LLM intent 的维度名放进 SemanticText
+        // （MetadataColumnId=0 / ColumnName=""），维度的物理落点**只能**来自 ApplyDimensionBinding。
+        // 因此任何拿不到 Resolution 绑定的 Runtime 维度必然无法通过 Validation
+        // （DimensionFieldNotFound）。
+        // GQ-008 "统计不同供应商数量" Golden 不期望任何 Dimension（Resolution.Dimensions=0），
+        // 但 flash 模型偶发多产出一个空维度；原先 bindings.Count==0 直接 return，
+        // 幻影维度原样留在 plan.Dimensions 里 → Decision Gate BLOCK（确定性 FAIL）。
+        // 这里与 ApplyFilterResolutions 完全对称：按 SemanticText 对齐 + 丢弃无绑定幻影维度。
+        if (bindings.Count == 0)
+        {
+            plan.Dimensions.RemoveAll(IsUnboundDimension);
+            return;
+        }
 
         // Phase D9 兜底补全：LLM 意图完全漏产出 Dimension（plan.Dimensions 为空），
         // 但语义解析已确认 Dimension 绑定（bindings.Count > 0）。
@@ -212,9 +285,86 @@ public partial class QueryPlanBuilder
             return;
         }
 
-        if (plan.Dimensions.Count != bindings.Count) throw new InvalidOperationException($"QueryPlan Semantic Binding Drift：Dimension 数量不一致，Resolution={bindings.Count}，Runtime={plan.Dimensions.Count}。");
-        for (var i = 0; i < bindings.Count; i++)
-            ApplyDimensionBinding(plan, plan.Dimensions[i], bindings[i], i);
+        // 数量/顺序漂移的统一处理（替代原先的硬抛 InvalidOperationException）：
+        //   1) 每个 Runtime 维度按 SemanticText（回退物理列同名、位置）匹配一条未消费绑定并落物理绑定；
+        //   2) 匹配失败者视为 LLM 幻影维度，逆序移除；
+        //   3) 未被消费的 Resolution 绑定按"Resolution 是权威绑定"原则补全为新维度。
+        var usedBindings = new HashSet<int>();
+        var dropIndexes = new List<int>();
+
+        for (var i = 0; i < plan.Dimensions.Count; i++)
+        {
+            var bindingIndex = MatchDimensionBinding(bindings, plan.Dimensions[i], usedBindings, i);
+            if (bindingIndex < 0)
+            {
+                dropIndexes.Add(i);
+                continue;
+            }
+
+            usedBindings.Add(bindingIndex);
+            ApplyDimensionBinding(plan, plan.Dimensions[i], bindings[bindingIndex], i);
+        }
+
+        for (var k = dropIndexes.Count - 1; k >= 0; k--)
+            plan.Dimensions.RemoveAt(dropIndexes[k]);
+
+        for (var j = 0; j < bindings.Count; j++)
+        {
+            if (usedBindings.Contains(j)) continue;
+            var runtime = new QueryDimension();
+            plan.Dimensions.Add(runtime);
+            ApplyDimensionBinding(plan, runtime, bindings[j], j);
+        }
+    }
+
+    /// <summary>
+    /// 判定一个 Runtime 维度是否"未绑定"（没有任何物理落点）。
+    /// Runtime 维度由 BuildResolvedPlanSkeleton 仅以 SemanticText 创建，物理列只能来自
+    /// ApplyDimensionBinding；因此 MetadataColumnId 与 ColumnName 皆空即为 LLM 幻影维度。
+    /// </summary>
+    private static bool IsUnboundDimension(QueryDimension dimension)
+        => dimension.MetadataColumnId <= 0 && string.IsNullOrWhiteSpace(dimension.ColumnName);
+
+    /// <summary>
+    /// 为单个 Runtime 维度在 Resolution 绑定集合中寻找最佳匹配。
+    /// 匹配优先级：SemanticText 精确匹配 → SemanticText/ColumnName 与绑定物理列同名 → 位置回退（1:1 常见情形）。
+    /// 返回绑定索引；找不到未使用绑定时返回 -1（调用方据此丢弃该幻影维度）。
+    /// </summary>
+    private static int MatchDimensionBinding(
+        IReadOnlyList<QueryPlanDimensionResolution> bindings,
+        QueryDimension runtime,
+        HashSet<int> used,
+        int positional)
+    {
+        for (var j = 0; j < bindings.Count; j++)
+        {
+            if (used.Contains(j)) continue;
+            if (!string.IsNullOrWhiteSpace(runtime.SemanticText)
+                && string.Equals(runtime.SemanticText, bindings[j].SemanticText, StringComparison.OrdinalIgnoreCase))
+                return j;
+        }
+
+        for (var j = 0; j < bindings.Count; j++)
+        {
+            if (used.Contains(j)) continue;
+            if (!string.IsNullOrWhiteSpace(runtime.SemanticText)
+                && string.Equals(runtime.SemanticText, bindings[j].Column, StringComparison.OrdinalIgnoreCase))
+                return j;
+            if (!string.IsNullOrWhiteSpace(runtime.ColumnName)
+                && (string.Equals(runtime.ColumnName, bindings[j].Column, StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(runtime.ColumnName, bindings[j].SemanticText, StringComparison.OrdinalIgnoreCase)))
+                return j;
+        }
+
+        // 位置回退（1:1 常见情形）：仅当该 Runtime 维度确有可识别文本时才允许。
+        // 空维度（SemanticText 与 ColumnName 皆空）必须判为幻影并丢弃，
+        // 否则会把 LLM 的空维度错误绑定到一条无关的 Resolution 维度上。
+        var hasText = !string.IsNullOrWhiteSpace(runtime.SemanticText)
+                      || !string.IsNullOrWhiteSpace(runtime.ColumnName);
+        if (hasText && positional < bindings.Count && !used.Contains(positional))
+            return positional;
+
+        return -1;
     }
 
     private static void ApplyDimensionBinding(QueryPlan plan, QueryDimension runtime, QueryPlanDimensionResolution b, int index)

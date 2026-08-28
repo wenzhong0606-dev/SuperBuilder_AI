@@ -209,9 +209,9 @@ Stage 0 (DONE)
 |---|---|---|---|
 | A1 | 目标结构设计与文档/骨架/冗余清理 | `docs/ARCHITECTURE.md` 等、删 40 冗余 | ✅ 完成 |
 | A2 | 单项目内 `src/` 分层物理迁移（命名空间保留） | 234 .cs git mv 四层 | ✅ 完成 |
-| A3 | 抽取独立项目（Domain/Application/Infrastructure/Api） | 新建 4 个 `.csproj` + slnx 引用；迁移包引用与 `Migrations`；**每拆一个项目 build + Golden** | ⬜ 随 P3 启动 |
-| A4 | 上帝类拆分 + 依赖倒置（补 `I*` 端口） | 拆分 `QueryPlanBuilder`(4308 行/8 partial)→ `BusinessTermExtractor`+`TableSelector`+`FieldResolver`+`JoinBuilder`+瘦编排器；`BIConversationService`→`QueryPlanPipeline`；`QueryPlanValidator`/`SemanticApplicabilityEvaluator` 抽纯领域服务；补 `IQueryPlanBuilder` 等端口与 DI | ⬜ **必须在 P6 前完成** |
-| A5 | 限界上下文解耦 | 消除 `Metadata↔Organization` 循环；抽 `SharedKernel`；合并 `GoldenBaseline`↔`GoldenBaselinePersistenceRecord`、`QueryPlanSemanticResolution`↔`SemanticApplicabilityResult/*Resolution`；统一三套搜索结果 DTO；统一 `DimensionResolutionType` 枚举 | ⬜ 随 A4 之后 |
+| A3 | 抽取独立项目（Domain/Application/Infrastructure/Api） | 新建 4 个 `.csproj` + slnx 引用；迁移包引用与 `Migrations`；**每拆一个项目 build + Golden** | 🚫 **阻塞：以 A5 为前置**（首次尝试 `1c7ff18` 因既有 `Domain↔Application`、`Application↔Infrastructure` 循环依赖物理不可行，已于 `e87d8b9` 回退为单项目分层） |
+| A4 | 上帝类拆分 + 依赖倒置（补 `I*` 端口） | 拆分 `QueryPlanBuilder`(4308 行/8 partial)→ `BusinessTermExtractor`+`TableSelector`+`FieldResolver`+`JoinBuilder`+瘦编排器；`BIConversationService`→`QueryPlanPipeline`；`QueryPlanValidator`/`SemanticApplicabilityEvaluator` 抽纯领域服务；补 `IQueryPlanBuilder` 等端口与 DI | ✅ 完成（`9981d73`；build 0 error；**Golden 18/18 PASS**，期间修复 GQ-010 Filter 数量漂移与 GQ-008 幽灵维度两处回归） |
+| A5 | 限界上下文解耦 | 消除 `Metadata↔Organization` 循环；抽 `SharedKernel`；合并 `GoldenBaseline`↔`GoldenBaselinePersistenceRecord`、`QueryPlanSemanticResolution`↔`SemanticApplicabilityResult/*Resolution`；统一三套搜索结果 DTO；统一 `DimensionResolutionType` 枚举 | ⬜ **A3 的前置条件**（须先解除分层循环依赖，再谈多项目物理拆分） |
 
 **A4 拆分后的 QueryPlan 五平面（用户建议，落地目标）**
 ```

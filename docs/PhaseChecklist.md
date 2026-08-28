@@ -22,13 +22,15 @@
   - [ ] 新建 4 个 `.csproj` + slnx 引用
   - [ ] 迁移包引用与 `Migrations`（随 Infrastructure.Persistence）
   - [ ] 每拆一个项目：`dotnet build` 绿 + Golden 18/18
-- [ ] **A4** 上帝类拆分 + 依赖倒置（**P6 前必须完成**）
-  - [ ] `QueryPlanBuilder`(4308行/8 partial) → `BusinessTermExtractor`+`TableSelector`+`FieldResolver`+`JoinBuilder`+瘦编排器
-  - [ ] `BIConversationService` → `QueryPlanPipeline` 编排器
-  - [ ] `QueryPlanValidator`/`SemanticApplicabilityEvaluator` 抽纯领域服务
-  - [ ] 补 `IQueryPlanBuilder` 等 `I*` 端口 + DI 注册
-  - [ ] 每步 build + Golden 18/18
-- [ ] **A5** 限界上下文解耦
+- [x] **A4** 上帝类拆分 + 依赖倒置（**P6 前必须完成**）
+  - [x] `QueryPlanBuilder`(4308行/8 partial) → `BusinessTermExtractor`+`TableSelector`+`FieldResolver`+`JoinBuilder`+瘦编排器（`QueryPlanBuilder.*.cs` partials）
+  - [x] `BIConversationService` → `QueryPlanPipeline` 编排器
+  - [x] `QueryPlanValidator`/`SemanticApplicabilityEvaluator` 抽纯领域服务
+  - [x] 补 `IQueryPlanBuilder` 等 `I*` 端口 + DI 注册
+  - [x] build 0 error；逐 partial 重建与语义对齐
+  - [x] **GQ-010 Filter 数量漂移回归修复**：`ApplyFilterResolutions` 由"按索引取 min 条重写、其余忽略"改为"按 SemanticText 语义对齐 + 丢弃无绑定幻影 Filter"，消除 Runtime 多产出 Filter 时残留未重写语义名（入库日期）触发 `FilterFieldNotFound`
+  - [x] **GQ-008 幽灵维度加固（与上条对称）**：`ApplyDimensionResolutions` 在 `bindings.Count==0` 时不再直接 return，改为 `RemoveAll(IsUnboundDimension)` 清除 LLM 空维度；数量漂移不再硬抛 `InvalidOperationException`，改为 SemanticText 对齐 + 丢弃幻影 + 用未消费 Resolution 绑定补全
+- [ ] **A5** 限界上下文解耦（**A3 前置**）
   - [ ] 消除 `Metadata↔Organization` 循环依赖
   - [ ] 抽 `SharedKernel`
   - [ ] 合并 `GoldenBaseline`↔`GoldenBaselinePersistenceRecord`
@@ -39,17 +41,19 @@
 
 ## ⬜ Stage 2 — 产品演进（P-track，至完成）
 
-### P3 — Business Semantic Model（**当前起点**）
-- [ ] `src/Domain/BusinessEntity/BusinessDomain.cs`（新增 AR：业务域）
-- [ ] `BusinessEntityMetricDefinition.cs` / `BusinessEntityDimensionDefinition.cs`（新增 VO）
-- [ ] `src/Application/BusinessEntity/IBusinessEntityRepository.cs`（端口）
-- [ ] `BusinessEntityRegistryService.cs`（注册/发现/校验）
-- [ ] `BusinessSemanticMappingService.cs`（Metadata→BusinessEntity，承接现有 PhysicalBindingResolver）
-- [ ] `QueryIntentNormalizer.cs` 注入"业务实体感知"
+### P3 — Business Semantic Model（**进行中：批次 1-2 已落地，管线接线未完成**）
+- [x] `src/Domain/BusinessEntity/BusinessDomain.cs`（新增 AR：业务域）
+- [x] `BusinessEntityDimension.cs`（子实体）+ `BusinessSemanticResolutionResult.cs`（VO）
+- [x] `src/Application/Ports/BI/Entity/IBusinessEntityRepository.cs`（端口）+ `Infrastructure/Persistence/BusinessEntityRepository.cs`（实现）
+- [x] `BusinessEntityRegistryService.cs`（注册/发现/校验）
+- [x] `BusinessSemanticMappingService.cs`（Metadata→BusinessEntity，确定性 token 重叠打分，不调 LLM）
+- [x] `Infrastructure/Persistence/Configurations/Phase31EntityModelConfiguration.cs`（含 `BusinessDomainConfiguration` + `BusinessEntityDimensionConfiguration`）
+- [x] Migration `20260828144504_P3BusinessEntityModelWithDomains`（8 张表，已 apply；消除 `TenantId1` 影子 FK）
+- [x] `Api/Controllers/BusinessModelController.cs` + DI 注册（`Program.cs:45-46`）
+- [ ] `QueryIntentNormalizer.cs` 注入"业务实体感知"（**未接线**：`QueryIntent.BusinessEntityHints` 已定型但无任何生产者）
 - [ ] `QueryPlanBuilder*.cs` 编排层走 BusinessEntity 语义路径（不膨胀）
-- [ ] `Infrastructure/Persistence/Configurations/BusinessDomainConfiguration.cs` + 新 Migration
-- [ ] `Api/Controllers/BusinessModelController.cs`（生产）
-- [ ] 诊断控制器 `Api/Diagnostics/*BusinessEntity*` 路由收敛
+- [ ] `BusinessEntityMetricDefinition.cs`（Metric VO，尚未新增）
+- [ ] 诊断控制器 `Api/Diagnostics/*BusinessEntity*` 路由收敛（现存 `BusinessEntityGoldenFixtureController` / `BusinessEntityRuntimeVerificationController`）
 - [ ] **验收**：build 0 error + BusinessEntity 优先解析 + **Golden 18/18** + Migration 可更新
 
 ### P4 — Multi-Tenant Platform Core
