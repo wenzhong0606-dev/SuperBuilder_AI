@@ -2,6 +2,7 @@
 using SuperBuilder_AI.Infrastructure.Database;
 using SuperBuilder_AI.Interfaces;
 using SuperBuilder_AI.Interfaces.BI;
+using SuperBuilder_AI.Interfaces.BI.Planning;
 using SuperBuilder_AI.Interfaces.Database;
 using SuperBuilder_AI.Models.AI;
 using SuperBuilder_AI.Models.BI;
@@ -53,59 +54,11 @@ public class BIConversationService
 	private readonly IQueryUnderstandingService
 		_queryUnderstandingService;
 
-	private readonly IQueryPlanBuilder
-		_queryPlanBuilder;
-
-	private readonly IQueryPlanContextBuilder
-		_queryPlanContextBuilder;
-
-	private readonly QueryPlanMetadataValidator
-		_queryPlanMetadataValidator;
+	private readonly IQueryPlanPipeline
+		_queryPlanPipeline;
 
 	private readonly SuperBIContext
 		_superBIContext;
-
-	/// <summary>
-	/// Phase 2.2.5
-	///
-	/// QueryPlan验证+自动修复Pipeline
-	/// </summary>
-	private readonly IQueryPlanValidationPipeline
-		_validationPipeline;
-
-	/// <summary>
-	/// Phase 2.4
-	///
-	/// QueryPlan Confidence 评估。
-	/// </summary>
-	private readonly IQueryPlanConfidenceService
-		_queryPlanConfidenceService;
-
-	/// <summary>
-	/// Phase 2.4
-	///
-	/// QueryPlan Decision Gate。
-	/// </summary>
-	private readonly IQueryPlanDecisionGate
-		_queryPlanDecisionGate;
-
-	/// <summary>
-	/// Phase 2.5
-	///
-	/// QueryPlan Explainability。
-	///
-	/// 负责聚合：
-	///
-	/// QueryPlan
-	/// Validation
-	/// RepairTrace
-	/// Confidence
-	/// Decision
-	///
-	/// 本服务不重新计算上述结果。
-	/// </summary>
-	private readonly IQueryPlanExplainabilityService
-		_queryPlanExplainabilityService;
 
 	private readonly ISqlQueryBuilder
 		_sqlQueryBuilder;
@@ -133,13 +86,7 @@ public class BIConversationService
 
 	public BIConversationService(
 		IQueryUnderstandingService queryUnderstandingService,
-		IQueryPlanBuilder queryPlanBuilder,
-		IQueryPlanContextBuilder queryPlanContextBuilder,
-		QueryPlanMetadataValidator queryPlanMetadataValidator,
-		IQueryPlanValidationPipeline validationPipeline,
-		IQueryPlanConfidenceService queryPlanConfidenceService,
-		IQueryPlanDecisionGate queryPlanDecisionGate,
-		IQueryPlanExplainabilityService queryPlanExplainabilityService,
+		IQueryPlanPipeline queryPlanPipeline,
 		ISqlQueryBuilder sqlQueryBuilder,
 		ISqlDialectResolver sqlDialectResolver,
 		SuperBIContext superBIContext,
@@ -149,26 +96,8 @@ public class BIConversationService
 		_queryUnderstandingService =
 			queryUnderstandingService;
 
-		_queryPlanBuilder =
-			queryPlanBuilder;
-
-		_queryPlanContextBuilder =
-			queryPlanContextBuilder;
-
-		_queryPlanMetadataValidator =
-			queryPlanMetadataValidator;
-
-		_validationPipeline =
-			validationPipeline;
-
-		_queryPlanConfidenceService =
-			queryPlanConfidenceService;
-
-		_queryPlanDecisionGate =
-			queryPlanDecisionGate;
-
-		_queryPlanExplainabilityService =
-			queryPlanExplainabilityService;
+		_queryPlanPipeline =
+			queryPlanPipeline;
 
 		_sqlQueryBuilder =
 			sqlQueryBuilder;
@@ -236,257 +165,39 @@ public class BIConversationService
 
 
 		/*
-         * Step 2
+         * Step 2 ~ Step 5.4
          *
          * 构建 QueryPlan
-         */
-		var plan =
-			await _queryPlanBuilder
-				.BuildAsync(intent);
-
-
-		/*
-         * Step 3
-         *
-         * 构建 QueryPlan Validation Context
-         */
-		var validationContext =
-			await _queryPlanContextBuilder
-				.BuildAsync(plan);
-
-
-		/*
-         * Step 4
-         *
-         * Metadata关系完整性验证
-         *
-         * 注意:
-         *
-         * 当前 Validator:
-         *
-         * void Validate()
-         *
-         * 失败通过异常表达。
-         *
-         * 此阶段尚未进入 QueryPlan Semantic
-         * Validation Pipeline，因此没有：
-         *
-         * ValidationResult
-         * RepairTrace
-         * Confidence
-         * Decision
-         *
-         * 所以不能生成虚假的 Explainability。
-         */
-		try
-		{
-			_queryPlanMetadataValidator
-				.Validate(
-					plan,
-					validationContext);
-		}
-		catch (Exception ex)
-		{
-			return new BIResponse
-			{
-				Success = false,
-
-				Question = question,
-
-				ErrorMessage =
-					ex.Message
-			};
-		}
-
-
-		/*
-         * Step 5
-         *
-         * QueryPlan语义验证+自动修复
-         *
-         * Phase 2.2.5
-         *
-         * Validate
-         *
-         * ↓
-         *
-         * Repair
-         *
-         * ↓
-         *
-         * ReValidate
-         */
-		var semanticValidation =
-			await _validationPipeline
-				.ValidateAsync(
-					plan,
-					validationContext,
-					question);
-
-		plan =
-			semanticValidation.Plan;
-
-
-		/*
-         * Step 5.1
-         *
-         * Validation 最终失败。
-         *
-         * Phase 2.5:
-         *
-         * 此时虽然还没有 Confidence / Decision，
-         * 但是已经拥有：
-         *
-         * QueryPlan
-         * ValidationResult
-         * RepairTrace
-         *
-         * 因此可以生成部分 Explainability。
-         *
-         * 不允许伪造：
-         *
-         * Confidence
-         * Decision
-         */
-		if (!semanticValidation.ValidationResult.IsValid)
-		{
-			var validationExplanation =
-				_queryPlanExplainabilityService
-					.Explain(
-						question,
-						plan,
-						semanticValidation.ValidationResult,
-						semanticValidation.RepairTrace,
-						null,
-						null);
-
-			return new BIResponse
-			{
-				Success = false,
-
-				Question = question,
-
-				ErrorMessage =
-					string.Join(
-						"\n",
-						semanticValidation.ValidationResult.Errors
-							.Select(x => x.Message)),
-
-				Explanation =
-					validationExplanation
-			};
-		}
-
-
-		/*
-         * Step 5.2
-         *
-         * QueryPlan Confidence
-         *
-         * Phase 2.4
-         *
-         * Validation
          *     ↓
-         * Repair
+         * Metadata 关系完整性验证
          *     ↓
-         * RepairTrace
+         * 语义验证 + 自动修复
          *     ↓
          * Confidence
-         */
-		var confidence =
-			await _queryPlanConfidenceService
-				.EvaluateAsync(
-					plan,
-					semanticValidation,
-					semanticValidation.RepairTrace,
-					question);
-
-
-		/*
-         * Step 5.3
-         *
-         * QueryPlan Decision Gate
-         *
-         * Phase 2.4
-         *
-         * High
          *     ↓
-         * Proceed
-         *
-         * Medium
+         * Decision Gate
          *     ↓
-         * Confirm
+         * Explainability
          *
-         * Low
-         *     ↓
-         * Reject
+         * 上述编排已抽取到 QueryPlanPipeline，
+         * 行为与重构前完全一致；提前结束（验证失败 / Decision Gate 阻断）时直接返回 EarlyResponse。
          */
-		var decision =
-			_queryPlanDecisionGate
-				.Evaluate(
-					confidence);
-
-
-		/*
-         * Step 5.3.1
-         *
-         * Phase 2.5
-         *
-         * QueryPlan Explainability。
-         *
-         * 此时所有核心 Pipeline 结果均已经存在：
-         *
-         * QueryPlan
-         * ValidationResult
-         * RepairTrace
-         * Confidence
-         * Decision
-         *
-         * Explainability 只负责聚合，
-         * 不重新计算任何结果。
-         */
-		var explanation =
-			_queryPlanExplainabilityService
-				.Explain(
+		var pipelineResult =
+			await _queryPlanPipeline
+				.RunAsync(
 					question,
-					plan,
-					semanticValidation.ValidationResult,
-					semanticValidation.RepairTrace,
-					confidence,
-					decision);
+					intent);
 
-
-		/*
-         * Step 5.4
-         *
-         * Decision Gate 阻断。
-         *
-         * 注意：
-         *
-         * 此处不能继续 SQL Builder。
-         *
-         * Phase 2.5:
-         *
-         * 即使被 Decision Gate 拒绝，
-         * 也必须保留完整 Explainability。
-         */
-		if (!decision.ShouldExecute)
+		if (pipelineResult.EarlyResponse != null)
 		{
-			return new BIResponse
-			{
-				Success = false,
-
-				Question = question,
-
-				ErrorMessage =
-					decision.Reason
-					??
-					"QueryPlan 未通过 Decision Gate，禁止进入 SQL Builder。",
-
-				Explanation =
-					explanation
-			};
+			return pipelineResult.EarlyResponse;
 		}
+
+		var plan =
+			pipelineResult.Plan;
+
+		var explanation =
+			pipelineResult.Explanation;
 
 
 		/*

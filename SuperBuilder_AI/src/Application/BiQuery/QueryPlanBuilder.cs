@@ -61,6 +61,12 @@ public partial class QueryPlanBuilder : IQueryPlanBuilder
 		_joinInference;
 	private readonly QueryPlanValidator _validator;
 
+	// A4 重构：协作子服务（职责拆分，逻辑保持不变）
+	private readonly BusinessTermExtractor _businessTermExtractor;
+	private readonly FieldResolver _fieldResolver;
+	private readonly TableSelector _tableSelector;
+	private readonly JoinBuilder _joinBuilder;
+
 	/// <summary>
 	/// 创建 QueryPlanBuilder。
 	/// </summary>
@@ -89,6 +95,21 @@ public partial class QueryPlanBuilder : IQueryPlanBuilder
 			validator
 			?? throw new ArgumentNullException(
 				nameof(validator));
+
+		_businessTermExtractor =
+			new BusinessTermExtractor(
+				_metadataSearch);
+
+		_fieldResolver =
+			new FieldResolver();
+
+		_tableSelector =
+			new TableSelector(
+				_fieldResolver);
+
+		_joinBuilder =
+			new JoinBuilder(
+				_joinInference);
 	}
 
 	/// <summary>

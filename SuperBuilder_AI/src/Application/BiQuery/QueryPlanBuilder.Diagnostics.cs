@@ -42,11 +42,11 @@ public partial class QueryPlanBuilder : IQueryPlanBuilder
 		var diagnostics = new QueryPlanDiagnostics { Intent = intent };
 
 		// 1. business terms
-		var businessTerms = CollectBusinessTerms(intent);
+		var businessTerms = _businessTermExtractor.CollectBusinessTerms(intent);
 		// fallback when no terms extracted
 		if (businessTerms.Count == 0)
 		{
-			businessTerms = CollectBusinessTermsFallback(intent);
+			businessTerms = _businessTermExtractor.CollectBusinessTermsFallback(intent);
 		}
 		diagnostics.BusinessTerms = businessTerms;
 
@@ -58,7 +58,7 @@ public partial class QueryPlanBuilder : IQueryPlanBuilder
 		}
 
 		// 3. aggregated metadata results (same as SearchMetadataAsync)
-		var metadataResults = await SearchMetadataAsync(businessTerms);
+		var metadataResults = await _businessTermExtractor.SearchMetadataAsync(businessTerms);
 
 		// 4. build candidate diagnostics
 		var groups = metadataResults.Where(x => x.Table != null).GroupBy(x => x.Table!.Id);
@@ -75,11 +75,11 @@ public partial class QueryPlanBuilder : IQueryPlanBuilder
 			double boost = 0.0;
 			try
 			{
-				var tableNameText = NormalizeText(table.TableName);
-				var tableCommentText = NormalizeText(table.TableComment);
+				var tableNameText = _fieldResolver.NormalizeText(table.TableName);
+				var tableCommentText = _fieldResolver.NormalizeText(table.TableComment);
 				foreach (var term in businessTerms)
 				{
-					var t = NormalizeText(term);
+					var t = _fieldResolver.NormalizeText(term);
 					if (string.IsNullOrWhiteSpace(t)) continue;
 					if ((!string.IsNullOrWhiteSpace(tableNameText) && tableNameText.Contains(t, StringComparison.OrdinalIgnoreCase)) ||
 						(!string.IsNullOrWhiteSpace(tableCommentText) && tableCommentText.Contains(t, StringComparison.OrdinalIgnoreCase)))
@@ -98,17 +98,17 @@ public partial class QueryPlanBuilder : IQueryPlanBuilder
 				{
 					foreach (var term in businessTerms)
 					{
-						var t = NormalizeText(term);
+						var t = _fieldResolver.NormalizeText(term);
 						if (string.IsNullOrWhiteSpace(t)) continue;
 						foreach (var col in table.Columns)
 						{
 							try
 							{
-								var colName = NormalizeText(col.ColumnName);
-								var colComment = NormalizeText(col.ColumnComment);
+								var colName = _fieldResolver.NormalizeText(col.ColumnName);
+								var colComment = _fieldResolver.NormalizeText(col.ColumnComment);
 								if ((!string.IsNullOrWhiteSpace(colName) && colName.Contains(t, StringComparison.OrdinalIgnoreCase)) ||
 									(!string.IsNullOrWhiteSpace(colComment) && colComment.Contains(t, StringComparison.OrdinalIgnoreCase)) ||
-									IsRelatedBusinessText(term, col))
+									_fieldResolver.IsRelatedBusinessText(term, col))
 								{
 									localMatchCount++;
 								}

@@ -13,6 +13,7 @@ using SuperBuilder_AI.Interfaces.BI;
 using SuperBuilder_AI.Interfaces.Database;
 using SuperBuilder_AI.Services.Database;
 using SuperBuilder_AI.Interfaces.BI.Entity;
+using SuperBuilder_AI.Infrastructure.Persistence;
 using SuperBuilder_AI.Services.BI.Entity;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -38,6 +39,13 @@ builder.Services.AddScoped<IQueryPlanContextBuilder, QueryPlanContextBuilder>();
 builder.Services.AddScoped<IBusinessEntityService, BusinessEntityService>();
 builder.Services.AddScoped<IPhysicalBindingResolver, PhysicalBindingResolver>();
 builder.Services.AddScoped<IEntityQueryPlanMapper, EntityQueryPlanMapper>();
+
+// P3 Business Semantic Model：业务实体注册表 + 语义映射（确定性匹配，不调 LLM）
+builder.Services.AddScoped<IBusinessEntityRegistryService, BusinessEntityRegistryService>();
+builder.Services.AddScoped<IBusinessSemanticMappingService, BusinessSemanticMappingService>();
+
+// P3 批次2：业务域 / 维度仓储（A4 依赖倒置准备，仅操作 Metadata DB）
+builder.Services.AddScoped<IBusinessEntityRepository, BusinessEntityRepository>();
 
 if (string.Equals(
         Environment.GetEnvironmentVariable("CI"),
@@ -75,6 +83,10 @@ builder.Services.AddScoped<IQueryJoinInferenceService>(sp => sp.GetRequiredServi
 builder.Services.AddScoped<QueryPlanValidator>();
 builder.Services.AddScoped<QueryPlanBuilder>();
 builder.Services.AddScoped<IQueryPlanBuilder>(sp => sp.GetRequiredService<QueryPlanBuilder>());
+
+// A4 重构：QueryPlanPipeline（从 BIConversationService 抽取的 QueryPlan 编排管线）
+builder.Services.AddScoped<QueryPlanPipeline>();
+builder.Services.AddScoped<IQueryPlanPipeline>(sp => sp.GetRequiredService<QueryPlanPipeline>());
 builder.Services.AddScoped<QuerySemanticValidator>();
 builder.Services.AddScoped<IQueryPlanRepairService, QueryPlanRepairService>();
 builder.Services.AddScoped<IQueryPlanValidationPipeline, QueryPlanValidationPipeline>();

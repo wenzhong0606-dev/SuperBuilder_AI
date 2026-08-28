@@ -10,6 +10,9 @@ namespace SuperBuilder_AI.Services.BI;
 
 public partial class QueryPlanBuilder : IQueryPlanBuilder
 {
+	/// <summary>
+	/// 判断列是否为非信息化展示字段（例如仅表示删除标记或内部用户ID），不适合单列展示。
+	/// </summary>
 	private bool IsNonInformativeColumn(MetadataColumn col)
 	{
 		if (col == null) return true;
@@ -30,7 +33,6 @@ public partial class QueryPlanBuilder : IQueryPlanBuilder
 
 	/// <summary>
 	/// 根据表结构返回一个优先展示列的候选列表（按优先级排序）。
-	/// 首选单号/编号、时间、主键、物料/商品/数量等业务字段。
 	/// </summary>
 	private IEnumerable<MetadataColumn> GetPreferredDisplayColumns(MetadataTable table)
 	{
@@ -74,27 +76,21 @@ public partial class QueryPlanBuilder : IQueryPlanBuilder
 	}
 
 	/// <summary>
-	/// 调试用的查询计划诊断信息。
+	/// 标准化SQL比较运算符。
 	/// </summary>
 	private string
 		NormalizeOperator(
 			string? value)
 	{
-
 		if (string.IsNullOrWhiteSpace(
 			value))
 		{
 			return "=";
 		}
 
-
-
 		var op =
 			value.Trim()
 			.ToUpperInvariant();
-
-
-
 
 		return op switch
 		{
@@ -113,13 +109,7 @@ public partial class QueryPlanBuilder : IQueryPlanBuilder
 			// M6 修复：与 SqlQueryBuilder.NormalizeOperator 保持一致，未知操作符默认为 "=" 而非抛异常
 			_ => "="
 		};
-
 	}
-
-
-
-
-
 
 	/// <summary>
 	/// 判断聚合方式。
@@ -128,14 +118,11 @@ public partial class QueryPlanBuilder : IQueryPlanBuilder
 		IsAggregation(
 			string? aggregation)
 	{
-
 		if (string.IsNullOrWhiteSpace(
 			aggregation))
 		{
 			return false;
 		}
-
-
 
 		return aggregation.ToUpperInvariant()
 			switch
@@ -148,13 +135,7 @@ public partial class QueryPlanBuilder : IQueryPlanBuilder
 
 			_ => false
 		};
-
 	}
-
-
-
-
-
 
 	/// <summary>
 	/// 获取Metric错误描述。
@@ -163,14 +144,11 @@ public partial class QueryPlanBuilder : IQueryPlanBuilder
 		GetMetricDescription(
 			QueryMetric metric)
 	{
-
 		if (!string.IsNullOrWhiteSpace(
 			metric.Field))
 		{
 			return metric.Field;
 		}
-
-
 
 		if (!string.IsNullOrWhiteSpace(
 			metric.Name))
@@ -178,82 +156,6 @@ public partial class QueryPlanBuilder : IQueryPlanBuilder
 			return metric.Name;
 		}
 
-
-
 		return "未知指标";
-
 	}
-
-
-
-
-
-
-	/// <summary>
-	/// Metadata字段候选对象。
-	/// </summary>
-	private sealed class ColumnCandidate
-	{
-
-		/// <summary>
-		/// Metadata语义检索结果。
-		/// </summary>
-		public MetadataSemanticSearchResult?
-			Result
-		{
-			get;
-			set;
-		}
-
-
-
-		/// <summary>
-		/// Metadata字段。
-		/// </summary>
-		public MetadataColumn
-			Column
-		{
-			get;
-			set;
-		}
-			= null!;
-
-
-
-		/// <summary>
-		/// Qdrant相似度。
-		/// </summary>
-		public double Score
-		{
-			get;
-			set;
-		}
-
-	}
-
-
-	/// <summary>
-	/// 根据当前查询召回的Metadata结果推断QueryPlan中的JOIN关系。
-	///
-	/// Phase 1.6.2.1
-	///
-	/// 当前阶段采用保守策略：
-	///
-	/// 1. 只考虑当前主表直接连接的候选表。
-	/// 2. 使用现有IQueryJoinInferenceService进行关系推断。
-	/// 3. 只接受InferenceService已经通过阈值的Candidate。
-	/// 4. 同一目标表只保留Confidence最高的一条JOIN。
-	/// 5. 当前最多增加2个直接关联表。
-	/// 6. 当前默认使用INNER JOIN。
-	///
-	/// 注意：
-	///
-	/// 本方法只负责:
-	///
-	/// QueryJoinCandidate
-	///        ↓
-	/// QueryJoin
-	///
-	/// 不负责SQL生成。
-	/// </summary>
 }
