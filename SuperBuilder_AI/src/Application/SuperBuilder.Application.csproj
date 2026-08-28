@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Application uses EF Core primitives/attributes and references the SuperBIContext
+         type (which lives in Infrastructure). The EF Core base package is required here. -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.10" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Clean Architecture: Application depends only on Domain. -->
+    <ProjectReference Include="..\Domain\SuperBuilder.Domain.csproj" />
+  </ItemGroup>
+
+  <!--
+    NOTE (architecture violation, see A3 report): Application also depends on
+    SuperBuilder_AI.Data.SuperBIContext (defined in the Infrastructure layer). That is a
+    layering violation and is intentionally NOT expressed as a ProjectReference here so the
+    project graph stays acyclic. It must be resolved in a later stage (expose the context
+    behind a repository/interface owned by Application, or move the DbContext contract down).
+  -->
+
+</Project>

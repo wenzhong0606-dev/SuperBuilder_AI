@@ -4,7 +4,13 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <!-- Scope compilation to the Api layer only; the other layers are now separate projects. -->
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="src\Api\**\*.cs" />
+  </ItemGroup>
 
   <ItemGroup>
     <Content Include="Document\column.csv" />
@@ -15,25 +21,21 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Dapper" Version="2.1.79" />
-    <PackageReference Include="Microsoft.Data.SqlClient" Version="7.0.2" />
+    <!-- EF design-time tooling so `dotnet ef` works from this (startup) project. -->
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.10">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.10" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="10.0.10">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="MySqlConnector" Version="2.6.1" />
-    <PackageReference Include="Npgsql" Version="10.0.3" />
-    <PackageReference Include="OpenAI" Version="2.13.0" />
-    <PackageReference Include="Qdrant.Client" Version="1.19.0" />
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="src\Infrastructure\Persistence\Migrations\" />
+    <ProjectReference Include="src\Application\SuperBuilder.Application.csproj" />
+    <ProjectReference Include="src\Infrastructure\SuperBuilder.Infrastructure.csproj" />
+    <ProjectReference Include="src\Domain\SuperBuilder.Domain.csproj" />
   </ItemGroup>
 
 </Project>
