@@ -97,7 +97,7 @@ jobs:
           ASPNETCORE_ENVIRONMENT: Development
           ConnectionStrings__DefaultConnection: "Server=127.0.0.1,1433;Database=SuperBuilder_C13_3;User Id=sa;Password=${{ env.TEST_SQL_PASSWORD }};TrustServerCertificate=True;"
         run: |
-          dotnet ef database update --project SuperBulider_AI/SuperBuilder_AI.csproj --startup-project SuperBulider_AI/SuperBuilder_AI.csproj --configuration Release
+          dotnet ef database update --project SuperBuilder_AI/SuperBuilder_AI.csproj --startup-project SuperBuilder_AI/SuperBuilder_AI.csproj --configuration Release
       - name: Release 编译 Runtime 应用
         run: dotnet build --configuration Release --no-restore
       - name: 启动 Web API
@@ -107,7 +107,7 @@ jobs:
           Qdrant__Host: 127.0.0.1
           Qdrant__Port: 6334
         run: |
-          dotnet run --project SuperBulider_AI/SuperBuilder_AI.csproj --configuration Release --no-restore --no-build --urls http://127.0.0.1:5050 > /tmp/superbuilder-api.log 2>&1 &
+          dotnet run --project SuperBuilder_AI/SuperBuilder_AI.csproj --configuration Release --no-restore --no-build --urls http://127.0.0.1:5050 > /tmp/superbuilder-api.log 2>&1 &
           echo $! > /tmp/superbuilder-api.pid
       - name: 等待 Controller 启动
         run: |
