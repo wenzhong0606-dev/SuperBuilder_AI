@@ -175,6 +175,9 @@ public class BIConversationService
 			: PlatformContext.System;
 		_platformContextAccessor?.Current = platformContext;
 
+		// P4.3：开启全局租户过滤（tenantId <= 0 时 ApplyTenantScope 内部保持关闭，等价于 no-op）。
+		_superBIContext.ApplyTenantScope(tenantId);
+
 		/*
          * Step 1
          *

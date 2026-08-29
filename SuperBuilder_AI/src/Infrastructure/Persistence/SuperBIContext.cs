@@ -10,6 +10,25 @@ public class SuperBIContext : DbContext
 {
     public SuperBIContext(DbContextOptions<SuperBIContext> options) : base(options) { }
 
+    #region P4.3 Global Tenant Query Filter
+    // 默认关闭（no-op）。由 Runtime 入口（BIConversationService.ExecuteAsync）在已知 tenantId 后显式调用 ApplyTenantScope 开启；
+    // Golden 无租户路径从不调用，故查询恒不过滤。
+    // 采用"显式开启"而非"读取 IPlatformContextAccessor"，避免 DbContext 构造期/请求期取值错位
+    // （此前 P4.3 曾因读取 System 上下文的 TenantId=0 而过度过滤，触发 Golden 回归）。
+    private bool _tenantFilterEnabled;
+    private long _scopedTenantId;
+
+    /// <summary>
+    /// 在请求作用域内开启全局租户过滤（P4.3 防御性隔离）。
+    /// 仅当 <paramref name="tenantId"/> &gt; 0 时启用；否则保持关闭（等价于 no-op），不影响系统/全局/ Golden 路径。
+    /// </summary>
+    public void ApplyTenantScope(long tenantId)
+    {
+        _tenantFilterEnabled = tenantId > 0;
+        _scopedTenantId = tenantId;
+    }
+    #endregion
+
     #region Organization
     public DbSet<Tenant> Tenants { get; set; }
     public DbSet<DataSource> DataSources { get; set; }
@@ -102,6 +121,19 @@ public class SuperBIContext : DbContext
 
         #region Learning
         builder.Entity<MetadataLearningRecord>().ToTable(tb => tb.HasComment("学习记录"));
+        #endregion
+
+        #region P4.3 Global Tenant Query Filter
+        // 直接持有 TenantId 的根实体施加全局过滤；子实体经父实体 FK 间接隔离。
+        // 表达式 !_tenantFilterEnabled || e.TenantId == _scopedTenantId：
+        //   - 未开启（Golden/系统路径，ApplyTenantScope 未被调用）：!false => 恒真，SQL 不产生 WHERE，等价于 no-op；
+        //   - 已开启：e.TenantId == 当前租户，强制跨租户不可见（与现有应用层手动 tenantId 过滤一致）。
+        // DataSource.TenantId 为 long?：必须用 HasValue 守卫，避免 long? == long 产生被提升的 bool?
+        // 与 !_tenantFilterEnabled 做 || 时破坏 EF 表达式处理（"Nullable object must have a value"）。
+        builder.Entity<DataSource>().HasQueryFilter(e => !_tenantFilterEnabled || (e.TenantId.HasValue && e.TenantId.Value == _scopedTenantId));
+        builder.Entity<MetadataTable>().HasQueryFilter(e => !_tenantFilterEnabled || e.TenantId == _scopedTenantId);
+        builder.Entity<Models.BI.Entity.BusinessEntity>().HasQueryFilter(e => !_tenantFilterEnabled || e.TenantId == _scopedTenantId);
+        builder.Entity<TenantSetting>().HasQueryFilter(e => !_tenantFilterEnabled || e.TenantId == _scopedTenantId);
         #endregion
 
         // Phase 3.1：Business Entity 只持久化到 SuperBuilder Metadata DB。

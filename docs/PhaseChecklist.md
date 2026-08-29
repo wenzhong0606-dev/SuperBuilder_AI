@@ -73,10 +73,12 @@
 - [x] `SuperBIContext` 新增 `DbSet<TenantSetting>` + 配置（级联删除、`(TenantId,Key)` 唯一索引、列注释）；Migration `20260829090341_P4_2_TenantSettings` 已生成并应用
 - [x] `TenantManagementController` 扩展 `GET/POST /api/tenant-management/{id}/settings`（运行时验证：写读往返 200）
 - [x] **验收**：`dotnet build` 0 error（10 个预存 nullable 警告均不在本阶段文件）；**Golden 18/18 PASS（decision=PASS, 18/18, failedGates=[]）**
-**P4.3 SuperBIContext 全局租户过滤 + 跨租户单测（⬜ 待做 · 最高风险）**
-- [ ] `OnModelCreating` 为带 `TenantId` 实体加 `HasQueryFilter`（值取自 `IPlatformContextAccessor.Current.Tenant.TenantId`；`System`/未作用域不加过滤）
-- [ ] 新增测试项目（xunit）+ 跨租户数据不可见性单测
-- [ ] **必须跑 Golden 18/18** 确认隔离未破 Tenant1 的 positive case
+**P4.3 SuperBIContext 全局租户过滤 + 跨租户单测（✅ 完成 · 零回归 · build 绿 + Golden 18/18）**
+- [x] `SuperBIContext` 新增 `_tenantFilterEnabled`/`_scopedTenantId` 私有字段 + 显式 `ApplyTenantScope(long tenantId)` 方法（默认关闭=no-op）；`OnModelCreating` 为 4 个直接持有 TenantId 的根实体加 `HasQueryFilter(e => !_tenantFilterEnabled || e.TenantId == _scopedTenantId)`
+- [x] **关键设计**：不读取 `IPlatformContextAccessor`（避免 DbContext 构造期/请求期取值错位）；由 `BIConversationService.ExecuteAsync` 在已知 tenantId 后显式调用 `ApplyTenantScope` 开启。**Golden 无租户路径从不调用 → 过滤恒为 no-op**（实测 18/18 未破）
+- [x] `DataSource.TenantId` 为 `long?`：过滤器用 `e.TenantId.HasValue && e.TenantId.Value == _scopedTenantId` 守卫，避免 `long? == long` 产生被提升的 `bool?` 与 `||` 组合触发 EF "Nullable object must have a value" 回归（此前两次失败根因）
+- [x] 新增测试项目 `tests/SuperBuilder_AI.Tests/`（xunit + EF Core SQLite 内存库，离线可还原）`SuperBIContextTenantFilterTests`：覆盖 4 个根实体，验证 (1) 无作用域=全可见 no-op (2) 开启租户=仅本租户可见 (3) 跨租户不可见 (4) System/tenantId<=0=no-op；**4/4 通过**
+- [x] **验收**：`dotnet build` 0 error 0 warning；**Golden 18/18 PASS（decision=PASS, passedCases=18/18, failedGates:None, overallPassRate=1.0, positivePassRate=1.0；3 个 ERROR 为预期负例 Qwen 403 抖动，expectedOutcome 满足）**
 **P4.4 核心 Runtime 入口 PlatformContext 化（⬜ 待做）**
 - [ ] `UnderstandAsync`/`QueryPlanPipeline` 等从 `long tenantId` 迁移为接受 `PlatformContext`；Golden 无租户重载不变
 - [ ] **P4 总验收**：build 绿 + **Golden 18/18**（租户隔离未破原有 case）+ 跨租户数据不可见单测
@@ -124,4 +126,4 @@
 - [ ] A4 上帝类拆分必须在 P6 之前收口
 
 ---
-**立即下一步**：P3 已完成（管线接线 + Golden 18/18）。A3/A5 用户决定暂缓。**P4 Multi-Tenant Platform Core** 进行中：**P4.1 平台上下文抽象 ✅**、**P4.2 Tenant 扩展 + Migration ✅（Golden 18/18 PASS）**；下一步 **P4.3 全局租户过滤 + 跨租户单测（最高风险 · 必跑 Golden 18/18）**。A3/A5 用户决定暂缓。每步 build + Golden。
+**立即下一步**：P3 已完成（管线接线 + Golden 18/18）。A3/A5 用户决定暂缓。**P4 Multi-Tenant Platform Core** 进行中：**P4.1 平台上下文抽象 ✅**、**P4.2 Tenant 扩展 + Migration ✅（Golden 18/18 PASS）**、**P4.3 全局租户过滤 + 跨租户单测 ✅（Golden 18/18 PASS，4/4 单测通过）**；下一步 **P4.4 核心 Runtime 入口 PlatformContext 化（UnderstandAsync/QueryPlanPipeline 从 long tenantId 迁移为 PlatformContext；Golden 无租户重载不变）**。A3/A5 用户决定暂缓。每步 build + Golden。
