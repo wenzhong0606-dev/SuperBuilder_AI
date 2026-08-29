@@ -121,11 +121,58 @@ public class LocalizationServiceTests
     }
 
     [Fact]
-    public void GetString_BeforeResourceWiring_ReturnsKey()
+    public void GetString_UnknownKey_ReturnsKeyItself()
     {
-        // P5.1 阶段资源尚未接入：返回键名本身，保证调用方无需判空（P5.3 后替换为真实文案）。
+        // 未登记的键返回键名本身——宁可暴露原始键，也不要向用户展示空文案。
         Assert.Equal("Common.Save", _service.GetString("Common.Save"));
         Assert.Equal(string.Empty, _service.GetString("   "));
+    }
+
+    [Theory]
+    // P5.3：内置资源按语言返回对应文案
+    [InlineData("zh-CN", "未找到与问题匹配的语义字段。")]
+    [InlineData("zh-TW", "未找到與問題匹配的語義欄位。")]
+    [InlineData("en-US", "No semantic field matches the question.")]
+    [InlineData("ja-JP", "質問に一致する意味項目が見つかりません。")]
+    [InlineData("ko-KR", "질문과 일치하는 시맨틱 필드를 찾지 못했습니다.")]
+    public void GetString_ResolvesRegisteredKeyPerCulture(string culture, string expected)
+    {
+        Assert.Equal(expected, _service.GetString("Query.NoSemanticMatch", _service.Resolve(culture)));
+    }
+
+    [Fact]
+    public void GetString_DefaultLocale_UsesChineseSimplified()
+    {
+        // 默认语言（Golden/未指定语言路径）必须取 zh-CN。
+        Assert.Equal("未找到与问题匹配的语义字段。", _service.GetString("Query.NoSemanticMatch"));
+        Assert.Equal("未找到与问题匹配的语义字段。", _service.GetString("Query.NoSemanticMatch", null));
+    }
+
+    [Fact]
+    public void GetString_UnsupportedCulture_FallsBackToDefault()
+    {
+        // de-DE 未登记资源 -> 回退链终点 zh-CN
+        Assert.Equal(
+            "未找到与问题匹配的语义字段。",
+            _service.GetString("Query.NoSemanticMatch", _service.Resolve("de-DE")));
+    }
+
+    [Fact]
+    public void GetString_EverySupportedCulture_HasFullResourceBundle()
+    {
+        // 不变量：任一受支持语言都不能出现"缺词条"——缺了会静默回退成中文，属隐性缺陷。
+        var keys = PlatformStrings.Resources["zh-CN"].Keys.ToList();
+        Assert.NotEmpty(keys);
+
+        foreach (var locale in _service.SupportedLocales)
+        {
+            foreach (var key in keys)
+            {
+                Assert.True(
+                    PlatformStrings.Resources[locale.Culture].ContainsKey(key),
+                    $"{locale.Culture} 缺少文案键 {key}");
+            }
+        }
     }
 
     [Fact]

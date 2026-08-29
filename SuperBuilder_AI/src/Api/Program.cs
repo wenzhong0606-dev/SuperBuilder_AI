@@ -61,6 +61,9 @@ builder.Services.AddSingleton<ILocalizationService, LocalizationService>();
 // P5.2：业务语义多语言标签服务（依赖 SuperBIContext，随 DbContext 注册为 scoped）
 builder.Services.AddScoped<ISemanticLabelService, SemanticLabelService>();
 
+// P5.3：多语言标签召回服务（非默认语言时提升检索排序；默认语言路径完全不参与）
+builder.Services.AddScoped<ISemanticLabelRecallService, SemanticLabelRecallService>();
+
 if (string.Equals(
         Environment.GetEnvironmentVariable("CI"),
         "true",

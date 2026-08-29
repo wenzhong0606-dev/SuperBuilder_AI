@@ -106,9 +106,15 @@
 - [x] 全局租户过滤放行 `TenantId == 0`：否则共享译文在租户作用域内会集体消失
 - [x] 单测 `SemanticLabelServiceTests` **12 项全通过**（回退到语言段/默认语言、无标签返回 null、同义词去重、upsert 归一化与幂等、跨租户不可见、全局标签可见）
 - [x] **验收**：build 0 error（10 个预存 nullable 警告均不在本阶段文件）；单测 **36/36**；端点读写往返 200（`zh_TW`→`zh-TW` 归一化，`ja-JP`/`ko-KR` 正确回退到默认语言）；**Golden 18/18 PASS（decision=PASS, 18/18, failedGates=None, overallPassRate=1.0, positivePassRate=1.0, 0 ERROR）**
-**P5.3 本地化资源 + 语义标签解析服务 + 链路接入（⬜ 待做 · 高风险）**
-- [ ] `Localization` 资源（zh-CN/zh-TW/en-US/ja-JP/ko-KR）
-- [ ] 语义标签解析服务接入元数据/向量检索（高风险，必跑 Golden）
+**P5.3 本地化资源 + 语义标签接入检索（✅ 完成 · 门控隔离 · Golden 18/18 PASS）**
+- [x] `PlatformStrings`（zh-CN/zh-TW/en-US/ja-JP/ko-KR 五语言文案资源）；`LocalizationService.GetString` 由"返回键名占位"升级为按回退链真实解析，未登记键仍返回键名本身（宁可暴露原始键，不展示空文案）
+- [x] `ISemanticLabelRecallService` / `SemanticLabelRecallService`：按已登记标签做**确定性**文本匹配（无 LLM、无向量库），解决跨语言 Embedding"能召回但排序偏后"的偏序问题
+- [x] **接入检索层（触及 Golden 路径文件）**：`IMetadataSemanticSearchService.SearchAsync` 新增**可选** `locale` 参数（既有调用方签名不变）；`MetadataSemanticSearchService` 仅在非默认语言时对命中标签的候选做排序提升
+- [x] **三重门控保证零回归**：`locale == null` / `IsDefault` / `Culture` 为空 → 标签匹配整体短路，行为与 P5 之前逐字节一致；Golden 与既有中文链路从不进入该分支
+- [x] **只提升已召回候选，绝不注入合成候选**（提升量 `0.15 × 匹配强度`，封顶 1.0），避免凭空产生下游无法解释的结果；标签召回异常一律静默降级、不阻断主检索
+- [x] `GET /api/semantic-labels/recall`（含 `gated` 字段便于验证门控是否生效）
+- [x] 单测 **19 项全通过**：门控不变量（默认/Invariant/null 均空）、大小写不敏感、长标签优先且强度归一化、同概念取最强、短标签过滤、回退到默认语言标签、仅作用于 MetadataSemantic
+- [x] **验收**：build 0 error（10 个预存 nullable 警告均不在本阶段文件）；单测 **55/55**；端点验证（默认语言 `gated:true` 零命中；`ja-JP` 经回退链命中 `入库日期`；`en-US` 命中 `Inbound Date`）；**Golden 18/18 PASS（decision=PASS, 18/18, failedGates=None, overallPassRate=1.0, positivePassRate=1.0, 0 ERROR）**
 **P5.4 AI 意图语言无关化 + 多语言 Golden 复跑 + 验收（⬜ 待做）**
 - [ ] AI 意图理解语言无关化（问句归一化到语义概念，剥离语言相关表述）
 - [ ] **P5 总验收**：build 绿 + **Golden 18/18**（多语言问句重跑）+ 语义映射测试
@@ -150,4 +156,4 @@
 - [ ] A4 上帝类拆分必须在 P6 之前收口
 
 ---
-**立即下一步**：P3 ✅、P4 Multi-Tenant Platform Core ✅ 全绿（P4.1~P4.4 均 ✅）。A3/A5 用户决定暂缓。**P5 Multi-Language Runtime 进行中**：**P5.1 LocaleContext + PlatformContext 接入 ✅（单测 26/26，Golden 18/18 PASS）**、**P5.2 语义多语言标签持久化 ✅（SemanticLabel + Migration，单测 36/36，端点读写往返 200，Golden 18/18 PASS）**；下一步 **P5.3 本地化资源（zh-CN/zh-TW/en-US/ja-JP/ko-KR）+ 语义标签接入元数据/向量检索（高风险，必跑 Golden）**，随后 P5.4 意图语言无关化与多语言 Golden 复跑。每步 build + Golden。
+**立即下一步**：P3 ✅、P4 Multi-Tenant Platform Core ✅ 全绿（P4.1~P4.4 均 ✅）。A3/A5 用户决定暂缓。**P5 Multi-Language Runtime 进行中**：**P5.1 LocaleContext + PlatformContext 接入 ✅（单测 26/26，Golden 18/18 PASS）**、**P5.2 语义多语言标签持久化 ✅（SemanticLabel + Migration，单测 36/36，Golden 18/18 PASS）**、**P5.3 本地化资源 + 语义标签接入检索 ✅（五语言资源 + 标签召回，门控隔离零回归，单测 55/55，Golden 18/18 PASS）**；下一步 **P5.4 AI 意图语言无关化 + 多语言问句 Golden 复跑 + P5 总验收**。每步 build + Golden。

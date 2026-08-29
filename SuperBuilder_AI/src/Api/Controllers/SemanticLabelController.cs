@@ -16,11 +16,16 @@ namespace SuperBuilder_AI.Controllers;
 public sealed class SemanticLabelController : ControllerBase
 {
 	private readonly ISemanticLabelService _labels;
+	private readonly ISemanticLabelRecallService _labelRecall;
 	private readonly ILocalizationService _localization;
 
-	public SemanticLabelController(ISemanticLabelService labels, ILocalizationService localization)
+	public SemanticLabelController(
+		ISemanticLabelService labels,
+		ISemanticLabelRecallService labelRecall,
+		ILocalizationService localization)
 	{
 		_labels = labels;
+		_labelRecall = labelRecall;
 		_localization = localization;
 	}
 
@@ -77,6 +82,30 @@ public sealed class SemanticLabelController : ControllerBase
 		return Ok(new SynonymResolution(conceptType, conceptId, _localization.Resolve(culture).Culture, synonyms));
 	}
 
+	/// <summary>
+	/// 多语言标签召回（P5.3）：按问句文本匹配已登记的语义标签。
+	/// 传入平台默认语言（zh-CN）或不传 culture 时返回空集合——该门控是 P5 零回归的保证。
+	/// </summary>
+	[HttpGet("recall")]
+	public async Task<IActionResult> Recall(
+		[FromQuery] string question,
+		[FromQuery] string? culture = null,
+		CancellationToken cancellationToken = default)
+	{
+		if (string.IsNullOrWhiteSpace(question)) return BadRequest("question 不能为空。");
+
+		var locale = _localization.Resolve(culture);
+		var hits = await _labelRecall.MatchAsync(question, locale, cancellationToken);
+
+		return Ok(new LabelRecallResult(
+			Question: question,
+			RequestedCulture: culture,
+			ResolvedCulture: locale.Culture,
+			Gated: locale.IsDefault,
+			FallbackChain: _localization.BuildFallbackChain(locale),
+			Hits: hits.Select(h => new LabelRecallHit(h.SemanticId, h.MatchedLabel, h.Culture, h.Strength)).ToList()));
+	}
+
 	/// <summary>新增或更新一条标签（按 TenantId+ConceptType+ConceptId+Culture+LabelKind 唯一）。</summary>
 	[HttpPost]
 	public async Task<IActionResult> Upsert(
@@ -128,3 +157,15 @@ public sealed record SynonymResolution(
 	long ConceptId,
 	string Culture,
 	IReadOnlyList<string> Synonyms);
+
+/// <summary>标签召回结果 DTO（<c>Gated=true</c> 表示因默认语言被门控短路）。</summary>
+public sealed record LabelRecallResult(
+	string Question,
+	string? RequestedCulture,
+	string ResolvedCulture,
+	bool Gated,
+	IReadOnlyList<string> FallbackChain,
+	IReadOnlyList<LabelRecallHit> Hits);
+
+/// <summary>标签召回命中项 DTO。</summary>
+public sealed record LabelRecallHit(long SemanticId, string MatchedLabel, string Culture, double Strength);

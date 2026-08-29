@@ -1,7 +1,9 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using SuperBuilder_AI.Data;
 using SuperBuilder_AI.Interfaces;
+using SuperBuilder_AI.Interfaces.Platform;
 using SuperBuilder_AI.Models.AI;
+using SuperBuilder_AI.Models.Organization;
 
 
 namespace SuperBuilder_AI.Services;
@@ -38,6 +40,13 @@ public class MetadataSemanticSearchService
 	: IMetadataSemanticSearchService
 {
 
+	/// <summary>
+	/// P5：多语言标签命中对候选排序的提升上限（乘以匹配强度 0–1）。
+	/// 取值保守（0.15）：标签命中是<strong>纠正偏序</strong>的证据，
+	/// 不应压倒向量相似度本身——避免短标签误命中时反向污染排序。
+	/// </summary>
+	private const double LabelRecallBoostFactor = 0.15;
+
 
 	private readonly IEmbeddingService _embedding;
 
@@ -48,11 +57,18 @@ public class MetadataSemanticSearchService
 	private readonly SuperBIContext _context;
 
 
+	/// <summary>
+	/// P5：多语言标签召回服务。仅在传入<strong>非默认</strong>语言区域时参与排序。
+	/// </summary>
+	private readonly ISemanticLabelRecallService? _labelRecall;
+
+
 
 	public MetadataSemanticSearchService(
 		IEmbeddingService embedding,
 		IQdrantService qdrant,
-		SuperBIContext context)
+		SuperBIContext context,
+		ISemanticLabelRecallService? labelRecall = null)
 	{
 
 		_embedding = embedding;
@@ -60,6 +76,8 @@ public class MetadataSemanticSearchService
 		_qdrant = qdrant;
 
 		_context = context;
+
+		_labelRecall = labelRecall;
 
 	}
 
@@ -73,7 +91,8 @@ public class MetadataSemanticSearchService
 	public async Task<List<MetadataSemanticSearchResult>>
 		SearchAsync(
 			string question,
-			int topK = 10)
+			int topK = 10,
+			LocaleContext? locale = null)
 	{
 
 
@@ -206,11 +225,82 @@ public class MetadataSemanticSearchService
 
 
 
+		/*
+		 * 4.
+		 * P5：多语言标签排序提升（可选）
+		 *
+		 * 仅当显式传入非默认语言区域时执行：
+		 *   - locale 为 null 或平台默认语言（zh-CN）=> 完全跳过，行为与 P5 之前逐字节一致；
+		 *   - 传入其他语言 => 对命中多语言标签的候选提升排序（跨语言 Embedding 常能召回
+		 *     正确概念但排序偏后，标签命中的确定性证据用于纠正该偏序）。
+		 *
+		 * 只提升已召回的候选，绝不注入合成候选——避免凭空产生下游无法解释的结果。
+		 */
+
+		if (_labelRecall is not null
+			&& locale is not null
+			&& !locale.IsDefault
+			&& !string.IsNullOrEmpty(locale.Culture))
+		{
+			await ApplyLabelRecallBoostAsync(
+				question,
+				locale,
+				results);
+		}
+
+
 		return results
 			.OrderByDescending(x =>
 				x.Score)
 			.ToList();
 
+	}
+
+
+
+	/// <summary>
+	/// P5：按多语言标签命中提升候选排序。
+	/// 提升量 = <see cref="LabelRecallBoostFactor"/> × 匹配强度，并封顶于 1.0
+	/// （Qdrant 余弦相似度上界为 1，避免产生超出原始分域的异常值）。
+	/// </summary>
+	private async Task ApplyLabelRecallBoostAsync(
+		string question,
+		LocaleContext locale,
+		List<MetadataSemanticSearchResult> results)
+	{
+		if (results.Count == 0) return;
+
+		IReadOnlyList<SemanticLabelHit> hits;
+
+		try
+		{
+			hits = await _labelRecall!
+				.MatchAsync(
+					question,
+					locale);
+		}
+		catch
+		{
+			// 标签召回属增强手段，任何异常都不得阻断主检索链路。
+			return;
+		}
+
+		if (hits.Count == 0) return;
+
+		var strengthBySemanticId = hits
+			.GroupBy(h => h.SemanticId)
+			.ToDictionary(g => g.Key, g => g.Max(h => h.Strength));
+
+		foreach (var result in results)
+		{
+			var semanticId = result.Semantic?.Id;
+			if (semanticId is null) continue;
+			if (!strengthBySemanticId.TryGetValue(semanticId.Value, out var strength)) continue;
+
+			result.Score = Math.Min(
+				1.0,
+				result.Score + (LabelRecallBoostFactor * strength));
+		}
 	}
 
 

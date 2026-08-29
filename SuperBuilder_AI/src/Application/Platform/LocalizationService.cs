@@ -50,8 +50,8 @@ public sealed class LocalizationService : ILocalizationService
 	{
 		if (string.IsNullOrWhiteSpace(key)) return string.Empty;
 
-		// P5.1：资源文件尚未接入，返回键名本身，使调用方在 P5.3 之前即可安全使用。
-		// 该行为对现有链路零影响（当前无任何调用方依赖本地化文案）。
-		return key;
+		// P5.3：按回退链依次查找内置资源（精确文化 → 语言段 → 平台默认）。
+		// 全部未命中时返回键名本身——宁可暴露原始键，也不要向用户展示空文案。
+		return PlatformStrings.Find(BuildFallbackChain(locale), key) ?? key;
 	}
 }
