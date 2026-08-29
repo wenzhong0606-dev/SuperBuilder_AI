@@ -22,13 +22,13 @@ AI Native BI 平台 — 自然语言 → AI理解 → 语义分析 → 查询计
 - **Stage 0 基础与 AI Native BI 运行时**：✅ 全部完成
   - Phase 0/1/2(2.1-2.5)/2.7(D14-D21 FROZEN, Phase2.7 READY TO CLOSE)/3.1 Golden Runtime+回归恢复
   - Golden 18/18 PASS（11+5+1+1, overall/pos/neg 100%, failedGates=[]）
-- **Stage 1 架构治理（A-track，并行）**：🟡 A1/A2 完成，A3-A5 待做
+- **Stage 1 架构治理（A-track，并行）**：🟡 A1/A2/A4 完成，A3/A5 暂缓（用户指令"A3和A5先不做"）
   - A1(4.1) 目标文档/骨架/删40冗余/归档13计划: ✅
   - A2(4.2) 单项目内 src/ 四层物理迁移(234 .cs, 命名空间保留, build 0 error, Golden 18/18): ✅
-  - A3(4.3) 抽独立项目 Domain/Application/Infrastructure/Api: ⬜（随 P3 启动）
-  - A4(4.4) 上帝类拆分+依赖倒置(I*端口): ⬜ **必须在 P6 前完成**（QueryPlanBuilder 4308行/8 partial）
-  - A5(4.5) 限界上下文解耦/合并重复模型: ⬜
-- **Stage 2 产品演进（P-track，用户10阶段路线）**：⬜ P3 为当前起点
+  - A3(4.3) 抽独立项目 Domain/Application/Infrastructure/Api: ⬜（用户指令暂缓，不随 P3 启动）
+  - A4(4.4) 上帝类拆分+依赖倒置(I*端口): ✅ 已完成（commit 9981d73 decompose QueryPlanBuilder，8 partial 拆分；P6 前无阻塞）
+  - A5(4.5) 限界上下文解耦/合并重复模型: ⬜（用户指令暂缓）
+- **Stage 2 产品演进（P-track，用户10阶段路线）**：✅ P3 已完成，下一步 **P4 Multi-Tenant Platform Core**
   - P3 Business Semantic Model / P4 Multi-Tenant Core / P5 Multi-Language / P6 Low-code BI / P7 Theme / P8 AI App Builder / P9 AI Agent / P10 Enterprise SaaS
   - 每个 P 阶段退出门槛 = Golden 18/18（硬约束，来自 Phase3 回归事故教训）
 - 主交付文档：`docs/DevelopmentPlan.md`(唯一事实来源) + `docs/PhaseChecklist.md`(可执行清单) + `docs/ARCHITECTURE.md`(目标结构)

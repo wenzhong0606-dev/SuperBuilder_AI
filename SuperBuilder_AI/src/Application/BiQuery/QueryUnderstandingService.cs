@@ -48,9 +48,10 @@ public class QueryUnderstandingService
 	}
 
 	/// <summary>
-	/// 理解用户查询意图。
+	/// 构建原始（未归一化）QueryIntent：完成 Metadata 上下文获取、Qwen 调用与 JSON 反序列化。
+	/// 归一化由公开 UnderstandAsync 重载负责，以便按需注入业务实体感知。
 	/// </summary>
-	public async Task<QueryIntent> UnderstandAsync(
+	private async Task<QueryIntent> BuildRawIntentAsync(
 		string question)
 	{
 		if (string.IsNullOrWhiteSpace(question))
@@ -685,7 +686,31 @@ public class QueryUnderstandingService
 		intent.OriginalQuestion =
 			question;
 
+		return intent;
+	}
+
+	/// <summary>
+	/// 理解用户查询意图（无租户上下文，不注入业务实体感知）。
+	/// Golden 回归运行时使用此重载，行为与历史版本完全一致。
+	/// </summary>
+	public async Task<QueryIntent> UnderstandAsync(
+		string question)
+	{
+		var intent = await BuildRawIntentAsync(question);
 		return _intentNormalizer.Normalize(intent);
+	}
+
+	/// <summary>
+	/// 理解用户查询意图并注入业务实体感知（P3）。
+	/// 在确定性结构归一化之后，异步识别候选业务实体并写入
+	/// QueryIntent.BusinessEntityHints，供 QueryPlanBuilder 编排层参考。
+	/// </summary>
+	public async Task<QueryIntent> UnderstandAsync(
+		string question,
+		long tenantId)
+	{
+		var intent = await BuildRawIntentAsync(question);
+		return await _intentNormalizer.NormalizeWithBusinessEntitiesAsync(intent, tenantId);
 	}
 
 	/// <summary>

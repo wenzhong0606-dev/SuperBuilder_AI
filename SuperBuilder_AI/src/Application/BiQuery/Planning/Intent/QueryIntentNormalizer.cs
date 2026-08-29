@@ -1,5 +1,7 @@
 using System.Text.RegularExpressions;
+using SuperBuilder_AI.Interfaces.BI.Entity;
 using SuperBuilder_AI.Models.BI;
+using SuperBuilder_AI.Models.BI.Entity;
 
 namespace SuperBuilder_AI.Services.BI.Planning;
 
@@ -9,6 +11,70 @@ namespace SuperBuilder_AI.Services.BI.Planning;
 /// </summary>
 public sealed class QueryIntentNormalizer
 {
+    private readonly IBusinessSemanticMappingService? _mapping;
+
+    /// <summary>
+    /// 创建查询意图归一化器。
+    /// </summary>
+    /// <param name="mapping">业务语义映射服务（可选）。提供时，归一化可注入业务实体感知（P3）。</param>
+    public QueryIntentNormalizer(IBusinessSemanticMappingService? mapping = null)
+    {
+        _mapping = mapping;
+    }
+
+    /// <summary>
+    /// P3 业务实体感知归一化：先执行确定性结构归一化，再异步识别候选业务实体并写入
+    /// <see cref="QueryIntent.BusinessEntityHints"/>（挂载业务语义层上下文）。
+    /// 业务实体识别为软信号：异常或无匹配时静默跳过，绝不阻断查询理解，保证 Golden 回归稳定。
+    /// </summary>
+    public async Task<QueryIntent> NormalizeWithBusinessEntitiesAsync(
+        QueryIntent intent,
+        long tenantId,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(intent);
+        Normalize(intent);
+        await EnrichBusinessEntityHintsAsync(intent, tenantId, cancellationToken);
+        return intent;
+    }
+
+    private async Task EnrichBusinessEntityHintsAsync(QueryIntent intent, long tenantId, CancellationToken cancellationToken)
+    {
+        if (_mapping is null) return;
+        try
+        {
+            var result = await _mapping.ResolveAsync(
+                tenantId,
+                0,
+                intent.OriginalQuestion ?? string.Empty,
+                cancellationToken: cancellationToken);
+            if (result?.Domains is null || result.Domains.Count == 0) return;
+
+            var hints = new List<BusinessEntityHint>();
+            foreach (var domain in result.Domains)
+            {
+                if (domain.Matches is null) continue;
+                foreach (var match in domain.Matches)
+                {
+                    hints.Add(new BusinessEntityHint
+                    {
+                        Name = match.Name,
+                        BusinessKey = match.BusinessKey,
+                        BusinessDomain = match.BusinessDomain,
+                        Confidence = Math.Round(match.Score / 100.0, 4)
+                    });
+                }
+            }
+
+            if (hints.Count > 0)
+                intent.BusinessEntityHints = hints.OrderByDescending(x => x.Confidence).Take(5).ToList();
+        }
+        catch
+        {
+            // 业务实体识别失败属于软信号缺失，不影响主链路。
+        }
+    }
+
     private static readonly string[] DescWords = { "最多", "最大", "最大的", "最高", "最高的", "数量最多", "金额最多", "销量最多", "库存最多", "库存数量最多", "Top", "top", "排名前" };
     private static readonly string[] AscWords = { "最少", "最小", "最小的", "最低", "最低的", "数量最少", "金额最少", "销量最少", "库存最少", "库存数量最少" };
     private static readonly string[] TimeDescWords = { "最近", "最新", "最近创建", "最新创建", "最近新增", "最新新增" };

@@ -306,6 +306,11 @@ public partial class QueryPlanBuilder : IQueryPlanBuilder
 					intent
 			};
 
+		// P3 业务实体语义上下文：把归一化阶段识别出的候选业务实体透传到计划，
+		// 供编排层/可解释性参考（不覆盖 Metadata 解析结果）。
+		if (intent.BusinessEntityHints is { Count: > 0 })
+			plan.BusinessEntityContext = intent.BusinessEntityHints;
+
 
 
 

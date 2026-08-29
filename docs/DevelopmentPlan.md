@@ -21,7 +21,7 @@
 |---|---|---|---|
 | **Stage 0** | 基础与 AI Native BI 运行时（已完成） | 旧 Phase 0 / 1 / 2 / 2.7(D14–D21) / 3.1 | ✅ 完成 |
 | **Stage 1** | 架构治理（A-track，工程线，与产品并行） | 旧 Phase 4（4.1–4.5） | 🟡 A1/A2 完成，A3–A5 待做 |
-| **Stage 2** | 产品演进（P-track，用户 10 阶段路线去掉已完成的 2.7） | 用户 Phase 3 → Phase 10 | ⬜ P3 起始 |
+| **Stage 2** | 产品演进（P-track，用户 10 阶段路线去掉已完成的 2.7） | 用户 Phase 3 → Phase 10 | ✅ P3 完成 |
 
 **Stage 2 产品阶段明细（即用户 10 阶段路线，含阶段依赖）：**
 
@@ -78,7 +78,7 @@ Stage 0 (DONE)
    │       A1 ✅  A2 ✅  A3(拆项目)⬜  A4(上帝类+DI)⬜  A5(BC解耦)⬜  │
    │                                                        │     │
    └──▶ Stage 2 P-track（产品线）                              │     │
-           P3 Business Semantic Model ⬜◀─── 当前起点             │     │
+           P3 Business Semantic Model ✅             │     │
             │                                                  │     │
             ▼                                                  │     │
            P4 Multi-Tenant Core ⬜ ──┬──▶ P5 Multi-Language ⬜  │     │
@@ -101,7 +101,7 @@ Stage 0 (DONE)
 
 ## 3. Stage 2 产品演进路线（至完成）—— 各阶段清单
 
-### P3 — Business Semantic Model（**当前起点**）
+### P3 — Business Semantic Model（✅ 已完成）
 **目标**：把"从 SQL 字段猜"升级为"先理解业务实体再生成查询"。建立 `BusinessDomain → BusinessEntity → Attribute/Metric/Dimension/Relationship → PhysicalBinding` 的语义业务模型，AI 提问时先映射到业务实体而非裸表字段。
 
 **范围与关键文件（文件级清单）**

@@ -20,6 +20,12 @@ public class QueryPlan
     public bool Distinct { get; set; }
     public int? Limit { get; set; }
 
+    /// <summary>
+    /// P3 业务实体语义上下文：本次查询命中的候选业务实体（来自 QueryIntent.BusinessEntityHints）。
+    /// 仅供可读性与下游消费，不覆盖 Metadata 解析结果。
+    /// </summary>
+    public List<BusinessEntityHint> BusinessEntityContext { get; set; } = new();
+
     private bool _isRanking;
     public bool IsRanking
     {

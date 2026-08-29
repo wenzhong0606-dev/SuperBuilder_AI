@@ -25,5 +25,13 @@ public interface IQueryUnderstandingService
 	Task<QueryIntent> UnderstandAsync(
 		string question);
 
+	/// <summary>
+	/// 理解用户查询并注入业务实体感知（P3）。
+	/// 提供租户上下文后，归一化阶段会识别候选业务实体并写入 QueryIntent.BusinessEntityHints。
+	/// </summary>
+	Task<QueryIntent> UnderstandAsync(
+		string question,
+		long tenantId);
+
 
 }

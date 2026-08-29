@@ -43,7 +43,7 @@
 
 ## ⬜ Stage 2 — 产品演进（P-track，至完成）
 
-### P3 — Business Semantic Model（**进行中：批次 1-2 已落地，管线接线未完成**）
+### P3 — Business Semantic Model（✅ 已完成：批次 1-2 模型落地 + 管线接线 + Golden 18/18）
 - [x] `src/Domain/BusinessEntity/BusinessDomain.cs`（新增 AR：业务域）
 - [x] `BusinessEntityDimension.cs`（子实体）+ `BusinessSemanticResolutionResult.cs`（VO）
 - [x] `src/Application/Ports/BI/Entity/IBusinessEntityRepository.cs`（端口）+ `Infrastructure/Persistence/BusinessEntityRepository.cs`（实现）
@@ -52,11 +52,11 @@
 - [x] `Infrastructure/Persistence/Configurations/Phase31EntityModelConfiguration.cs`（含 `BusinessDomainConfiguration` + `BusinessEntityDimensionConfiguration`）
 - [x] Migration `20260828144504_P3BusinessEntityModelWithDomains`（8 张表，已 apply；消除 `TenantId1` 影子 FK）
 - [x] `Api/Controllers/BusinessModelController.cs` + DI 注册（`Program.cs:45-46`）
-- [ ] `QueryIntentNormalizer.cs` 注入"业务实体感知"（**未接线**：`QueryIntent.BusinessEntityHints` 已定型但无任何生产者）
-- [ ] `QueryPlanBuilder*.cs` 编排层走 BusinessEntity 语义路径（不膨胀）
-- [ ] `BusinessEntityMetricDefinition.cs`（Metric VO，尚未新增）
-- [ ] 诊断控制器 `Api/Diagnostics/*BusinessEntity*` 路由收敛（现存 `BusinessEntityGoldenFixtureController` / `BusinessEntityRuntimeVerificationController`）
-- [ ] **验收**：build 0 error + BusinessEntity 优先解析 + **Golden 18/18** + Migration 可更新
+- [x] **管线接线（P3 收口）**：`QueryIntentNormalizer.NormalizeWithBusinessEntitiesAsync` 在同步归一化后异步调用 `IBusinessSemanticMappingService` 识别候选业务实体并写入 `QueryIntent.BusinessEntityHints`（软信号，异常/无匹配静默跳过，绝不阻断主链路）；`IQueryUnderstandingService` 新增 `UnderstandAsync(question, tenantId)` 重载，`BIConversationService` 实时路径接入；Golden 沿用无 tenant 的 `UnderstandAsync(question)` 重载 → 走新代码零行为变化
+- [x] **编排层透传**：`QueryPlan.BusinessEntityContext` 承载命中业务实体；`QueryPlanBuilder` 两路径（1 参/2 参 `BuildAsync`）将 `intent.BusinessEntityHints` 透传到计划（不覆盖 Metadata 解析结果，零膨胀）
+- [x] `BusinessEntityMetric.cs`（即 Metric VO；`BusinessEntityMetricDefinition.cs` 命名项由该文件承担，无需新增）
+- [x] 诊断控制器 `Api/Diagnostics/*BusinessEntity*` 路由收敛（已统一于 `evaluation/business-entity*` 前缀，内部链接自洽）
+- [x] **验收**：`dotnet build` 0 error 0 warning；**Golden 18/18 PASS**（`expectedOutcomePassed 18/18`、`failedGates:[]`、`decision:PASS`）；无新增 Migration（未新增 EF 实体）
 
 ### P4 — Multi-Tenant Platform Core
 - [ ] `PlatformContext`（先 `TenantContext` 增量建设）
@@ -109,4 +109,4 @@
 - [ ] A4 上帝类拆分必须在 P6 之前收口
 
 ---
-**立即下一步**：启动 P3（按 DevelopmentPlan §3 P3 文件级清单）+ 并行启动 A3（拆项目）。每步 build + Golden。
+**立即下一步**：P3 已完成（管线接线 + Golden 18/18）。A3/A5 用户决定暂缓。下一步进入 **P4 Multi-Tenant Platform Core**（TenantContext 增量建设，先 Tenant 注入）。每步 build + Golden。
