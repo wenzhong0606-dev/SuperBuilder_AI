@@ -55,14 +55,6 @@ public partial class QueryPlanBuilder
             plan.Distinct = true;
         }
 
-        try
-        {
-            System.IO.File.AppendAllText(
-                "C:/tmp/step10b.log",
-                $"[{DateTime.Now:HH:mm:ss.fff}] 2param IsAggregate={plan.IsAggregate} Distinct={plan.Distinct} metrics=[{string.Join(",", plan.Metrics.Select(m => m.Aggregation))}] dims=[{string.Join(",", plan.Dimensions.Select(d => d.SemanticText))}]\n");
-        }
-        catch { }
-
         return Task.FromResult(plan);
     }
 
@@ -124,23 +116,88 @@ public partial class QueryPlanBuilder
     private static void ApplyMetricResolutions(QueryPlan plan, IReadOnlyList<QueryPlanMetricResolution> bindings)
     {
         if (bindings.Count == 0) return;
-        if (plan.Metrics.Count != bindings.Count) throw new InvalidOperationException($"QueryPlan Semantic Binding Drift：Metric 数量不一致，Resolution={bindings.Count}，Runtime={plan.Metrics.Count}。");
-        for (var i = 0; i < bindings.Count; i++)
-        {
-            var b = bindings[i];
-            ValidateColumn(b.ColumnId, b.Column, $"Metric[{i}]");
-            EnsureTable(plan, b.TableId, b.DataSourceId, b.Table, $"Metric[{i}]");
-            plan.Metrics[i].SemanticText = b.SemanticText;
-            plan.Metrics[i].Field = b.Column;
 
-            // GQ-002：EntityCount 契约强制运行时聚合为 COUNT。
-            // Semantic Applicability 已依据 Golden 契约（Aggregation=Count）判定 MetricType=EntityCount，
-            // 而 LLM Intent 对"入库单数量"这类问句不稳定（曾产出 SUM(id)），
-            // QueryPlanMetricScoringService 对 Aggregation 严格断言（expected=Count vs actual=Sum → 0 分）。
-            // 这里以 Resolution 的 MetricType 为准覆盖 LLM 猜测，保证 EntityCount 语义不被破坏。
-            if (string.Equals(b.MetricType, "EntityCount", StringComparison.OrdinalIgnoreCase))
-                plan.Metrics[i].Aggregation = QueryAggregation.Count.ToString().ToUpperInvariant();
+        // Phase A4 加固（与 Filter/Dimension 漂移处理同构）：
+        // Runtime(LLM) 指标与 Semantic Resolution 绑定在数量/顺序上可能漂移
+        // （旧代码硬抛 "Metric 数量不一致" 会直接 500 Golden Regression，如 GQ-002/GQ-005）。
+        // 改为按 SemanticText 对齐 + 丢弃无绑定幻影指标 + 用未消费 Resolution 绑定补全
+        // （Resolution 为权威绑定，契合 C.13.2 "只消费已确认 Semantic Resolution"）：
+        //   1) 每个 Runtime 指标按 SemanticText（回退 Field 同名、位置）匹配一条未消费绑定并落物理绑定；
+        //   2) 匹配失败者视为 LLM 幻影指标（无物理落点），逆序移除；
+        //   3) 未被消费的 Resolution 绑定按"权威绑定"原则补全为新指标（LLM 漏产出指标的兜底）。
+        // 数量一致（1:1）时等价于原先的索引重写，不引入行为变化。
+        var usedBindings = new HashSet<int>();
+        var dropIndexes = new List<int>();
+
+        for (var i = 0; i < plan.Metrics.Count; i++)
+        {
+            var bindingIndex = MatchMetricBinding(bindings, plan.Metrics[i], usedBindings, i);
+            if (bindingIndex < 0)
+            {
+                dropIndexes.Add(i);
+                continue;
+            }
+            usedBindings.Add(bindingIndex);
+            ApplyMetricBinding(plan, plan.Metrics[i], bindings[bindingIndex], i);
         }
+
+        for (var k = dropIndexes.Count - 1; k >= 0; k--)
+            plan.Metrics.RemoveAt(dropIndexes[k]);
+
+        for (var j = 0; j < bindings.Count; j++)
+        {
+            if (usedBindings.Contains(j)) continue;
+            var runtime = new QueryMetric();
+            plan.Metrics.Add(runtime);
+            ApplyMetricBinding(plan, runtime, bindings[j], j);
+        }
+    }
+
+    /// <summary>
+    /// 为单个 Runtime 指标在 Resolution 绑定集合中寻找最佳匹配（与 MatchFilterBinding 同构）。
+    /// 优先级：SemanticText 精确匹配 → Runtime Field 与绑定 SemanticText/物理列同名 → 位置回退。
+    /// 返回绑定索引；找不到未使用绑定时返回 -1（调用方据此丢弃该幻影指标）。
+    /// </summary>
+    private static int MatchMetricBinding(
+        IReadOnlyList<QueryPlanMetricResolution> bindings,
+        QueryMetric runtime,
+        HashSet<int> used,
+        int positional)
+    {
+        for (var j = 0; j < bindings.Count; j++)
+        {
+            if (used.Contains(j)) continue;
+            if (!string.IsNullOrWhiteSpace(runtime.SemanticText)
+                && string.Equals(runtime.SemanticText, bindings[j].SemanticText, StringComparison.OrdinalIgnoreCase))
+                return j;
+        }
+        for (var j = 0; j < bindings.Count; j++)
+        {
+            if (used.Contains(j)) continue;
+            if (!string.IsNullOrWhiteSpace(runtime.Field)
+                && (string.Equals(runtime.Field, bindings[j].SemanticText, StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(runtime.Field, bindings[j].Column, StringComparison.OrdinalIgnoreCase)))
+                return j;
+        }
+        if (positional < bindings.Count && !used.Contains(positional))
+            return positional;
+        return -1;
+    }
+
+    private static void ApplyMetricBinding(QueryPlan plan, QueryMetric runtime, QueryPlanMetricResolution b, int index)
+    {
+        ValidateColumn(b.ColumnId, b.Column, $"Metric[{index}]");
+        EnsureTable(plan, b.TableId, b.DataSourceId, b.Table, $"Metric[{index}]");
+        runtime.SemanticText = b.SemanticText;
+        runtime.Field = b.Column;
+
+        // GQ-002：EntityCount 契约强制运行时聚合为 COUNT（不变）。
+        // Semantic Applicability 已依据 Golden 契约（Aggregation=Count）判定 MetricType=EntityCount，
+        // 而 LLM Intent 对"入库单数量"这类问句不稳定（曾产出 SUM(id)），
+        // QueryPlanMetricScoringService 对 Aggregation 严格断言（expected=Count vs actual=Sum → 0 分）。
+        // 这里以 Resolution 的 MetricType 为准覆盖 LLM 猜测，保证 EntityCount 语义不被破坏。
+        if (string.Equals(b.MetricType, "EntityCount", StringComparison.OrdinalIgnoreCase))
+            runtime.Aggregation = QueryAggregation.Count.ToString().ToUpperInvariant();
     }
 
     private static void ApplyFilterResolutions(QueryPlan plan, IReadOnlyList<QueryPlanFilterResolution> bindings)

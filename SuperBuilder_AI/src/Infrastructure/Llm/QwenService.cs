@@ -38,6 +38,19 @@ public class QwenService
 	/// </summary>
 	/// <param name="httpClient">用于发送 HTTP 请求的 <see cref="HttpClient"/>，由依赖注入提供并可被配置。</param>
 	/// <param name="configuration">应用配置，用于读取千问服务相关设置。</param>
+	/// <summary>
+	/// LLM 对话请求的默认超时秒数。
+	/// </summary>
+	/// <remarks>
+	/// HttpClient 默认超时为 100 秒，而 qwen3.7-plus 单次推理在高延迟时段可超过该阈值，
+	/// 导致 Golden 回归出现 "The request was canceled due to the configured
+	/// HttpClient.Timeout of 100 seconds elapsing"（GQ-005 曾因此判为 ERROR，
+	/// 属基础设施抖动而非逻辑失败，却会污染 18/18 闸门结论）。
+	/// 这里与 Embedding 侧（Embedding:TimeoutSeconds=120）对齐为可配置项，
+	/// 并给出更宽裕的默认值；可用 Qwen:TimeoutSeconds 覆盖。
+	/// </remarks>
+	private const int DefaultTimeoutSeconds = 180;
+
 	public QwenService(
 		HttpClient httpClient,
 		IConfiguration configuration)
@@ -46,6 +59,13 @@ public class QwenService
 		_httpClient = httpClient;
 
 		_configuration = configuration;
+
+		var timeoutSeconds =
+		_configuration.GetValue<int?>("Qwen:TimeoutSeconds")
+		?? DefaultTimeoutSeconds;
+
+		if (timeoutSeconds > 0)
+			_httpClient.Timeout = TimeSpan.FromSeconds(timeoutSeconds);
 
 	}
 
