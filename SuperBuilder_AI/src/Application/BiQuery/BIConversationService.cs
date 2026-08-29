@@ -6,6 +6,8 @@ using SuperBuilder_AI.Interfaces.BI.Planning;
 using SuperBuilder_AI.Interfaces.Database;
 using SuperBuilder_AI.Models.AI;
 using SuperBuilder_AI.Models.BI;
+using SuperBuilder_AI.Interfaces.Platform;
+using SuperBuilder_AI.Models.Organization;
 
 namespace SuperBuilder_AI.Services.BI;
 
@@ -83,6 +85,9 @@ public class BIConversationService
 	private readonly IResultUnderstandingService
 		_resultUnderstandingService;
 
+	private readonly IPlatformContextAccessor?
+		_platformContextAccessor;
+
 
 	public BIConversationService(
 		IQueryUnderstandingService queryUnderstandingService,
@@ -91,7 +96,8 @@ public class BIConversationService
 		ISqlDialectResolver sqlDialectResolver,
 		SuperBIContext superBIContext,
 		IQueryExecutionService queryExecutionService,
-		IResultUnderstandingService resultUnderstandingService)
+		IResultUnderstandingService resultUnderstandingService,
+		IPlatformContextAccessor? platformContextAccessor = null)
 	{
 		_queryUnderstandingService =
 			queryUnderstandingService;
@@ -113,6 +119,9 @@ public class BIConversationService
 
 		_superBIContext =
 			superBIContext;
+
+		_platformContextAccessor =
+			platformContextAccessor;
 	}
 
 
@@ -154,6 +163,18 @@ public class BIConversationService
 			string question,
 			long tenantId)
 	{
+		/*
+		 * Step 0（P4）
+		 *
+		 * 建立平台运行时上下文：把传入的 tenantId 收敛为 PlatformContext，
+		 * 写入 IPlatformContextAccessor 供下游（含 P4.3 的 SuperBIContext 全局租户过滤）读取。
+		 * 不修改下游 tenantId 透传，Golden 无租户路径不受影响。
+		 */
+		var platformContext = tenantId > 0
+			? PlatformContext.FromTenant(tenantId)
+			: PlatformContext.System;
+		_platformContextAccessor?.Current = platformContext;
+
 		/*
          * Step 1
          *

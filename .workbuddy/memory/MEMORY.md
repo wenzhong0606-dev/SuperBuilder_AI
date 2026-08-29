@@ -28,7 +28,7 @@ AI Native BI 平台 — 自然语言 → AI理解 → 语义分析 → 查询计
   - A3(4.3) 抽独立项目 Domain/Application/Infrastructure/Api: ⬜（用户指令暂缓，不随 P3 启动）
   - A4(4.4) 上帝类拆分+依赖倒置(I*端口): ✅ 已完成（commit 9981d73 decompose QueryPlanBuilder，8 partial 拆分；P6 前无阻塞）
   - A5(4.5) 限界上下文解耦/合并重复模型: ⬜（用户指令暂缓）
-- **Stage 2 产品演进（P-track，用户10阶段路线）**：✅ P3 已完成，下一步 **P4 Multi-Tenant Platform Core**
+- **Stage 2 产品演进（P-track，用户10阶段路线）**：✅ P3 已完成，当前 **P4 进行中（P4.1 基石已落地）**
   - P3 Business Semantic Model / P4 Multi-Tenant Core / P5 Multi-Language / P6 Low-code BI / P7 Theme / P8 AI App Builder / P9 AI Agent / P10 Enterprise SaaS
   - 每个 P 阶段退出门槛 = Golden 18/18（硬约束，来自 Phase3 回归事故教训）
 - 主交付文档：`docs/DevelopmentPlan.md`(唯一事实来源) + `docs/PhaseChecklist.md`(可执行清单) + `docs/ARCHITECTURE.md`(目标结构)

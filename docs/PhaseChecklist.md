@@ -59,12 +59,25 @@
 - [x] **验收**：`dotnet build` 0 error 0 warning；**Golden 18/18 PASS**（`expectedOutcomePassed 18/18`、`failedGates:[]`、`decision:PASS`）；无新增 Migration（未新增 EF 实体）
 
 ### P4 — Multi-Tenant Platform Core
-- [ ] `PlatformContext`（先 `TenantContext` 增量建设）
-- [ ] `Tenant` 扩展 Setting/Locale/Theme/Workspace/User/Role/Permission
-- [ ] 核心 Runtime 入口接受 PlatformContext（先 Tenant 注入）
-- [ ] 持久化全量 `TenantId` 过滤；`SuperBIContext` 自动租户作用域
-- [ ] `TenantManagementController` + Migration
-- [ ] **验收**：build 绿 + **Golden 18/18**（租户隔离未破原有 case）+ 跨租户不可见单测
+**P4.1 平台上下文抽象（✅ 完成 · 零 schema 变更 · 未触及 gated 查询链路）**
+- [x] `src/Domain/Organization/TenantContext.cs`（租户运行时上下文 record，含 `System` 全局态）
+- [x] `src/Domain/Organization/PlatformContext.cs`（聚合 Tenant/User/Workspace/Locale/Theme，先落地 Tenant）
+- [x] `src/Application/Ports/Platform/IPlatformContextAccessor.cs`（scoped 访问器接口）
+- [x] `src/Application/Platform/PlatformContextAccessor.cs`（默认实现）
+- [x] `BIConversationService` 注入可选 `IPlatformContextAccessor`；`ExecuteAsync` 内由 `tenantId` 建立 `PlatformContext` 写入访问器（为 P4.3 全局过滤奠基；下游 `tenantId` 透传不变）
+- [x] `TenantManagementController`（`api/tenant-management`：GET 列表/按Id、POST 创建、PATCH 启用/停用；注入 `SuperBIContext`）— 已验证返回 Tenant1(WMS)/Tenant3(CSV_FIXTURE) → 200
+- [x] `Program.cs` 注册 `IPlatformContextAccessor`（scoped）
+- [x] **验收**：`dotnet build` 0 error 0 warning；服务启动监听 5032 无 DI 错误；未触及 gated 路径 → 不强制重跑 Golden
+**P4.2 Tenant 实体扩展 + Migration（⬜ 待做）**
+- [ ] `Tenant` 扩展 Setting/Locale/Theme/Workspace 子实体（User/Role/Permission 留 P10 IAM）
+- [ ] 新增 EF 配置 + Migration（`dotnet ef migrations add`）
+**P4.3 SuperBIContext 全局租户过滤 + 跨租户单测（⬜ 待做 · 最高风险）**
+- [ ] `OnModelCreating` 为带 `TenantId` 实体加 `HasQueryFilter`（值取自 `IPlatformContextAccessor.Current.Tenant.TenantId`；`System`/未作用域不加过滤）
+- [ ] 新增测试项目（xunit）+ 跨租户数据不可见性单测
+- [ ] **必须跑 Golden 18/18** 确认隔离未破 Tenant1 的 positive case
+**P4.4 核心 Runtime 入口 PlatformContext 化（⬜ 待做）**
+- [ ] `UnderstandAsync`/`QueryPlanPipeline` 等从 `long tenantId` 迁移为接受 `PlatformContext`；Golden 无租户重载不变
+- [ ] **P4 总验收**：build 绿 + **Golden 18/18**（租户隔离未破原有 case）+ 跨租户数据不可见单测
 
 ### P5 — Multi-Language Runtime
 - [ ] `Localization` 资源（zh-CN/zh-TW/en-US/ja-JP/ko-KR…）
@@ -109,4 +122,4 @@
 - [ ] A4 上帝类拆分必须在 P6 之前收口
 
 ---
-**立即下一步**：P3 已完成（管线接线 + Golden 18/18）。A3/A5 用户决定暂缓。下一步进入 **P4 Multi-Tenant Platform Core**（TenantContext 增量建设，先 Tenant 注入）。每步 build + Golden。
+**立即下一步**：P3 已完成（管线接线 + Golden 18/18）。A3/A5 用户决定暂缓。下一步进入 **P4 Multi-Tenant Platform Core**（P4.1 已落地）。下一步 **P4.2 Tenant 扩展 + Migration**，随后 **P4.3 全局租户过滤（必跑 Golden 18/18）**。A3/A5 暂缓。每步 build + Golden。

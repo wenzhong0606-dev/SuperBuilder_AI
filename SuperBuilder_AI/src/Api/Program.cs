@@ -16,6 +16,8 @@ using SuperBuilder_AI.Services.Database;
 using SuperBuilder_AI.Interfaces.BI.Entity;
 using SuperBuilder_AI.Infrastructure.Persistence;
 using SuperBuilder_AI.Services.BI.Entity;
+using SuperBuilder_AI.Interfaces.Platform;
+using SuperBuilder_AI.Services.Platform;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -47,6 +49,10 @@ builder.Services.AddScoped<IBusinessSemanticMappingService, BusinessSemanticMapp
 
 // P3 批次2：业务域 / 维度仓储（A4 依赖倒置准备，仅操作 Metadata DB）
 builder.Services.AddScoped<IBusinessEntityRepository, BusinessEntityRepository>();
+
+// P4 Multi-Tenant Platform Core：平台上下文访问器（scoped）
+// 由 Runtime 入口在每个请求作用域内写入；P4.3 的 SuperBIContext 全局租户过滤将读取它。
+builder.Services.AddScoped<IPlatformContextAccessor, PlatformContextAccessor>();
 
 if (string.Equals(
         Environment.GetEnvironmentVariable("CI"),

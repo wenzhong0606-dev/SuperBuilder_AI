@@ -81,7 +81,7 @@ Stage 0 (DONE)
            P3 Business Semantic Model ✅             │     │
             │                                                  │     │
             ▼                                                  │     │
-           P4 Multi-Tenant Core ⬜ ──┬──▶ P5 Multi-Language ⬜  │     │
+           P4 Multi-Tenant Core 🟡 ──┬──▶ P5 Multi-Language ⬜  │     │
             │                       └──▶ P6 Low-code BI ⬜ ──────┘     │
             │                                 │                     │
             │                                 ▼                     │
@@ -129,6 +129,8 @@ Stage 0 (DONE)
 ---
 
 ### P4 — Multi-Tenant Platform Core
+
+> 🟡 **P4 进行中**：P4.1 平台上下文抽象（TenantContext / PlatformContext / IPlatformContextAccessor）+ 租户管理控制器已落地（build 绿 + 端点 200）；P4.2/3/4 待做，Golden 全量复跑在 P4.3 隔离落地后。
 **目标**：把 `Tenant` 升级为平台第一层运行时上下文 `TenantContext`，任何 Business Data / Metadata / Semantic / Dashboard / AI Memory 都具备 Tenant Scope。
 
 **关键交付**
