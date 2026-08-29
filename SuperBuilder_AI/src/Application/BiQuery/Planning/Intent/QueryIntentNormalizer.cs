@@ -2,6 +2,7 @@ using System.Text.RegularExpressions;
 using SuperBuilder_AI.Interfaces.BI.Entity;
 using SuperBuilder_AI.Models.BI;
 using SuperBuilder_AI.Models.BI.Entity;
+using SuperBuilder_AI.Models.Organization;
 
 namespace SuperBuilder_AI.Services.BI.Planning;
 
@@ -29,18 +30,19 @@ public sealed class QueryIntentNormalizer
     /// </summary>
     public async Task<QueryIntent> NormalizeWithBusinessEntitiesAsync(
         QueryIntent intent,
-        long tenantId,
+        PlatformContext platformContext,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(intent);
         Normalize(intent);
-        await EnrichBusinessEntityHintsAsync(intent, tenantId, cancellationToken);
+        await EnrichBusinessEntityHintsAsync(intent, platformContext, cancellationToken);
         return intent;
     }
 
-    private async Task EnrichBusinessEntityHintsAsync(QueryIntent intent, long tenantId, CancellationToken cancellationToken)
+    private async Task EnrichBusinessEntityHintsAsync(QueryIntent intent, PlatformContext platformContext, CancellationToken cancellationToken)
     {
         if (_mapping is null) return;
+        var tenantId = platformContext?.Tenant?.TenantId ?? 0;
         try
         {
             var result = await _mapping.ResolveAsync(

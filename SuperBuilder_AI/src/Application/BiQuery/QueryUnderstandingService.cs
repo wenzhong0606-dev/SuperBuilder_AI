@@ -1,6 +1,7 @@
 ﻿using SuperBuilder_AI.Interfaces;
 using SuperBuilder_AI.Interfaces.BI;
 using SuperBuilder_AI.Models.BI;
+using SuperBuilder_AI.Models.Organization;
 using SuperBuilder_AI.Services.BI.Planning;
 using System.Text.Json;
 
@@ -702,15 +703,15 @@ public class QueryUnderstandingService
 
 	/// <summary>
 	/// 理解用户查询意图并注入业务实体感知（P3）。
-	/// 在确定性结构归一化之后，异步识别候选业务实体并写入
+	/// 接收平台运行时上下文（PlatformContext，P4），在确定性结构归一化之后异步识别候选业务实体并写入
 	/// QueryIntent.BusinessEntityHints，供 QueryPlanBuilder 编排层参考。
 	/// </summary>
 	public async Task<QueryIntent> UnderstandAsync(
 		string question,
-		long tenantId)
+		PlatformContext platformContext)
 	{
 		var intent = await BuildRawIntentAsync(question);
-		return await _intentNormalizer.NormalizeWithBusinessEntitiesAsync(intent, tenantId);
+		return await _intentNormalizer.NormalizeWithBusinessEntitiesAsync(intent, platformContext);
 	}
 
 	/// <summary>

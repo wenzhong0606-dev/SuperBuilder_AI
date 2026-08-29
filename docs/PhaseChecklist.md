@@ -79,9 +79,13 @@
 - [x] `DataSource.TenantId` 为 `long?`：过滤器用 `e.TenantId.HasValue && e.TenantId.Value == _scopedTenantId` 守卫，避免 `long? == long` 产生被提升的 `bool?` 与 `||` 组合触发 EF "Nullable object must have a value" 回归（此前两次失败根因）
 - [x] 新增测试项目 `tests/SuperBuilder_AI.Tests/`（xunit + EF Core SQLite 内存库，离线可还原）`SuperBIContextTenantFilterTests`：覆盖 4 个根实体，验证 (1) 无作用域=全可见 no-op (2) 开启租户=仅本租户可见 (3) 跨租户不可见 (4) System/tenantId<=0=no-op；**4/4 通过**
 - [x] **验收**：`dotnet build` 0 error 0 warning；**Golden 18/18 PASS（decision=PASS, passedCases=18/18, failedGates:None, overallPassRate=1.0, positivePassRate=1.0；3 个 ERROR 为预期负例 Qwen 403 抖动，expectedOutcome 满足）**
-**P4.4 核心 Runtime 入口 PlatformContext 化（⬜ 待做）**
-- [ ] `UnderstandAsync`/`QueryPlanPipeline` 等从 `long tenantId` 迁移为接受 `PlatformContext`；Golden 无租户重载不变
-- [ ] **P4 总验收**：build 绿 + **Golden 18/18**（租户隔离未破原有 case）+ 跨租户数据不可见单测
+**P4.4 核心 Runtime 入口 PlatformContext 化（✅ 完成 · 零回归 · build 绿 + Golden 18/18 PASS）**
+- [x] `IQueryUnderstandingService.UnderstandAsync` 带租户重载签名由 `(question, long tenantId)` 迁移为 `(question, PlatformContext platformContext)`
+- [x] `QueryUnderstandingService` 实现同步迁移；`BIConversationService.ExecuteAsync` 在已知 `platformContext`（由 tenantId 收敛）后显式传入 `UnderstandAsync(question, platformContext)`，内部不再透传裸 `tenantId`
+- [x] `QueryIntentNormalizer.NormalizeWithBusinessEntitiesAsync` / `EnrichBusinessEntityHintsAsync` 由 `long tenantId` 迁移为 `PlatformContext`；内部以 `platformContext?.Tenant?.TenantId ?? 0` 提取租户并调用 `IBusinessSemanticMappingService.ResolveAsync`（行为等价：System/TenantId=0 时解析为空、hint 静默跳过）
+- [x] **范围澄清**：`QueryPlanPipeline.RunAsync(question, intent)` 当前签名本就不携带 `tenantId`（其对租户隔离的依赖已通过 P4.3 的 `SuperBIContext` 全局过滤在查询层强制执行），故 P4.4 无需改动该入口；"核心 Runtime 入口 PlatformContext 化"实际落地于意图理解入口链路
+- [x] Golden 无租户重载 `UnderstandAsync(question)` 保持不变 → 历史行为零变化
+- [x] **P4 总验收（✅ 完成 · Golden 18/18 PASS）**：build 绿（0 error，10 个预存 nullable 警告均不在本阶段文件）+ 跨租户单测 4/4 通过；Golden 18/18 在切换可用模型 `qwen-plus` 后复跑通过（decision=PASS, passedCases=18/18, failedGates=None, overallPassRate=1.0, positivePassRate=1.0, 0 ERROR）。此前两次失败（qwen3.7-plus 配额耗尽 403 / qwen3.5-ocr 模型不适用）均属外部模型问题、非本阶段代码回归。
 
 ### P5 — Multi-Language Runtime
 - [ ] `Localization` 资源（zh-CN/zh-TW/en-US/ja-JP/ko-KR…）
@@ -126,4 +130,4 @@
 - [ ] A4 上帝类拆分必须在 P6 之前收口
 
 ---
-**立即下一步**：P3 已完成（管线接线 + Golden 18/18）。A3/A5 用户决定暂缓。**P4 Multi-Tenant Platform Core** 进行中：**P4.1 平台上下文抽象 ✅**、**P4.2 Tenant 扩展 + Migration ✅（Golden 18/18 PASS）**、**P4.3 全局租户过滤 + 跨租户单测 ✅（Golden 18/18 PASS，4/4 单测通过）**；下一步 **P4.4 核心 Runtime 入口 PlatformContext 化（UnderstandAsync/QueryPlanPipeline 从 long tenantId 迁移为 PlatformContext；Golden 无租户重载不变）**。A3/A5 用户决定暂缓。每步 build + Golden。
+**立即下一步**：P3 ✅、P4 Multi-Tenant Platform Core ✅ 全绿（P4.1/P4.2/P4.3/P4.4 均 ✅，Golden 18/18 PASS ×P4.2/P4.3/P4.4 三轮）。A3/A5 用户决定暂缓。下一阶段 **P5 Multi-Language Runtime**（LocaleContext 接入 PlatformContext + 业务语义多语言标签 + 多语言问句 Golden 复跑）。每步 build + Golden。

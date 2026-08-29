@@ -185,7 +185,7 @@ public class BIConversationService
          */
 		var intent =
 			await _queryUnderstandingService
-				.UnderstandAsync(question, tenantId);
+				.UnderstandAsync(question, platformContext);
 
 
 		/*

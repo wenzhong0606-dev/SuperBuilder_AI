@@ -1,4 +1,5 @@
 ﻿using SuperBuilder_AI.Models.BI;
+using SuperBuilder_AI.Models.Organization;
 
 
 namespace SuperBuilder_AI.Interfaces.BI;
@@ -27,11 +28,11 @@ public interface IQueryUnderstandingService
 
 	/// <summary>
 	/// 理解用户查询并注入业务实体感知（P3）。
-	/// 提供租户上下文后，归一化阶段会识别候选业务实体并写入 QueryIntent.BusinessEntityHints。
+	/// 提供平台运行时上下文（PlatformContext，P4）后，归一化阶段会识别候选业务实体并写入 QueryIntent.BusinessEntityHints。
 	/// </summary>
 	Task<QueryIntent> UnderstandAsync(
 		string question,
-		long tenantId);
+		PlatformContext platformContext);
 
 
 }
