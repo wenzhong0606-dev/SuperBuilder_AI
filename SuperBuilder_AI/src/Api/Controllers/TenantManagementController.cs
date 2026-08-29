@@ -83,6 +83,47 @@ public sealed class TenantManagementController : ControllerBase
 		await _db.SaveChangesAsync(cancellationToken);
 		return Ok(new TenantSummary(t.Id, t.TenantCode, t.TenantName, t.Enabled));
 	}
+
+	[HttpGet("{id:long}/settings")]
+	public async Task<IActionResult> ListSettings(long id, CancellationToken cancellationToken = default)
+	{
+		if (!await _db.Tenants.AnyAsync(t => t.Id == id, cancellationToken))
+			return NotFound($"租户 {id} 不存在。");
+
+		var settings = await _db.TenantSettings
+			.AsNoTracking()
+			.Where(s => s.TenantId == id)
+			.OrderBy(s => s.Key)
+			.Select(s => new TenantSettingSummary(s.Id, s.Key, s.Value, s.DataType))
+			.ToListAsync(cancellationToken);
+		return Ok(settings);
+	}
+
+	[HttpPost("{id:long}/settings")]
+	public async Task<IActionResult> UpsertSetting(
+		long id,
+		[FromBody] UpsertTenantSettingRequest request,
+		CancellationToken cancellationToken = default)
+	{
+		var key = (request.Key ?? string.Empty).Trim();
+		if (key.Length == 0)
+			return BadRequest("Key 不能为空。");
+
+		if (!await _db.Tenants.AnyAsync(t => t.Id == id, cancellationToken))
+			return NotFound($"租户 {id} 不存在。");
+
+		var existing = await _db.TenantSettings
+			.FirstOrDefaultAsync(s => s.TenantId == id && s.Key == key, cancellationToken);
+		if (existing is null)
+		{
+			existing = new TenantSetting { TenantId = id, Key = key };
+			_db.TenantSettings.Add(existing);
+		}
+		existing.Value = request.Value;
+		existing.DataType = (request.DataType ?? "string").Trim();
+		await _db.SaveChangesAsync(cancellationToken);
+		return Ok(new TenantSettingSummary(existing.Id, existing.Key, existing.Value, existing.DataType));
+	}
 }
 
 /// <summary>租户摘要 DTO。</summary>
@@ -90,3 +131,9 @@ public sealed record TenantSummary(long Id, string? TenantCode, string? TenantNa
 
 /// <summary>创建租户请求。</summary>
 public sealed record CreateTenantRequest(string? TenantCode, string? TenantName);
+
+/// <summary>租户配置项 DTO。</summary>
+public sealed record TenantSettingSummary(long Id, string Key, string? Value, string? DataType);
+
+/// <summary>写入租户配置项请求。</summary>
+public sealed record UpsertTenantSettingRequest(string? Key, string? Value, string? DataType);

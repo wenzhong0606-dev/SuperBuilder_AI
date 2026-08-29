@@ -13,6 +13,7 @@ public class SuperBIContext : DbContext
     #region Organization
     public DbSet<Tenant> Tenants { get; set; }
     public DbSet<DataSource> DataSources { get; set; }
+    public DbSet<TenantSetting> TenantSettings { get; set; }
     #endregion
 
     #region Metadata
@@ -49,6 +50,15 @@ public class SuperBIContext : DbContext
         builder.Entity<Tenant>().Property(x => x.TenantCode).HasComment("租户编码");
         builder.Entity<Tenant>().Property(x => x.TenantName).HasComment("租户名称");
         builder.Entity<Tenant>().Property(x => x.Enabled).HasComment("是否启用");
+        #endregion
+
+        #region TenantSetting
+        builder.Entity<TenantSetting>().HasOne(x => x.Tenant).WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Cascade);
+        builder.Entity<TenantSetting>().ToTable(tb => tb.HasComment("租户键值配置"));
+        builder.Entity<TenantSetting>().HasIndex(x => new { x.TenantId, x.Key }).IsUnique();
+        builder.Entity<TenantSetting>().Property(x => x.Key).IsRequired().HasMaxLength(128).HasComment("配置键");
+        builder.Entity<TenantSetting>().Property(x => x.Value).HasComment("配置值");
+        builder.Entity<TenantSetting>().Property(x => x.DataType).HasMaxLength(32).HasComment("值类型");
         #endregion
 
         #region DataSource

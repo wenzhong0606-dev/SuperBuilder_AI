@@ -130,15 +130,15 @@ Stage 0 (DONE)
 
 ### P4 — Multi-Tenant Platform Core
 
-> 🟡 **P4 进行中**：P4.1 平台上下文抽象（TenantContext / PlatformContext / IPlatformContextAccessor）+ 租户管理控制器已落地（build 绿 + 端点 200）；P4.2/3/4 待做，Golden 全量复跑在 P4.3 隔离落地后。
+> 🟡 **P4 进行中**：P4.1 平台上下文抽象（TenantContext / PlatformContext / IPlatformContextAccessor）+ 租户管理控制器已落地（build 绿 + 端点 200）；**P4.2 Tenant 扩展 + Migration ✅（TenantSetting KV + 迁移已应用 + 设置端点运行时验证 + Golden 18/18 PASS）**；P4.3 全局租户过滤（最高风险 · 必跑 Golden）与 P4.4 待做。
 **目标**：把 `Tenant` 升级为平台第一层运行时上下文 `TenantContext`，任何 Business Data / Metadata / Semantic / Dashboard / AI Memory 都具备 Tenant Scope。
 
 **关键交付**
-- [ ] `PlatformContext`（聚合：Tenant / User / Workspace / Locale / Theme）—— 增量建设，先 `TenantContext`
-- [ ] `Tenant`（`src/Domain/Organization/Tenant.cs`，已存在）扩展 `TenantSetting / TenantLocale / TenantTheme / TenantWorkspace / TenantUser / TenantRole / TenantPermission`
+- [x] `PlatformContext`（聚合：Tenant / User / Workspace / Locale / Theme）—— 增量建设，P4.1 已落地 `TenantContext` + `PlatformContext` 骨架
+- [x] `Tenant`（`src/Domain/Organization/Tenant.cs`，已存在）扩展 `TenantSetting`（通用租户 KV 配置，统一承载 Setting/Locale/Theme/Workspace；细分实体按需；`TenantUser/Role/Permission` 留 P10 IAM）— Migration `20260829090341_P4_2_TenantSettings` 已生成并应用
 - [ ] 所有核心 Runtime 入口改为接受 `PlatformContext` 而非仅 `Question`（先 Tenant 注入，逐步扩）
 - [ ] 持久化层全量加 `TenantId` 过滤；`SuperBIContext` 查询自动带租户作用域
-- [ ] 新增 `TenantManagementController`（生产）+ Migration
+- [x] 新增 `TenantManagementController`（生产）+ Migration（P4.1 落地控制器；P4.2 扩展 settings 端点 + 应用 Migration）
 
 **验收**：build 绿 + **Golden 18/18**（验证加租户隔离后原有 positive 查询未被破坏）+ 跨租户数据不可见性单测。
 

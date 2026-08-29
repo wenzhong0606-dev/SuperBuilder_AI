@@ -68,9 +68,11 @@
 - [x] `TenantManagementController`（`api/tenant-management`：GET 列表/按Id、POST 创建、PATCH 启用/停用；注入 `SuperBIContext`）— 已验证返回 Tenant1(WMS)/Tenant3(CSV_FIXTURE) → 200
 - [x] `Program.cs` 注册 `IPlatformContextAccessor`（scoped）
 - [x] **验收**：`dotnet build` 0 error 0 warning；服务启动监听 5032 无 DI 错误；未触及 gated 路径 → 不强制重跑 Golden
-**P4.2 Tenant 实体扩展 + Migration（⬜ 待做）**
-- [ ] `Tenant` 扩展 Setting/Locale/Theme/Workspace 子实体（User/Role/Permission 留 P10 IAM）
-- [ ] 新增 EF 配置 + Migration（`dotnet ef migrations add`）
+**P4.2 Tenant 实体扩展 + Migration（✅ 完成 · 零行为变更 · build 绿 + Golden 18/18）**
+- [x] `src/Domain/Organization/TenantSetting.cs`（通用租户 KV 配置，统一承载 Setting/Locale/Theme/Workspace，Key 命名约定按域前缀）
+- [x] `SuperBIContext` 新增 `DbSet<TenantSetting>` + 配置（级联删除、`(TenantId,Key)` 唯一索引、列注释）；Migration `20260829090341_P4_2_TenantSettings` 已生成并应用
+- [x] `TenantManagementController` 扩展 `GET/POST /api/tenant-management/{id}/settings`（运行时验证：写读往返 200）
+- [x] **验收**：`dotnet build` 0 error（10 个预存 nullable 警告均不在本阶段文件）；**Golden 18/18 PASS（decision=PASS, 18/18, failedGates=[]）**
 **P4.3 SuperBIContext 全局租户过滤 + 跨租户单测（⬜ 待做 · 最高风险）**
 - [ ] `OnModelCreating` 为带 `TenantId` 实体加 `HasQueryFilter`（值取自 `IPlatformContextAccessor.Current.Tenant.TenantId`；`System`/未作用域不加过滤）
 - [ ] 新增测试项目（xunit）+ 跨租户数据不可见性单测
@@ -122,4 +124,4 @@
 - [ ] A4 上帝类拆分必须在 P6 之前收口
 
 ---
-**立即下一步**：P3 已完成（管线接线 + Golden 18/18）。A3/A5 用户决定暂缓。下一步进入 **P4 Multi-Tenant Platform Core**（P4.1 已落地）。下一步 **P4.2 Tenant 扩展 + Migration**，随后 **P4.3 全局租户过滤（必跑 Golden 18/18）**。A3/A5 暂缓。每步 build + Golden。
+**立即下一步**：P3 已完成（管线接线 + Golden 18/18）。A3/A5 用户决定暂缓。**P4 Multi-Tenant Platform Core** 进行中：**P4.1 平台上下文抽象 ✅**、**P4.2 Tenant 扩展 + Migration ✅（Golden 18/18 PASS）**；下一步 **P4.3 全局租户过滤 + 跨租户单测（最高风险 · 必跑 Golden 18/18）**。A3/A5 用户决定暂缓。每步 build + Golden。
