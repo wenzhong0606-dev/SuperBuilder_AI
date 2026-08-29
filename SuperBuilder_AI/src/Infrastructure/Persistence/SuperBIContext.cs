@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using SuperBuilder_AI.Models.Localization;
 using SuperBuilder_AI.Models.Metadata;
 using SuperBuilder_AI.Models.Organization;
 using SuperBuilder_AI.Data.Configurations;
@@ -40,6 +41,10 @@ public class SuperBIContext : DbContext
     public DbSet<MetadataColumn> MetadataColumns { get; set; }
     public DbSet<MetadataSemantic> MetadataSemantics { get; set; }
     public DbSet<MetadataLearningRecord> LearningRecords { get; set; }
+    #endregion
+
+    #region P5 Localization
+    public DbSet<SemanticLabel> SemanticLabels { get; set; }
     #endregion
 
     #region Phase 3.1 Business Entity
@@ -123,6 +128,27 @@ public class SuperBIContext : DbContext
         builder.Entity<MetadataLearningRecord>().ToTable(tb => tb.HasComment("学习记录"));
         #endregion
 
+        #region P5.2 SemanticLabel
+        builder.Entity<SemanticLabel>().ToTable(tb => tb.HasComment("语义多语言标签"));
+        // 唯一键含 SortOrder：同义词/示例问句是多值标签（一个概念一种语言可有多条），
+        // 若只按 LabelKind 唯一，第二条同义词会撞键被覆盖。以 SortOrder 作为槽位区分多值。
+        // 读取侧按 Value 去重，避免同一译文占多个槽位时重复展示。
+        builder.Entity<SemanticLabel>()
+            .HasIndex(x => new { x.TenantId, x.ConceptType, x.ConceptId, x.Culture, x.LabelKind, x.SortOrder })
+            .IsUnique();
+        // 按概念 + 语言 + 排序 取标签的高频查询路径
+        builder.Entity<SemanticLabel>()
+            .HasIndex(x => new { x.ConceptType, x.ConceptId, x.Culture });
+        builder.Entity<SemanticLabel>().Property(x => x.TenantId).HasComment("所属租户（0=全局共享）");
+        builder.Entity<SemanticLabel>().Property(x => x.ConceptType).IsRequired().HasMaxLength(64).HasComment("概念类型");
+        builder.Entity<SemanticLabel>().Property(x => x.ConceptId).HasComment("概念实体Id");
+        builder.Entity<SemanticLabel>().Property(x => x.Culture).IsRequired().HasMaxLength(16).HasComment("语言标签");
+        builder.Entity<SemanticLabel>().Property(x => x.LabelKind).IsRequired().HasMaxLength(32).HasComment("标签种类");
+        builder.Entity<SemanticLabel>().Property(x => x.Value).IsRequired().HasMaxLength(512).HasComment("标签文本");
+        builder.Entity<SemanticLabel>().Property(x => x.Source).HasMaxLength(32).HasComment("来源");
+        builder.Entity<SemanticLabel>().Property(x => x.SortOrder).HasComment("排序");
+        #endregion
+
         #region P4.3 Global Tenant Query Filter
         // 直接持有 TenantId 的根实体施加全局过滤；子实体经父实体 FK 间接隔离。
         // 表达式 !_tenantFilterEnabled || e.TenantId == _scopedTenantId：
@@ -134,6 +160,10 @@ public class SuperBIContext : DbContext
         builder.Entity<MetadataTable>().HasQueryFilter(e => !_tenantFilterEnabled || e.TenantId == _scopedTenantId);
         builder.Entity<Models.BI.Entity.BusinessEntity>().HasQueryFilter(e => !_tenantFilterEnabled || e.TenantId == _scopedTenantId);
         builder.Entity<TenantSetting>().HasQueryFilter(e => !_tenantFilterEnabled || e.TenantId == _scopedTenantId);
+
+        // SemanticLabel：租户私有标签 + 全局共享标签（TenantId=0）均对本租户可见。
+        // 与其余实体不同，此处显式放行 TenantId == 0，否则全局译文在租户作用域内会被误过滤。
+        builder.Entity<SemanticLabel>().HasQueryFilter(e => !_tenantFilterEnabled || e.TenantId == _scopedTenantId || e.TenantId == 0);
         #endregion
 
         // Phase 3.1：Business Entity 只持久化到 SuperBuilder Metadata DB。

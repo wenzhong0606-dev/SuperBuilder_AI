@@ -96,10 +96,16 @@
 - [x] `LocalizationController`（`api/localization`：GET `locales` / `resolve?culture=` / `fallback-chain?culture=`）；`Program.cs` 注册 singleton
 - [x] 单测 `LocalizationServiceTests`：**22 项全通过**（归一化、无效输入回退、回退链不变量、默认语言零回归）
 - [x] **验收**：`dotnet build` 0 error（10 个预存 nullable 警告均不在本阶段文件）；单测 **26/26**（P4.3 4 + P5.1 22）；3 个端点运行时 200；**Golden 18/18 PASS（decision=PASS, passedCases=18/18, failedGates=None, overallPassRate=1.0, positivePassRate=1.0, 0 ERROR）**
-**P5.2 业务语义多语言标签持久化 + Migration（⬜ 待做）**
-- [ ] `SemanticLabel` 实体（绑定同一 Semantic Concept：`MetadataSemantic` / `BusinessEntity*`），按 (ConceptType, ConceptId, Culture, LabelKind) 唯一
-- [ ] `SuperBIContext` 配置 + EF Migration 生成并应用；端点运行时验证读写往返
-- [ ] **验收**：build 绿 + **Golden 18/18** + 标签解析单测
+**P5.2 业务语义多语言标签持久化 + Migration（✅ 完成 · Golden 18/18 PASS）**
+- [x] `src/Domain/Localization/SemanticLabel.cs`（同一语义概念的多语言表述：`销售额`/`Sales Amount`/`売上高` → 同一 Concept 的多条标签）+ `SemanticConceptTypes` / `SemanticLabelKinds` 常量
+- [x] **弱多态关联**（ConceptType + ConceptId）而非为每个宿主建表：一套机制同时服务字段级语义与 P3 业务实体。`TenantId` 用非可空 `long`（0=全局共享），规避 P4.3 的 `long?` 提升布尔陷阱
+- [x] 唯一索引含 **`SortOrder`**：同义词/示例问句天然多值，仅按 LabelKind 唯一会使第二条同义词撞键被覆盖（单测暴露后修正）
+- [x] `ISemanticLabelService` / `SemanticLabelService`：回退链解析（单次 SQL 取链上全部候选 → 内存按链序定序）、同义词去重排序、upsert 文化归一化；解析失败软降级返回 null，绝不阻断主链路
+- [x] `SemanticLabelController`（`api/semantic-labels`：GET 列表 / `resolve` / `synonyms`；POST upsert）
+- [x] Migration `20260829154339_P5_2_SemanticLabels` 已生成并应用（仅新增 `SemanticLabels` 表，未触碰任何既有表）
+- [x] 全局租户过滤放行 `TenantId == 0`：否则共享译文在租户作用域内会集体消失
+- [x] 单测 `SemanticLabelServiceTests` **12 项全通过**（回退到语言段/默认语言、无标签返回 null、同义词去重、upsert 归一化与幂等、跨租户不可见、全局标签可见）
+- [x] **验收**：build 0 error（10 个预存 nullable 警告均不在本阶段文件）；单测 **36/36**；端点读写往返 200（`zh_TW`→`zh-TW` 归一化，`ja-JP`/`ko-KR` 正确回退到默认语言）；**Golden 18/18 PASS（decision=PASS, 18/18, failedGates=None, overallPassRate=1.0, positivePassRate=1.0, 0 ERROR）**
 **P5.3 本地化资源 + 语义标签解析服务 + 链路接入（⬜ 待做 · 高风险）**
 - [ ] `Localization` 资源（zh-CN/zh-TW/en-US/ja-JP/ko-KR）
 - [ ] 语义标签解析服务接入元数据/向量检索（高风险，必跑 Golden）
@@ -144,4 +150,4 @@
 - [ ] A4 上帝类拆分必须在 P6 之前收口
 
 ---
-**立即下一步**：P3 ✅、P4 Multi-Tenant Platform Core ✅ 全绿（P4.1~P4.4 均 ✅）。A3/A5 用户决定暂缓。**P5 Multi-Language Runtime 进行中**：**P5.1 LocaleContext + PlatformContext 接入 ✅（Golden 18/18 PASS，单测 26/26）**；下一步 **P5.2 业务语义多语言标签持久化（SemanticLabel 实体 + Migration + 端点读写验证）**，随后 P5.3 本地化资源与语义标签解析、P5.4 意图语言无关化与多语言 Golden 复跑。每步 build + Golden。
+**立即下一步**：P3 ✅、P4 Multi-Tenant Platform Core ✅ 全绿（P4.1~P4.4 均 ✅）。A3/A5 用户决定暂缓。**P5 Multi-Language Runtime 进行中**：**P5.1 LocaleContext + PlatformContext 接入 ✅（单测 26/26，Golden 18/18 PASS）**、**P5.2 语义多语言标签持久化 ✅（SemanticLabel + Migration，单测 36/36，端点读写往返 200，Golden 18/18 PASS）**；下一步 **P5.3 本地化资源（zh-CN/zh-TW/en-US/ja-JP/ko-KR）+ 语义标签接入元数据/向量检索（高风险，必跑 Golden）**，随后 P5.4 意图语言无关化与多语言 Golden 复跑。每步 build + Golden。

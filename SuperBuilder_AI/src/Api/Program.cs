@@ -58,6 +58,9 @@ builder.Services.AddScoped<IPlatformContextAccessor, PlatformContextAccessor>();
 // 负责语言区域解析、标签回退链与本地化文案取值；不触碰查询链路。
 builder.Services.AddSingleton<ILocalizationService, LocalizationService>();
 
+// P5.2：业务语义多语言标签服务（依赖 SuperBIContext，随 DbContext 注册为 scoped）
+builder.Services.AddScoped<ISemanticLabelService, SemanticLabelService>();
+
 if (string.Equals(
         Environment.GetEnvironmentVariable("CI"),
         "true",
