@@ -53,7 +53,8 @@ public class QueryUnderstandingService
 	/// 归一化由公开 UnderstandAsync 重载负责，以便按需注入业务实体感知。
 	/// </summary>
 	private async Task<QueryIntent> BuildRawIntentAsync(
-		string question)
+		string question,
+		LocaleContext? locale = null)
 	{
 		if (string.IsNullOrWhiteSpace(question))
 		{
@@ -61,6 +62,17 @@ public class QueryUnderstandingService
 				"用户问题不能为空。",
 				nameof(question));
 		}
+
+		/*
+		 * P5.4：语言指令（语言无关化）。
+		 *
+		 * 默认语言（zh-CN）返回空字符串 -> 提示词与 P5 之前完全一致（零回归）；
+		 * 非默认语言 -> 追加"一律以简体中文输出语义名称"的指令，
+		 * 使 Intent 归一化到平台语义空间，下游解析与提问语言无关。
+		 */
+
+		var localeDirective =
+			QueryIntentLocaleDirective.Build(locale);
 
 		/*
          * ============================================================
@@ -624,6 +636,7 @@ public class QueryUnderstandingService
               "Explanation": ""
             }
 
+            {{localeDirective}}
             ============================================================
             最终只返回JSON
             ============================================================
@@ -710,7 +723,12 @@ public class QueryUnderstandingService
 		string question,
 		PlatformContext platformContext)
 	{
-		var intent = await BuildRawIntentAsync(question);
+		// P5.4：把语言区域透传给提示词构建，启用语言无关化指令。
+		// 默认语言（zh-CN）时指令为空字符串，提示词与 P5 之前完全一致。
+		var intent = await BuildRawIntentAsync(
+			question,
+			platformContext?.Locale);
+
 		return await _intentNormalizer.NormalizeWithBusinessEntitiesAsync(intent, platformContext);
 	}
 

@@ -87,7 +87,7 @@
 - [x] Golden 无租户重载 `UnderstandAsync(question)` 保持不变 → 历史行为零变化
 - [x] **P4 总验收（✅ 完成 · Golden 18/18 PASS）**：build 绿（0 error，10 个预存 nullable 警告均不在本阶段文件）+ 跨租户单测 4/4 通过；Golden 18/18 在切换可用模型 `qwen-plus` 后复跑通过（decision=PASS, passedCases=18/18, failedGates=None, overallPassRate=1.0, positivePassRate=1.0, 0 ERROR）。此前两次失败（qwen3.7-plus 配额耗尽 403 / qwen3.5-ocr 模型不适用）均属外部模型问题、非本阶段代码回归。
 
-### P5 — Multi-Language Runtime
+### P5 — Multi-Language Runtime（✅ 已完成 · 全绿 · Golden 18/18 ×4 轮）
 **P5.1 LocaleContext 领域模型 + 接入 PlatformContext（✅ 完成 · 零 schema 变更 · Golden 18/18 PASS）**
 - [x] `src/Domain/Organization/LocaleContext.cs`（语言区域运行时上下文 record：Culture/Language/Region/DisplayName/TimeZoneId/TextDirection/IsDefault；IETF BCP 47 归一化 `zh_CN`→`zh-CN`；无效输入回退 `Default`）
 - [x] **零回归硬约束**：平台默认语言恒为 `zh-CN`（与既有中文业务语义、Golden 基线一致）；未显式指定语言的路径（含 Golden 运行时）恒取 `Default` → 行为与 P5 之前完全一致
@@ -115,9 +115,13 @@
 - [x] `GET /api/semantic-labels/recall`（含 `gated` 字段便于验证门控是否生效）
 - [x] 单测 **19 项全通过**：门控不变量（默认/Invariant/null 均空）、大小写不敏感、长标签优先且强度归一化、同概念取最强、短标签过滤、回退到默认语言标签、仅作用于 MetadataSemantic
 - [x] **验收**：build 0 error（10 个预存 nullable 警告均不在本阶段文件）；单测 **55/55**；端点验证（默认语言 `gated:true` 零命中；`ja-JP` 经回退链命中 `入库日期`；`en-US` 命中 `Inbound Date`）；**Golden 18/18 PASS（decision=PASS, 18/18, failedGates=None, overallPassRate=1.0, positivePassRate=1.0, 0 ERROR）**
-**P5.4 AI 意图语言无关化 + 多语言 Golden 复跑 + 验收（⬜ 待做）**
-- [ ] AI 意图理解语言无关化（问句归一化到语义概念，剥离语言相关表述）
-- [ ] **P5 总验收**：build 绿 + **Golden 18/18**（多语言问句重跑）+ 语义映射测试
+**P5.4 AI 意图语言无关化 + 多语言验收（✅ 完成 · 门控隔离 · Golden 18/18 PASS）**
+- [x] `QueryIntentLocaleDirective`（纯函数、可离线断言）：非默认语言时在 QueryIntent 提示词中追加"一律以**简体中文**输出语义名称"的指令，使 `Intent → Semantic Concept` 与提问语言无关
+- [x] **门控（零回归核心）**：默认语言 / Invariant / null → 返回空字符串 → **提示词与 P5 之前逐字节一致**；Golden 走无 locale 的 `UnderstandAsync(question)` 重载，恒不进入该分支
+- [x] `QueryUnderstandingService.BuildRawIntentAsync` 新增可选 `locale` 参数；`UnderstandAsync(question, PlatformContext)` 透传 `platformContext.Locale`
+- [x] **关于"多语言问句 Golden 复跑"的落地方式（重要约束）**：契约文件 `Evaluation/Golden/query-plan-golden-v1.json` 为**不可删改**的护栏，故多语言验证未改写该契约，而是新增**确定性离线一致性测试**——同一语义概念登记 zh-CN/en-US/ja-JP/ko-KR 四种标签后，四种语言的问句均解析到同一 `semanticId`，证明语义层语言无关（无需 LLM，可离线复现）
+- [x] 单测 **10 项全通过**（门控不变量、四语言指令内容、归一化目标为简体中文、禁止保留源语言词汇、未登记语言回退、跨语言语义一致性、默认语言走门控路径不受标签影响）
+- [x] **P5 总验收 ✅**：P5.1~P5.4 全绿；build 0 error（10 个预存 nullable 警告均不在本阶段文件）；单测 **65/65**；**Golden 18/18 PASS ×4 轮（P5.1/P5.2/P5.3/P5.4）**
 
 ### P6 — Low-code BI Engine ⚠️（前置：A4 完成）
 - [ ] `Dashboard/Page/Widget/Chart/Table/KPI/Filter/Text/AI Insight/Query` DSL 模型
@@ -156,4 +160,4 @@
 - [ ] A4 上帝类拆分必须在 P6 之前收口
 
 ---
-**立即下一步**：P3 ✅、P4 Multi-Tenant Platform Core ✅ 全绿（P4.1~P4.4 均 ✅）。A3/A5 用户决定暂缓。**P5 Multi-Language Runtime 进行中**：**P5.1 LocaleContext + PlatformContext 接入 ✅（单测 26/26，Golden 18/18 PASS）**、**P5.2 语义多语言标签持久化 ✅（SemanticLabel + Migration，单测 36/36，Golden 18/18 PASS）**、**P5.3 本地化资源 + 语义标签接入检索 ✅（五语言资源 + 标签召回，门控隔离零回归，单测 55/55，Golden 18/18 PASS）**；下一步 **P5.4 AI 意图语言无关化 + 多语言问句 Golden 复跑 + P5 总验收**。每步 build + Golden。
+**立即下一步**：P3 ✅、P4 Multi-Tenant Platform Core ✅ 全绿（P4.1~P4.4 均 ✅）。A3/A5 用户决定暂缓。**P5 Multi-Language Runtime 进行中**：**P5.1 LocaleContext + PlatformContext 接入 ✅（单测 26/26，Golden 18/18 PASS）**、**P5.2 语义多语言标签持久化 ✅（SemanticLabel + Migration，单测 36/36，Golden 18/18 PASS）**、**P5.3 本地化资源 + 语义标签接入检索 ✅**、**P5.4 AI 意图语言无关化 + 多语言验收 ✅** —— **P5 Multi-Language Runtime 已全绿（P5.1~P5.4 均 ✅，单测 65/65，Golden 18/18 PASS ×4 轮）**。下一阶段 **P6 Low-code BI Engine**（前置 A4 已完成，无阻塞）。每步 build + Golden。

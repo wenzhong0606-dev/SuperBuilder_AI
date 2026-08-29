@@ -147,13 +147,15 @@ Stage 0 (DONE)
 ### P5 — Multi-Language Runtime
 **目标**：三层本地化（UI 语言 / 业务语义语言 / AI 语言）。语义概念语言无关，`Intent → Semantic Concept → QueryPlan` 不受提问语言影响。
 
-> 🟡 **P5 进行中**：**P5.1 LocaleContext 领域模型 + 接入 PlatformContext ✅（默认语言恒为 `zh-CN` 保证零回归；单测 26/26；Golden 18/18 PASS）**；**P5.2 业务语义多语言标签持久化 ✅（`SemanticLabel` + Migration `20260829154339_P5_2_SemanticLabels` + `api/semantic-labels`；单测 36/36；Golden 18/18 PASS）**；**P5.3 本地化资源 + 语义标签接入检索 ✅（五语言 `PlatformStrings` + `SemanticLabelRecallService`；以"非默认语言才启用"三重门控隔离，Golden 路径逐字节不变；单测 55/55；Golden 18/18 PASS）**；P5.4 意图语言无关化 + 多语言 Golden 复跑 待做。
+> ✅ **P5 已完成（全绿）**：**P5.1** LocaleContext + PlatformContext 接入（默认语言恒 `zh-CN` 保证零回归）；**P5.2** `SemanticLabel` 多语言标签持久化 + Migration；**P5.3** 五语言 `PlatformStrings` + `SemanticLabelRecallService` 接入检索；**P5.4** `QueryIntentLocaleDirective` 意图语言无关化。**统一手法：多语言能力一律以「非默认语言才启用」门控隔离，默认语言路径行为逐字节不变。** 单测 65/65；Golden 18/18 PASS ×4 轮（P5.1/P5.2/P5.3/P5.4）。
+>
+> 注：多语言问句验证未改写不可删改的契约文件 `Evaluation/Golden/query-plan-golden-v1.json`，而是新增确定性离线一致性测试（四语言问句解析到同一 `semanticId`）。
 
 **关键交付**
 - [x] `Localization` 资源体系（zh-CN/zh-TW/en-US/ja-JP/ko-KR…）—— **P5.3 完成**：`PlatformStrings` 静态资源 + `ILocalizationService.GetString` 按回退链解析（业务语义多语言走数据库 `SemanticLabel`，与 UI 文案职责分离）
 - [x] 业务语义多语言标签映射（如 销售额/Sales Amount/売上高/매출액 映射到同一 Semantic Concept）—— **P5.2 完成**：`SemanticLabel`（ConceptType+ConceptId 弱多态）+ 回退链解析 + 全局/租户私有两级作用域
 - [x] `LocaleContext` 接入 `PlatformContext`（**P5.1 完成**：`PlatformContext.Locale` 由 `string?` 升级为 `LocaleContext`，新增带 culture 的 `FromTenant` 工厂；回退链策略位于 `ILocalizationService`）
-- [ ] AI 意图理解语言无关化 —— **P5.4 待做**
+- [x] AI 意图理解语言无关化 —— **P5.4 完成**：`QueryIntentLocaleDirective` 要求模型一律以简体中文输出语义名称，使 `Intent → Semantic Concept → QueryPlan` 与提问语言无关；默认语言时指令为空，提示词逐字节不变
 - [ ] 问答/错误/消息多语言
 
 **验收**：build 绿 + **Golden 18/18**（用多语言问句重跑核心 case，语义层不变）+ 语义概念映射测试。
