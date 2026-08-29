@@ -4,8 +4,8 @@ namespace SuperBuilder_AI.Models.Organization;
 /// 平台级运行时上下文（P4 增量建设）。
 ///
 /// 聚合 Tenant / User / Workspace / Locale / Theme，作为所有核心 Runtime 入口的统一上下文载体。
-/// 当前阶段先落地 <see cref="Tenant"/>；User / Workspace / Locale / Theme 为占位属性，
-/// 后续由 P5（Multi-Language）/ P7（Theme）/ P10（IAM）填充。
+/// 已落地：<see cref="Tenant"/>（P4）、<see cref="Locale"/>（P5）；
+/// 仍为占位：User / Workspace（P10 IAM）、Theme（P7）。
 /// </summary>
 public sealed record PlatformContext
 {
@@ -18,15 +18,30 @@ public sealed record PlatformContext
 	/// <summary>工作区标识（P4 后续扩展）。</summary>
 	public long? WorkspaceId { get; init; }
 
-	/// <summary>语言区域，如 zh-CN / en-US（P5 Multi-Language 填充）。</summary>
-	public string? Locale { get; init; }
+	/// <summary>
+	/// 语言区域上下文（P5 Multi-Language 填充）。
+	/// 默认 <see cref="LocaleContext.Default"/>（zh-CN），与平台既有中文业务语义一致；
+	/// 未显式指定语言的路径（含 Golden 运行时）恒取默认值 → 行为与 P5 之前完全一致。
+	/// </summary>
+	public LocaleContext Locale { get; init; } = LocaleContext.Default;
 
 	/// <summary>主题标识（P7 Theme 填充）。</summary>
 	public string? Theme { get; init; }
 
-	/// <summary>由租户标识构造一个作用域内的平台上下文。</summary>
+	/// <summary>由租户标识构造一个作用域内的平台上下文（语言区域取 <see cref="LocaleContext.Default"/>）。</summary>
 	public static PlatformContext FromTenant(long tenantId, string? tenantCode = null)
 		=> new() { Tenant = TenantContext.Scoped(tenantId, tenantCode) };
+
+	/// <summary>
+	/// 由租户标识 + 语言区域构造一个作用域内的平台上下文（P5）。
+	/// <paramref name="culture"/> 为 null/空白或无法识别时回退到 <see cref="LocaleContext.Default"/>。
+	/// </summary>
+	public static PlatformContext FromTenant(long tenantId, string? tenantCode, string? culture)
+		=> new()
+		{
+			Tenant = TenantContext.Scoped(tenantId, tenantCode),
+			Locale = LocaleContext.FromCulture(culture),
+		};
 
 	/// <summary>系统/全局平台上下文（无租户隔离）。</summary>
 	public static PlatformContext System { get; } = new() { Tenant = TenantContext.System };

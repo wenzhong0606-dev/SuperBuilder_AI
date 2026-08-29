@@ -54,6 +54,10 @@ builder.Services.AddScoped<IBusinessEntityRepository, BusinessEntityRepository>(
 // 由 Runtime 入口在每个请求作用域内写入；P4.3 的 SuperBIContext 全局租户过滤将读取它。
 builder.Services.AddScoped<IPlatformContextAccessor, PlatformContextAccessor>();
 
+// P5 Multi-Language Runtime：本地化服务（无状态确定性实现，注册为 singleton）
+// 负责语言区域解析、标签回退链与本地化文案取值；不触碰查询链路。
+builder.Services.AddSingleton<ILocalizationService, LocalizationService>();
+
 if (string.Equals(
         Environment.GetEnvironmentVariable("CI"),
         "true",

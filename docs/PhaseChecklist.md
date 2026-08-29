@@ -88,10 +88,24 @@
 - [x] **P4 总验收（✅ 完成 · Golden 18/18 PASS）**：build 绿（0 error，10 个预存 nullable 警告均不在本阶段文件）+ 跨租户单测 4/4 通过；Golden 18/18 在切换可用模型 `qwen-plus` 后复跑通过（decision=PASS, passedCases=18/18, failedGates=None, overallPassRate=1.0, positivePassRate=1.0, 0 ERROR）。此前两次失败（qwen3.7-plus 配额耗尽 403 / qwen3.5-ocr 模型不适用）均属外部模型问题、非本阶段代码回归。
 
 ### P5 — Multi-Language Runtime
-- [ ] `Localization` 资源（zh-CN/zh-TW/en-US/ja-JP/ko-KR…）
-- [ ] 业务语义多语言标签映射（同一 Semantic Concept）
-- [ ] `LocaleContext` 接入 PlatformContext；AI 意图语言无关化
-- [ ] **验收**：build 绿 + **Golden 18/18**（多语言问句重跑）+ 语义映射测试
+**P5.1 LocaleContext 领域模型 + 接入 PlatformContext（✅ 完成 · 零 schema 变更 · Golden 18/18 PASS）**
+- [x] `src/Domain/Organization/LocaleContext.cs`（语言区域运行时上下文 record：Culture/Language/Region/DisplayName/TimeZoneId/TextDirection/IsDefault；IETF BCP 47 归一化 `zh_CN`→`zh-CN`；无效输入回退 `Default`）
+- [x] **零回归硬约束**：平台默认语言恒为 `zh-CN`（与既有中文业务语义、Golden 基线一致）；未显式指定语言的路径（含 Golden 运行时）恒取 `Default` → 行为与 P5 之前完全一致
+- [x] `PlatformContext.Locale` 由占位 `string? Locale` 升级为 `LocaleContext Locale`；新增 `FromTenant(tenantId, tenantCode, culture)` 工厂
+- [x] `ILocalizationService` / `LocalizationService`（纯确定性：无 DB、无 LLM）：语言区域解析 + 回退链（`zh-TW`→`["zh-TW","zh","zh-CN"]`，终点恒为默认语言）+ 支持语言清单
+- [x] `LocalizationController`（`api/localization`：GET `locales` / `resolve?culture=` / `fallback-chain?culture=`）；`Program.cs` 注册 singleton
+- [x] 单测 `LocalizationServiceTests`：**22 项全通过**（归一化、无效输入回退、回退链不变量、默认语言零回归）
+- [x] **验收**：`dotnet build` 0 error（10 个预存 nullable 警告均不在本阶段文件）；单测 **26/26**（P4.3 4 + P5.1 22）；3 个端点运行时 200；**Golden 18/18 PASS（decision=PASS, passedCases=18/18, failedGates=None, overallPassRate=1.0, positivePassRate=1.0, 0 ERROR）**
+**P5.2 业务语义多语言标签持久化 + Migration（⬜ 待做）**
+- [ ] `SemanticLabel` 实体（绑定同一 Semantic Concept：`MetadataSemantic` / `BusinessEntity*`），按 (ConceptType, ConceptId, Culture, LabelKind) 唯一
+- [ ] `SuperBIContext` 配置 + EF Migration 生成并应用；端点运行时验证读写往返
+- [ ] **验收**：build 绿 + **Golden 18/18** + 标签解析单测
+**P5.3 本地化资源 + 语义标签解析服务 + 链路接入（⬜ 待做 · 高风险）**
+- [ ] `Localization` 资源（zh-CN/zh-TW/en-US/ja-JP/ko-KR）
+- [ ] 语义标签解析服务接入元数据/向量检索（高风险，必跑 Golden）
+**P5.4 AI 意图语言无关化 + 多语言 Golden 复跑 + 验收（⬜ 待做）**
+- [ ] AI 意图理解语言无关化（问句归一化到语义概念，剥离语言相关表述）
+- [ ] **P5 总验收**：build 绿 + **Golden 18/18**（多语言问句重跑）+ 语义映射测试
 
 ### P6 — Low-code BI Engine ⚠️（前置：A4 完成）
 - [ ] `Dashboard/Page/Widget/Chart/Table/KPI/Filter/Text/AI Insight/Query` DSL 模型
@@ -130,4 +144,4 @@
 - [ ] A4 上帝类拆分必须在 P6 之前收口
 
 ---
-**立即下一步**：P3 ✅、P4 Multi-Tenant Platform Core ✅ 全绿（P4.1/P4.2/P4.3/P4.4 均 ✅，Golden 18/18 PASS ×P4.2/P4.3/P4.4 三轮）。A3/A5 用户决定暂缓。下一阶段 **P5 Multi-Language Runtime**（LocaleContext 接入 PlatformContext + 业务语义多语言标签 + 多语言问句 Golden 复跑）。每步 build + Golden。
+**立即下一步**：P3 ✅、P4 Multi-Tenant Platform Core ✅ 全绿（P4.1~P4.4 均 ✅）。A3/A5 用户决定暂缓。**P5 Multi-Language Runtime 进行中**：**P5.1 LocaleContext + PlatformContext 接入 ✅（Golden 18/18 PASS，单测 26/26）**；下一步 **P5.2 业务语义多语言标签持久化（SemanticLabel 实体 + Migration + 端点读写验证）**，随后 P5.3 本地化资源与语义标签解析、P5.4 意图语言无关化与多语言 Golden 复跑。每步 build + Golden。
