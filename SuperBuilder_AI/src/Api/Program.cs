@@ -20,6 +20,8 @@ using SuperBuilder_AI.Infrastructure.Persistence;
 using SuperBuilder_AI.Services.BI.Entity;
 using SuperBuilder_AI.Interfaces.Platform;
 using SuperBuilder_AI.Services.Platform;
+using SuperBuilder_AI.Interfaces.Theme;
+using SuperBuilder_AI.Services.Theming;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -155,6 +157,9 @@ builder.Services.AddScoped<IDashboardDslSerializer, DashboardDslSerializer>();
 // P6.3 LowcodeRenderer 渲染引擎（对照 QueryPlanPipeline 接入取数）
 builder.Services.AddScoped<IDashboardRenderer, DashboardLowcodeRenderer>();
 builder.Services.AddScoped<IWidgetDataResolver, QueryPlanWidgetDataResolver>();
+
+// P7.2 Theme 级联解析端口（仪表盘显式键 → 租户默认 → 内置默认）
+builder.Services.AddScoped<IThemeResolver, ThemeResolver>();
 
 // ── BIConversationService 依赖链补充注册 ──────────────────
 builder.Services.AddScoped<IQueryPlanExplainabilityService>(sp => sp.GetRequiredService<QueryPlanExplainabilityService>());

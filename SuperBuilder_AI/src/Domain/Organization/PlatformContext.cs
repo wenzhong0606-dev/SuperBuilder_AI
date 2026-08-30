@@ -1,11 +1,13 @@
 namespace SuperBuilder_AI.Models.Organization;
 
+using SuperBuilder_AI.Models.Theme;
+
 /// <summary>
 /// 平台级运行时上下文（P4 增量建设）。
 ///
 /// 聚合 Tenant / User / Workspace / Locale / Theme，作为所有核心 Runtime 入口的统一上下文载体。
-/// 已落地：<see cref="Tenant"/>（P4）、<see cref="Locale"/>（P5）；
-/// 仍为占位：User / Workspace（P10 IAM）、Theme（P7）。
+/// 已落地：<see cref="Tenant"/>（P4）、<see cref="Locale"/>（P5）、<see cref="Theme"/>（P7）；
+/// 仍为占位：User / Workspace（P10 IAM）。
 /// </summary>
 public sealed record PlatformContext
 {
@@ -15,7 +17,7 @@ public sealed record PlatformContext
 	/// <summary>操作用户标识（P10 IAM 填充）。</summary>
 	public long? UserId { get; init; }
 
-	/// <summary>工作区标识（P4 后续扩展）。</summary>
+	/// <summary>工作区标识（P4 后续扩展；P7.2 级联解析暂未启用工作区级主题）。</summary>
 	public long? WorkspaceId { get; init; }
 
 	/// <summary>
@@ -25,8 +27,12 @@ public sealed record PlatformContext
 	/// </summary>
 	public LocaleContext Locale { get; init; } = LocaleContext.Default;
 
-	/// <summary>主题标识（P7 Theme 填充）。</summary>
-	public string? Theme { get; init; }
+	/// <summary>
+	/// 主题上下文（P7.2 Theme 填充）。默认 <see cref="ThemeContext.Default"/>（内置浅色主题）。
+	/// 由 <see cref="SuperBuilder_AI.Interfaces.Theme.IThemeResolver"/> 在运行时解析后注入；
+	/// 未显式解析的路径（含 Golden 运行时）恒取内置默认 → 行为与 P7.2 之前完全一致。
+	/// </summary>
+	public ThemeContext Theme { get; init; } = ThemeContext.Default;
 
 	/// <summary>由租户标识构造一个作用域内的平台上下文（语言区域取 <see cref="LocaleContext.Default"/>）。</summary>
 	public static PlatformContext FromTenant(long tenantId, string? tenantCode = null)

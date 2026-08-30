@@ -154,7 +154,7 @@
 
 ### P7 — Multi-Theme / Style Engine
 - [x] **P7.1 Theme 领域聚合 + 持久化 + 内置默认主题 ✅**：`ThemeDsl`（结构化设计令牌 Brand/Color/Typography/Layout/Border/Radius/Shadow/ChartPalette/Component/DashboardTemplate，绝不承载 CSS/HTML）+ `Theme` 实体（TenantId/Key/Name/IsBuiltIn/DslVersion/DslJson，租户查询过滤 TenantId=0 放行）+ 内置默认浅色主题 `BuiltInThemes.DefaultDsl()`；`SuperBIContext` 增加 `DbSet<Theme>` 与配置；迁移 `20260830034528_P7_1_Theme` 已生成并应用到 `SuperBuilder_Platform`；单测 `ThemeDslTests` 3 项通过。**build 0 error；单测 120/120；Golden 18/18 PASS**。
-- [ ] **P7.2 ThemeContext 接入 PlatformContext + 级联解析服务**
+- [x] **P7.2 ThemeContext 接入 PlatformContext + 级联解析服务 ✅**：`ThemeContext` 值对象（Key/Source/Dsl，绝不承载 CSS/HTML）+ `ThemeSource` 枚举；`PlatformContext.Theme` 由 `string?` 升级为 `ThemeContext`（默认 `ThemeContext.Default` 内置浅色）；`IThemeResolver`/`ThemeResolver` 实现级联 仪表盘显式键 → 租户默认(TenantSetting `theme:defaultKey`) → 内置默认，跨租户不泄漏（仅允许当前租户 ∪ 内置 TenantId=0）；`Program.cs` 注册 `IThemeResolver`。单测 `ThemeResolverTests` 6 项（级联优先级 + 跨租户隔离）通过。**build 0 error；单测 126/126；Golden 18/18 PASS（C:/tmp/golden_p72.json）**。
 - [ ] **P7.3 渲染引擎接入主题 + 主题切换渲染测试**
 - [ ] **P7.4 Theme 管理端点（CRUD + 指派）+ P7 总验收**
 - [ ] **P7 总验收**：build 绿 + **Golden 18/18** + 主题切换渲染测试
@@ -185,4 +185,4 @@
 - [ ] A4 上帝类拆分必须在 P6 之前收口
 
 ---
-**立即下一步**：P3 ✅、P4 Multi-Tenant Platform Core ✅ 全绿（P4.1~P4.4 均 ✅）、P5 Multi-Language Runtime ✅ 全绿（P5.1~P5.4 均 ✅）、**P6 Low-code BI Engine ✅ 全绿（P6.1/P6.2/P6.3/P6.4 均 ✅，合计单测 117/117，Golden 18/18 PASS）**。**P7 Multi-Theme / Style Engine 进行中**：**P7.1 Theme 领域聚合+持久化+内置默认主题 ✅**（build 0 error；单测 120/120；Golden 18/18 PASS）。下一子阶段 **P7.2 ThemeContext 接入 PlatformContext + 级联解析服务**（前置 P7.1 已完成，无阻塞）。A3/A5 用户决定暂缓。
+**立即下一步**：P3 ✅、P4 Multi-Tenant Platform Core ✅ 全绿（P4.1~P4.4 均 ✅）、P5 Multi-Language Runtime ✅ 全绿（P5.1~P5.4 均 ✅）、**P6 Low-code BI Engine ✅ 全绿（P6.1/P6.2/P6.3/P6.4 均 ✅，合计单测 117/117，Golden 18/18 PASS）**。**P7 Multi-Theme / Style Engine 进行中**：**P7.1 Theme 领域聚合+持久化+内置默认主题 ✅**、**P7.2 ThemeContext 接入 PlatformContext + 级联解析服务 ✅**（均 build 0 error、单测 126/126、Golden 18/18 PASS）。下一子阶段 **P7.3 渲染引擎接入主题 + 主题切换渲染测试**（前置 P7.2 已完成，无阻塞）。A3/A5 用户决定暂缓。
