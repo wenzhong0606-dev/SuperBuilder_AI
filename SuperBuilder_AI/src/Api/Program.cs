@@ -167,6 +167,9 @@ builder.Services.AddScoped<IAgentDslSerializer, AgentDslSerializer>();
 // P8.2 App 编排端口（默认路径确定性、非默认路径启用 LLM）
 builder.Services.AddScoped<IAppBuilderAgent, AppBuilderAgent>();
 
+// P9.2 Agent 编排端口（默认路径确定性、非默认路径启用 LLM）
+builder.Services.AddScoped<IAgentPlanner, AgentPlanner>();
+
 // P6.3 LowcodeRenderer 渲染引擎（对照 QueryPlanPipeline 接入取数）
 builder.Services.AddScoped<IDashboardRenderer, DashboardLowcodeRenderer>();
 builder.Services.AddScoped<IWidgetDataResolver, QueryPlanWidgetDataResolver>();

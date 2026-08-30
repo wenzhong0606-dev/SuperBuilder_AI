@@ -213,6 +213,7 @@ Stage 0 (DONE)
 
 **子阶段**：
 - [x] **P9.1 ToolRegistry + Agent 领域模型 + 序列化器 + 持久化** ✅（build 0 error；单测 203/203；Golden 18/18 PASS；AgentDsl/AgentPlan/AgentResult + ToolRegistry 目录/意图解析/异常链 + AgentDslSerializer 校验 + 迁移 20260830073012_P9_1_AgentPlan）
+- [x] **P9.2 AgentPlanner 编排** ✅（build 0 error；单测 214/214；Golden 18/18 PASS；`IAgentPlanner`/`AgentPlanner` 双路径——默认 `PlanFromIntentAsync` 确定性 + 非默认 `GenerateFromDescriptionAsync` LLM 先校验后信任；`AgentResult` 承载 + Program.cs 注册 + `AgentPlannerTests` 11 项）
 - [ ] **P9.2 AgentPlanner 编排**（默认路径确定性 + 非默认 LLM 增强）
 - [ ] **P9.3 AgentController 端点 + 异常检测/原因分析链路**
 - [ ] **P9.4 P9 总验收 + 工具选择测试 + 端到端冒烟**
