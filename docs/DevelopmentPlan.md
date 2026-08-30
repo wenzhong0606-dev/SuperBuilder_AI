@@ -200,7 +200,7 @@ Stage 0 (DONE)
 - [x] **P8.1 App 领域模型（AppPlan/PagePlan/ComponentPlan）** ✅（build 0 error；单测 157/157；Golden 18/18 PASS；DSL 整体存储 + AppDslSerializer 校验 + 迁移 20260830053330_P8_1_AppPlan）
 - [x] **P8.2 AppBuilderAgent 编排** ✅（build 0 error；单测 166/166；Golden 18/18 PASS；IAppBuilderAgent 端口 + AppBuilderAgent 实现，默认路径确定性/非默认路径 LLM 增强，零回归门控）
 - [x] **P8.3 AppBuilderController 端点** ✅（build 0 error；单测 179/179；Golden 18/18 PASS；租户作用域 CRUD + 生成端点 + 编辑器蓝图，编排委托 IAppBuilderAgent 双路径零回归）
-- [ ] **P8.4 P8 总验收**：build 绿 + Golden 18/18 + 端到端应用生成冒烟
+- [x] **P8.4 P8 总验收** ✅（build 0 error；单测 179/179；Golden 18/18 PASS；端到端应用生成冒烟：蓝图→结构化创建→读取回填一致→列表→跨租户隔离→清理；自然语言生成路径 Qwen 限流 502 best-effort 非阻断）
 
 **验收**：build 绿 + **Golden 18/18** + 端到端应用生成冒烟。
 
