@@ -149,6 +149,9 @@ builder.Services.AddScoped<ISqlDialectResolver>(sp => sp.GetRequiredService<SqlD
 builder.Services.AddScoped<BIConversationService>();
 builder.Services.AddScoped<IBIConversationService>(sp => sp.GetRequiredService<BIConversationService>());
 
+// P6.1/P6.2 DSL 序列化与校验端口
+builder.Services.AddScoped<IDashboardDslSerializer, DashboardDslSerializer>();
+
 // P6.3 LowcodeRenderer 渲染引擎（对照 QueryPlanPipeline 接入取数）
 builder.Services.AddScoped<IDashboardRenderer, DashboardLowcodeRenderer>();
 builder.Services.AddScoped<IWidgetDataResolver, QueryPlanWidgetDataResolver>();

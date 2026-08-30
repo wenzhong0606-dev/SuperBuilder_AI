@@ -16,6 +16,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- 允许单测直接针对 ASP.NET Core 控制器与 IActionResult 类型（P6.4 DashboardController 单测） -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\SuperBuilder_AI\SuperBuilder_AI.csproj" />
   </ItemGroup>
 

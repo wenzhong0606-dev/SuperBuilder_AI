@@ -145,8 +145,12 @@
 - [x] `Program.cs` 注册 `IDashboardRenderer`/`IWidgetDataResolver`
 - [x] 单测 **9 项全通过**（渲染器 6：全类型/数据行/筛选下推/文本净化/无取数组件/AI 占位；解析器 3：NoQuery/Blocked/Proceed）；合计 **单测 107/107**
 - [x] **验收**：build 0 error；**Golden 18/18 PASS（C:/tmp/golden_p63.json，decision=PASS, 18/18, failedGates:None）**
-- [ ] **P6.4 DashboardController（生产）+ 编辑器前端占位 + P6 总验收**
-- [ ] **P6 总验收**：build 绿 + **Golden 18/18** + DSL 渲染冒烟
+- [x] **P6.4 DashboardController（生产）+ 编辑器前端占位（✅ 完成 · Golden 18/18 PASS）**
+  - [x] `src/Api/Controllers/DashboardController.cs`：CRUD（`POST /api/dashboards` 创建·`GET` 列表/单资源·`PUT`·`DELETE`，租户作用域隔离）+ `GET /api/dashboards/{id}/render`（加载 DSL → P6.3 `IDashboardRenderer` → 纯结构化 `DashboardRenderModel`，取数按仪表盘所属租户作用域隔离）+ `GET /api/dashboards/editor/blueprint`（编辑器占位：DSL 骨架 + 全部可用枚举清单，仅结构化 JSON）
+  - [x] `Program.cs` 补注册 `IDashboardDslSerializer`（P6.1/P6.2 序列化器此前未注入 DI）；`IDashboardRenderer`/`IWidgetDataResolver` 已注册（P6.3）
+  - [x] 测试项目 `SuperBuilder_AI.Tests.csproj` 增加 `FrameworkReference Microsoft.AspNetCore.App` 以支持控制器单测；`DashboardControllerTests` **10 项全通过**（创建/校验失败/租户作用域/获取/更新/删除/渲染编排/编辑器蓝图）
+  - [x] **验收**：build 0 error；**单测 117/117**（107 + P6.4 10）；**Golden 18/18 PASS（C:/tmp/golden_p64.json，首跑 GQ-011 因 Qwen LLM 非确定性抖动 ERROR → 复跑 PASS，decision=PASS, 18/18, failedGates:None, overallPassRate=1.0, 0 ERROR）。已确认 `IDashboardDslSerializer` 仅被 P6.4 控制器与注册使用，绝不进入 BI 查询链路，故该抖动非本阶段代码回归**
+- [x] **P6 总验收 ✅**：build 0 error；单测 **117/117**；**Golden 18/18 PASS（×2 轮：首跑 GQ-011 抖动 BLOCK，复跑 18/18 PASS）**；DSL 渲染冒烟（`/api/dashboards` 返回 200 `[]`、`/editor/blueprint` 返回完整结构化蓝图）通过
 
 ### P7 — Multi-Theme / Style Engine
 - [ ] `Theme` 聚合（Brand/Color/Typography/Layout/.../ChartPalette/Component/DashboardTemplate）
@@ -179,4 +183,4 @@
 - [ ] A4 上帝类拆分必须在 P6 之前收口
 
 ---
-**立即下一步**：P3 ✅、P4 Multi-Tenant Platform Core ✅ 全绿（P4.1~P4.4 均 ✅）、P5 Multi-Language Runtime ✅ 全绿（P5.1~P5.4 均 ✅）、**P6 Low-code BI Engine 进行中**：**P6.1 Dashboard DSL 领域模型 + 持久化 ✅**、**P6.2 DashboardDSL 序列化与校验 ✅**、**P6.3 LowcodeRenderer 渲染引擎 ✅**（均 Golden 18/18 PASS，单测 107/107）。下一子阶段 **P6.4 DashboardController（生产）+ 编辑器前端占位 + P6 总验收**（前置 A4 已完成，无阻塞）。每步 build + Golden。A3/A5 用户决定暂缓。
+**立即下一步**：P3 ✅、P4 Multi-Tenant Platform Core ✅ 全绿（P4.1~P4.4 均 ✅）、P5 Multi-Language Runtime ✅ 全绿（P5.1~P5.4 均 ✅）、**P6 Low-code BI Engine ✅ 全绿（P6.1/P6.2/P6.3/P6.4 均 ✅，合计单测 117/117，Golden 18/18 PASS）**。下一阶段 **P7 Multi-Theme / Style Engine**（前置 P6 已完成，无阻塞）。A3/A5 用户决定暂缓。
