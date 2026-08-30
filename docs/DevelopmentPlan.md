@@ -162,13 +162,15 @@ Stage 0 (DONE)
 
 ---
 
-### P6 — Low-code BI Engine ⚠️（前置依赖 **A4 上帝类拆分必须完成**）
+### P6 — Low-code BI Engine（前置依赖 **A4 上帝类拆分已完成**）
 **目标**：`Dashboard DSL`（JSON 描述 type/query/visualization/layout/style），AI 生成 + 低代码编辑器 + 运行时渲染，底层不存裸 HTML。
 
 **关键交付**
-- [ ] `Dashboard / Page / Widget / Chart / Table / KPI / Filter / Text / AI Insight / Query` 领域模型（DSL）
-- [ ] `DashboardDSL` 序列化/反序列化 + `LowcodeRenderer`
-- [ ] `DashboardController`（生产）+ 低代码编辑器前端占位
+- [x] **P6.1 Dashboard DSL 领域模型 + 持久化** ✅（Domain `DashboardDsl`/`WidgetDsl`/`WidgetQueryDsl` + 持久化实体 `Dashboard` 无 FK；Migration `P6_1_Dashboard`；租户隔离单测 5/5；Golden 18/18 PASS）
+- [x] **P6.2 DashboardDSL 序列化与校验** ✅（`IDashboardDslSerializer` + `DashboardDslSerializer` 含「不存裸 HTML」红线拦截；单测 28 项；Golden 18/18 PASS；合计单测 98/98）
+- [ ] **P6.3 LowcodeRenderer 渲染引擎**（对照 QueryPlanPipeline 接入）
+- [ ] **P6.4 DashboardController（生产）+ 低代码编辑器前端占位**
+- [ ] `Dashboard / Page / Widget / Chart / Table / KPI / Filter / Text / AI Insight / Query` DSL 类型补全
 
 **验收**：build 绿 + **Golden 18/18** + DSL 渲染冒烟测试。
 

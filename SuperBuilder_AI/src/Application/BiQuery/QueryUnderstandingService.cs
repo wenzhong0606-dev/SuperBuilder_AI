@@ -723,13 +723,17 @@ public class QueryUnderstandingService
 		string question,
 		PlatformContext platformContext)
 	{
+		// 空上下文按 System 处理：与既往传入 null 的行为完全等价
+		// （System 的 TenantId=0 且 Locale 为默认语言，归一化与语言指令结果一致）。
+		var context = platformContext ?? PlatformContext.System;
+
 		// P5.4：把语言区域透传给提示词构建，启用语言无关化指令。
 		// 默认语言（zh-CN）时指令为空字符串，提示词与 P5 之前完全一致。
 		var intent = await BuildRawIntentAsync(
 			question,
-			platformContext?.Locale);
+			context.Locale);
 
-		return await _intentNormalizer.NormalizeWithBusinessEntitiesAsync(intent, platformContext);
+		return await _intentNormalizer.NormalizeWithBusinessEntitiesAsync(intent, context);
 	}
 
 	/// <summary>

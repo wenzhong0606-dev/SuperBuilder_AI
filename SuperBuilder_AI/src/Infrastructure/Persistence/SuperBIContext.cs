@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using SuperBuilder_AI.Models.Dashboard;
 using SuperBuilder_AI.Models.Localization;
 using SuperBuilder_AI.Models.Metadata;
 using SuperBuilder_AI.Models.Organization;
@@ -45,6 +46,10 @@ public class SuperBIContext : DbContext
 
     #region P5 Localization
     public DbSet<SemanticLabel> SemanticLabels { get; set; }
+    #endregion
+
+    #region P6 Low-code BI
+    public DbSet<Dashboard> Dashboards { get; set; }
     #endregion
 
     #region Phase 3.1 Business Entity
@@ -149,6 +154,22 @@ public class SuperBIContext : DbContext
         builder.Entity<SemanticLabel>().Property(x => x.SortOrder).HasComment("排序");
         #endregion
 
+        #region P6.1 Dashboard
+        // 刻意不建指向 Tenant 的外键：TenantId=0 表示全局模板，而 Tenant 表无 Id=0 的行，
+        // 加外键会在写入全局模板时违反外键约束（与 P5.2 SemanticLabel 保持一致）。
+        builder.Entity<Dashboard>().ToTable(tb => tb.HasComment("仪表盘"));
+        builder.Entity<Dashboard>().HasIndex(x => new { x.TenantId, x.Code }).IsUnique();
+        builder.Entity<Dashboard>().HasIndex(x => new { x.TenantId, x.Status });
+        builder.Entity<Dashboard>().Property(x => x.TenantId).HasComment("所属租户（0=全局模板）");
+        builder.Entity<Dashboard>().Property(x => x.Code).IsRequired().HasMaxLength(128).HasComment("业务编码");
+        builder.Entity<Dashboard>().Property(x => x.Title).IsRequired().HasMaxLength(256).HasComment("标题");
+        builder.Entity<Dashboard>().Property(x => x.Description).HasMaxLength(1024).HasComment("描述");
+        builder.Entity<Dashboard>().Property(x => x.Status).IsRequired().HasMaxLength(32).HasComment("状态");
+        builder.Entity<Dashboard>().Property(x => x.DslVersion).IsRequired().HasMaxLength(16).HasComment("DSL版本");
+        builder.Entity<Dashboard>().Property(x => x.DslJson).IsRequired().HasComment("DSL文档（结构化，非裸HTML）");
+        builder.Entity<Dashboard>().Property(x => x.ThemeKey).HasMaxLength(64).HasComment("主题键");
+        #endregion
+
         #region P4.3 Global Tenant Query Filter
         // 直接持有 TenantId 的根实体施加全局过滤；子实体经父实体 FK 间接隔离。
         // 表达式 !_tenantFilterEnabled || e.TenantId == _scopedTenantId：
@@ -164,6 +185,9 @@ public class SuperBIContext : DbContext
         // SemanticLabel：租户私有标签 + 全局共享标签（TenantId=0）均对本租户可见。
         // 与其余实体不同，此处显式放行 TenantId == 0，否则全局译文在租户作用域内会被误过滤。
         builder.Entity<SemanticLabel>().HasQueryFilter(e => !_tenantFilterEnabled || e.TenantId == _scopedTenantId || e.TenantId == 0);
+
+        // Dashboard：同 SemanticLabel，放行 TenantId == 0 的全局模板（否则租户作用域内模板会消失）。
+        builder.Entity<Dashboard>().HasQueryFilter(e => !_tenantFilterEnabled || e.TenantId == _scopedTenantId || e.TenantId == 0);
         #endregion
 
         // Phase 3.1：Business Entity 只持久化到 SuperBuilder Metadata DB。

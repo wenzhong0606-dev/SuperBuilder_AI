@@ -123,11 +123,23 @@
 - [x] 单测 **10 项全通过**（门控不变量、四语言指令内容、归一化目标为简体中文、禁止保留源语言词汇、未登记语言回退、跨语言语义一致性、默认语言走门控路径不受标签影响）
 - [x] **P5 总验收 ✅**：P5.1~P5.4 全绿；build 0 error（10 个预存 nullable 警告均不在本阶段文件）；单测 **65/65**；**Golden 18/18 PASS ×4 轮（P5.1/P5.2/P5.3/P5.4）**
 
-### P6 — Low-code BI Engine ⚠️（前置：A4 完成）
-- [ ] `Dashboard/Page/Widget/Chart/Table/KPI/Filter/Text/AI Insight/Query` DSL 模型
-- [ ] `DashboardDSL` 序列化 + `LowcodeRenderer`
-- [ ] `DashboardController`（生产）+ 编辑器前端占位
-- [ ] **验收**：build 绿 + **Golden 18/18** + DSL 渲染冒烟
+### P6 — Low-code BI Engine（前置：A4 完成）
+**P6.1 Dashboard DSL 领域模型 + 持久化（✅ 完成 · 零 schema 破坏 · Golden 18/18 PASS）**
+- [x] `src/Domain/Dashboard/DashboardDsl.cs`（`DashboardDsl` 根聚合 + `DashboardWidget`/`DashboardPage` 子实体：纯 POCO、无 EF 依赖；`TenantId` 仅作用域列）
+- [x] `src/Domain/Dashboard/WidgetDsl.cs` / `WidgetQueryDsl.cs`（`WidgetType` 枚举 + 查询/过滤/排序 VO；覆盖 Chart/Table/KPI/Filter/Text/AIInsight/Query/Page 等类型占位）
+- [x] `src/Domain/Dashboard/Dashboard.cs`（`Dashboard` 持久化实体：Id/TenantId/DslJson/Name/Version/IsGlobal；**无外键**——全局共享模板 `TenantId=0` 在 `Tenant` 表无行会触发 FK 约束失败，故仅保留 TenantId 作用域列）
+- [x] `SuperBIContext` 注册 `DbSet<Dashboard>` + `HasQueryFilter(e => !_tenantFilterEnabled || e.TenantId==_scopedTenantId || e.TenantId==0)`（全局共享模板放行）
+- [x] Migration `20260830012408_P6_1_Dashboard` 已生成并应用（仅新增 `Dashboards` 表；首次因 FK 约束失败回滚后去 FK 重做）
+- [x] 单测 `DashboardTenantIsolationTests` **5/5 通过**（无作用域全可见、本租户隔离、全局模板可见、跨租户不可见、System no-op）
+- [x] **验收**：build 0 error；单测 **98/98**（P5 65 + P6.1 5 + P6.2 28）；**Golden 18/18 PASS（decision=PASS, 18/18, failedGates:None, overallPassRate=1.0, positivePassRate=1.0, 0 ERROR）**
+**P6.2 DashboardDSL 序列化与校验（✅ 完成 · 不存裸 HTML 红线 · Golden 18/18 PASS）**
+- [x] `src/Application/Ports/BI/IDashboardDslSerializer.cs`（端口：`SerializeAsync`/`DeserializeAsync`/`Validate`）
+- [x] `src/Application/BiQuery/Dashboard/DashboardDslSerializer.cs`：JSON 序列化 + 结构校验 + **「不存裸 HTML」红线拦截**（检测到 `<script>`/内联事件/on* 属性/iframe 等危险片段即抛 `DashboardDslValidationException`，绝不写入 DB）
+- [x] 单测 `DashboardDslSerializerTests` **28 项全通过**（序列化往返、各 Widget 类型、租户作用域列保留、HTML 红线多情形、空/缺字段降级）
+- [x] **验收**：build 0 error；单测 98/98；**Golden 18/18 PASS（decision=PASS, 18/18, failedGates:None）**
+- [ ] **P6.3 LowcodeRenderer 渲染引擎**（对照 QueryPlanPipeline 接入）
+- [ ] **P6.4 DashboardController（生产）+ 编辑器前端占位 + P6 总验收**
+- [ ] **P6 总验收**：build 绿 + **Golden 18/18** + DSL 渲染冒烟
 
 ### P7 — Multi-Theme / Style Engine
 - [ ] `Theme` 聚合（Brand/Color/Typography/Layout/.../ChartPalette/Component/DashboardTemplate）
@@ -160,4 +172,4 @@
 - [ ] A4 上帝类拆分必须在 P6 之前收口
 
 ---
-**立即下一步**：P3 ✅、P4 Multi-Tenant Platform Core ✅ 全绿（P4.1~P4.4 均 ✅）。A3/A5 用户决定暂缓。**P5 Multi-Language Runtime 进行中**：**P5.1 LocaleContext + PlatformContext 接入 ✅（单测 26/26，Golden 18/18 PASS）**、**P5.2 语义多语言标签持久化 ✅（SemanticLabel + Migration，单测 36/36，Golden 18/18 PASS）**、**P5.3 本地化资源 + 语义标签接入检索 ✅**、**P5.4 AI 意图语言无关化 + 多语言验收 ✅** —— **P5 Multi-Language Runtime 已全绿（P5.1~P5.4 均 ✅，单测 65/65，Golden 18/18 PASS ×4 轮）**。下一阶段 **P6 Low-code BI Engine**（前置 A4 已完成，无阻塞）。每步 build + Golden。
+**立即下一步**：P3 ✅、P4 Multi-Tenant Platform Core ✅ 全绿（P4.1~P4.4 均 ✅）、P5 Multi-Language Runtime ✅ 全绿（P5.1~P5.4 均 ✅）、**P6 Low-code BI Engine 进行中**：**P6.1 Dashboard DSL 领域模型 + 持久化 ✅**、**P6.2 DashboardDSL 序列化与校验 ✅**（均 Golden 18/18 PASS，单测 98/98）。下一子阶段 **P6.3 LowcodeRenderer 渲染引擎**（前置 A4 已完成，无阻塞）。每步 build + Golden。A3/A5 用户决定暂缓。
