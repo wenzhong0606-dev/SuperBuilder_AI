@@ -168,7 +168,7 @@ Stage 0 (DONE)
 **关键交付**
 - [x] **P6.1 Dashboard DSL 领域模型 + 持久化** ✅（Domain `DashboardDsl`/`WidgetDsl`/`WidgetQueryDsl` + 持久化实体 `Dashboard` 无 FK；Migration `P6_1_Dashboard`；租户隔离单测 5/5；Golden 18/18 PASS）
 - [x] **P6.2 DashboardDSL 序列化与校验** ✅（`IDashboardDslSerializer` + `DashboardDslSerializer` 含「不存裸 HTML」红线拦截；单测 28 项；Golden 18/18 PASS；合计单测 98/98）
-- [ ] **P6.3 LowcodeRenderer 渲染引擎**（对照 QueryPlanPipeline 接入）
+- [x] **P6.3 LowcodeRenderer 渲染引擎** ✅（`DashboardLowcodeRenderer` + `QueryPlanWidgetDataResolver` 对照 QueryPlanPipeline 接入取数；纯结构化渲染模型不存 HTML；单测 9 项；Golden 18/18 PASS；合计单测 107/107）
 - [ ] **P6.4 DashboardController（生产）+ 低代码编辑器前端占位**
 - [ ] `Dashboard / Page / Widget / Chart / Table / KPI / Filter / Text / AI Insight / Query` DSL 类型补全
 

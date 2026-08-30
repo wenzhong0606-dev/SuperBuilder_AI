@@ -4,12 +4,14 @@ using SuperBuilder_AI.Infrastructure.Database;
 using SuperBuilder_AI.Interfaces;
 using SuperBuilder_AI.Models;
 using SuperBuilder_AI.Services.BI;
+using SuperBuilder_AI.Services.BI.Dashboard;
 using SuperBuilder_AI.Services.BI.Evaluation;
 using SuperBuilder_AI.Services.BI.Planning;
 using SuperBuilder_AI.Services;
 using SuperBuilder_AI.Configuration;
 using SuperBuilder_AI.Interfaces.BI.Evaluation;
 using SuperBuilder_AI.Interfaces.BI;
+using SuperBuilder_AI.Interfaces.BI.Dashboard;
 using SuperBuilder_AI.Interfaces.BI.Planning;
 using SuperBuilder_AI.Interfaces.Database;
 using SuperBuilder_AI.Services.Database;
@@ -146,6 +148,10 @@ builder.Services.AddScoped<ISqlDialectResolver>(sp => sp.GetRequiredService<SqlD
 // ── BI 查询主链路编排服务 (Phase 1 核心) ──────────────────
 builder.Services.AddScoped<BIConversationService>();
 builder.Services.AddScoped<IBIConversationService>(sp => sp.GetRequiredService<BIConversationService>());
+
+// P6.3 LowcodeRenderer 渲染引擎（对照 QueryPlanPipeline 接入取数）
+builder.Services.AddScoped<IDashboardRenderer, DashboardLowcodeRenderer>();
+builder.Services.AddScoped<IWidgetDataResolver, QueryPlanWidgetDataResolver>();
 
 // ── BIConversationService 依赖链补充注册 ──────────────────
 builder.Services.AddScoped<IQueryPlanExplainabilityService>(sp => sp.GetRequiredService<QueryPlanExplainabilityService>());

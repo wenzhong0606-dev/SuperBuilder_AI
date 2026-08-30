@@ -28,7 +28,7 @@ AI Native BI 平台 — 自然语言 → AI理解 → 语义分析 → 查询计
   - A3(4.3) 抽独立项目 Domain/Application/Infrastructure/Api: ⬜（用户指令暂缓，不随 P3 启动）
   - A4(4.4) 上帝类拆分+依赖倒置(I*端口): ✅ 已完成（commit 9981d73 decompose QueryPlanBuilder，8 partial 拆分；P6 前无阻塞）
   - A5(4.5) 限界上下文解耦/合并重复模型: ⬜（用户指令暂缓）
-- **Stage 2 产品演进（P-track，用户10阶段路线）**：✅ P3 已完成，**P4 Multi-Tenant Platform Core ✅ 已全绿（P4.1/P4.2/P4.3/P4.4 均 ✅；build 0 error；跨租户单测 4/4；Golden 18/18 PASS ×P4.2/P4.3/P4.4 三轮）**。**P5 Multi-Language Runtime ✅ 已全绿（P5.1~P5.4 均 ✅；单测 65/65；Golden 18/18 PASS ×4 轮）**。当前 **P6 Low-code BI Engine 待启动**（前置 A4 已完成，无阻塞）。A3/A5 仍缓（用户指令）。
+- **Stage 2 产品演进（P-track，用户10阶段路线）**：✅ P3 已完成，**P4 Multi-Tenant Platform Core ✅ 已全绿（P4.1/P4.2/P4.3/P4.4 均 ✅；build 0 error；跨租户单测 4/4；Golden 18/18 PASS ×P4.2/P4.3/P4.4 三轮）**。**P5 Multi-Language Runtime ✅ 已全绿（P5.1~P5.4 均 ✅；单测 65/65；Golden 18/18 PASS ×4 轮）**。当前 **P6 Low-code BI Engine 进行中**：**P6.1 Dashboard DSL 领域模型+持久化 ✅**、**P6.2 DashboardDSL 序列化与校验 ✅**、**P6.3 LowcodeRenderer 渲染引擎 ✅**（均 Golden 18/18 PASS；单测 107/107）；P6.4 DashboardController 待启动（前置 A4 已完成，无阻塞）。A3/A5 仍缓（用户指令）。
   - **P5 零回归核心手法（可复用）**：多语言能力一律以「非默认语言才启用」门控隔离（`locale==null || IsDefault || Culture 空` → 短路），默认语言路径行为逐字节不变。这让"触碰 Golden 依赖文件"的改动也能安全落地（P5.3 改检索服务、P5.4 改意图理解服务，Golden 均全绿）。
   - **约束**：Golden 契约 `Evaluation/Golden/query-plan-golden-v1.json` 不可删改 —— 多语言问句验证只能用独立的确定性离线一致性测试，不能改写契约。
   - P3 Business Semantic Model / P4 Multi-Tenant Core / P5 Multi-Language / P6 Low-code BI / P7 Theme / P8 AI App Builder / P9 AI Agent / P10 Enterprise SaaS

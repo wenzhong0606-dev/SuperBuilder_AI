@@ -137,7 +137,14 @@
 - [x] `src/Application/BiQuery/Dashboard/DashboardDslSerializer.cs`：JSON 序列化 + 结构校验 + **「不存裸 HTML」红线拦截**（检测到 `<script>`/内联事件/on* 属性/iframe 等危险片段即抛 `DashboardDslValidationException`，绝不写入 DB）
 - [x] 单测 `DashboardDslSerializerTests` **28 项全通过**（序列化往返、各 Widget 类型、租户作用域列保留、HTML 红线多情形、空/缺字段降级）
 - [x] **验收**：build 0 error；单测 98/98；**Golden 18/18 PASS（decision=PASS, 18/18, failedGates:None）**
-- [ ] **P6.3 LowcodeRenderer 渲染引擎**（对照 QueryPlanPipeline 接入）
+**P6.3 LowcodeRenderer 渲染引擎（✅ 完成 · 对照 QueryPlanPipeline 接入 · Golden 18/18 PASS）**
+- [x] `src/Domain/Dashboard/Rendering/DashboardRenderModels.cs`（纯结构化渲染模型 `DashboardRenderModel`/`PageRenderModel`/`WidgetRenderModel`/`WidgetDataRenderModel`/`FilterRenderModel`/`AiInsightRenderSpec`；**绝不承载 HTML**，与 P6.2 红线一致）
+- [x] `src/Application/Ports/BI/IDashboardRenderer.cs` + `IWidgetDataResolver.cs`/`WidgetDataResult`（端口 + 取数结果）
+- [x] `src/Application/BiQuery/Dashboard/DashboardLowcodeRenderer.cs`：DSL→渲染模型；全局筛选器下推（合并进 `EffectiveFilters`）；数据组件委托 `IWidgetDataResolver`；文本组件二次净化（去 HTML 防 XSS）；AI 洞察仅占位
+- [x] `src/Application/BiQuery/Dashboard/QueryPlanWidgetDataResolver.cs`：**对照 QueryPlanPipeline 接入**——`WidgetQueryDsl`→`QueryIntent`（自然语言问句或显式指标合成）→`IQueryPlanPipeline`（Decision Gate）→`ISqlQueryBuilder`→`IQueryExecutionService`，与 `BIConversationService` 的 Step 2~7 完全一致，不引入新语义漂移
+- [x] `Program.cs` 注册 `IDashboardRenderer`/`IWidgetDataResolver`
+- [x] 单测 **9 项全通过**（渲染器 6：全类型/数据行/筛选下推/文本净化/无取数组件/AI 占位；解析器 3：NoQuery/Blocked/Proceed）；合计 **单测 107/107**
+- [x] **验收**：build 0 error；**Golden 18/18 PASS（C:/tmp/golden_p63.json，decision=PASS, 18/18, failedGates:None）**
 - [ ] **P6.4 DashboardController（生产）+ 编辑器前端占位 + P6 总验收**
 - [ ] **P6 总验收**：build 绿 + **Golden 18/18** + DSL 渲染冒烟
 
@@ -172,4 +179,4 @@
 - [ ] A4 上帝类拆分必须在 P6 之前收口
 
 ---
-**立即下一步**：P3 ✅、P4 Multi-Tenant Platform Core ✅ 全绿（P4.1~P4.4 均 ✅）、P5 Multi-Language Runtime ✅ 全绿（P5.1~P5.4 均 ✅）、**P6 Low-code BI Engine 进行中**：**P6.1 Dashboard DSL 领域模型 + 持久化 ✅**、**P6.2 DashboardDSL 序列化与校验 ✅**（均 Golden 18/18 PASS，单测 98/98）。下一子阶段 **P6.3 LowcodeRenderer 渲染引擎**（前置 A4 已完成，无阻塞）。每步 build + Golden。A3/A5 用户决定暂缓。
+**立即下一步**：P3 ✅、P4 Multi-Tenant Platform Core ✅ 全绿（P4.1~P4.4 均 ✅）、P5 Multi-Language Runtime ✅ 全绿（P5.1~P5.4 均 ✅）、**P6 Low-code BI Engine 进行中**：**P6.1 Dashboard DSL 领域模型 + 持久化 ✅**、**P6.2 DashboardDSL 序列化与校验 ✅**、**P6.3 LowcodeRenderer 渲染引擎 ✅**（均 Golden 18/18 PASS，单测 107/107）。下一子阶段 **P6.4 DashboardController（生产）+ 编辑器前端占位 + P6 总验收**（前置 A4 已完成，无阻塞）。每步 build + Golden。A3/A5 用户决定暂缓。
