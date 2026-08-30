@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using SuperBuilder_AI.Models.AppBuilder;
 using SuperBuilder_AI.Models.Dashboard;
 using SuperBuilder_AI.Models.Localization;
 using SuperBuilder_AI.Models.Metadata;
@@ -55,6 +56,10 @@ public class SuperBIContext : DbContext
 
     #region P7 Multi-Theme / Style Engine
     public DbSet<Theme> Themes { get; set; }
+    #endregion
+
+    #region P8 AI App Builder
+    public DbSet<AppPlan> AppPlans { get; set; }
     #endregion
 
     #region Phase 3.1 Business Entity
@@ -188,6 +193,21 @@ public class SuperBIContext : DbContext
         builder.Entity<Theme>().Property(x => x.DslJson).IsRequired().HasComment("主题DSL文档（结构化令牌，非CSS/HTML）");
         #endregion
 
+        #region P8.1 AppPlan
+        // 与 Dashboard/Theme 一致：TenantId=0 表示全局模板，不建指向 Tenant 的外键（Tenant 表无 Id=0 行）。
+        builder.Entity<AppPlan>().ToTable(tb => tb.HasComment("应用"));
+        builder.Entity<AppPlan>().HasIndex(x => new { x.TenantId, x.Code }).IsUnique();
+        builder.Entity<AppPlan>().HasIndex(x => new { x.TenantId, x.Status });
+        builder.Entity<AppPlan>().Property(x => x.TenantId).HasComment("所属租户（0=全局模板）");
+        builder.Entity<AppPlan>().Property(x => x.Code).IsRequired().HasMaxLength(128).HasComment("业务编码");
+        builder.Entity<AppPlan>().Property(x => x.Name).IsRequired().HasMaxLength(256).HasComment("名称");
+        builder.Entity<AppPlan>().Property(x => x.Description).HasMaxLength(1024).HasComment("描述");
+        builder.Entity<AppPlan>().Property(x => x.Status).IsRequired().HasMaxLength(32).HasComment("状态");
+        builder.Entity<AppPlan>().Property(x => x.DslVersion).IsRequired().HasMaxLength(16).HasComment("DSL版本");
+        builder.Entity<AppPlan>().Property(x => x.DslJson).IsRequired().HasComment("DSL文档（结构化，非裸HTML）");
+        builder.Entity<AppPlan>().Property(x => x.ThemeKey).HasMaxLength(64).HasComment("主题键");
+        #endregion
+
         #region P4.3 Global Tenant Query Filter
         // 直接持有 TenantId 的根实体施加全局过滤；子实体经父实体 FK 间接隔离。
         // 表达式 !_tenantFilterEnabled || e.TenantId == _scopedTenantId：
@@ -209,6 +229,9 @@ public class SuperBIContext : DbContext
 
         // Theme：同 Dashboard，放行 TenantId == 0 的内置/全局主题（租户可继承平台默认主题）。
         builder.Entity<Theme>().HasQueryFilter(e => !_tenantFilterEnabled || e.TenantId == _scopedTenantId || e.TenantId == 0);
+
+        // AppPlan：同 Dashboard/Theme，放行 TenantId == 0 的全局模板（租户可继承平台默认应用）。
+        builder.Entity<AppPlan>().HasQueryFilter(e => !_tenantFilterEnabled || e.TenantId == _scopedTenantId || e.TenantId == 0);
         #endregion
 
         // Phase 3.1：Business Entity 只持久化到 SuperBuilder Metadata DB。

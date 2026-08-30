@@ -22,6 +22,8 @@ using SuperBuilder_AI.Interfaces.Platform;
 using SuperBuilder_AI.Services.Platform;
 using SuperBuilder_AI.Interfaces.Theme;
 using SuperBuilder_AI.Services.Theming;
+using SuperBuilder_AI.Interfaces.AppBuilder;
+using SuperBuilder_AI.Services.AppBuilder;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -153,6 +155,9 @@ builder.Services.AddScoped<IBIConversationService>(sp => sp.GetRequiredService<B
 
 // P6.1/P6.2 DSL 序列化与校验端口
 builder.Services.AddScoped<IDashboardDslSerializer, DashboardDslSerializer>();
+
+// P8.1 App DSL 序列化与校验端口
+builder.Services.AddScoped<IAppDslSerializer, AppDslSerializer>();
 
 // P6.3 LowcodeRenderer 渲染引擎（对照 QueryPlanPipeline 接入取数）
 builder.Services.AddScoped<IDashboardRenderer, DashboardLowcodeRenderer>();

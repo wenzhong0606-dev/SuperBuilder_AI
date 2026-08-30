@@ -31,7 +31,7 @@ AI Native BI 平台 — 自然语言 → AI理解 → 语义分析 → 查询计
 - **Stage 2 产品演进（P-track，用户10阶段路线）**：✅ P3 已完成，**P4 Multi-Tenant Platform Core ✅ 已全绿（P4.1/P4.2/P4.3/P4.4 均 ✅；build 0 error；跨租户单测 4/4；Golden 18/18 PASS ×P4.2/P4.3/P4.4 三轮）**。**P5 Multi-Language Runtime ✅ 已全绿（P5.1~P5.4 均 ✅；单测 65/65；Golden 18/18 PASS ×4 轮）**。**P6 Low-code BI Engine ✅ 已全绿（P6.1/P6.2/P6.3/P6.4 均 ✅；单测 117/117；Golden 18/18 PASS）**。**P7 Multi-Theme / Style Engine ✅ 已全绿（P7.1~P7.4 均 ✅；单测 147/147；Golden 18/18 PASS ×4 轮 P7.1/P7.2/P7.3/P7.4）**：P7.1 领域聚合+持久化+内置默认主题；P7.2 ThemeContext 接入 PlatformContext + 级联解析服务；P7.3 渲染引擎接入主题（ThemeRenderMapper + 逐组件 StyleSpec）；P7.4 Theme 管理端点（CRUD+指派+复制+蓝图）+ P7 总验收闭合。A3/A5 仍缓（用户指令）。
   - **P5 零回归核心手法（可复用）**：多语言能力一律以「非默认语言才启用」门控隔离（`locale==null || IsDefault || Culture 空` → 短路），默认语言路径行为逐字节不变。这让"触碰 Golden 依赖文件"的改动也能安全落地（P5.3 改检索服务、P5.4 改意图理解服务，Golden 均全绿）。
   - **约束**：Golden 契约 `Evaluation/Golden/query-plan-golden-v1.json` 不可删改 —— 多语言问句验证只能用独立的确定性离线一致性测试，不能改写契约。
-  - P3 Business Semantic Model / P4 Multi-Tenant Core / P5 Multi-Language / P6 Low-code BI / P7 Theme / P8 AI App Builder / P9 AI Agent / P10 Enterprise SaaS
+  - P3 Business Semantic Model / P4 Multi-Tenant Core / P5 Multi-Language / P6 Low-code BI / P7 Theme ✅(全绿) / P8 AI App Builder(P8.1 ✅ App领域模型) / P9 AI Agent / P10 Enterprise SaaS
   - 每个 P 阶段退出门槛 = Golden 18/18（硬约束，来自 Phase3 回归事故教训）
 - 主交付文档：`docs/DevelopmentPlan.md`(唯一事实来源) + `docs/PhaseChecklist.md`(可执行清单) + `docs/ARCHITECTURE.md`(目标结构)
 

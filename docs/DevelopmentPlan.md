@@ -196,6 +196,12 @@ Stage 0 (DONE)
 
 **关键交付**：`AppPlan / PagePlan / ComponentPlan` 模型、`AppBuilderAgent`（编排）、`AppBuilderController`。
 
+**子阶段**：
+- [x] **P8.1 App 领域模型（AppPlan/PagePlan/ComponentPlan）** ✅（build 0 error；单测 157/157；Golden 18/18 PASS；DSL 整体存储 + AppDslSerializer 校验 + 迁移 20260830053330_P8_1_AppPlan）
+- [ ] **P8.2 AppBuilderAgent 编排**
+- [ ] **P8.3 AppBuilderController 端点**
+- [ ] **P8.4 P8 总验收**：build 绿 + Golden 18/18 + 端到端应用生成冒烟
+
 **验收**：build 绿 + **Golden 18/18** + 端到端应用生成冒烟。
 
 ---

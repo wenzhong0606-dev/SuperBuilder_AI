@@ -160,10 +160,10 @@
 - [x] **P7 总验收 ✅**：build 绿 + **Golden 18/18 PASS** + 主题切换渲染测试（147/147 单测 + Golden 18/18 双绿）
 
 ### P8 — AI App Builder
-- [ ] `AppPlan/PagePlan/ComponentPlan` 模型
-- [ ] `AppBuilderAgent` 编排
-- [ ] `AppBuilderController`
-- [ ] **验收**：build 绿 + **Golden 18/18** + 端到端应用生成冒烟
+- [x] **P8.1 App 领域模型（AppPlan/PagePlan/ComponentPlan）✅**：`AppPlan` 实体（TenantId/Code/Name/Description/Status/DslVersion/DslJson/ThemeKey，租户查询过滤 TenantId=0 放行）+ `AppDsl`（根 DSL：Version/Code/Name/Description/ThemeKey/Pages）+ `PagePlan`（Id/Name/Order/Layout/Components）+ `ComponentPlan`（Type/Id/Title/Order/Position/Binding 强类型取数 + Properties 类型专属参数 + Style 语义键）+ 常量类（AppComponentTypes/AppAggregateTypes/AppFilterOperators/AppLayoutKinds/AppStatuses/AppDslVersions）。`AppDslSerializer`（IAppDslSerializer）做序列化/反序列化/校验（HTML 红线 + 版本/唯一性/枚举/绑定校验）。`SuperBIContext` 加 `DbSet<AppPlan>` + 配置 + 迁移 `20260830053330_P8_1_AppPlan`（已应用到 SuperBuilder_Platform）。单测 `AppDslSerializerTests` 10 项（往返/空JSON/畸形/版本/重复页/不支持组件/HTML/空页/不支持聚合/默认实体）。**build 0 error；单测 157/157；Golden 18/18 PASS（C:/tmp/golden_p81.json）**。
+- [ ] **P8.2 AppBuilderAgent 编排**
+- [ ] **P8.3 AppBuilderController 端点**
+- [ ] **P8.4 P8 总验收**：build 绿 + **Golden 18/18** + 端到端应用生成冒烟
 
 ### P9 — AI Agent / Copilot
 - [ ] `AgentPlanner` / `ToolRegistry` / `AgentController`
@@ -185,4 +185,4 @@
 - [ ] A4 上帝类拆分必须在 P6 之前收口
 
 ---
-**立即下一步**：P3 ✅、P4 Multi-Tenant Platform Core ✅ 全绿（P4.1~P4.4 均 ✅）、P5 Multi-Language Runtime ✅ 全绿（P5.1~P5.4 均 ✅）、P6 Low-code BI Engine ✅ 全绿（P6.1/P6.2/P6.3/P6.4 均 ✅，合计单测 117/117，Golden 18/18 PASS）、**P7 Multi-Theme / Style Engine ✅ 全绿（P7.1~P7.4 均 ✅，合计单测 147/147，Golden 18/18 PASS ×4 轮：P7.1/P7.2/P7.3/P7.4）**。下一阶段 **P8 AI App Builder**（前置 P7 已完成，无阻塞）。A3/A5 用户决定暂缓。
+**立即下一步**：P3 ✅、P4 Multi-Tenant Platform Core ✅ 全绿（P4.1~P4.4 均 ✅）、P5 Multi-Language Runtime ✅ 全绿（P5.1~P5.4 均 ✅）、P6 Low-code BI Engine ✅ 全绿（P6.1/P6.2/P6.3/P6.4 均 ✅，合计单测 117/117，Golden 18/18 PASS）、**P7 Multi-Theme / Style Engine ✅ 全绿（P7.1~P7.4 均 ✅，合计单测 147/147，Golden 18/18 PASS ×4 轮）**。**P8 AI App Builder 进行中：P8.1 App 领域模型（AppPlan/PagePlan/ComponentPlan）✅（build 0 error、单测 157/157、Golden 18/18 PASS）**。下一子阶段 **P8.2 AppBuilderAgent 编排**（前置 P8.1 已完成，无阻塞）。A3/A5 用户决定暂缓。
