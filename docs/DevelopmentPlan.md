@@ -229,7 +229,7 @@ Stage 0 (DONE)
 **子阶段**：
 - [x] **P10.1 Identity 基础设施 ✅**（build 0 error；单测 240/240；Golden 18/18 PASS；User/Role/Permission/UserRole/RolePermission + 迁移 `20260830093125_P10_1_Identity` + `IIdentityService`/`IdentityService` 幂等种子+确定性 RBAC + `IdentityCatalog`；`IdentityServiceTests` 9 项）
 - [x] **P10.2 Identity API 端点 ✅**（build 0 error；单测 256/256；Golden 18/18 PASS；`IdentityController` api/identity 租户作用域用户/角色/权限 CRUD + 角色指派/撤销 + 权限解析 + 全局目录守卫；`IdentityControllerTests` 16 项）
-- [ ] **P10.3 AuditLog 审计日志**（domain + 持久化 + `IAuditLogService` + 可选中间件）
+- [x] **P10.3 AuditLog 审计日志 ✅**（build 0 error；单测 268/268；Golden 18/18 PASS；`AuditLog` `src/Domain/Audit` + 迁移 `20260830104059_P10_3_AuditLog` + `IAuditLogService`/`AuditLogService` 结构化记录谁/什么/何时/结果 + 租户作用域查询（确定性、不调 LLM）+ `AuditController` api/audit 租户作用域查询/手动记录 + `AuditMiddleware` 自动请求级审计；`AuditLogServiceTests` 8 项 + `AuditControllerTests` 4 项）
 - [ ] **P10.4 Billing/Quota 账单与配额**（domain + 持久化 + `IQuotaService` 配额 enforcement）
 - [ ] **P10.5 Observability 中间件 + NetArchTest 架构依赖校验 + P10 总验收**（build 0 error；单测绿；Golden 18/18；安全/审计基线测试）
 
@@ -306,9 +306,9 @@ AI Intent → Semantic Plan → Query Plan → Execution Plan → Visualization 
 ---
 
 ## 8. 下一步动作（立即）
-1. **启动 P3**（Business Semantic Model）：按 §3 P3 文件级清单落地，每步 build + Golden。
-2. **并行启动 A3**（拆独立项目）：低风险加固，不阻塞 P3 功能。
+1. **启动 P10.4 Billing/Quota 账单与配额**（前置 P10.3 已完成，无阻塞）：按 P10 子阶段清单落地 `IQuotaService` 配额 enforcement（确定性、不调 LLM）。
+2. **P10.5 Observability 中间件 + NetArchTest 架构依赖校验 + P10 总验收**（前置 P10.4 已完成）。
 3. 每完成一个子步骤，跑 `GET /evaluation/golden-runtime/run` 确认 18/18。
-4. A4 上帝类拆分在 P6 之前必须收口。
+4. A3/A5 架构治理用户决定暂缓，不随 P10 启动。
 
 > 历史计划文档已归档于 `docs/plans/archive/`，本文件为唯一权威来源。任何阶段编号以 §0 主阶段脊柱为准。

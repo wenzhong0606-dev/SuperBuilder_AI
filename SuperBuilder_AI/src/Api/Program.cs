@@ -28,6 +28,9 @@ using SuperBuilder_AI.Interfaces.Agent;
 using SuperBuilder_AI.Services.Agent;
 using SuperBuilder_AI.Interfaces.Identity;
 using SuperBuilder_AI.Services.Identity;
+using SuperBuilder_AI.Interfaces.Audit;
+using SuperBuilder_AI.Services.Audit;
+using SuperBuilder_AI.Middleware;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -175,6 +178,9 @@ builder.Services.AddScoped<IAgentPlanner, AgentPlanner>();
 // P10.1 Identity / RBAC（确定性，不调 LLM）
 builder.Services.AddScoped<IIdentityService, IdentityService>();
 
+// P10.3 Audit Log（确定性，不调 LLM）
+builder.Services.AddScoped<IAuditLogService, AuditLogService>();
+
 // P6.3 LowcodeRenderer 渲染引擎（对照 QueryPlanPipeline 接入取数）
 builder.Services.AddScoped<IDashboardRenderer, DashboardLowcodeRenderer>();
 builder.Services.AddScoped<IWidgetDataResolver, QueryPlanWidgetDataResolver>();
@@ -212,6 +218,8 @@ if (!app.Environment.IsDevelopment()) { app.UseExceptionHandler("/Home/Error"); 
 app.UseHttpsRedirection();
 app.UseRouting();
 app.UseAuthorization();
+// P10.3 自动请求级审计中间件（非阻塞、异常静默，不影响 Golden 行为契约）
+app.UseMiddleware<AuditMiddleware>();
 app.MapStaticAssets();
 app.MapControllerRoute(name: "default", pattern: "{controller=Home}/{action=Index}/{id?}").WithStaticAssets();
 app.Run();

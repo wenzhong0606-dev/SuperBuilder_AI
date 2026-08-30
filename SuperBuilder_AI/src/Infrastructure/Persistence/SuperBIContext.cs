@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using SuperBuilder_AI.Models.Agent;
 using SuperBuilder_AI.Models.AppBuilder;
 using SuperBuilder_AI.Models.Identity;
+using SuperBuilder_AI.Models.Audit;
 using SuperBuilder_AI.Models.Dashboard;
 using SuperBuilder_AI.Models.Localization;
 using SuperBuilder_AI.Models.Metadata;
@@ -74,6 +75,10 @@ public class SuperBIContext : DbContext
         public DbSet<Permission> Permissions { get; set; }
         public DbSet<UserRole> UserRoles { get; set; }
         public DbSet<RolePermission> RolePermissions { get; set; }
+        #endregion
+
+        #region P10.3 Audit
+        public DbSet<AuditLog> AuditLogs { get; set; }
         #endregion
 
     #region Phase 3.1 Business Entity
@@ -271,6 +276,20 @@ public class SuperBIContext : DbContext
         builder.Entity<RolePermission>().HasIndex(rp => new { rp.TenantId, rp.RoleId, rp.PermissionId }).IsUnique();
         #endregion
 
+        #region P10.3 Audit
+        builder.Entity<AuditLog>().ToTable(tb => tb.HasComment("审计日志"));
+        builder.Entity<AuditLog>().HasIndex(a => a.TenantId);
+        builder.Entity<AuditLog>().HasIndex(a => new { a.TenantId, a.Action });
+        builder.Entity<AuditLog>().HasIndex(a => new { a.TenantId, a.EntityType });
+        builder.Entity<AuditLog>().HasIndex(a => a.Timestamp);
+        builder.Entity<AuditLog>().Property(a => a.TenantId).HasComment("所属租户（0=平台级）");
+        builder.Entity<AuditLog>().Property(a => a.Actor).IsRequired().HasMaxLength(128).HasComment("操作者标识");
+        builder.Entity<AuditLog>().Property(a => a.Action).IsRequired().HasMaxLength(128).HasComment("动作类型");
+        builder.Entity<AuditLog>().Property(a => a.EntityType).IsRequired().HasMaxLength(128).HasComment("实体类型");
+        builder.Entity<AuditLog>().Property(a => a.EntityId).HasMaxLength(256).HasComment("实体Id");
+        builder.Entity<AuditLog>().Property(a => a.Result).IsRequired().HasMaxLength(32).HasComment("结果");
+        #endregion
+
         #region P4.3 Global Tenant Query Filter
         // 直接持有 TenantId 的根实体施加全局过滤；子实体经父实体 FK 间接隔离。
         // 表达式 !_tenantFilterEnabled || e.TenantId == _scopedTenantId：
@@ -305,6 +324,9 @@ public class SuperBIContext : DbContext
         // Role/Permission：与 AgentPlan 一致，放行 TenantId == 0 的全局角色/权限（租户可继承平台默认）。
         builder.Entity<Role>().HasQueryFilter(e => !_tenantFilterEnabled || e.TenantId == _scopedTenantId || e.TenantId == 0);
         builder.Entity<Permission>().HasQueryFilter(e => !_tenantFilterEnabled || e.TenantId == _scopedTenantId || e.TenantId == 0);
+
+        // AuditLog：与 AgentPlan 等一致，放行 TenantId == 0 的全局审计（租户可查看平台级审计）。
+        builder.Entity<AuditLog>().HasQueryFilter(e => !_tenantFilterEnabled || e.TenantId == _scopedTenantId || e.TenantId == 0);
         #endregion
 
         // Phase 3.1：Business Entity 只持久化到 SuperBuilder Metadata DB。
