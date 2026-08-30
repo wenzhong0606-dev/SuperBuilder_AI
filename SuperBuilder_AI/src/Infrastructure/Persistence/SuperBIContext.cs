@@ -3,6 +3,7 @@ using SuperBuilder_AI.Models.Dashboard;
 using SuperBuilder_AI.Models.Localization;
 using SuperBuilder_AI.Models.Metadata;
 using SuperBuilder_AI.Models.Organization;
+using SuperBuilder_AI.Models.Theme;
 using SuperBuilder_AI.Data.Configurations;
 
 namespace SuperBuilder_AI.Data;
@@ -50,6 +51,10 @@ public class SuperBIContext : DbContext
 
     #region P6 Low-code BI
     public DbSet<Dashboard> Dashboards { get; set; }
+    #endregion
+
+    #region P7 Multi-Theme / Style Engine
+    public DbSet<Theme> Themes { get; set; }
     #endregion
 
     #region Phase 3.1 Business Entity
@@ -170,6 +175,19 @@ public class SuperBIContext : DbContext
         builder.Entity<Dashboard>().Property(x => x.ThemeKey).HasMaxLength(64).HasComment("主题键");
         #endregion
 
+        #region P7.1 Theme
+        // 与 Dashboard 一致：TenantId=0 表示内置/全局模板，不建指向 Tenant 的外键（Tenant 表无 Id=0 行）。
+        builder.Entity<Theme>().ToTable(tb => tb.HasComment("主题"));
+        builder.Entity<Theme>().HasIndex(x => new { x.TenantId, x.Key }).IsUnique();
+        builder.Entity<Theme>().HasIndex(x => x.TenantId);
+        builder.Entity<Theme>().Property(x => x.TenantId).HasComment("所属租户（0=内置/全局模板）");
+        builder.Entity<Theme>().Property(x => x.Key).IsRequired().HasMaxLength(64).HasComment("主题键（同租户内唯一）");
+        builder.Entity<Theme>().Property(x => x.Name).IsRequired().HasMaxLength(128).HasComment("主题名称");
+        builder.Entity<Theme>().Property(x => x.IsBuiltIn).HasComment("是否内置主题");
+        builder.Entity<Theme>().Property(x => x.DslVersion).IsRequired().HasMaxLength(16).HasComment("DSL版本");
+        builder.Entity<Theme>().Property(x => x.DslJson).IsRequired().HasComment("主题DSL文档（结构化令牌，非CSS/HTML）");
+        #endregion
+
         #region P4.3 Global Tenant Query Filter
         // 直接持有 TenantId 的根实体施加全局过滤；子实体经父实体 FK 间接隔离。
         // 表达式 !_tenantFilterEnabled || e.TenantId == _scopedTenantId：
@@ -188,6 +206,9 @@ public class SuperBIContext : DbContext
 
         // Dashboard：同 SemanticLabel，放行 TenantId == 0 的全局模板（否则租户作用域内模板会消失）。
         builder.Entity<Dashboard>().HasQueryFilter(e => !_tenantFilterEnabled || e.TenantId == _scopedTenantId || e.TenantId == 0);
+
+        // Theme：同 Dashboard，放行 TenantId == 0 的内置/全局主题（租户可继承平台默认主题）。
+        builder.Entity<Theme>().HasQueryFilter(e => !_tenantFilterEnabled || e.TenantId == _scopedTenantId || e.TenantId == 0);
         #endregion
 
         // Phase 3.1：Business Entity 只持久化到 SuperBuilder Metadata DB。

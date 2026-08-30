@@ -153,9 +153,11 @@
 - [x] **P6 总验收 ✅**：build 0 error；单测 **117/117**；**Golden 18/18 PASS（×2 轮：首跑 GQ-011 抖动 BLOCK，复跑 18/18 PASS）**；DSL 渲染冒烟（`/api/dashboards` 返回 200 `[]`、`/editor/blueprint` 返回完整结构化蓝图）通过
 
 ### P7 — Multi-Theme / Style Engine
-- [ ] `Theme` 聚合（Brand/Color/Typography/Layout/.../ChartPalette/Component/DashboardTemplate）
-- [ ] `ThemeContext` 接入 PlatformContext；Tenant→Theme→Workspace→Dashboard 级联
-- [ ] **验收**：build 绿 + **Golden 18/18** + 主题切换渲染测试
+- [x] **P7.1 Theme 领域聚合 + 持久化 + 内置默认主题 ✅**：`ThemeDsl`（结构化设计令牌 Brand/Color/Typography/Layout/Border/Radius/Shadow/ChartPalette/Component/DashboardTemplate，绝不承载 CSS/HTML）+ `Theme` 实体（TenantId/Key/Name/IsBuiltIn/DslVersion/DslJson，租户查询过滤 TenantId=0 放行）+ 内置默认浅色主题 `BuiltInThemes.DefaultDsl()`；`SuperBIContext` 增加 `DbSet<Theme>` 与配置；迁移 `20260830034528_P7_1_Theme` 已生成并应用到 `SuperBuilder_Platform`；单测 `ThemeDslTests` 3 项通过。**build 0 error；单测 120/120；Golden 18/18 PASS**。
+- [ ] **P7.2 ThemeContext 接入 PlatformContext + 级联解析服务**
+- [ ] **P7.3 渲染引擎接入主题 + 主题切换渲染测试**
+- [ ] **P7.4 Theme 管理端点（CRUD + 指派）+ P7 总验收**
+- [ ] **P7 总验收**：build 绿 + **Golden 18/18** + 主题切换渲染测试
 
 ### P8 — AI App Builder
 - [ ] `AppPlan/PagePlan/ComponentPlan` 模型
@@ -183,4 +185,4 @@
 - [ ] A4 上帝类拆分必须在 P6 之前收口
 
 ---
-**立即下一步**：P3 ✅、P4 Multi-Tenant Platform Core ✅ 全绿（P4.1~P4.4 均 ✅）、P5 Multi-Language Runtime ✅ 全绿（P5.1~P5.4 均 ✅）、**P6 Low-code BI Engine ✅ 全绿（P6.1/P6.2/P6.3/P6.4 均 ✅，合计单测 117/117，Golden 18/18 PASS）**。下一阶段 **P7 Multi-Theme / Style Engine**（前置 P6 已完成，无阻塞）。A3/A5 用户决定暂缓。
+**立即下一步**：P3 ✅、P4 Multi-Tenant Platform Core ✅ 全绿（P4.1~P4.4 均 ✅）、P5 Multi-Language Runtime ✅ 全绿（P5.1~P5.4 均 ✅）、**P6 Low-code BI Engine ✅ 全绿（P6.1/P6.2/P6.3/P6.4 均 ✅，合计单测 117/117，Golden 18/18 PASS）**。**P7 Multi-Theme / Style Engine 进行中**：**P7.1 Theme 领域聚合+持久化+内置默认主题 ✅**（build 0 error；单测 120/120；Golden 18/18 PASS）。下一子阶段 **P7.2 ThemeContext 接入 PlatformContext + 级联解析服务**（前置 P7.1 已完成，无阻塞）。A3/A5 用户决定暂缓。

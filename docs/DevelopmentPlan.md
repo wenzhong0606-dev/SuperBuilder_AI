@@ -85,7 +85,7 @@ Stage 0 (DONE)
             │                       └──▶ P6 Low-code BI ⬜ ──────┘     │
             │                                 │                     │
             │                                 ▼                     │
-            │                              P7 Theme ⬜ ──▶ P8 App Builder ⬜
+            │                              P7 Theme 🔵 ──▶ P8 App Builder ⬜
             │                                 │                     │
             └────────────────────────────────┴──▶ P9 Agent ⬜      │
                                                   │                │
@@ -180,6 +180,12 @@ Stage 0 (DONE)
 **目标**：`Theme`（Brand/Color/Typography/Layout/Border/Radius/Shadow/ChartPalette/Component/DashboardTemplate），同一 DSL 不同主题产生不同风格。
 
 **关键交付**：`Theme` 聚合、`ThemeContext` 接入 PlatformContext、Tenant→Theme→Workspace→Dashboard 级联。
+
+**子阶段**：
+- [x] **P7.1 Theme 领域聚合 + 持久化 + 内置默认主题** ✅（build 0 error；单测 120/120；Golden 18/18 PASS）
+- [ ] **P7.2 ThemeContext 接入 PlatformContext + 级联解析服务**
+- [ ] **P7.3 渲染引擎接入主题 + 主题切换渲染测试**
+- [ ] **P7.4 Theme 管理端点（CRUD + 指派）+ P7 总验收**
 
 **验收**：build 绿 + **Golden 18/18** + 主题切换渲染测试。
 
