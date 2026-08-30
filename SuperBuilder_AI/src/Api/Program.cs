@@ -26,6 +26,8 @@ using SuperBuilder_AI.Interfaces.AppBuilder;
 using SuperBuilder_AI.Services.AppBuilder;
 using SuperBuilder_AI.Interfaces.Agent;
 using SuperBuilder_AI.Services.Agent;
+using SuperBuilder_AI.Interfaces.Identity;
+using SuperBuilder_AI.Services.Identity;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -170,6 +172,9 @@ builder.Services.AddScoped<IAppBuilderAgent, AppBuilderAgent>();
 // P9.2 Agent 编排端口（默认路径确定性、非默认路径启用 LLM）
 builder.Services.AddScoped<IAgentPlanner, AgentPlanner>();
 
+// P10.1 Identity / RBAC（确定性，不调 LLM）
+builder.Services.AddScoped<IIdentityService, IdentityService>();
+
 // P6.3 LowcodeRenderer 渲染引擎（对照 QueryPlanPipeline 接入取数）
 builder.Services.AddScoped<IDashboardRenderer, DashboardLowcodeRenderer>();
 builder.Services.AddScoped<IWidgetDataResolver, QueryPlanWidgetDataResolver>();
@@ -188,6 +193,21 @@ builder.Services.AddScoped<IMetadataSearchService>(sp => sp.GetRequiredService<M
 builder.Services.AddScoped<GoldenBaselineComparisonService>();
 
 var app = builder.Build();
+
+// P10.1 Identity 全局目录种子（幂等；失败不阻断平台启动）
+using (var seedScope = app.Services.CreateScope())
+{
+    try
+    {
+        var identity = seedScope.ServiceProvider.GetRequiredService<IIdentityService>();
+        await identity.SeedAsync();
+    }
+    catch (Exception seedEx)
+    {
+        Console.Error.WriteLine($"[IdentitySeed] skipped: {seedEx.Message}");
+    }
+}
+
 if (!app.Environment.IsDevelopment()) { app.UseExceptionHandler("/Home/Error"); app.UseHsts(); }
 app.UseHttpsRedirection();
 app.UseRouting();

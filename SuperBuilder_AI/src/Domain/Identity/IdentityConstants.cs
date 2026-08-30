@@ -1,0 +1,134 @@
+namespace SuperBuilder_AI.Models.Identity;
+
+/// <summary>内置角色码（TenantId=0 全局角色）。</summary>
+public static class IdentityRoles
+{
+    public const string PlatformAdmin = "platform-admin";
+    public const string TenantAdmin = "tenant-admin";
+    public const string Member = "member";
+    public const string Viewer = "viewer";
+}
+
+/// <summary>内置权限码（按资源分类）。</summary>
+public static class IdentityPermissions
+{
+    public const string DashboardView = "dashboard:view";
+    public const string DashboardCreate = "dashboard:create";
+    public const string DashboardEdit = "dashboard:edit";
+    public const string DashboardPublish = "dashboard:publish";
+    public const string DashboardDelete = "dashboard:delete";
+
+    public const string AppView = "app:view";
+    public const string AppCreate = "app:create";
+    public const string AppEdit = "app:edit";
+    public const string AppPublish = "app:publish";
+    public const string AppDelete = "app:delete";
+
+    public const string AgentView = "agent:view";
+    public const string AgentCreate = "agent:create";
+    public const string AgentManage = "agent:manage";
+    public const string AgentDelete = "agent:delete";
+
+    public const string ThemeView = "theme:view";
+    public const string ThemeEdit = "theme:edit";
+    public const string ThemePublish = "theme:publish";
+
+    public const string MetadataView = "metadata:view";
+    public const string MetadataEdit = "metadata:edit";
+    public const string MetadataScan = "metadata:scan";
+
+    public const string AuditView = "audit:view";
+
+    public const string BillingView = "billing:view";
+    public const string BillingManage = "billing:manage";
+
+    public const string IdentityManage = "identity:manage";
+}
+
+/// <summary>权限定义（种子用）。</summary>
+public sealed record PermissionDef(string Code, string Name, string Category, string Description);
+
+/// <summary>角色定义（种子用，含其权限码集合）。</summary>
+public sealed record RoleDef(string Code, string Name, string Description, string[] Permissions);
+
+/// <summary>Identity 种子目录：平台全局角色与权限的权威定义，供幂等种子使用。</summary>
+public static class IdentityCatalog
+{
+    public static readonly IReadOnlyList<PermissionDef> Permissions = new List<PermissionDef>
+    {
+        new(IdentityPermissions.DashboardView, "查看仪表盘", "dashboard", "查看仪表盘"),
+        new(IdentityPermissions.DashboardCreate, "创建仪表盘", "dashboard", "创建仪表盘"),
+        new(IdentityPermissions.DashboardEdit, "编辑仪表盘", "dashboard", "编辑仪表盘"),
+        new(IdentityPermissions.DashboardPublish, "发布仪表盘", "dashboard", "发布仪表盘"),
+        new(IdentityPermissions.DashboardDelete, "删除仪表盘", "dashboard", "删除仪表盘"),
+
+        new(IdentityPermissions.AppView, "查看应用", "app", "查看应用"),
+        new(IdentityPermissions.AppCreate, "创建应用", "app", "创建应用"),
+        new(IdentityPermissions.AppEdit, "编辑应用", "app", "编辑应用"),
+        new(IdentityPermissions.AppPublish, "发布应用", "app", "发布应用"),
+        new(IdentityPermissions.AppDelete, "删除应用", "app", "删除应用"),
+
+        new(IdentityPermissions.AgentView, "查看Agent", "agent", "查看Agent"),
+        new(IdentityPermissions.AgentCreate, "创建Agent", "agent", "创建Agent"),
+        new(IdentityPermissions.AgentManage, "管理Agent", "agent", "管理Agent"),
+        new(IdentityPermissions.AgentDelete, "删除Agent", "agent", "删除Agent"),
+
+        new(IdentityPermissions.ThemeView, "查看主题", "theme", "查看主题"),
+        new(IdentityPermissions.ThemeEdit, "编辑主题", "theme", "编辑主题"),
+        new(IdentityPermissions.ThemePublish, "发布主题", "theme", "发布主题"),
+
+        new(IdentityPermissions.MetadataView, "查看元数据", "metadata", "查看业务元数据"),
+        new(IdentityPermissions.MetadataEdit, "编辑元数据", "metadata", "编辑业务元数据"),
+        new(IdentityPermissions.MetadataScan, "扫描数据源", "metadata", "扫描数据源"),
+
+        new(IdentityPermissions.AuditView, "查看审计", "audit", "查看审计日志"),
+
+        new(IdentityPermissions.BillingView, "查看账单", "billing", "查看账单与配额"),
+        new(IdentityPermissions.BillingManage, "管理账单", "billing", "管理账单与配额"),
+
+        new(IdentityPermissions.IdentityManage, "管理身份", "identity", "管理用户与角色"),
+    };
+
+    public static readonly IReadOnlyList<RoleDef> Roles = new List<RoleDef>
+    {
+        new(IdentityRoles.PlatformAdmin, "平台超级管理员", "平台级全权限", new[]
+        {
+            IdentityPermissions.DashboardView, IdentityPermissions.DashboardCreate, IdentityPermissions.DashboardEdit,
+            IdentityPermissions.DashboardPublish, IdentityPermissions.DashboardDelete,
+            IdentityPermissions.AppView, IdentityPermissions.AppCreate, IdentityPermissions.AppEdit,
+            IdentityPermissions.AppPublish, IdentityPermissions.AppDelete,
+            IdentityPermissions.AgentView, IdentityPermissions.AgentCreate, IdentityPermissions.AgentManage, IdentityPermissions.AgentDelete,
+            IdentityPermissions.ThemeView, IdentityPermissions.ThemeEdit, IdentityPermissions.ThemePublish,
+            IdentityPermissions.MetadataView, IdentityPermissions.MetadataEdit, IdentityPermissions.MetadataScan,
+            IdentityPermissions.AuditView, IdentityPermissions.BillingView, IdentityPermissions.BillingManage,
+            IdentityPermissions.IdentityManage,
+        }),
+        new(IdentityRoles.TenantAdmin, "租户管理员", "租户内管理权限（不含平台账单）", new[]
+        {
+            IdentityPermissions.DashboardView, IdentityPermissions.DashboardCreate, IdentityPermissions.DashboardEdit,
+            IdentityPermissions.DashboardPublish, IdentityPermissions.DashboardDelete,
+            IdentityPermissions.AppView, IdentityPermissions.AppCreate, IdentityPermissions.AppEdit,
+            IdentityPermissions.AppPublish, IdentityPermissions.AppDelete,
+            IdentityPermissions.AgentView, IdentityPermissions.AgentCreate, IdentityPermissions.AgentManage,
+            IdentityPermissions.ThemeView, IdentityPermissions.ThemeEdit, IdentityPermissions.ThemePublish,
+            IdentityPermissions.MetadataView, IdentityPermissions.MetadataEdit, IdentityPermissions.MetadataScan,
+            IdentityPermissions.AuditView, IdentityPermissions.IdentityManage,
+        }),
+        new(IdentityRoles.Member, "成员", "创建与编辑权限", new[]
+        {
+            IdentityPermissions.DashboardView, IdentityPermissions.DashboardCreate, IdentityPermissions.DashboardEdit, IdentityPermissions.DashboardPublish,
+            IdentityPermissions.AppView, IdentityPermissions.AppCreate, IdentityPermissions.AppEdit, IdentityPermissions.AppPublish,
+            IdentityPermissions.AgentView, IdentityPermissions.AgentCreate,
+            IdentityPermissions.ThemeView,
+            IdentityPermissions.MetadataView,
+        }),
+        new(IdentityRoles.Viewer, "只读访客", "仅查看权限", new[]
+        {
+            IdentityPermissions.DashboardView,
+            IdentityPermissions.AppView,
+            IdentityPermissions.AgentView,
+            IdentityPermissions.ThemeView,
+            IdentityPermissions.MetadataView,
+        }),
+    };
+}

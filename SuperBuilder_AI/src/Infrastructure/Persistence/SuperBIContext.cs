@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using SuperBuilder_AI.Models.Agent;
 using SuperBuilder_AI.Models.AppBuilder;
+using SuperBuilder_AI.Models.Identity;
 using SuperBuilder_AI.Models.Dashboard;
 using SuperBuilder_AI.Models.Localization;
 using SuperBuilder_AI.Models.Metadata;
@@ -63,9 +64,17 @@ public class SuperBIContext : DbContext
     public DbSet<AppPlan> AppPlans { get; set; }
     #endregion
 
-    #region P9 AI Agent / Copilot
-    public DbSet<AgentPlan> AgentPlans { get; set; }
-    #endregion
+        #region P9 AI Agent / Copilot
+        public DbSet<AgentPlan> AgentPlans { get; set; }
+        #endregion
+
+        #region P10.1 Identity
+        public DbSet<User> Users { get; set; }
+        public DbSet<Role> Roles { get; set; }
+        public DbSet<Permission> Permissions { get; set; }
+        public DbSet<UserRole> UserRoles { get; set; }
+        public DbSet<RolePermission> RolePermissions { get; set; }
+        #endregion
 
     #region Phase 3.1 Business Entity
     public DbSet<Models.BI.Entity.BusinessEntity> BusinessEntities { get; set; }
@@ -227,6 +236,41 @@ public class SuperBIContext : DbContext
         builder.Entity<AgentPlan>().Property(x => x.DslJson).IsRequired().HasComment("DSL文档（结构化，非裸HTML）");
         #endregion
 
+        #region P10.1 Identity
+        // User：租户作用域，用户名全局唯一（TenantId=0 不放开，用户始终归属某一租户）。
+        builder.Entity<User>().ToTable(tb => tb.HasComment("用户"));
+        builder.Entity<User>().HasIndex(u => u.Username).IsUnique();
+        builder.Entity<User>().HasIndex(u => u.TenantId);
+        builder.Entity<User>().Property(u => u.TenantId).HasComment("所属租户");
+        builder.Entity<User>().Property(u => u.Username).IsRequired().HasMaxLength(128).HasComment("登录名（全局唯一）");
+        builder.Entity<User>().Property(u => u.DisplayName).IsRequired().HasMaxLength(128).HasComment("显示名");
+        builder.Entity<User>().Property(u => u.Email).HasMaxLength(256).HasComment("邮箱");
+        builder.Entity<User>().Property(u => u.Status).HasComment("状态");
+
+        // Role：TenantId=0 为平台全局角色；同租户内 Code 唯一。
+        builder.Entity<Role>().ToTable(tb => tb.HasComment("角色"));
+        builder.Entity<Role>().HasIndex(r => new { r.TenantId, r.Code }).IsUnique();
+        builder.Entity<Role>().Property(r => r.TenantId).HasComment("所属租户（0=全局角色）");
+        builder.Entity<Role>().Property(r => r.Code).IsRequired().HasMaxLength(64).HasComment("角色码（同租户唯一）");
+        builder.Entity<Role>().Property(r => r.Name).IsRequired().HasMaxLength(128).HasComment("角色名");
+
+        // Permission：TenantId=0 为平台全局权限；同租户内 Code 唯一。
+        builder.Entity<Permission>().ToTable(tb => tb.HasComment("权限"));
+        builder.Entity<Permission>().HasIndex(p => new { p.TenantId, p.Code }).IsUnique();
+        builder.Entity<Permission>().Property(p => p.TenantId).HasComment("所属租户（0=全局权限）");
+        builder.Entity<Permission>().Property(p => p.Code).IsRequired().HasMaxLength(64).HasComment("权限码（同租户唯一）");
+        builder.Entity<Permission>().Property(p => p.Name).IsRequired().HasMaxLength(128).HasComment("权限名");
+        builder.Entity<Permission>().Property(p => p.Category).IsRequired().HasMaxLength(32).HasComment("权限分类");
+
+        // UserRole：同租户内 (User, Role) 唯一。
+        builder.Entity<UserRole>().ToTable(tb => tb.HasComment("用户-角色关联"));
+        builder.Entity<UserRole>().HasIndex(ur => new { ur.TenantId, ur.UserId, ur.RoleId }).IsUnique();
+
+        // RolePermission：同租户内 (Role, Permission) 唯一。
+        builder.Entity<RolePermission>().ToTable(tb => tb.HasComment("角色-权限关联"));
+        builder.Entity<RolePermission>().HasIndex(rp => new { rp.TenantId, rp.RoleId, rp.PermissionId }).IsUnique();
+        #endregion
+
         #region P4.3 Global Tenant Query Filter
         // 直接持有 TenantId 的根实体施加全局过滤；子实体经父实体 FK 间接隔离。
         // 表达式 !_tenantFilterEnabled || e.TenantId == _scopedTenantId：
@@ -254,6 +298,13 @@ public class SuperBIContext : DbContext
 
         // AgentPlan：同 Dashboard/Theme/AppPlan，放行 TenantId == 0 的全局模板。
         builder.Entity<AgentPlan>().HasQueryFilter(e => !_tenantFilterEnabled || e.TenantId == _scopedTenantId || e.TenantId == 0);
+
+        // User：租户作用域，不放行 TenantId == 0（用户恒归属某一租户）。
+        builder.Entity<User>().HasQueryFilter(e => !_tenantFilterEnabled || e.TenantId == _scopedTenantId);
+
+        // Role/Permission：与 AgentPlan 一致，放行 TenantId == 0 的全局角色/权限（租户可继承平台默认）。
+        builder.Entity<Role>().HasQueryFilter(e => !_tenantFilterEnabled || e.TenantId == _scopedTenantId || e.TenantId == 0);
+        builder.Entity<Permission>().HasQueryFilter(e => !_tenantFilterEnabled || e.TenantId == _scopedTenantId || e.TenantId == 0);
         #endregion
 
         // Phase 3.1：Business Entity 只持久化到 SuperBuilder Metadata DB。
