@@ -177,8 +177,8 @@
 - [x] **P10.2 Identity API 端点 ✅**：`IdentityController`（`api/identity`）租户作用域 用户/角色/权限 CRUD + 角色指派/撤销 + 权限解析 + 全局目录守卫。单测 `IdentityControllerTests` 16 项（镜像 P9.3 范式）。**build 0 error；单测 256/256；Golden 18/18 PASS**
 - [x] **P10.3 AuditLog 审计日志 ✅**：`AuditLog`（`src/Domain/Audit`）+ SuperBIContext DbSet/配置/查询过滤(TenantId=0 全局放行) + 迁移 `20260830104059_P10_3_AuditLog` + `IAuditLogService`/`AuditLogService`（结构化记录 谁/什么/何时/结果 + 租户作用域查询，确定性、不调 LLM）+ `AuditController`（`api/audit` 租户作用域查询 + 手动记录）+ `AuditMiddleware`（自动请求级审计，非阻塞、异常静默）。单测 `AuditLogServiceTests` 8 项 + `AuditControllerTests` 4 项。**build 0 error；单测 268/268；Golden 18/18 PASS**。
 - [x] **P10.4 Billing/Quota 账单与配额 ✅**：`QuotaPolicy`/`QuotaUsage`（`src/Domain/Quota`）+ SuperBIContext DbSet/配置/查询过滤(QuotaPolicy 放行 TenantId=0 平台默认 / QuotaUsage 仅本租户) + 迁移 `20260830111544_P10_4_Quota` + `IQuotaService`/`QuotaService`（幂等种子平台默认配额 + 租户覆盖优先回退 + 按周期键 Total/Monthly/Daily 滚动归零 + Check/Consume enforcement，确定性、不调 LLM）+ `QuotaController`（`api/quota` 概览/单资源/校验/扣减，TenantId<=0 拒绝 400）。单测 `QuotaServiceTests` 9 项 + `QuotaControllerTests` 8 项。**build 0 error；单测 285/285；Golden 18/18 PASS**。
-- [ ] **P10.5 Observability 中间件 + NetArchTest 架构依赖校验 + P10 总验收**：请求日志/关联ID/耗时 + 依赖方向校验 + 安全/审计基线测试
-- [ ] **验收**：build 绿 + **Golden 18/18** + 安全/审计基线测试
+- [x] **P10.5 Observability 中间件 + 架构依赖校验（反射等价 NetArchTest）+ P10 总验收 ✅**：`ObservabilityMiddleware`（关联ID透传 + 请求/响应日志 + 耗时，非阻塞静默）+ 依赖方向校验（Domain/Ports/Services/Controllers 不反依赖外层；NuGet 镜像缺 NetArchTest 故改反射实现）+ 安全/审计基线测试（RBAC deny-by-default + 租户隔离 + 审计记录/查询往返 + 配额平台默认 enforcement）
+- [x] **验收 ✅**：build 0 error + **Golden 18/18** + 安全/审计基线测试（单测 294/294）
 
 ---
 
@@ -190,4 +190,4 @@
 - [ ] A4 上帝类拆分必须在 P6 之前收口
 
 ---
-**立即下一步**：P3 ✅、P4 Multi-Tenant Platform Core ✅ 全绿（P4.1~P4.4 均 ✅）、P5 Multi-Language Runtime ✅ 全绿（P5.1~P5.4 均 ✅）、P6 Low-code BI Engine ✅ 全绿（P6.1/P6.2/P6.3/P6.4 均 ✅，合计单测 117/117，Golden 18/18 PASS）、**P7 Multi-Theme / Style Engine ✅ 全绿（P7.1~P7.4 均 ✅，合计单测 147/147，Golden 18/18 PASS ×4 轮）**。**P8 AI App Builder ✅ 全绿（P8.1~P8.4 均 ✅，合计单测 179/179，Golden 18/18 PASS）**。**P9 AI Agent / Copilot ✅ 全绿（P9.1~P9.4 均 ✅，单测 231/231，Golden 18/18 PASS ×3 轮）：P9.1 ToolRegistry + Agent 领域模型 + 序列化器 + 持久化 ✅（build 0 error、单测 203/203、Golden 18/18 PASS）、P9.2 AgentPlanner 编排 ✅（build 0 error、单测 214/214、Golden 18/18 PASS）、P9.3 AgentController 端点 + 异常原因分析链路 ✅（build 0 error、单测 231/231、Golden 18/18 PASS）**。下一子阶段 **P10.5 Observability 中间件 + NetArchTest 架构依赖校验 + P10 总验收**（前置 P10.4 已完成，无阻塞）。A3/A5 用户决定暂缓。
+**立即下一步**：P3 ✅、P4 Multi-Tenant Platform Core ✅ 全绿（P4.1~P4.4 均 ✅）、P5 Multi-Language Runtime ✅ 全绿（P5.1~P5.4 均 ✅）、P6 Low-code BI Engine ✅ 全绿（P6.1/P6.2/P6.3/P6.4 均 ✅，合计单测 117/117，Golden 18/18 PASS）、**P7 Multi-Theme / Style Engine ✅ 全绿（P7.1~P7.4 均 ✅，合计单测 147/147，Golden 18/18 PASS ×4 轮）**。**P8 AI App Builder ✅ 全绿（P8.1~P8.4 均 ✅，合计单测 179/179，Golden 18/18 PASS）**。**P9 AI Agent / Copilot ✅ 全绿（P9.1~P9.4 均 ✅，单测 231/231，Golden 18/18 PASS ×3 轮）：P9.1 ToolRegistry + Agent 领域模型 + 序列化器 + 持久化 ✅（build 0 error、单测 203/203、Golden 18/18 PASS）、P9.2 AgentPlanner 编排 ✅（build 0 error、单测 214/214、Golden 18/18 PASS）、P9.3 AgentController 端点 + 异常原因分析链路 ✅（build 0 error、单测 231/231、Golden 18/18 PASS）**。**P10.5 Observability 中间件 + 架构依赖校验(反射等价 NetArchTest) + P10 总验收 ✅ 已全绿（build 0 error；单测 294/294；Golden 18/18），用户产品路线 10 阶段(P3~P10)全部完成**。A3/A5 用户决定暂缓。

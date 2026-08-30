@@ -237,6 +237,8 @@ if (!app.Environment.IsDevelopment()) { app.UseExceptionHandler("/Home/Error"); 
 app.UseHttpsRedirection();
 app.UseRouting();
 app.UseAuthorization();
+// P10.5 可观测性中间件（关联ID透传 + 请求/响应日志 + 耗时，非阻塞、异常静默，不影响 Golden 行为契约）
+app.UseMiddleware<ObservabilityMiddleware>();
 // P10.3 自动请求级审计中间件（非阻塞、异常静默，不影响 Golden 行为契约）
 app.UseMiddleware<AuditMiddleware>();
 app.MapStaticAssets();
