@@ -30,6 +30,8 @@ using SuperBuilder_AI.Interfaces.Identity;
 using SuperBuilder_AI.Services.Identity;
 using SuperBuilder_AI.Interfaces.Audit;
 using SuperBuilder_AI.Services.Audit;
+using SuperBuilder_AI.Interfaces.Quota;
+using SuperBuilder_AI.Services.Quota;
 using SuperBuilder_AI.Middleware;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -181,6 +183,9 @@ builder.Services.AddScoped<IIdentityService, IdentityService>();
 // P10.3 Audit Log（确定性，不调 LLM）
 builder.Services.AddScoped<IAuditLogService, AuditLogService>();
 
+// P10.4 Quota / Billing（确定性，不调 LLM）
+builder.Services.AddScoped<IQuotaService, QuotaService>();
+
 // P6.3 LowcodeRenderer 渲染引擎（对照 QueryPlanPipeline 接入取数）
 builder.Services.AddScoped<IDashboardRenderer, DashboardLowcodeRenderer>();
 builder.Services.AddScoped<IWidgetDataResolver, QueryPlanWidgetDataResolver>();
@@ -211,6 +216,20 @@ using (var seedScope = app.Services.CreateScope())
     catch (Exception seedEx)
     {
         Console.Error.WriteLine($"[IdentitySeed] skipped: {seedEx.Message}");
+    }
+}
+
+// P10.4 Quota 平台默认配额种子（幂等；失败不阻断平台启动）
+using (var quotaScope = app.Services.CreateScope())
+{
+    try
+    {
+        var quota = quotaScope.ServiceProvider.GetRequiredService<IQuotaService>();
+        await quota.EnsureSeededAsync();
+    }
+    catch (Exception seedEx)
+    {
+        Console.Error.WriteLine($"[QuotaSeed] skipped: {seedEx.Message}");
     }
 }
 

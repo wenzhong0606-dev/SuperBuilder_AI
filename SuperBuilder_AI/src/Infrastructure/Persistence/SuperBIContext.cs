@@ -3,6 +3,7 @@ using SuperBuilder_AI.Models.Agent;
 using SuperBuilder_AI.Models.AppBuilder;
 using SuperBuilder_AI.Models.Identity;
 using SuperBuilder_AI.Models.Audit;
+using SuperBuilder_AI.Models.Quota;
 using SuperBuilder_AI.Models.Dashboard;
 using SuperBuilder_AI.Models.Localization;
 using SuperBuilder_AI.Models.Metadata;
@@ -79,6 +80,11 @@ public class SuperBIContext : DbContext
 
         #region P10.3 Audit
         public DbSet<AuditLog> AuditLogs { get; set; }
+        #endregion
+
+        #region P10.4 Quota
+        public DbSet<QuotaPolicy> QuotaPolicies { get; set; }
+        public DbSet<QuotaUsage> QuotaUsages { get; set; }
         #endregion
 
     #region Phase 3.1 Business Entity
@@ -290,6 +296,22 @@ public class SuperBIContext : DbContext
         builder.Entity<AuditLog>().Property(a => a.Result).IsRequired().HasMaxLength(32).HasComment("结果");
         #endregion
 
+        #region P10.4 Quota
+        builder.Entity<QuotaPolicy>().ToTable(tb => tb.HasComment("配额策略"));
+        builder.Entity<QuotaPolicy>().HasIndex(q => new { q.TenantId, q.ResourceType }).IsUnique();
+        builder.Entity<QuotaPolicy>().Property(q => q.TenantId).HasComment("所属租户（0=平台默认）");
+        builder.Entity<QuotaPolicy>().Property(q => q.ResourceType).HasComment("资源类型");
+        builder.Entity<QuotaPolicy>().Property(q => q.Limit).HasComment("上限");
+        builder.Entity<QuotaPolicy>().Property(q => q.Window).HasComment("周期窗口");
+
+        builder.Entity<QuotaUsage>().ToTable(tb => tb.HasComment("配额使用量"));
+        builder.Entity<QuotaUsage>().HasIndex(q => new { q.TenantId, q.ResourceType }).IsUnique();
+        builder.Entity<QuotaUsage>().Property(q => q.TenantId).HasComment("所属租户");
+        builder.Entity<QuotaUsage>().Property(q => q.ResourceType).HasComment("资源类型");
+        builder.Entity<QuotaUsage>().Property(q => q.Used).HasComment("已用");
+        builder.Entity<QuotaUsage>().Property(q => q.PeriodKey).IsRequired().HasMaxLength(32).HasComment("周期键");
+        #endregion
+
         #region P4.3 Global Tenant Query Filter
         // 直接持有 TenantId 的根实体施加全局过滤；子实体经父实体 FK 间接隔离。
         // 表达式 !_tenantFilterEnabled || e.TenantId == _scopedTenantId：
@@ -327,6 +349,12 @@ public class SuperBIContext : DbContext
 
         // AuditLog：与 AgentPlan 等一致，放行 TenantId == 0 的全局审计（租户可查看平台级审计）。
         builder.Entity<AuditLog>().HasQueryFilter(e => !_tenantFilterEnabled || e.TenantId == _scopedTenantId || e.TenantId == 0);
+
+        // QuotaPolicy：与 Role/Permission 一致，放行 TenantId == 0 的平台默认配额（租户可继承平台默认）。
+        builder.Entity<QuotaPolicy>().HasQueryFilter(e => !_tenantFilterEnabled || e.TenantId == _scopedTenantId || e.TenantId == 0);
+
+        // QuotaUsage：租户级使用量，不放行 TenantId == 0（用量恒归属某一租户）。
+        builder.Entity<QuotaUsage>().HasQueryFilter(e => !_tenantFilterEnabled || e.TenantId == _scopedTenantId);
         #endregion
 
         // Phase 3.1：Business Entity 只持久化到 SuperBuilder Metadata DB。
