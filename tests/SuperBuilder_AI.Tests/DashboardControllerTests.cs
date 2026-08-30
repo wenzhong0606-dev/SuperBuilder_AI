@@ -11,6 +11,7 @@ using SuperBuilder_AI.Data;
 using SuperBuilder_AI.Interfaces.BI;
 using SuperBuilder_AI.Interfaces.BI.Dashboard;
 using SuperBuilder_AI.Interfaces.Platform;
+using SuperBuilder_AI.Interfaces.Theme;
 using SuperBuilder_AI.Models.Dashboard;
 using SuperBuilder_AI.Models.Dashboard.Rendering;
 using SuperBuilder_AI.Models.Organization;
@@ -72,6 +73,16 @@ public class DashboardControllerTests
 		public PlatformContext? Current { get; set; }
 	}
 
+	private sealed class FakeThemeResolver : IThemeResolver
+	{
+		public SuperBuilder_AI.Models.Theme.ThemeContext Resolved { get; set; }
+			= SuperBuilder_AI.Models.Theme.ThemeContext.Default;
+
+		public Task<SuperBuilder_AI.Models.Theme.ThemeContext> ResolveAsync(
+			long tenantId, string? dashboardThemeKey = null, CancellationToken ct = default) =>
+			Task.FromResult(Resolved);
+	}
+
 	private static SuperBIContext CreateContext(out SqliteConnection connection)
 	{
 		connection = new SqliteConnection("DataSource=:memory:");
@@ -91,7 +102,8 @@ public class DashboardControllerTests
 		serializer = new FakeSerializer();
 		renderer = new FakeRenderer();
 		accessor = new FakeAccessor();
-		return new DashboardController(serializer, renderer, accessor, db);
+		var themeResolver = new FakeThemeResolver();
+		return new DashboardController(serializer, renderer, accessor, themeResolver, db);
 	}
 
 	[Fact]

@@ -184,7 +184,7 @@ Stage 0 (DONE)
 **子阶段**：
 - [x] **P7.1 Theme 领域聚合 + 持久化 + 内置默认主题** ✅（build 0 error；单测 120/120；Golden 18/18 PASS）
 - [x] **P7.2 ThemeContext 接入 PlatformContext + 级联解析服务** ✅（build 0 error；单测 126/126；Golden 18/18 PASS）
-- [ ] **P7.3 渲染引擎接入主题 + 主题切换渲染测试**
+- [x] **P7.3 渲染引擎接入主题 + 主题切换渲染测试** ✅（build 0 error；单测 131/131；Golden 18/18 PASS；ThemeRenderMapper 输出 ThemeRenderModel.ColorMap + WidgetStyleRenderModel，同 DSL 两主题 StyleSpec 不同）
 - [ ] **P7.4 Theme 管理端点（CRUD + 指派）+ P7 总验收**
 
 **验收**：build 绿 + **Golden 18/18** + 主题切换渲染测试。

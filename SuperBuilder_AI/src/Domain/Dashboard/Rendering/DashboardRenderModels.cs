@@ -1,4 +1,5 @@
 using SuperBuilder_AI.Models.Dashboard;
+using SuperBuilder_AI.Models.Theme;
 
 namespace SuperBuilder_AI.Models.Dashboard.Rendering;
 
@@ -16,6 +17,13 @@ public sealed class DashboardRenderModel
 
 	/// <summary>主题键（P7 消费）。</summary>
 	public string? ThemeKey { get; set; }
+
+	/// <summary>
+	/// 解析后的主题渲染模型（P7.3）。由 <see cref="DashboardLowcodeRenderer"/> 依据
+	/// <see cref="SuperBuilder_AI.Models.Organization.PlatformContext.Theme"/> 填充，
+	/// 携带具体色值映射，供前端按主题切换风格。绝不承载 CSS 字符串。
+	/// </summary>
+	public ThemeRenderModel? Theme { get; set; }
 
 	/// <summary>页面渲染模型集合（已按 Order 排序）。</summary>
 	public List<PageRenderModel> Pages { get; set; } = new();
@@ -60,6 +68,12 @@ public sealed class WidgetRenderModel
 
 	/// <summary>AI 洞察占位（运行时由分析链路填充 Insights）。</summary>
 	public AiInsightRenderSpec? AiInsight { get; set; }
+
+	/// <summary>
+	/// 组件级风格渲染模型（P7.3）。合并主题 Component 默认值与 <see cref="WidgetDsl.Style"/> 的语义键，
+	/// 把 "primary"/"surface" 等语义键解析为具体色值/档位。绝不含 CSS 字符串。
+	/// </summary>
+	public WidgetStyleRenderModel? StyleSpec { get; set; }
 
 	/// <summary>渲染备注（如文本组件净化说明）。</summary>
 	public string? Note { get; set; }
@@ -109,4 +123,55 @@ public sealed class AiInsightRenderSpec
 	public int MaxInsights { get; set; } = 3;
 	public string? Perspective { get; set; }
 	public List<string> Insights { get; set; } = new();
+}
+
+/// <summary>
+/// 主题渲染模型（P7.3）。把已解析的 <see cref="ThemeContext"/> 投影为渲染层可直接消费的纯结构化形态：
+/// 既保留完整令牌（<see cref="Tokens"/>），又额外给出<strong>语义键 → 具体色值</strong>的解析映射
+/// （<see cref="ColorMap"/>），供前端与组件级 <see cref="WidgetStyleRenderModel"/> 直接落地颜色。
+/// <para>本模型仅含结构化设计令牌，绝不承载 CSS 字符串或任何标记语言——延续 P6/P7 红线。</para>
+/// </summary>
+public sealed class ThemeRenderModel
+{
+	/// <summary>主题键（同 <see cref="ThemeContext.Key"/>）。</summary>
+	public string Key { get; set; } = BuiltInThemeKeys.Default;
+
+	/// <summary>解析来源名（BuiltIn / Tenant / Dashboard / Workspace）。</summary>
+	public string Source { get; set; } = nameof(ThemeSource.BuiltIn);
+
+	/// <summary>完整已解析的结构化设计令牌（色值/字号/间距等纯数据）。</summary>
+	public ThemeDsl Tokens { get; set; } = new();
+
+	/// <summary>
+	/// 语义色键 → 具体色值 的解析映射，由 <see cref="ThemeDsl.Color"/>/<see cref="ThemeDsl.Brand"/> 派生。
+	/// 例：<c>"primary" → "#2563eb"</c>、<c>"surface" → "#f8fafc"</c>。
+	/// 前端与组件级 StyleSpec 据此把语义键落到真实色值；切换主题后此映射随之变化。
+	/// </summary>
+	public Dictionary<string, string> ColorMap { get; set; } = new();
+
+	/// <summary>组件级默认风格（与 <see cref="WidgetDsl.Style"/> 合并时的兜底）。</summary>
+	public ThemeComponent Component { get; set; } = new();
+}
+
+/// <summary>
+/// 组件级风格渲染模型（P7.3）。合并<strong>主题 Component 默认值</strong>与组件自身
+/// <see cref="StyleDsl"/> 的语义键，输出可落地的具体色值与档位。
+/// <list type="bullet">
+///   <item><see cref="PaletteColor"/> / <see cref="BackgroundColor"/>：组件显式 <see cref="StyleDsl"/> 指定的语义键经 ColorMap 解析后的色值；未指定则为 null（前端回退到主题令牌）。</item>
+///   <item><see cref="ShowBorder"/> / <see cref="Padding"/>：组件 <see cref="StyleDsl"/> 优先，否则取主题 Component 默认值。</item>
+/// </list>
+/// </summary>
+public sealed class WidgetStyleRenderModel
+{
+	/// <summary>组件语义色（Style.Palette 解析后的 hex；未指定为 null）。</summary>
+	public string? PaletteColor { get; set; }
+
+	/// <summary>组件背景色（Style.Background 语义键解析后的 hex；未指定为 null）。</summary>
+	public string? BackgroundColor { get; set; }
+
+	/// <summary>是否显示边框：Style.ShowBorder 优先，否则取主题 Component.CardShowBorder。</summary>
+	public bool ShowBorder { get; set; } = true;
+
+	/// <summary>内边距档位：Style.Padding 优先，否则取主题 Component.CardPadding。</summary>
+	public string Padding { get; set; } = "normal";
 }

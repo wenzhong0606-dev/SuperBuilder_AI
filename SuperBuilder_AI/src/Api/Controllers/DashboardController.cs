@@ -7,6 +7,7 @@ using SuperBuilder_AI.Data;
 using SuperBuilder_AI.Interfaces.BI;
 using SuperBuilder_AI.Interfaces.BI.Dashboard;
 using SuperBuilder_AI.Interfaces.Platform;
+using SuperBuilder_AI.Interfaces.Theme;
 using SuperBuilder_AI.Models.Dashboard;
 using SuperBuilder_AI.Models.Dashboard.Rendering;
 using SuperBuilder_AI.Models.Organization;
@@ -44,17 +45,20 @@ public sealed class DashboardController : ControllerBase
 	private readonly IDashboardDslSerializer _serializer;
 	private readonly IDashboardRenderer _renderer;
 	private readonly IPlatformContextAccessor _accessor;
+	private readonly IThemeResolver _themeResolver;
 	private readonly SuperBIContext _db;
 
 	public DashboardController(
 		IDashboardDslSerializer serializer,
 		IDashboardRenderer renderer,
 		IPlatformContextAccessor accessor,
+		IThemeResolver themeResolver,
 		SuperBIContext db)
 	{
 		_serializer = serializer;
 		_renderer = renderer;
 		_accessor = accessor;
+		_themeResolver = themeResolver;
 		_db = db;
 	}
 
@@ -228,7 +232,10 @@ public sealed class DashboardController : ControllerBase
 		if (!_serializer.TryDeserialize(entity.DslJson, out var dsl, out var errors) || dsl is null)
 			return StatusCode(500, new { errors });
 
-		var platformContext = _accessor.Current ?? PlatformContext.System;
+		// P7.3：按仪表盘所属租户 + 仪表盘显式 ThemeKey 级联解析主题，注入渲染上下文。
+		// 解析失败（或租户/键未命中）时 ThemeResolver 自动兜底内置默认，渲染永不失败。
+		var themeContext = await _themeResolver.ResolveAsync(entity.TenantId, entity.ThemeKey, cancellationToken);
+		var platformContext = (_accessor.Current ?? PlatformContext.System) with { Theme = themeContext };
 		var model = await _renderer.RenderAsync(dsl, platformContext, cancellationToken);
 		return Ok(model);
 	}

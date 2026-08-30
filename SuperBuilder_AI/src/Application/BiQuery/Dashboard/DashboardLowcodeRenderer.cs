@@ -4,6 +4,7 @@ using SuperBuilder_AI.Interfaces.BI.Dashboard;
 using SuperBuilder_AI.Models.Dashboard;
 using SuperBuilder_AI.Models.Dashboard.Rendering;
 using SuperBuilder_AI.Models.Organization;
+using SuperBuilder_AI.Models.Theme;
 
 namespace SuperBuilder_AI.Services.BI.Dashboard;
 
@@ -35,17 +36,22 @@ public sealed class DashboardLowcodeRenderer : IDashboardRenderer
 	{
 		ArgumentNullException.ThrowIfNull(dsl);
 
+		var theme = context.Theme ?? ThemeContext.Default;
+		var themeModel = ThemeRenderMapper.Build(theme);
+		var colorMap = themeModel.ColorMap;
+
 		var model = new DashboardRenderModel
 		{
 			Version = dsl.Version,
 			Title = dsl.Title,
 			Description = dsl.Description,
 			ThemeKey = dsl.ThemeKey,
+			Theme = themeModel,
 		};
 
 		foreach (var page in dsl.Pages.OrderBy(p => p.Order))
 		{
-			model.Pages.Add(await RenderPageAsync(page, dsl.GlobalFilters, context, cancellationToken));
+			model.Pages.Add(await RenderPageAsync(page, dsl.GlobalFilters, context, theme, colorMap, cancellationToken));
 		}
 
 		return model;
@@ -55,6 +61,8 @@ public sealed class DashboardLowcodeRenderer : IDashboardRenderer
 		PageDsl page,
 		List<FilterDsl> globalFilters,
 		PlatformContext context,
+		ThemeContext theme,
+		IReadOnlyDictionary<string, string> colorMap,
 		CancellationToken ct)
 	{
 		var layout = page.Layout is null
@@ -77,7 +85,7 @@ public sealed class DashboardLowcodeRenderer : IDashboardRenderer
 
 		foreach (var widget in page.Widgets.OrderBy(w => w.Order))
 		{
-			pageModel.Widgets.Add(await RenderWidgetAsync(widget, globalFilters, context, ct));
+			pageModel.Widgets.Add(await RenderWidgetAsync(widget, globalFilters, context, theme, colorMap, ct));
 		}
 
 		return pageModel;
@@ -87,6 +95,8 @@ public sealed class DashboardLowcodeRenderer : IDashboardRenderer
 		WidgetDsl widget,
 		List<FilterDsl> globalFilters,
 		PlatformContext context,
+		ThemeContext theme,
+		IReadOnlyDictionary<string, string> colorMap,
 		CancellationToken ct)
 	{
 		var effective = BuildEffectiveFilters(
@@ -103,6 +113,9 @@ public sealed class DashboardLowcodeRenderer : IDashboardRenderer
 			Source = widget,
 			EffectiveFilters = effective,
 		};
+
+		// P7.3：合并主题 Component 默认值与组件 Style 语义键，解析为具体色值/档位。
+		model.StyleSpec = ThemeRenderMapper.BuildWidgetStyle(widget.Style, theme.Dsl, colorMap);
 
 		switch (widget)
 		{
