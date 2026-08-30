@@ -24,6 +24,8 @@ using SuperBuilder_AI.Interfaces.Theme;
 using SuperBuilder_AI.Services.Theming;
 using SuperBuilder_AI.Interfaces.AppBuilder;
 using SuperBuilder_AI.Services.AppBuilder;
+using SuperBuilder_AI.Interfaces.Agent;
+using SuperBuilder_AI.Services.Agent;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -158,6 +160,9 @@ builder.Services.AddScoped<IDashboardDslSerializer, DashboardDslSerializer>();
 
 // P8.1 App DSL 序列化与校验端口
 builder.Services.AddScoped<IAppDslSerializer, AppDslSerializer>();
+
+// P9.1 Agent DSL 序列化与校验端口
+builder.Services.AddScoped<IAgentDslSerializer, AgentDslSerializer>();
 
 // P8.2 App 编排端口（默认路径确定性、非默认路径启用 LLM）
 builder.Services.AddScoped<IAppBuilderAgent, AppBuilderAgent>();

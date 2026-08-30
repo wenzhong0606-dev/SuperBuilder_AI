@@ -166,8 +166,10 @@
 - [x] **P8.4 P8 总验收 + 端到端应用生成冒烟 ✅**：真实运行 5032 服务端到端验证整链——`GET /api/apps/editor/blueprint`(200) → `POST /api/apps` 结构化 DSL 默认路径(201) → `GET /api/apps/{code}` 读取回填一致 → 列表包含 → 跨租户(tenant=2)隔离返回 404 → `DELETE` 清理(204)；`POST /api/apps/generate` 自然语言非默认路径因 Qwen 限流返 502（best-effort 非阻断，LLM 路径已由 P8.2/P8.3 FakeQwen 单测覆盖）。**build 0 error；单测 179/179；Golden 18/18 PASS（expectedOutcomePassed 18/18, failedGates=None）**。P8 AI App Builder 全绿闭合。
 
 ### P9 — AI Agent / Copilot
-- [ ] `AgentPlanner` / `ToolRegistry` / `AgentController`
-- [ ] 异常检测/原因分析链路（销售额→同比→环比→区域→客户→产品→渠道）
+- [x] **P9.1 ToolRegistry + Agent 领域模型 + 序列化器 + 持久化 ✅**：`AgentTools`/`AnalysisDimensions`/`AnalysisDirections` 常量 + `AgentDsl`/`AgentToolSelection`/`AnalysisStep`/`AgentPlan`/`AgentResult` 模型；`ToolRegistry`（工具目录 + 确定性意图解析 + 异常分析链路构建）；`AgentDslSerializer`（序列化/校验/HTML 红线）；`SuperBIContext` 加 `DbSet<AgentPlan>` + 配置 + 查询过滤（TenantId=0 放行）；迁移 `20260830073012_P9_1_AgentPlan`；`IAgentDslSerializer` 注册。单测 `ToolRegistryTests` 11 项 + `AgentDslSerializerTests` 13 项。**build 0 error；单测 203/203；Golden 18/18 PASS**。
+- [ ] **P9.2 AgentPlanner 编排**：`IAgentPlanner` 端口 + `AgentPlanner`（默认路径 `PlanFromIntentAsync` 确定性工具选择 + 异常链，不调 LLM；非默认 `GenerateFromDescriptionAsync` 调 `IQwenService` 先校验后信任；零回归门控）
+- [ ] **P9.3 AgentController 端点 + 异常检测/原因分析链路**：租户作用域 CRUD + 生成端点 + 目录/蓝图 + 异常分析端点
+- [ ] **P9.4 P9 总验收**：build 绿 + **Golden 18/18** + 工具选择测试 + 端到端 Agent 计划生成冒烟
 - [ ] **验收**：build 绿 + **Golden 18/18** + 工具选择测试
 
 ### P10 — Enterprise / SaaS
@@ -185,4 +187,4 @@
 - [ ] A4 上帝类拆分必须在 P6 之前收口
 
 ---
-**立即下一步**：P3 ✅、P4 Multi-Tenant Platform Core ✅ 全绿（P4.1~P4.4 均 ✅）、P5 Multi-Language Runtime ✅ 全绿（P5.1~P5.4 均 ✅）、P6 Low-code BI Engine ✅ 全绿（P6.1/P6.2/P6.3/P6.4 均 ✅，合计单测 117/117，Golden 18/18 PASS）、**P7 Multi-Theme / Style Engine ✅ 全绿（P7.1~P7.4 均 ✅，合计单测 147/147，Golden 18/18 PASS ×4 轮）**。**P8 AI App Builder ✅ 全绿（P8.1 App 领域模型 ✅、P8.2 AppBuilderAgent 编排 ✅、P8.3 AppBuilderController 端点 ✅、P8.4 P8 总验收 + 端到端应用生成冒烟 ✅；合计单测 179/179；Golden 18/18 PASS，P8.1/P8.2/P8.3/P8.4 各轮均全绿）**。下一阶段 **P9 AI Agent / Copilot**（前置 P8 已完成，无阻塞）。A3/A5 用户决定暂缓。
+**立即下一步**：P3 ✅、P4 Multi-Tenant Platform Core ✅ 全绿（P4.1~P4.4 均 ✅）、P5 Multi-Language Runtime ✅ 全绿（P5.1~P5.4 均 ✅）、P6 Low-code BI Engine ✅ 全绿（P6.1/P6.2/P6.3/P6.4 均 ✅，合计单测 117/117，Golden 18/18 PASS）、**P7 Multi-Theme / Style Engine ✅ 全绿（P7.1~P7.4 均 ✅，合计单测 147/147，Golden 18/18 PASS ×4 轮）**。**P8 AI App Builder ✅ 全绿（P8.1~P8.4 均 ✅，合计单测 179/179，Golden 18/18 PASS）**。**P9 AI Agent / Copilot 进行中：P9.1 ToolRegistry + Agent 领域模型 + 序列化器 + 持久化 ✅（build 0 error、单测 203/203、Golden 18/18 PASS）**。下一子阶段 **P9.2 AgentPlanner 编排**（前置 P9.1 已完成，无阻塞）。A3/A5 用户决定暂缓。
