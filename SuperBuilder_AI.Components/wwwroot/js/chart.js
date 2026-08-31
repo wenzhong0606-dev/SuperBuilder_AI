@@ -6,16 +6,31 @@ window.SuperBuilder.setTheme = function (theme) {
     document.documentElement.setAttribute('data-theme', theme || 'light');
 };
 
-// 渲染图表：P11.1 骨架——若 Chart.js 已引入则构造图表，否则给出占位提示（图表库选型待定）
-window.SuperBuilder.renderChart = function (canvas, type, json) {
+// 渲染图表：spec 为结构化对象 { type, data:{labels,datasets}, options }
+// 实例生命周期：同一 canvas 上先销毁旧图表再新建，支持「视图层多轮调整」即时重渲染。
+window.SuperBuilder.renderChart = function (canvas, spec) {
     if (!canvas || !canvas.getContext) return;
-    var ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
     if (!window.Chart) {
+        var ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.fillStyle = '#888';
         ctx.font = '14px sans-serif';
-        ctx.fillText('图表库待接入（Chart.js 候选）', 20, 40);
+        ctx.fillText('图表库未加载（Chart.js）', 20, 40);
         return;
     }
-    // P11.2 细化：window.Chart 就绪后在此构造对应 type 的图表
+    try {
+        if (canvas._sbChart) { canvas._sbChart.destroy(); canvas._sbChart = null; }
+        canvas._sbChart = new window.Chart(canvas, spec);
+    } catch (e) {
+        var c = canvas.getContext('2d');
+        c.clearRect(0, 0, canvas.width, canvas.height);
+        c.fillStyle = '#dc2626';
+        c.font = '13px sans-serif';
+        c.fillText('图表渲染失败：' + (e && e.message ? e.message : e), 12, 36);
+    }
+};
+
+// 显式销毁（组件卸载时可选调用）
+window.SuperBuilder.destroyChart = function (canvas) {
+    if (canvas && canvas._sbChart) { canvas._sbChart.destroy(); canvas._sbChart = null; }
 };

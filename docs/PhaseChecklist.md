@@ -216,7 +216,12 @@
   - [x] MAUI Head `SuperBuilder_AI.Maui`（MAUI Blazor Hybrid，Windows 目标 `net10.0-windows10.0.19041.0` 编译 **0 error**；`MainPage.BlazorWebView` 以 RCL `Routes` 为 RootComponent、`wwwroot/index.html` 为 HostPage；`WindowsPackageType=None` 免打包）
   - [x] 图表库选型：**Chart.js**（轻量、纯 JS、Web 与 MAUI WebView 双端通用；RCL `ChartView.razor` 经 JS 互操作封装，P11.2 细化）
   - [x] 解决方案 `SuperBulider_AI.slnx` 已纳入三个新项目（注：文件名拼写沿用历史，未改名以免破坏现有引用）
-- [ ] P11.2 旗舰页：登录/租户 + Ask BI 端到端（依赖 P11.0 `api/ask`）+ 视图层多轮调整（纯前端 DSL 变更）
+- [x] **P11.2 旗舰页 ✅**（三个 Head 零后端改动；现有 API src 零改动；Golden 18/18 不受影响；三项目 build 0 error；Web Head 运行时 `/`·`/ask`·`/login` 均 200、RCL 静态资源 200）：
+  - [x] `Models/BIResponse.cs`：对齐后端契约（BIResponse/QueryResult/QueryAnswer/VisualizationSuggestion）+ `JsonValue` 辅助（JsonElement→字符串/数值）；`ApiClient` 增加类型化 `AskAsync`(返回 AskOutcome) 与 `PublishAppAsync`(POST `api/apps`)
+  - [x] Chart.js **本地化**：`wwwroot/js/chart.umd.min.js`（v4.4.1，205KB，Web/MAUI 离线可用）；重写 `chart.js` 的 `renderChart(canvas, spec)` 支持 type/data/datasets/options 且管理实例生命周期（重渲染前 destroy）；Web `_Host.cshtml` 与 MAUI `index.html` 显式引入 `chart.umd.min.js`+`chart.js`（RCL JS 不会自动加载）
+  - [x] `ChartView.razor` 重写：参数化图表规格（Type/Labels/Datasets/Title/ShowLegend/Palette），参数变化即即时重渲染
+  - [x] `Ask.razor` 重写（旗舰）：多轮对话列表 + 端到端渲染（AI 解读 / KPI 卡(Summary) / Chart.js 图表(Visualizations) / 数据表 / SQL 折叠）+ **视图层多轮调整**（每图工具栏：柱状/折线/饼图·图例开关·换配色；+ 自然语言指令框「改成柱状图/隐藏图例/配色换绿」→ 纯前端 DSL 变更、零后端调用、即时重渲染）+ **发布为应用**（序列化为 App DSL v1.0 POST `api/apps`，复用 P8 `BuildFromDslAsync` 确定性路径）
+  - [x] `app.css` 补充：KPI 卡 / 数据表 / 对话气泡 / 答案块 / 视图工具栏 / 迷你按钮 等
 - [ ] P11.3 其余页面 + 组件库页 + 主题编辑器 + ask/refine（多轮语义调整）
 - [ ] P11.4 MAUI 双端验证（Android/iOS/Windows 原生运行/编译校验）
 - [ ] P11.5 优化轨道（体验/前端·性能/成本·安全/运维）

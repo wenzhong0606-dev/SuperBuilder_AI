@@ -1,20 +1,102 @@
 @inject IJSRuntime JS
 
 <div class="chart-view">
-    <canvas @ref="_canvas" width="640" height="360"></canvas>
+    <canvas @ref="_canvas" style="width:100%;height:320px;"></canvas>
 </div>
 
 @code {
     private ElementReference _canvas;
+    private string? _lastSig;
 
-    [Parameter] public string? JsonData { get; set; }
-    [Parameter] public string ChartType { get; set; } = "bar";
+    [Parameter] public string Type { get; set; } = "bar";
+    [Parameter] public List<string>? Labels { get; set; }
+    [Parameter] public List<ChartDataset>? Datasets { get; set; }
+    [Parameter] public string? Title { get; set; }
+    [Parameter] public bool ShowLegend { get; set; } = true;
+    [Parameter] public string Palette { get; set; } = "primary";
+
+    /// <summary>单个数据集（序列）。</summary>
+    public sealed class ChartDataset
+    {
+        public string Label { get; set; } = "";
+        public List<double?> Data { get; set; } = new();
+    }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (firstRender && !string.IsNullOrEmpty(JsonData))
+        if (Labels is null || Datasets is null) return;
+        var sig = BuildSignature();
+        if (sig == _lastSig) return;
+        _lastSig = sig;
+
+        var spec = BuildSpec();
+        await JS.InvokeVoidAsync("SuperBuilder.renderChart", _canvas, spec);
+    }
+
+    private string BuildSignature()
+        => $"{Type}|{ShowLegend}|{Palette}|{Title}|{string.Join(",", Labels ?? new())}|"
+         + string.Join(";", (Datasets ?? new()).Select(d => d.Label + "=" + string.Join(",", d.Data.Select(x => x?.ToString() ?? ""))));
+
+    private object BuildSpec()
+    {
+        var palette = PaletteColors(Palette, Math.Max(Labels?.Count ?? 1, Datasets?.Count ?? 1));
+        var isPie = string.Equals(Type, "pie", StringComparison.OrdinalIgnoreCase);
+
+        var datasets = (Datasets ?? new List<ChartDataset>()).Select((d, i) =>
         {
-            await JS.InvokeVoidAsync("SuperBuilder.renderChart", _canvas, ChartType, JsonData);
-        }
+            var dataArr = d.Data.Select(x => (object)(x ?? 0)).ToArray();
+            var ds = new Dictionary<string, object> { ["label"] = d.Label, ["data"] = dataArr, ["borderWidth"] = 1 };
+            if (isPie)
+            {
+                // 饼图：单一数据集，每片一个颜色
+                ds["backgroundColor"] = palette.ToArray();
+                ds["borderColor"] = "#fff";
+            }
+            else
+            {
+                var color = palette[i % palette.Count];
+                ds["backgroundColor"] = color;
+                ds["borderColor"] = color;
+                ds["fill"] = false;
+            }
+            return (object)ds;
+        }).ToArray();
+
+        var scales = isPie
+            ? new { x = new { display = false, beginAtZero = false }, y = new { display = false, beginAtZero = false } }
+            : new { x = new { display = true, beginAtZero = false }, y = new { display = true, beginAtZero = true } };
+
+        return new
+        {
+            type = Type,
+            data = new { labels = (Labels ?? new List<string>()).ToArray(), datasets },
+            options = new
+            {
+                responsive = true,
+                maintainAspectRatio = false,
+                plugins = new
+                {
+                    legend = new { display = ShowLegend, position = "bottom" },
+                    title = new { display = !string.IsNullOrEmpty(Title), text = Title ?? "" }
+                },
+                scales
+            }
+        };
+    }
+
+    /// <summary>语义色板 → 具体色值（与 P7 主题调色一致）。</summary>
+    private static List<string> PaletteColors(string palette, int count)
+    {
+        var baseColors = palette switch
+        {
+            "success" => new[] { "#16a34a", "#22c55e", "#4ade80", "#86efac", "#15803d", "#bbf7d0" },
+            "warning" => new[] { "#d97706", "#f59e0b", "#fbbf24", "#fcd34d", "#b45309", "#fde68a" },
+            "danger"  => new[] { "#dc2626", "#ef4444", "#f87171", "#fca5a5", "#b91c1c", "#fecaca" },
+            "neutral" => new[] { "#475569", "#64748b", "#94a3b8", "#cbd5e1", "#334155", "#e2e8f0" },
+            _         => new[] { "#2563eb", "#38bdf8", "#6366f1", "#0ea5e9", "#3b82f6", "#818cf8" } // primary
+        };
+        var out_ = new List<string>();
+        for (var i = 0; i < count; i++) out_.Add(baseColors[i % baseColors.Length]);
+        return out_;
     }
 }

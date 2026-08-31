@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using SuperBuilder_AI.Components.Models;
 
 namespace SuperBuilder_AI.Components.Services;
 
@@ -52,6 +53,53 @@ public sealed class ApiClient : IApiClient
             return "ERROR " + (int)resp.StatusCode + ": " + err;
         }
         return await resp.Content.ReadAsStringAsync(ct);
+    }
+
+    /// <summary>类型化问数：反序列化为 <see cref="BIResponse"/>，并区分传输错误。</summary>
+    public async Task<AskOutcome> AskAsync(string question, long? dataSourceId, CancellationToken ct = default)
+    {
+        var raw = await AskRawAsync(question, dataSourceId, ct);
+        if (string.IsNullOrEmpty(raw))
+            return new AskOutcome { Error = "请求失败：空响应。" };
+        if (raw.StartsWith("ERROR", StringComparison.Ordinal))
+            return new AskOutcome { Error = raw };
+
+        try
+        {
+            var opt = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+            var resp = JsonSerializer.Deserialize<BIResponse>(raw, opt);
+            if (resp is null)
+                return new AskOutcome { Error = "响应解析失败。" };
+            return new AskOutcome { Response = resp };
+        }
+        catch (JsonException ex)
+        {
+            return new AskOutcome { Error = "响应解析失败：" + ex.Message };
+        }
+    }
+
+    /// <summary>发布为应用：将结构化 App DSL 经默认路径（P8 <c>BuildFromDslAsync</c>）保存到 <c>api/apps</c>。</summary>
+    public async Task<(bool Ok, string? Code, string? Error)> PublishAppAsync(
+        long tenantId, string dslJson, string? code, CancellationToken ct = default)
+    {
+        var client = CreateClient();
+        var body = new { tenantId, dslJson, code };
+        var resp = await client.PostAsJsonAsync("api/apps", body, ct);
+        if (resp.IsSuccessStatusCode)
+        {
+            try
+            {
+                var detail = await resp.Content.ReadFromJsonAsync<JsonElement>(ct);
+                var c = detail.TryGetProperty("code", out var ce) ? ce.GetString() : code;
+                return (true, c ?? code, null);
+            }
+            catch
+            {
+                return (true, code, null);
+            }
+        }
+        var err = await resp.Content.ReadAsStringAsync(ct);
+        return (false, null, $"{(int)resp.StatusCode}: {err}");
     }
 
     public async Task<T?> GetAsync<T>(string relativeUrl, CancellationToken ct = default) where T : class

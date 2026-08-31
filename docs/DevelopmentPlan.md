@@ -309,7 +309,8 @@ AI Intent → Semantic Plan → Query Plan → Execution Plan → Visualization 
 1. **P10.5 Observability 中间件 + 架构依赖校验（反射等价 NetArchTest）+ P10 总验收 ✅ 已完成**（build 0 error；单测 294/294；Golden 18/18；安全/审计基线测试）：ObservabilityMiddleware（关联ID透传+请求/响应日志+耗时，非阻塞静默）+ 依赖方向校验（Domain/Ports/Services/Controllers 不反依赖外层；NuGet 镜像缺 NetArchTest 故改反射实现）+ 安全/审计基线测试。用户产品路线 10 阶段(P3~P10)全部完成。
 2. **P10 总验收闭合 ✅**：build 0 error；单测 294/294；Golden 18/18；安全/审计基线测试。后续可执行 A3/A5（用户暂缓）或新功能规划。
 3. **P11.0 后端前置 ✅ 已完成**（方案 `docs/P11_Frontend_MAUI_Blazor_Plan.md`）：新增 `api/ask` 自然语言问数端点 + 鉴权中间件（HMAC 无状态令牌，零 NuGet 依赖）+ CORS(`P11Cors`) + 限流中间件 + `/health` 探测。全为新增文件 + `Program.cs` 编辑，未碰 Golden 依赖；build 0 error；单测 308/308；**Golden 18/18 PASS**。解决核实发现的硬缺口：①核心 NL 问数端点缺失 ②api/* 零鉴权保护（P10.2 仅权限 CRUD 无逐请求守卫）。
-4. **P11.1 前端脚手架 ✅ 已完成**：MAUI Blazor Hybrid + Blazor Web 共享 RCL（`SuperBuilder_AI.Components`），双端复用现有 API（零改动）。RCL + Web Head（Blazor Server）+ MAUI Head（Windows 目标编译 0 error）三项目全部 build 0 error；图表库选型 Chart.js。阶段 P11.2~P11.5 待启动（旗舰页登录+Ask BI→其余页面→MAUI 双端验证→优化轨道）；§12 用户自定义能力、§13 平台扩展（多数据库连接器 / 多 AI 模型 BYO）已规划。
+4. **P11.1 前端脚手架 ✅ 已完成**：MAUI Blazor Hybrid + Blazor Web 共享 RCL（`SuperBuilder_AI.Components`），双端复用现有 API（零改动）。RCL + Web Head（Blazor Server）+ MAUI Head（Windows 目标编译 0 error）三项目全部 build 0 error；图表库选型 Chart.js。
+5. **P11.2 旗舰页 ✅ 已完成**：`Ask.razor` 重写为多轮对话 + 端到端渲染（AI 解读 / KPI 卡 / Chart.js 图表 / 数据表 / SQL）+ **视图层多轮调整**（纯前端 DSL 变更、零后端调用、即时重渲染）+ **发布为应用**（序列化 App DSL v1.0 → `POST api/apps`，复用 P8 `BuildFromDslAsync`）。Chart.js 本地化（`chart.umd.min.js` v4.4.1）；三项目 build 0 error；Web Head 运行时 `/`·`/ask`·`/login` 与 RCL 静态资源均 HTTP 200。现有 API src 零改动，Golden 18/18 不受影响。阶段 P11.3~P11.5 待启动。
 3. 每完成一个子步骤，跑 `GET /evaluation/golden-runtime/run` 确认 18/18。
 4. A3/A5 架构治理用户决定暂缓，不随 P10 启动。
 
