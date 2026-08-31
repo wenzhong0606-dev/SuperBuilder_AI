@@ -308,6 +308,8 @@ AI Intent → Semantic Plan → Query Plan → Execution Plan → Visualization 
 ## 8. 下一步动作（立即）
 1. **P10.5 Observability 中间件 + 架构依赖校验（反射等价 NetArchTest）+ P10 总验收 ✅ 已完成**（build 0 error；单测 294/294；Golden 18/18；安全/审计基线测试）：ObservabilityMiddleware（关联ID透传+请求/响应日志+耗时，非阻塞静默）+ 依赖方向校验（Domain/Ports/Services/Controllers 不反依赖外层；NuGet 镜像缺 NetArchTest 故改反射实现）+ 安全/审计基线测试。用户产品路线 10 阶段(P3~P10)全部完成。
 2. **P10 总验收闭合 ✅**：build 0 error；单测 294/294；Golden 18/18；安全/审计基线测试。后续可执行 A3/A5（用户暂缓）或新功能规划。
+3. **P11.0 后端前置 ✅ 已完成**（方案 `docs/P11_Frontend_MAUI_Blazor_Plan.md`）：新增 `api/ask` 自然语言问数端点 + 鉴权中间件（HMAC 无状态令牌，零 NuGet 依赖）+ CORS(`P11Cors`) + 限流中间件 + `/health` 探测。全为新增文件 + `Program.cs` 编辑，未碰 Golden 依赖；build 0 error；单测 308/308；**Golden 18/18 PASS**。解决核实发现的硬缺口：①核心 NL 问数端点缺失 ②api/* 零鉴权保护（P10.2 仅权限 CRUD 无逐请求守卫）。
+4. **P11.1 前端脚手架（下一步）**：MAUI Blazor Hybrid + Blazor Web 共享 RCL（`SuperBuilder_AI.Components`），双端复用现有 API（零改动）。阶段 P11.1~P11.5（脚手架→旗舰页登录+Ask BI→其余页面→MAUI 双端验证→优化轨道）；§12 用户自定义能力、§13 平台扩展（多数据库连接器 / 多 AI 模型 BYO）已规划。
 3. 每完成一个子步骤，跑 `GET /evaluation/golden-runtime/run` 确认 18/18。
 4. A3/A5 架构治理用户决定暂缓，不随 P10 启动。
 

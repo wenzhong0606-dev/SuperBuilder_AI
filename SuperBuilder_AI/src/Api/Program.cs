@@ -203,6 +203,21 @@ builder.Services.AddScoped<MetadataSearchService>();
 builder.Services.AddScoped<IMetadataSearchService>(sp => sp.GetRequiredService<MetadataSearchService>());
 builder.Services.AddScoped<GoldenBaselineComparisonService>();
 
+// P11.0 安全轨道：无状态令牌服务（单例；密钥取自配置 Auth:SigningKey，缺失用开发默认值）
+var authSigningKey = builder.Configuration["Auth:SigningKey"];
+builder.Services.AddSingleton<SuperBuilder_AI.Services.Auth.ITokenService>(
+	new SuperBuilder_AI.Services.Auth.TokenService(authSigningKey));
+
+// P11.0 CORS 策略（MAUI / Blazor Web 跨源联调；生产须显式配置 Cors:AllowedOrigins）
+var corsOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>();
+builder.Services.AddCors(o => o.AddPolicy("P11Cors", p =>
+{
+	if (corsOrigins is { Length: > 0 })
+		p.WithOrigins(corsOrigins).AllowAnyHeader().AllowAnyMethod();
+	else
+		p.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod();
+}));
+
 var app = builder.Build();
 
 // P10.1 Identity 全局目录种子（幂等；失败不阻断平台启动）
@@ -236,6 +251,10 @@ using (var quotaScope = app.Services.CreateScope())
 if (!app.Environment.IsDevelopment()) { app.UseExceptionHandler("/Home/Error"); app.UseHsts(); }
 app.UseHttpsRedirection();
 app.UseRouting();
+// P11.0 安全轨道：CORS → 限流 → 鉴权（顺序：路由之后、授权之前；与 Observability/Audit 互不干扰）
+app.UseCors("P11Cors");
+app.UseMiddleware<RateLimitMiddleware>();
+app.UseMiddleware<AuthMiddleware>();
 app.UseAuthorization();
 // P10.5 可观测性中间件（关联ID透传 + 请求/响应日志 + 耗时，非阻塞、异常静默，不影响 Golden 行为契约）
 app.UseMiddleware<ObservabilityMiddleware>();
@@ -243,4 +262,6 @@ app.UseMiddleware<ObservabilityMiddleware>();
 app.UseMiddleware<AuditMiddleware>();
 app.MapStaticAssets();
 app.MapControllerRoute(name: "default", pattern: "{controller=Home}/{action=Index}/{id?}").WithStaticAssets();
+// P11.0 健康探测（匿名白名单，供运维/可观测面使用）
+app.MapGet("/health", () => new { status = "healthy", ts = System.DateTime.UtcNow });
 app.Run();

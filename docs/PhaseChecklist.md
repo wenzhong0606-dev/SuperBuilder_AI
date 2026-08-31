@@ -182,6 +182,36 @@
 
 ---
 
+### P11 — 前端 + 平台扩展（方案 `docs/P11_Frontend_MAUI_Blazor_Plan.md`）
+
+**P11.0 后端前置（✅ 已完成 · 全为新增文件 + Program.cs 编辑，未碰 Golden 依赖 · build 0 error · 单测 308/308 · Golden 18/18 PASS）**
+- [x] `src/Application/Auth/TokenService.cs`：`ITokenService`（`Issue`/`Validate`）+ `TokenPrincipal`；HMAC-SHA256 手动 JWT 风格无状态令牌，**零 NuGet 依赖**
+- [x] `src/Api/Middleware/AuthMiddleware.cs`：Bearer/X-Api-Token 解析 → 校验 → 设 `HttpContext.User` + `Items["TenantId"]`；匿名白名单（`/evaluation`、`/health`、`/api/auth/login`、`/`、静态资源，**保证 Golden 不受影响**）；其余 `/api/*` 无令牌 → 401
+- [x] `src/Api/Middleware/RateLimitMiddleware.cs`：`/api/*` 按 IP/令牌固定窗口限流（120/分），异常静默
+- [x] `src/Api/Controllers/AuthController.cs`（`api/auth`）：`POST /login {username,tenantId}` → 查活跃用户 → `GetPermissionsAsync` → 签发令牌；`GET /me`（本阶段登录不校验口令，口令/外部 IdP 在 P13 BYO 补齐）
+- [x] `src/Api/Controllers/AskController.cs`（`api/ask`）：`POST {question,dataSourceId?}` → 需有效令牌 + `DashboardView` 权限（deny-by-default 与 P10 一致）→ `IBIConversationService.AskAsync(question, tenantId)`；租户隔离由令牌 `tid` 声明驱动
+- [x] `src/Api/Program.cs`：注册 `ITokenService` 单例（密钥 `Auth:SigningKey`，缺失用 dev 默认）+ CORS 策略 `P11Cors`；中间件顺序 `Routing → Cors → RateLimit → Auth → Authorization → Observability → Audit`；`MapGet("/health")`
+- [x] 测试（确定性、无 LLM/DB）：`TokenServiceTests`(5) + `AuthMiddlewareTests`(5) + `AskControllerTests`(4)
+- [x] **验收**：build 0 error（仅 12 个预存 nullable 警告）；单测 308/308（原 294 + 14）；**Golden 18/18 PASS（decision=PASS, expectedOutcomePassed 18, expectedOutcomeFailed 0, failedGates=None）**
+
+**P11.1~P11.5 前端（MAUI Blazor Hybrid + Blazor Web 共享 RCL，待启动）**
+- [ ] P11.1 脚手架：RCL `SuperBuilder_AI.Components` + Blazor Web Head + MAUI Head 空壳 + Theme/Localization 骨架
+- [ ] P11.2 旗舰页：登录/租户 + Ask BI（依赖 P11.0 `api/ask`）
+- [ ] P11.3 其余页面 + 组件库页 + 主题编辑器 + ask/refine（多轮）
+- [ ] P11.4 MAUI 双端验证（Android/iOS/Windows）
+- [ ] P11.5 优化轨道（体验/前端·性能/成本·安全/运维）
+
+**§12 用户自定义能力（接入 P11.3，已规划）**
+- [ ] ① 用户自定义组件库（需新建 Component 领域模型 + 持久化 + `api/components`，受 P8 `AppComponentTypes` 白名单约束）
+- [ ] ② 用户自定义风格/样式（P7 主题引擎已支撑 `AppDsl.ThemeKey` 引用）
+- [ ] ③ Ask 多轮调整 + 发布为应用页面（接 P8 应用工厂）
+
+**§13 平台扩展（已规划）**
+- [ ] 多类型数据库连接器（复用 `ISqlDialect`/`IDataSourceConnectionFactory`）
+- [ ] 多 AI 模型 BYO（用户自绑定账号；含 P11.0 登录口令/外部 IdP 补齐）
+
+---
+
 ## 统一护栏（贯穿所有阶段）
 - [ ] 每个 P 阶段退出 = `Golden 18/18`
 - [ ] 触及 `src/Application/BI`、`src/Domain/{Metadata,BiQuery}`、`src/Infrastructure/{Vector,Database}`、Resolution 的每次提交都重跑 Golden
@@ -190,4 +220,4 @@
 - [ ] A4 上帝类拆分必须在 P6 之前收口
 
 ---
-**立即下一步**：P3 ✅、P4 Multi-Tenant Platform Core ✅ 全绿（P4.1~P4.4 均 ✅）、P5 Multi-Language Runtime ✅ 全绿（P5.1~P5.4 均 ✅）、P6 Low-code BI Engine ✅ 全绿（P6.1/P6.2/P6.3/P6.4 均 ✅，合计单测 117/117，Golden 18/18 PASS）、**P7 Multi-Theme / Style Engine ✅ 全绿（P7.1~P7.4 均 ✅，合计单测 147/147，Golden 18/18 PASS ×4 轮）**。**P8 AI App Builder ✅ 全绿（P8.1~P8.4 均 ✅，合计单测 179/179，Golden 18/18 PASS）**。**P9 AI Agent / Copilot ✅ 全绿（P9.1~P9.4 均 ✅，单测 231/231，Golden 18/18 PASS ×3 轮）：P9.1 ToolRegistry + Agent 领域模型 + 序列化器 + 持久化 ✅（build 0 error、单测 203/203、Golden 18/18 PASS）、P9.2 AgentPlanner 编排 ✅（build 0 error、单测 214/214、Golden 18/18 PASS）、P9.3 AgentController 端点 + 异常原因分析链路 ✅（build 0 error、单测 231/231、Golden 18/18 PASS）**。**P10.5 Observability 中间件 + 架构依赖校验(反射等价 NetArchTest) + P10 总验收 ✅ 已全绿（build 0 error；单测 294/294；Golden 18/18），用户产品路线 10 阶段(P3~P10)全部完成**。A3/A5 用户决定暂缓。
+**立即下一步**：P3~P10 ✅ 全绿（用户产品路线 10 阶段全部完成，Golden 18/18 全程保持）。**P11.0 后端前置 ✅ 已完成**（api/ask + 鉴权中间件 + CORS + 限流 + /health；build 0 error；单测 308/308；Golden 18/18 PASS）。**下一步 P11.1 前端脚手架**（RCL + Blazor Web Head + MAUI Head，现有 API 零改动）。A3/A5 用户决定暂缓。
