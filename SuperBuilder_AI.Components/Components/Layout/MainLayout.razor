@@ -2,6 +2,7 @@
 @inject ThemeService Theme
 @inject NavigationManager Nav
 @inject AppState State
+@inject AuthStore Session
 @inject IJSRuntime JS
 
 <div class="app-shell @(NavOpen ? "nav-open" : "")">
@@ -48,6 +49,7 @@
     protected override void OnInitialized()
     {
         Nav.LocationChanged += OnLocationChanged;
+        State.SessionExpired += OnSessionExpired;
     }
 
     // 主题读取/应用需在浏览器中执行（预渲染阶段无 JS 运行时）。
@@ -58,7 +60,22 @@
         var theme = await JS.InvokeAsync<string>("SuperBuilder.getTheme");
         IsDark = theme == "dark";
         await Theme.ApplyAsync(theme);
+
+        // 会话自举：从 localStorage 还原令牌，并校验是否仍有效（过期则清除）。
+        // 必须在浏览器阶段执行（JS 运行时可用）。
+        await Session.RestoreAsync();
+        if (State.IsAuthenticated)
+        {
+            await Session.ValidateAsync();
+        }
         StateHasChanged();
+    }
+
+    /// <summary>会话失效（token 过期/被拒）时回收并跳登录。</summary>
+    private async void OnSessionExpired()
+    {
+        await Session.ClearAsync();
+        Nav.NavigateTo("/login");
     }
 
     private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)

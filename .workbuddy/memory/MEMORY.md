@@ -12,7 +12,7 @@
 - **Stage 0 基础/运行时**：✅ 全完成；Golden 18/18 PASS
 - **Stage 1 架构治理**：🟡 A1/A2/A4 ✅；A3/A5 ⬜（用户指令暂缓「先不做」）
 - **Stage 2 产品演进 P3~P10**：✅ 全绿（每阶段退出门槛 = Golden 18/18，硬约束）
-- **P11 前端（MAUI Blazor Hybrid + Web 共享 RCL）**：✅ P11.0/P11.1/P11.2 + UI 现代化重构；✅ P11.3 全完成（15 页 + 组件库页 + 主题编辑器 + `ask/refine` 多轮语义调整）；✅ P11.4 MAUI 验证（Windows 0 error + 共享 RCL 正确性经 Web 渲染证实；Android/iOS 配置就绪未跑模拟器）；⬜ P11.5 优化轨道
+- **P11 前端（MAUI Blazor Hybrid + Web 共享 RCL）**：✅ P11.0/P11.1/P11.2 + UI 现代化重构；✅ P11.3 全完成（15 页 + 组件库页 + 主题编辑器 + `ask/refine` 多轮语义调整）；✅ P11.4 MAUI 验证（RCL/MAUI 多目标化，Android 真原生 Signed.apk + iOS 编译链打通，已提交 `6aab6f8`）；✅ P11.5 优化轨道起步（缓存+指标已提交 `2651026`；**鉴权收尾已完成未提交**）
 
 ## 可复用零回归手法（核心）
 - **门控隔离**：多语言/AI 路径一律「非默认才启用」短路，默认路径逐字节不变 → 触碰 Golden 依赖文件也安全
@@ -45,6 +45,12 @@
 - **RCL 多目标打通**：RCL `net10.0;net10.0-android;net10.0-ios`；MAUI 头 `net10.0-android;net10.0-ios;net10.0-windows10.0.19041.0`；补齐 `Platforms/Android`+`Platforms/iOS`+`Resources/AppIcon|/Splash`。**Android 真原生 0 error 产出 Signed.apk；iOS 0 error(AOT+原生库+资源) 但 `.app` 打包/签名需配对 Mac**（Windows 上 `_CreateAppBundle` 为空操作，属平台限制）。已提交 `6aab6f8`。
 - **运行时提示**：`MauiProgram.cs` `HttpClient.BaseAddress=https://localhost:5032`，Android 模拟器内应改 `http://10.0.2.2:5032`
 - **⚠️ RCL 静态资源陷阱（关键，已付学费）**：RCL **不可**引 `Microsoft.AspNetCore.Components.WebView.Maui`。该包随 RCL 发布 `_framework/blazor.modules.json` 等 WebView 宿主静态资源，与引用 RCL 的 MAUI 应用自身资源冲突（`StaticWebAsset SourceType: Project` 重复 → build error）；且 `<StaticWebAsset Remove>` 在评估期无法拦截（包资源在 build 期注入）。RCL 统一只引 `Microsoft.AspNetCore.Components.Web` + `Microsoft.Extensions.Http`（全 TFM），WebView 宿主能力由 MAUI 头项目自身提供。
+
+### P11.5 优化轨道（2026-08-31）
+- **鉴权收尾（P11.5.3，已完成待提交）**：核心守卫 `AuthMiddleware`+`TokenService`(HMAC 无状态令牌) **早已在 P11.0 落地并接进管道**（`Program.cs: app.UseMiddleware<AuthMiddleware>()`，对所有 `/api/*` 除 `login` 要求有效 Bearer/X-Api-Token 否则 401）——**计划文档 §9.3/第227行「无鉴权中间件」为过时记录**，勿再据其新建中间件。
+- **⚠️ 签名密钥坑（已修）**：`TokenService` 在 `Auth:SigningKey` 缺失时回退到硬编码 dev 默认串 `dev-insecure-signing-key-P11-change-in-prod` → **任何人可伪造任意租户/权限 token**。已在本轮于 `appsettings.json` 配强随机 `Auth:SigningKey`；生产须用密钥管理覆盖此值。
+- **前端 token 链路**：`Login.razor`→`AuthStore.SetFromLoginAsync`（写 `AppState`+持久化 localStorage）；`MainLayout` 启动 `RestoreAsync`+`ValidateAsync(/api/auth/me)` 自举；`ApiClient` 401→`AppState.NotifySessionExpired`→`MainLayout` 跳 `/login`。`AuthStore`/`AppState` 须在两个 Head(Web+MAUI) 注册 `AddScoped`；`AppState` 现含 `event Action? SessionExpired` + `ClearSession()`。
+- **验证**：三端(API/Web/MAUI-Win) build 0 error；单测 308/308；运行时实测 无 token→401 / 坏 token→401 / 合法 token→200 / `/metrics`→200。Golden 走独立 `evaluation/golden-runtime` 端点隔离。
 
 ### ⚠️ Blazor/Razor 踩坑（务必遵守，已付学费）
 1. **事件处理器含 C# 字符串 → 属性用单引号定界**：`@onclick='() => Toast("文本")'` ✅；`@onclick="() => Toast('文本')"` ❌（单引号变 char 字面量 → CS1012）；`$"..."` 内嵌双引号会提前闭合属性 → CS1056/CS1026。

@@ -225,6 +225,7 @@ SuperBuilder_AI.Maui/              (新增 · MAUI Blazor Hybrid)
 1. **核心问数端点缺失（已核实 ✅ 确认缺失）**：`BIConversationService.AskAsync` 存在且已 DI 注册（`Program.cs` 162–163），但**仅被 `QueryPlanWidgetDataResolver` 消费**（仪表盘取数）；11 个生产控制器 + 15 个诊断控制器中**无任何 NL 问数端点**。→ **P11.2 前必须新增 `api/ask`**（包装 `IBIConversationService.AskAsync`，新文件、不改动 Golden 依赖、不影响 18/18）。这是旗舰页的**硬前置依赖**。
    - 附带：`Api/Diagnostics/HomeController.cs` 存在且 `Index()` 返回 `View()`，但项目**无 `Views/` 视图文件** → 默认路由实际无法渲染；P11 前端接入后应移除或改指向前端入口。
 2. **P10.2 全局守卫不存在（已核实 ✅ 确认缺失 · 安全硬缺口）**：全库 `grep "Guard"` **零命中**；`Program.cs` 仅注册 `ObservabilityMiddleware` + `AuditMiddleware`，**无鉴权中间件**。→ 当前所有 `api/*` 端点**无任何鉴权保护**。P11 安全轨道须从「补接线」升级为「**新建鉴权中间件 + Token 校验**」（见 §9.3）。
+   - **⚠️ 已修正（2026-08-31）**：上述「无鉴权中间件」判断**已过时**。`AuthMiddleware`（`src/Api/Middleware/AuthMiddleware.cs`）+ `TokenService`（`src/Application/Auth/TokenService.cs`，HMAC 无状态令牌）**已在 P11.0 落地并接进管道**（`Program.cs` 注册 `app.UseMiddleware<AuthMiddleware>()`，对所有 `/api/*` 除 `login` 要求有效 Bearer/X-Api-Token，否则 401；`AskController` 另做 `HasPermissionAsync` 细粒度 RBAC）。本轮 P11.5.3 仅做「生产可用收口」：配置 `Auth:SigningKey`（防 token 伪造）、前端 `AuthStore` 持久化+自举、401 自动回收。
 3. **MAUI 原生运行受限**：本沙箱可编译 Windows/Android，但启动原生窗口/模拟器不一定可行 → MAUI Head 以「可编译」为闸门，真机/模拟器运行单列验证。
 4. **严守不碰 A3**：仅在 UI 层新增，不重构后端单项目。
 5. **图表库选型**（Chart.js 轻量 vs 组件库丰富）在 P11.1 确定。

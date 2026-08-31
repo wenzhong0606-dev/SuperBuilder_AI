@@ -9,6 +9,7 @@ builder.Services.AddServerSideBlazor();
 
 // 共享服务（Scoped，每个 SignalR 电路一个实例）
 builder.Services.AddScoped<AppState>();
+builder.Services.AddScoped<AuthStore>();
 builder.Services.AddScoped<ThemeService>();
 builder.Services.AddScoped<LocalizationService>();
 builder.Services.AddScoped<IApiClient, ApiClient>();

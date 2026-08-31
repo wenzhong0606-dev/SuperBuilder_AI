@@ -2,6 +2,7 @@
 @page "/login"
 @inject IApiClient Api
 @inject AppState State
+@inject AuthStore Session
 @inject NavigationManager Nav
 
 <div class="login-wrap">
@@ -55,20 +56,14 @@
             Error = loginErr ?? "登录失败：用户不存在或已禁用。";
             return;
         }
-        State.Token = r.Token;
-        State.TenantId = r.TenantId;
-        State.UserId = r.UserId;
-        State.Username = r.Username;
-        State.Permissions = r.Permissions ?? new System.Collections.Generic.List<string>();
+        // 写入 AppState 并持久化到 localStorage（刷新不掉登录）
+        await Session.SetFromLoginAsync(r);
         Nav.NavigateTo("/ask");
     }
 
-    private void Logout()
+    private async Task Logout()
     {
-        State.Token = null;
-        State.TenantId = 0;
-        State.UserId = 0;
-        State.Username = "";
-        State.Permissions = System.Array.Empty<string>();
+        await Session.ClearAsync();
+        StateHasChanged();
     }
 }

@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -36,6 +37,17 @@ public sealed class ApiClient : IApiClient
         return client;
     }
 
+    /// <summary>
+    /// 会话失效回收：收到 401 时清空本地 token 并通知壳层跳登录。
+    /// 仅当当前确为已登录态才触发，避免重复通知。
+    /// </summary>
+    private void OnUnauthorized()
+    {
+        if (!_appState.IsAuthenticated) return;
+        _appState.ClearSession();
+        _appState.NotifySessionExpired();
+    }
+
     public async Task<(AuthResult? Result, string? Error)> LoginAsync(string username, long tenantId, CancellationToken ct = default)
     {
         var client = _factory.CreateClient("SuperBuilderApi");
@@ -57,6 +69,7 @@ public sealed class ApiClient : IApiClient
         if (!resp.IsSuccessStatusCode)
         {
             var err = await resp.Content.ReadAsStringAsync(ct);
+            if (resp.StatusCode == HttpStatusCode.Unauthorized) OnUnauthorized();
             return "ERROR " + (int)resp.StatusCode + ": " + err;
         }
         return await resp.Content.ReadAsStringAsync(ct);
@@ -70,6 +83,7 @@ public sealed class ApiClient : IApiClient
         if (!resp.IsSuccessStatusCode)
         {
             var (code, msg, trace) = ParseApiError(await resp.Content.ReadAsStringAsync(ct));
+            if (resp.StatusCode == HttpStatusCode.Unauthorized) OnUnauthorized();
             return new AskOutcome
             {
                 Code = code,
@@ -123,6 +137,7 @@ public sealed class ApiClient : IApiClient
         if (!resp.IsSuccessStatusCode)
         {
             var (code, msg, trace) = ParseApiError(await resp.Content.ReadAsStringAsync(ct));
+            if (resp.StatusCode == HttpStatusCode.Unauthorized) OnUnauthorized();
             return new AskOutcome
             {
                 Code = code,
@@ -196,13 +211,26 @@ public sealed class ApiClient : IApiClient
             }
         }
         var err = await resp.Content.ReadAsStringAsync(ct);
+        if (resp.StatusCode == HttpStatusCode.Unauthorized) OnUnauthorized();
         return (false, null, $"{(int)resp.StatusCode}: {err}");
     }
 
     public async Task<T?> GetAsync<T>(string relativeUrl, CancellationToken ct = default) where T : class
     {
         var client = CreateClient();
-        return await client.GetFromJsonAsync<T>(relativeUrl, ct);
+        try
+        {
+            var resp = await client.GetAsync(relativeUrl, ct);
+            if (resp.StatusCode == HttpStatusCode.Unauthorized) OnUnauthorized();
+            if (!resp.IsSuccessStatusCode) return null;
+            var body = await resp.Content.ReadAsStringAsync(ct);
+            if (string.IsNullOrWhiteSpace(body)) return null;
+            return JsonSerializer.Deserialize<T>(body, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     /// <summary>
@@ -218,8 +246,9 @@ public sealed class ApiClient : IApiClient
             var body = await resp.Content.ReadAsStringAsync(ct);
             if (!resp.IsSuccessStatusCode)
             {
-                var (code, msg, _) = ParseApiError(body);
-                return (null, (int)resp.StatusCode, msg ?? $"请求失败（{(int)resp.StatusCode}）。");
+            var (code, msg, _) = ParseApiError(body);
+            if (resp.StatusCode == HttpStatusCode.Unauthorized) OnUnauthorized();
+            return (null, (int)resp.StatusCode, msg ?? $"请求失败（{(int)resp.StatusCode}）。");
             }
             if (string.IsNullOrWhiteSpace(body))
                 return (null, 200, null);

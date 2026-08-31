@@ -11,4 +11,20 @@ public sealed class AppState
         = System.Array.Empty<string>();
 
     public bool IsAuthenticated => !string.IsNullOrEmpty(Token);
+
+    /// <summary>会话失效（如 token 过期/被服务端拒绝）时由 ApiClient 触发，供壳层回收并跳登录。</summary>
+    public event Action? SessionExpired;
+
+    /// <summary>清空本地会话态（不触碰持久化存储；存储清理由 <see cref="AuthStore"/> 负责）。</summary>
+    public void ClearSession()
+    {
+        Token = null;
+        TenantId = 0;
+        UserId = 0;
+        Username = "";
+        Permissions = System.Array.Empty<string>();
+    }
+
+    /// <summary>通知监听方会话已失效。</summary>
+    public void NotifySessionExpired() => SessionExpired?.Invoke();
 }

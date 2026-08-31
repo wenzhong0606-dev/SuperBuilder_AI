@@ -20,6 +20,7 @@ public static class MauiProgram
 
         // 共享服务（Scoped，MAUI WebView 本地电路）
         builder.Services.AddScoped<AppState>();
+        builder.Services.AddScoped<AuthStore>();
         builder.Services.AddScoped<ThemeService>();
         builder.Services.AddScoped<LocalizationService>();
         builder.Services.AddScoped<IApiClient, ApiClient>();
