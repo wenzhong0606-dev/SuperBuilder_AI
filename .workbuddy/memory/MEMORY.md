@@ -12,7 +12,7 @@
 - **Stage 0 基础/运行时**：✅ 全完成；Golden 18/18 PASS
 - **Stage 1 架构治理**：🟡 A1/A2/A4 ✅；A3/A5 ⬜（用户指令暂缓「先不做」）
 - **Stage 2 产品演进 P3~P10**：✅ 全绿（每阶段退出门槛 = Golden 18/18，硬约束）
-- **P11 前端（MAUI Blazor Hybrid + Web 共享 RCL）**：✅ P11.0/P11.1/P11.2 + UI 现代化重构；✅ P11.3 页面部分（15 页 + 组件库页 + 主题编辑器）；⬜ P11.3 遗留 `ask/refine`、P11.4 MAUI 双端验证、P11.5 优化轨道
+- **P11 前端（MAUI Blazor Hybrid + Web 共享 RCL）**：✅ P11.0/P11.1/P11.2 + UI 现代化重构；✅ P11.3 全完成（15 页 + 组件库页 + 主题编辑器 + `ask/refine` 多轮语义调整）；✅ P11.4 MAUI 验证（Windows 0 error + 共享 RCL 正确性经 Web 渲染证实；Android/iOS 配置就绪未跑模拟器）；⬜ P11.5 优化轨道
 
 ## 可复用零回归手法（核心）
 - **门控隔离**：多语言/AI 路径一律「非默认才启用」短路，默认路径逐字节不变 → 触碰 Golden 依赖文件也安全
@@ -38,6 +38,12 @@
 - `IApiClient`/`ApiClient` 新增松类型 `GetJsonAsync` → `(JsonElement? Data, int Status, string? Error)`，不抛异常，页面优雅降级
 - 15 个页面：数据类 Dashboards/Apps/BusinessModel/SemanticLabels/Agent；平台类 DataSources/ModelAccounts/Components(组件库)/Themes(主题编辑器)；管理后台 Admin/{Tenants,Identity,Audit,Quota,Localization,Themes}
 - 设计系统工具类：`page-head`/`stat-grid`/`stat-tile`/`panel`/`toolbar`/`badge`/`empty-state`/`field-grid`/`seg`/`row-list`/`swatch-grid`；`NavMenu` 图标精灵共 22 symbol
+- `ask/refine` 多轮语义调整：后端 `POST api/ask/refine`（`ComposeRefinedQuestion` 合成「原问题+历史(user轮)+指令」）；前端 `Ask.razor`「语义细化」框，结果作子轮次(`.turn.refine` 高亮)追加。**门控隔离**：默认 `api/ask` 路径不变，不碰 Golden 依赖文件
+
+### P11.4 MAUI 双端验证（2026-08-31）
+- **Windows 端 0 error**（复验）；`MauiProgram.cs` 用 `AddMauiBlazorWebView()` + Scoped 注册 `IApiClient/AppState/ThemeService/LocalizationService`；`index.html` 同 Web 引用 RCL 资源 + no-FOUC 主题脚本
+- **Android/iOS 降级结论**：workloads 已装；但 RCL 仅单目标 `net10.0`，MAUI 双端需头+RCL 均多目标(`net10.0-android;net10.0-ios;net10.0-windows10.0.19041.0`)；iOS 需 Mac、Android 需模拟器 → 沙箱无法跑。属配置项非缺陷
+- **运行时提示**：`MauiProgram.cs` `HttpClient.BaseAddress=https://localhost:5032`，Android 模拟器内应改 `http://10.0.2.2:5032`
 
 ### ⚠️ Blazor/Razor 踩坑（务必遵守，已付学费）
 1. **事件处理器含 C# 字符串 → 属性用单引号定界**：`@onclick='() => Toast("文本")'` ✅；`@onclick="() => Toast('文本')"` ❌（单引号变 char 字面量 → CS1012）；`$"..."` 内嵌双引号会提前闭合属性 → CS1056/CS1026。

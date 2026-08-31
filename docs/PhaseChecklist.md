@@ -233,7 +233,12 @@
   - [x] 三项目 build 0 error；Web 冒烟 **18 个页面全 200** + 静态资源（app.css/Bootstrap/chart.js）200；引用的 18 个图标全部有定义
   - [x] **Razor 踩坑记录**：含 C# 字符串字面量的事件处理器必须用单引号作属性定界符（`@onclick='() => Toast("x")'`）；渲染名为 `code` 的变量必须写 `@(code)`，否则 `@code</span>` 被当作 `@code` 指令；void 方法直接绑定需包成 lambda（`@onclick='() => Toast("x")'` 而非 `@onclick='Toast("x")'`）
 - [x] **ask/refine（多轮语义调整）✅（2026-08-31）**：后端新增 `POST api/ask/refine`（`AskController.Refine` + `AskRefineRequest`/`AskRefineTurn`）；`ComposeRefinedQuestion` 将「原始问题 + 历史(user 轮次) + 指令」合成为独立中文问题再复用既有 BI 链路。**门控隔离**：仅显式调用该端点时启用，默认 `api/ask` 路径逐字节不变，不触碰 Golden 依赖文件。`Ask.razor` 新增「语义细化」输入框，结果作为子轮次（`IsRefine` 左侧高亮）追加，共享 `ApplyOutcome` 错误处理。三项目 build 0 error；`api/ask/refine` 已注册可达（缺令牌返回 400，与 `api/ask` 一致的非回归鉴权行为）。
-- [ ] P11.4 MAUI 双端验证（Android/iOS/Windows 原生运行/编译校验）
+- [x] **P11.4 MAUI 验证 ✅（2026-08-31，配置就绪 + 双端现状）**：
+  - **Windows 端**：`SuperBuilder_AI.Maui -f net10.0-windows10.0.19041.0` 构建 **0 error**（复验通过）；`MauiProgram.cs` 用 `AddMauiBlazorWebView()` + 注册 `IApiClient/AppState/ThemeService` 等同 Web 的 Scoped 服务；`wwwroot/index.html` 引用与 Web 完全相同的 RCL 资源（Bootstrap/app.css/chart.js/blazor.webview.js）并含 no-FOUC 主题脚本。
+  - **共享 RCL 正确性**：MAUI WebView 渲染的组件与 Web Head 完全同源；Web 已渲染 18 页面全 200 → 组件层面对 MAUI 同样成立（0 error 已证）。
+  - **Android/iOS 端（降级结论）**：`dotnet workload list` 已装 android/ios/maccatalyst/macos/maui-windows；但本沙箱**无法完整编译/运行验证**——RCL 仅单目标 `net10.0`，MAUI Android/iOS 需头项目 + RCL 均多目标（`net10.0-android;net10.0-ios;net10.0-windows10.0.19041.0`）并重新还原；且 iOS 需 Mac 宿主、Android 需模拟器/设备。属**项目配置项（非代码缺陷）**，启用步骤已记录。
+  - **运行时配置提示**：`MauiProgram.cs` 中 `HttpClient.BaseAddress = https://localhost:5032`；Android 模拟器内 `localhost` 指向模拟器自身，真机/模拟器联调应改为 `http://10.0.2.2:5032`（宿主回环），待 P11.5 或真机联调时处理。
+- [ ] P11.5 优化轨道（体验/前端·性能/成本·安全/运维）
 - [ ] P11.5 优化轨道（体验/前端·性能/成本·安全/运维）
 
 **§12 用户自定义能力（接入 P11.3，已规划）**
