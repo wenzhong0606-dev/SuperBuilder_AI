@@ -40,10 +40,11 @@
 - 设计系统工具类：`page-head`/`stat-grid`/`stat-tile`/`panel`/`toolbar`/`badge`/`empty-state`/`field-grid`/`seg`/`row-list`/`swatch-grid`；`NavMenu` 图标精灵共 22 symbol
 - `ask/refine` 多轮语义调整：后端 `POST api/ask/refine`（`ComposeRefinedQuestion` 合成「原问题+历史(user轮)+指令」）；前端 `Ask.razor`「语义细化」框，结果作子轮次(`.turn.refine` 高亮)追加。**门控隔离**：默认 `api/ask` 路径不变，不碰 Golden 依赖文件
 
-### P11.4 MAUI 双端验证（2026-08-31）
+### P11.4 MAUI 双端验证（2026-08-31，已打通原生构建）
 - **Windows 端 0 error**（复验）；`MauiProgram.cs` 用 `AddMauiBlazorWebView()` + Scoped 注册 `IApiClient/AppState/ThemeService/LocalizationService`；`index.html` 同 Web 引用 RCL 资源 + no-FOUC 主题脚本
-- **Android/iOS 降级结论**：workloads 已装；但 RCL 仅单目标 `net10.0`，MAUI 双端需头+RCL 均多目标(`net10.0-android;net10.0-ios;net10.0-windows10.0.19041.0`)；iOS 需 Mac、Android 需模拟器 → 沙箱无法跑。属配置项非缺陷
+- **RCL 多目标打通**：RCL `net10.0;net10.0-android;net10.0-ios`；MAUI 头 `net10.0-android;net10.0-ios;net10.0-windows10.0.19041.0`；补齐 `Platforms/Android`+`Platforms/iOS`+`Resources/AppIcon|/Splash`。**Android 真原生 0 error 产出 Signed.apk；iOS 0 error(AOT+原生库+资源) 但 `.app` 打包/签名需配对 Mac**（Windows 上 `_CreateAppBundle` 为空操作，属平台限制）。已提交 `6aab6f8`。
 - **运行时提示**：`MauiProgram.cs` `HttpClient.BaseAddress=https://localhost:5032`，Android 模拟器内应改 `http://10.0.2.2:5032`
+- **⚠️ RCL 静态资源陷阱（关键，已付学费）**：RCL **不可**引 `Microsoft.AspNetCore.Components.WebView.Maui`。该包随 RCL 发布 `_framework/blazor.modules.json` 等 WebView 宿主静态资源，与引用 RCL 的 MAUI 应用自身资源冲突（`StaticWebAsset SourceType: Project` 重复 → build error）；且 `<StaticWebAsset Remove>` 在评估期无法拦截（包资源在 build 期注入）。RCL 统一只引 `Microsoft.AspNetCore.Components.Web` + `Microsoft.Extensions.Http`（全 TFM），WebView 宿主能力由 MAUI 头项目自身提供。
 
 ### ⚠️ Blazor/Razor 踩坑（务必遵守，已付学费）
 1. **事件处理器含 C# 字符串 → 属性用单引号定界**：`@onclick='() => Toast("文本")'` ✅；`@onclick="() => Toast('文本')"` ❌（单引号变 char 字面量 → CS1012）；`$"..."` 内嵌双引号会提前闭合属性 → CS1056/CS1026。

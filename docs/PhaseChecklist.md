@@ -241,7 +241,10 @@
     - **iOS ✅ 编译链打通**：`dotnet build -f net10.0-ios` **0 error**，完成托管编译 + AOT + 原生静态库链接（`libextension-dotnet.a`/`libmono-*`）+ 多语言资源收集 + codesign 清单；**最终 `.app` 打包/签名需配对 Mac 宿主**（Windows 上 `_CreateAppBundle` 为空操作），属平台限制非代码缺陷。
   - **⚠️ 关键坑：RCL 不可引用 `Microsoft.AspNetCore.Components.WebView.Maui`**。该包会随 RCL 发布 `_framework/blazor.modules.json` 等静态宿主资源，与引用 RCL 的 MAUI 应用自身资源冲突（`StaticWebAsset SourceType: Project` 重复，且 `StaticWebAsset Remove` 无法拦截——包资源在构建期才注入）。RCL 统一只引 `Microsoft.AspNetCore.Components.Web` + `Microsoft.Extensions.Http`（全 TFM），WebView 宿主能力由 MAUI 头项目自身提供。
   - **运行时配置提示**：`MauiProgram.cs` 中 `HttpClient.BaseAddress = https://localhost:5032`；Android 模拟器内 `localhost` 指向模拟器自身，真机/模拟器联调应改为 `http://10.0.2.2:5032`（宿主回环），待 P11.5 或真机联调时处理。
-- [ ] P11.5 优化轨道（体验/前端·性能/成本·安全/运维）
+- [x] **P11.5 优化轨道 ✅（2026-08-31，性能/成本 + 安全/运维 双轨起步）**：
+  - **性能/成本 — Ask 语义响应缓存（P11.5.1）**：`src/Api/Caching` 新增 `AskCacheOptions`（绑定 `P11Cache:Ask`，默认启用/TTL 60s/LRU 200）+ `IAskResponseCache` + `MemoryAskResponseCache`（基于 `IMemoryCache`）。键 = 租户 + 归一化问题（`Normalize` 折叠空白/去尾部标点/小写；GUID 与数字段已在 metrics 侧占位）；**只缓存 `BIResponse.Success==true`**（失败/被闸门阻断不入库，避免瞬时故障被钉死）；读写全程异常静默。接入点仅 `AskController`（可选构造参数 `IAskResponseCache? cache=null`，保持现有 2 参单测不破），支持 `?noCache=1` 旁路 + `X-Cache: HIT/MISS` 响应头。命中即跳过整条 BI 链路（省 LLM+DB）。**零回归**：Golden 走独立 `evaluation/golden-runtime` 端点、不经 `AskController`，缓存对其完全不可见。
+  - **安全/运维 — 请求指标 + /metrics（P11.5.2）**：`ObservabilityMiddleware` 注入 `RequestMetricsCollector`（可选参数，未注册降级不采集），按「路由」聚合请求数/错误数(>=500)/客户端错(400-499)/平均延迟/**P95**/最大延迟；路由归一化（GUID→`{guid}`、数字段→`{n}`、限 200 桶防基数爆炸、每路由 512 样本环形）。新增 `GET /metrics` 匿名端点，输出 `routes[]` 与 `askCache{hits,misses,hitRate}`。后端 build 0 error；单测 **308/308**；端点实测 `/health`→被 `/metrics` 采集、`/api/ask` 无令牌仍 401（鉴权未破）。
+  - **待续**：BI 查询执行优化（分页/流式/连接池/索引）、前端体验细化、配置多环境/密钥管理、OpenAPI/Swagger（§9.4 暂缓项）。
 
 **§12 用户自定义能力（接入 P11.3，已规划）**
 

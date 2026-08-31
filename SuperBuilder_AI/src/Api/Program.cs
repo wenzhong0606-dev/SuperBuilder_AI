@@ -218,6 +218,21 @@ builder.Services.AddCors(o => o.AddPolicy("P11Cors", p =>
 		p.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod();
 }));
 
+// P11.5.1 性能/成本轨：Ask 语义响应缓存（租户 + 归一化问题为键，TTL 默认 60s，LRU 淘汰）
+// 只作用于 POST api/ask；Golden 回归走独立 evaluation/golden-runtime 端点，不经过本缓存。
+var askCacheSection = builder.Configuration.GetSection(SuperBuilder_AI.Api.Caching.AskCacheOptions.SectionName);
+builder.Services.Configure<SuperBuilder_AI.Api.Caching.AskCacheOptions>(askCacheSection);
+var askCacheMax = askCacheSection.GetValue<int?>(nameof(SuperBuilder_AI.Api.Caching.AskCacheOptions.MaxEntries)) ?? 200;
+builder.Services.AddMemoryCache(o =>
+{
+	if (askCacheMax > 0) o.SizeLimit = askCacheMax;
+});
+builder.Services.AddSingleton<SuperBuilder_AI.Api.Caching.IAskResponseCache,
+	SuperBuilder_AI.Api.Caching.MemoryAskResponseCache>();
+
+// P11.5.2 安全/运维轨：请求指标采集器（请求数 / 错误数 / P95 延迟，按路由聚合）
+builder.Services.AddSingleton<SuperBuilder_AI.Middleware.RequestMetricsCollector>();
+
 var app = builder.Build();
 
 // P10.1 Identity 全局目录种子（幂等；失败不阻断平台启动）
@@ -266,4 +281,30 @@ app.MapStaticAssets();
 app.MapControllerRoute(name: "default", pattern: "{controller=Home}/{action=Index}/{id?}").WithStaticAssets();
 // P11.0 健康探测（匿名白名单，供运维/可观测面使用）
 app.MapGet("/health", () => new { status = "healthy", ts = System.DateTime.UtcNow });
+// P11.5.2 请求指标端点（匿名白名单，供运维/可观测面拉取；异常静默降级为空快照）
+app.MapGet("/metrics", (SuperBuilder_AI.Middleware.RequestMetricsCollector metrics,
+		SuperBuilder_AI.Api.Caching.IAskResponseCache cache) =>
+{
+	try
+	{
+		var routes = metrics.Snapshot();
+		var (hits, misses) = cache.Snapshot();
+		var total = hits + misses;
+		return Results.Ok(new
+		{
+			generatedAt = System.DateTime.UtcNow,
+			routes,
+			askCache = new
+			{
+				hits,
+				misses,
+				hitRate = total == 0 ? 0.0 : Math.Round(hits / (double)total, 4)
+			}
+		});
+	}
+	catch
+	{
+		return Results.Ok(new { generatedAt = System.DateTime.UtcNow, routes = Array.Empty<object>() });
+	}
+});
 app.Run();

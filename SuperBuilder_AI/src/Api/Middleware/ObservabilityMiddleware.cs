@@ -20,9 +20,15 @@ public sealed class ObservabilityMiddleware
 
     public ObservabilityMiddleware(RequestDelegate next) => _next = next;
 
-    public async Task InvokeAsync(HttpContext context, ILogger<ObservabilityMiddleware> logger)
-    {
-        var correlationId = GetOrCreateCorrelationId(context);
+	/// <param name="context">HTTP 上下文。</param>
+	/// <param name="logger">日志器。</param>
+	/// <param name="metrics">请求指标采集器（P11.5.2）。可选——未注册时降级为「不采集」，不影响链路。</param>
+	public async Task InvokeAsync(
+		HttpContext context,
+		ILogger<ObservabilityMiddleware> logger,
+		RequestMetricsCollector? metrics = null)
+	{
+		var correlationId = GetOrCreateCorrelationId(context);
         context.Items[CorrelationItemKey] = correlationId;
         TrySetResponseHeader(context, correlationId);
 
@@ -40,11 +46,14 @@ public sealed class ObservabilityMiddleware
         {
             try
             {
-                var elapsedMs = (long)(DateTime.UtcNow - started).TotalMilliseconds;
-                var statusCode = context.Response.StatusCode;
-                TryLog(logger, LogLevel.Information,
-                    "RES {CorrelationId} {StatusCode} {ElapsedMs}ms",
-                    correlationId, statusCode, elapsedMs);
+				var elapsedMs = (long)(DateTime.UtcNow - started).TotalMilliseconds;
+				var statusCode = context.Response.StatusCode;
+				TryLog(logger, LogLevel.Information,
+					"RES {CorrelationId} {StatusCode} {ElapsedMs}ms",
+					correlationId, statusCode, elapsedMs);
+
+				// P11.5.2：请求指标（请求数 / 错误数 / P95 延迟），异常静默
+				metrics?.Record(NormalizeRoute(context), statusCode, elapsedMs);
             }
             catch
             {
@@ -95,5 +104,38 @@ public sealed class ObservabilityMiddleware
         if (context.Request.Headers.TryGetValue("X-Tenant-Id", out var h) && long.TryParse(h.ToString(), out var ht))
             return ht;
         return 0;
+    }
+
+    /// <summary>
+    /// 路由归一化：把 GUID 与纯数字段替换为占位符，避免 <c>/api/x/1024</c>、<c>/api/x/1025</c>
+    /// 各占一条指标导致基数爆炸；查询串一律丢弃。
+    /// </summary>
+    private static string NormalizeRoute(HttpContext context)
+    {
+        var path = context.Request.Path.Value ?? "/";
+        var sb = new System.Text.StringBuilder(path.Length);
+
+        for (var i = 0; i < path.Length; i++)
+        {
+            // GUID 先判（8-4-4-4-12，36 字符），避免被数字段拆碎
+            if (i + 36 <= path.Length && Guid.TryParse(path.AsSpan(i, 36), out _))
+            {
+                sb.Append("{guid}");
+                i += 35;
+                continue;
+            }
+
+            if (char.IsAsciiDigit(path[i]))
+            {
+                while (i < path.Length && char.IsAsciiDigit(path[i])) i++;
+                sb.Append("{n}");
+                i--; // for 循环会再 +1，回到末尾
+                continue;
+            }
+
+            sb.Append(path[i]);
+        }
+
+        return string.Concat(context.Request.Method, " ", sb.ToString());
     }
 }

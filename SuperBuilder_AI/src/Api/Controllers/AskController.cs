@@ -4,6 +4,7 @@ using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
+using SuperBuilder_AI.Api.Caching;
 using SuperBuilder_AI.Api.Errors;
 using SuperBuilder_AI.Interfaces.BI;
 using SuperBuilder_AI.Interfaces.Identity;
@@ -33,11 +34,13 @@ public sealed class AskController : ControllerBase
 {
 	private readonly IBIConversationService _bi;
 	private readonly IIdentityService _identity;
+	private readonly IAskResponseCache? _cache;
 
-	public AskController(IBIConversationService bi, IIdentityService identity)
+	public AskController(IBIConversationService bi, IIdentityService identity, IAskResponseCache? cache = null)
 	{
 		_bi = bi;
 		_identity = identity;
+		_cache = cache;
 	}
 
 	/// <summary>提交一个自然语言问题并执行 BI 查询。</summary>
@@ -61,7 +64,23 @@ public sealed class AskController : ControllerBase
 		if (!await _identity.HasPermissionAsync(tenantId, userId, IdentityPermissions.DashboardView, cancellationToken))
 			return StatusCode(403, new ApiError { Code = ErrorCodes.Forbidden, Message = "禁止：缺少 dashboard:view 权限。" });
 
+		// P11.5.1 语义缓存：命中则直接返回，跳过整条 BI 链路（仅作用于 api/ask；Golden 走独立端点不受影响）。
+		// ?noCache=1 旁路，便于联调/强制刷新。
+		var bypass = BypassCache();
+		if (_cache is not null && !bypass)
+		{
+			var cached = _cache.Get(tenantId, request.Question!, request.DataSourceId);
+			if (cached is not null)
+			{
+				Response.Headers["X-Cache"] = "HIT";
+				return Ok(cached);
+			}
+			Response.Headers["X-Cache"] = "MISS";
+		}
+
 		var response = await _bi.AskAsync(request.Question, tenantId);
+
+		if (_cache is not null && !bypass) _cache.Set(tenantId, request.Question!, request.DataSourceId, response);
 		return Ok(response);
 	}
 
@@ -152,6 +171,27 @@ public sealed class AskController : ControllerBase
 	{
 		var v = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
 		return long.TryParse(v, out var u) ? u : 0;
+	}
+
+	/// <summary>
+	/// 是否旁路缓存：<c>?noCache=1</c> / <c>true</c> / <c>yes</c> 视为要求强制刷新。
+	/// 仅读取查询串，不影响主链路；异常时保守返回 false（不旁路）。
+	/// </summary>
+	private bool BypassCache()
+	{
+		try
+		{
+			if (Request.Query.TryGetValue("noCache", out var v))
+			{
+				var s = v.ToString().Trim().ToLowerInvariant();
+				return s is "1" or "true" or "yes";
+			}
+		}
+		catch
+		{
+			// 读取失败默认不旁路
+		}
+		return false;
 	}
 }
 
