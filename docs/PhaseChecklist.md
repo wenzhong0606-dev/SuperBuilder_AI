@@ -1,11 +1,12 @@
 # SuperBuilder — 至完成开发清单（可执行 CheckList）
 
-> 配套主文档：`docs/DevelopmentPlan.md`（单一事实来源）。本文件为纯执行清单，按 §0 主阶段脊柱编号。
+> 配套主文档：`docs/DevelopmentPlan.md`（单一事实来源）。本文件为纯执行清单，按 §0 主阶段脊柱编号。  
 > 规则：**每个打 ✅ 的阶段都必须通过 `Golden 18/18` 回归闸门**（端点 `GET /evaluation/golden-runtime/run`）。
 
 ---
 
 ## ✅ Stage 0 — 基础与 AI Native BI 运行时（已完成）
+
 - [x] Phase 0 基础架构（EF/Qdrant/Qwen/多数据库）
 - [x] Phase 1 AI BI 查询核心链
 - [x] Phase 2 QueryPlan 可靠性（2.1/2.2/2.2.5/2.4/2.5）
@@ -16,6 +17,7 @@
 ---
 
 ## 🟡 Stage 1 — 架构治理（A-track，并行）
+
 - [x] **A1** 目标结构文档/骨架/冗余清理（删 40 文件、归档 13 计划）
 - [x] **A2** 单项目内 `src/` 四层物理迁移（234 .cs，命名空间保留，build 0 error，Golden 18/18）
 - [ ] **A3** 抽取独立项目 Domain/Application/Infrastructure/Api
@@ -44,6 +46,7 @@
 ## ⬜ Stage 2 — 产品演进（P-track，至完成）
 
 ### P3 — Business Semantic Model（✅ 已完成：批次 1-2 模型落地 + 管线接线 + Golden 18/18）
+
 - [x] `src/Domain/BusinessEntity/BusinessDomain.cs`（新增 AR：业务域）
 - [x] `BusinessEntityDimension.cs`（子实体）+ `BusinessSemanticResolutionResult.cs`（VO）
 - [x] `src/Application/Ports/BI/Entity/IBusinessEntityRepository.cs`（端口）+ `Infrastructure/Persistence/BusinessEntityRepository.cs`（实现）
@@ -59,7 +62,9 @@
 - [x] **验收**：`dotnet build` 0 error 0 warning；**Golden 18/18 PASS**（`expectedOutcomePassed 18/18`、`failedGates:[]`、`decision:PASS`）；无新增 Migration（未新增 EF 实体）
 
 ### P4 — Multi-Tenant Platform Core
+
 **P4.1 平台上下文抽象（✅ 完成 · 零 schema 变更 · 未触及 gated 查询链路）**
+
 - [x] `src/Domain/Organization/TenantContext.cs`（租户运行时上下文 record，含 `System` 全局态）
 - [x] `src/Domain/Organization/PlatformContext.cs`（聚合 Tenant/User/Workspace/Locale/Theme，先落地 Tenant）
 - [x] `src/Application/Ports/Platform/IPlatformContextAccessor.cs`（scoped 访问器接口）
@@ -67,19 +72,19 @@
 - [x] `BIConversationService` 注入可选 `IPlatformContextAccessor`；`ExecuteAsync` 内由 `tenantId` 建立 `PlatformContext` 写入访问器（为 P4.3 全局过滤奠基；下游 `tenantId` 透传不变）
 - [x] `TenantManagementController`（`api/tenant-management`：GET 列表/按Id、POST 创建、PATCH 启用/停用；注入 `SuperBIContext`）— 已验证返回 Tenant1(WMS)/Tenant3(CSV_FIXTURE) → 200
 - [x] `Program.cs` 注册 `IPlatformContextAccessor`（scoped）
-- [x] **验收**：`dotnet build` 0 error 0 warning；服务启动监听 5032 无 DI 错误；未触及 gated 路径 → 不强制重跑 Golden
-**P4.2 Tenant 实体扩展 + Migration（✅ 完成 · 零行为变更 · build 绿 + Golden 18/18）**
+- [x] **验收**：`dotnet build` 0 error 0 warning；服务启动监听 5032 无 DI 错误；未触及 gated 路径 → 不强制重跑 Golden  
+  **P4.2 Tenant 实体扩展 + Migration（✅ 完成 · 零行为变更 · build 绿 + Golden 18/18）**
 - [x] `src/Domain/Organization/TenantSetting.cs`（通用租户 KV 配置，统一承载 Setting/Locale/Theme/Workspace，Key 命名约定按域前缀）
 - [x] `SuperBIContext` 新增 `DbSet<TenantSetting>` + 配置（级联删除、`(TenantId,Key)` 唯一索引、列注释）；Migration `20260829090341_P4_2_TenantSettings` 已生成并应用
 - [x] `TenantManagementController` 扩展 `GET/POST /api/tenant-management/{id}/settings`（运行时验证：写读往返 200）
-- [x] **验收**：`dotnet build` 0 error（10 个预存 nullable 警告均不在本阶段文件）；**Golden 18/18 PASS（decision=PASS, 18/18, failedGates=[]）**
-**P4.3 SuperBIContext 全局租户过滤 + 跨租户单测（✅ 完成 · 零回归 · build 绿 + Golden 18/18）**
+- [x] **验收**：`dotnet build` 0 error（10 个预存 nullable 警告均不在本阶段文件）；**Golden 18/18 PASS（decision=PASS, 18/18, failedGates=[]）**  
+  **P4.3 SuperBIContext 全局租户过滤 + 跨租户单测（✅ 完成 · 零回归 · build 绿 + Golden 18/18）**
 - [x] `SuperBIContext` 新增 `_tenantFilterEnabled`/`_scopedTenantId` 私有字段 + 显式 `ApplyTenantScope(long tenantId)` 方法（默认关闭=no-op）；`OnModelCreating` 为 4 个直接持有 TenantId 的根实体加 `HasQueryFilter(e => !_tenantFilterEnabled || e.TenantId == _scopedTenantId)`
 - [x] **关键设计**：不读取 `IPlatformContextAccessor`（避免 DbContext 构造期/请求期取值错位）；由 `BIConversationService.ExecuteAsync` 在已知 tenantId 后显式调用 `ApplyTenantScope` 开启。**Golden 无租户路径从不调用 → 过滤恒为 no-op**（实测 18/18 未破）
 - [x] `DataSource.TenantId` 为 `long?`：过滤器用 `e.TenantId.HasValue && e.TenantId.Value == _scopedTenantId` 守卫，避免 `long? == long` 产生被提升的 `bool?` 与 `||` 组合触发 EF "Nullable object must have a value" 回归（此前两次失败根因）
 - [x] 新增测试项目 `tests/SuperBuilder_AI.Tests/`（xunit + EF Core SQLite 内存库，离线可还原）`SuperBIContextTenantFilterTests`：覆盖 4 个根实体，验证 (1) 无作用域=全可见 no-op (2) 开启租户=仅本租户可见 (3) 跨租户不可见 (4) System/tenantId<=0=no-op；**4/4 通过**
-- [x] **验收**：`dotnet build` 0 error 0 warning；**Golden 18/18 PASS（decision=PASS, passedCases=18/18, failedGates:None, overallPassRate=1.0, positivePassRate=1.0；3 个 ERROR 为预期负例 Qwen 403 抖动，expectedOutcome 满足）**
-**P4.4 核心 Runtime 入口 PlatformContext 化（✅ 完成 · 零回归 · build 绿 + Golden 18/18 PASS）**
+- [x] **验收**：`dotnet build` 0 error 0 warning；**Golden 18/18 PASS（decision=PASS, passedCases=18/18, failedGates:None, overallPassRate=1.0, positivePassRate=1.0；3 个 ERROR 为预期负例 Qwen 403 抖动，expectedOutcome 满足）**  
+  **P4.4 核心 Runtime 入口 PlatformContext 化（✅ 完成 · 零回归 · build 绿 + Golden 18/18 PASS）**
 - [x] `IQueryUnderstandingService.UnderstandAsync` 带租户重载签名由 `(question, long tenantId)` 迁移为 `(question, PlatformContext platformContext)`
 - [x] `QueryUnderstandingService` 实现同步迁移；`BIConversationService.ExecuteAsync` 在已知 `platformContext`（由 tenantId 收敛）后显式传入 `UnderstandAsync(question, platformContext)`，内部不再透传裸 `tenantId`
 - [x] `QueryIntentNormalizer.NormalizeWithBusinessEntitiesAsync` / `EnrichBusinessEntityHintsAsync` 由 `long tenantId` 迁移为 `PlatformContext`；内部以 `platformContext?.Tenant?.TenantId ?? 0` 提取租户并调用 `IBusinessSemanticMappingService.ResolveAsync`（行为等价：System/TenantId=0 时解析为空、hint 静默跳过）
@@ -88,15 +93,17 @@
 - [x] **P4 总验收（✅ 完成 · Golden 18/18 PASS）**：build 绿（0 error，10 个预存 nullable 警告均不在本阶段文件）+ 跨租户单测 4/4 通过；Golden 18/18 在切换可用模型 `qwen-plus` 后复跑通过（decision=PASS, passedCases=18/18, failedGates=None, overallPassRate=1.0, positivePassRate=1.0, 0 ERROR）。此前两次失败（qwen3.7-plus 配额耗尽 403 / qwen3.5-ocr 模型不适用）均属外部模型问题、非本阶段代码回归。
 
 ### P5 — Multi-Language Runtime（✅ 已完成 · 全绿 · Golden 18/18 ×4 轮）
+
 **P5.1 LocaleContext 领域模型 + 接入 PlatformContext（✅ 完成 · 零 schema 变更 · Golden 18/18 PASS）**
+
 - [x] `src/Domain/Organization/LocaleContext.cs`（语言区域运行时上下文 record：Culture/Language/Region/DisplayName/TimeZoneId/TextDirection/IsDefault；IETF BCP 47 归一化 `zh_CN`→`zh-CN`；无效输入回退 `Default`）
 - [x] **零回归硬约束**：平台默认语言恒为 `zh-CN`（与既有中文业务语义、Golden 基线一致）；未显式指定语言的路径（含 Golden 运行时）恒取 `Default` → 行为与 P5 之前完全一致
 - [x] `PlatformContext.Locale` 由占位 `string? Locale` 升级为 `LocaleContext Locale`；新增 `FromTenant(tenantId, tenantCode, culture)` 工厂
 - [x] `ILocalizationService` / `LocalizationService`（纯确定性：无 DB、无 LLM）：语言区域解析 + 回退链（`zh-TW`→`["zh-TW","zh","zh-CN"]`，终点恒为默认语言）+ 支持语言清单
 - [x] `LocalizationController`（`api/localization`：GET `locales` / `resolve?culture=` / `fallback-chain?culture=`）；`Program.cs` 注册 singleton
 - [x] 单测 `LocalizationServiceTests`：**22 项全通过**（归一化、无效输入回退、回退链不变量、默认语言零回归）
-- [x] **验收**：`dotnet build` 0 error（10 个预存 nullable 警告均不在本阶段文件）；单测 **26/26**（P4.3 4 + P5.1 22）；3 个端点运行时 200；**Golden 18/18 PASS（decision=PASS, passedCases=18/18, failedGates=None, overallPassRate=1.0, positivePassRate=1.0, 0 ERROR）**
-**P5.2 业务语义多语言标签持久化 + Migration（✅ 完成 · Golden 18/18 PASS）**
+- [x] **验收**：`dotnet build` 0 error（10 个预存 nullable 警告均不在本阶段文件）；单测 **26/26**（P4.3 4 + P5.1 22）；3 个端点运行时 200；**Golden 18/18 PASS（decision=PASS, passedCases=18/18, failedGates=None, overallPassRate=1.0, positivePassRate=1.0, 0 ERROR）**  
+  **P5.2 业务语义多语言标签持久化 + Migration（✅ 完成 · Golden 18/18 PASS）**
 - [x] `src/Domain/Localization/SemanticLabel.cs`（同一语义概念的多语言表述：`销售额`/`Sales Amount`/`売上高` → 同一 Concept 的多条标签）+ `SemanticConceptTypes` / `SemanticLabelKinds` 常量
 - [x] **弱多态关联**（ConceptType + ConceptId）而非为每个宿主建表：一套机制同时服务字段级语义与 P3 业务实体。`TenantId` 用非可空 `long`（0=全局共享），规避 P4.3 的 `long?` 提升布尔陷阱
 - [x] 唯一索引含 **`SortOrder`**：同义词/示例问句天然多值，仅按 LabelKind 唯一会使第二条同义词撞键被覆盖（单测暴露后修正）
@@ -105,8 +112,8 @@
 - [x] Migration `20260829154339_P5_2_SemanticLabels` 已生成并应用（仅新增 `SemanticLabels` 表，未触碰任何既有表）
 - [x] 全局租户过滤放行 `TenantId == 0`：否则共享译文在租户作用域内会集体消失
 - [x] 单测 `SemanticLabelServiceTests` **12 项全通过**（回退到语言段/默认语言、无标签返回 null、同义词去重、upsert 归一化与幂等、跨租户不可见、全局标签可见）
-- [x] **验收**：build 0 error（10 个预存 nullable 警告均不在本阶段文件）；单测 **36/36**；端点读写往返 200（`zh_TW`→`zh-TW` 归一化，`ja-JP`/`ko-KR` 正确回退到默认语言）；**Golden 18/18 PASS（decision=PASS, 18/18, failedGates=None, overallPassRate=1.0, positivePassRate=1.0, 0 ERROR）**
-**P5.3 本地化资源 + 语义标签接入检索（✅ 完成 · 门控隔离 · Golden 18/18 PASS）**
+- [x] **验收**：build 0 error（10 个预存 nullable 警告均不在本阶段文件）；单测 **36/36**；端点读写往返 200（`zh_TW`→`zh-TW` 归一化，`ja-JP`/`ko-KR` 正确回退到默认语言）；**Golden 18/18 PASS（decision=PASS, 18/18, failedGates=None, overallPassRate=1.0, positivePassRate=1.0, 0 ERROR）**  
+  **P5.3 本地化资源 + 语义标签接入检索（✅ 完成 · 门控隔离 · Golden 18/18 PASS）**
 - [x] `PlatformStrings`（zh-CN/zh-TW/en-US/ja-JP/ko-KR 五语言文案资源）；`LocalizationService.GetString` 由"返回键名占位"升级为按回退链真实解析，未登记键仍返回键名本身（宁可暴露原始键，不展示空文案）
 - [x] `ISemanticLabelRecallService` / `SemanticLabelRecallService`：按已登记标签做**确定性**文本匹配（无 LLM、无向量库），解决跨语言 Embedding"能召回但排序偏后"的偏序问题
 - [x] **接入检索层（触及 Golden 路径文件）**：`IMetadataSemanticSearchService.SearchAsync` 新增**可选** `locale` 参数（既有调用方签名不变）；`MetadataSemanticSearchService` 仅在非默认语言时对命中标签的候选做排序提升
@@ -114,8 +121,8 @@
 - [x] **只提升已召回候选，绝不注入合成候选**（提升量 `0.15 × 匹配强度`，封顶 1.0），避免凭空产生下游无法解释的结果；标签召回异常一律静默降级、不阻断主检索
 - [x] `GET /api/semantic-labels/recall`（含 `gated` 字段便于验证门控是否生效）
 - [x] 单测 **19 项全通过**：门控不变量（默认/Invariant/null 均空）、大小写不敏感、长标签优先且强度归一化、同概念取最强、短标签过滤、回退到默认语言标签、仅作用于 MetadataSemantic
-- [x] **验收**：build 0 error（10 个预存 nullable 警告均不在本阶段文件）；单测 **55/55**；端点验证（默认语言 `gated:true` 零命中；`ja-JP` 经回退链命中 `入库日期`；`en-US` 命中 `Inbound Date`）；**Golden 18/18 PASS（decision=PASS, 18/18, failedGates=None, overallPassRate=1.0, positivePassRate=1.0, 0 ERROR）**
-**P5.4 AI 意图语言无关化 + 多语言验收（✅ 完成 · 门控隔离 · Golden 18/18 PASS）**
+- [x] **验收**：build 0 error（10 个预存 nullable 警告均不在本阶段文件）；单测 **55/55**；端点验证（默认语言 `gated:true` 零命中；`ja-JP` 经回退链命中 `入库日期`；`en-US` 命中 `Inbound Date`）；**Golden 18/18 PASS（decision=PASS, 18/18, failedGates=None, overallPassRate=1.0, positivePassRate=1.0, 0 ERROR）**  
+  **P5.4 AI 意图语言无关化 + 多语言验收（✅ 完成 · 门控隔离 · Golden 18/18 PASS）**
 - [x] `QueryIntentLocaleDirective`（纯函数、可离线断言）：非默认语言时在 QueryIntent 提示词中追加"一律以**简体中文**输出语义名称"的指令，使 `Intent → Semantic Concept` 与提问语言无关
 - [x] **门控（零回归核心）**：默认语言 / Invariant / null → 返回空字符串 → **提示词与 P5 之前逐字节一致**；Golden 走无 locale 的 `UnderstandAsync(question)` 重载，恒不进入该分支
 - [x] `QueryUnderstandingService.BuildRawIntentAsync` 新增可选 `locale` 参数；`UnderstandAsync(question, PlatformContext)` 透传 `platformContext.Locale`
@@ -124,20 +131,22 @@
 - [x] **P5 总验收 ✅**：P5.1~P5.4 全绿；build 0 error（10 个预存 nullable 警告均不在本阶段文件）；单测 **65/65**；**Golden 18/18 PASS ×4 轮（P5.1/P5.2/P5.3/P5.4）**
 
 ### P6 — Low-code BI Engine（前置：A4 完成）
+
 **P6.1 Dashboard DSL 领域模型 + 持久化（✅ 完成 · 零 schema 破坏 · Golden 18/18 PASS）**
+
 - [x] `src/Domain/Dashboard/DashboardDsl.cs`（`DashboardDsl` 根聚合 + `DashboardWidget`/`DashboardPage` 子实体：纯 POCO、无 EF 依赖；`TenantId` 仅作用域列）
 - [x] `src/Domain/Dashboard/WidgetDsl.cs` / `WidgetQueryDsl.cs`（`WidgetType` 枚举 + 查询/过滤/排序 VO；覆盖 Chart/Table/KPI/Filter/Text/AIInsight/Query/Page 等类型占位）
 - [x] `src/Domain/Dashboard/Dashboard.cs`（`Dashboard` 持久化实体：Id/TenantId/DslJson/Name/Version/IsGlobal；**无外键**——全局共享模板 `TenantId=0` 在 `Tenant` 表无行会触发 FK 约束失败，故仅保留 TenantId 作用域列）
 - [x] `SuperBIContext` 注册 `DbSet<Dashboard>` + `HasQueryFilter(e => !_tenantFilterEnabled || e.TenantId==_scopedTenantId || e.TenantId==0)`（全局共享模板放行）
 - [x] Migration `20260830012408_P6_1_Dashboard` 已生成并应用（仅新增 `Dashboards` 表；首次因 FK 约束失败回滚后去 FK 重做）
 - [x] 单测 `DashboardTenantIsolationTests` **5/5 通过**（无作用域全可见、本租户隔离、全局模板可见、跨租户不可见、System no-op）
-- [x] **验收**：build 0 error；单测 **98/98**（P5 65 + P6.1 5 + P6.2 28）；**Golden 18/18 PASS（decision=PASS, 18/18, failedGates:None, overallPassRate=1.0, positivePassRate=1.0, 0 ERROR）**
-**P6.2 DashboardDSL 序列化与校验（✅ 完成 · 不存裸 HTML 红线 · Golden 18/18 PASS）**
+- [x] **验收**：build 0 error；单测 **98/98**（P5 65 + P6.1 5 + P6.2 28）；**Golden 18/18 PASS（decision=PASS, 18/18, failedGates:None, overallPassRate=1.0, positivePassRate=1.0, 0 ERROR）**  
+  **P6.2 DashboardDSL 序列化与校验（✅ 完成 · 不存裸 HTML 红线 · Golden 18/18 PASS）**
 - [x] `src/Application/Ports/BI/IDashboardDslSerializer.cs`（端口：`SerializeAsync`/`DeserializeAsync`/`Validate`）
 - [x] `src/Application/BiQuery/Dashboard/DashboardDslSerializer.cs`：JSON 序列化 + 结构校验 + **「不存裸 HTML」红线拦截**（检测到 `<script>`/内联事件/on* 属性/iframe 等危险片段即抛 `DashboardDslValidationException`，绝不写入 DB）
 - [x] 单测 `DashboardDslSerializerTests` **28 项全通过**（序列化往返、各 Widget 类型、租户作用域列保留、HTML 红线多情形、空/缺字段降级）
-- [x] **验收**：build 0 error；单测 98/98；**Golden 18/18 PASS（decision=PASS, 18/18, failedGates:None）**
-**P6.3 LowcodeRenderer 渲染引擎（✅ 完成 · 对照 QueryPlanPipeline 接入 · Golden 18/18 PASS）**
+- [x] **验收**：build 0 error；单测 98/98；**Golden 18/18 PASS（decision=PASS, 18/18, failedGates:None）**  
+  **P6.3 LowcodeRenderer 渲染引擎（✅ 完成 · 对照 QueryPlanPipeline 接入 · Golden 18/18 PASS）**
 - [x] `src/Domain/Dashboard/Rendering/DashboardRenderModels.cs`（纯结构化渲染模型 `DashboardRenderModel`/`PageRenderModel`/`WidgetRenderModel`/`WidgetDataRenderModel`/`FilterRenderModel`/`AiInsightRenderSpec`；**绝不承载 HTML**，与 P6.2 红线一致）
 - [x] `src/Application/Ports/BI/IDashboardRenderer.cs` + `IWidgetDataResolver.cs`/`WidgetDataResult`（端口 + 取数结果）
 - [x] `src/Application/BiQuery/Dashboard/DashboardLowcodeRenderer.cs`：DSL→渲染模型；全局筛选器下推（合并进 `EffectiveFilters`）；数据组件委托 `IWidgetDataResolver`；文本组件二次净化（去 HTML 防 XSS）；AI 洞察仅占位
@@ -153,6 +162,7 @@
 - [x] **P6 总验收 ✅**：build 0 error；单测 **117/117**；**Golden 18/18 PASS（×2 轮：首跑 GQ-011 抖动 BLOCK，复跑 18/18 PASS）**；DSL 渲染冒烟（`/api/dashboards` 返回 200 `[]`、`/editor/blueprint` 返回完整结构化蓝图）通过
 
 ### P7 — Multi-Theme / Style Engine
+
 - [x] **P7.1 Theme 领域聚合 + 持久化 + 内置默认主题 ✅**：`ThemeDsl`（结构化设计令牌 Brand/Color/Typography/Layout/Border/Radius/Shadow/ChartPalette/Component/DashboardTemplate，绝不承载 CSS/HTML）+ `Theme` 实体（TenantId/Key/Name/IsBuiltIn/DslVersion/DslJson，租户查询过滤 TenantId=0 放行）+ 内置默认浅色主题 `BuiltInThemes.DefaultDsl()`；`SuperBIContext` 增加 `DbSet<Theme>` 与配置；迁移 `20260830034528_P7_1_Theme` 已生成并应用到 `SuperBuilder_Platform`；单测 `ThemeDslTests` 3 项通过。**build 0 error；单测 120/120；Golden 18/18 PASS**。
 - [x] **P7.2 ThemeContext 接入 PlatformContext + 级联解析服务 ✅**：`ThemeContext` 值对象（Key/Source/Dsl，绝不承载 CSS/HTML）+ `ThemeSource` 枚举；`PlatformContext.Theme` 由 `string?` 升级为 `ThemeContext`（默认 `ThemeContext.Default` 内置浅色）；`IThemeResolver`/`ThemeResolver` 实现级联 仪表盘显式键 → 租户默认(TenantSetting `theme:defaultKey`) → 内置默认，跨租户不泄漏（仅允许当前租户 ∪ 内置 TenantId=0）；`Program.cs` 注册 `IThemeResolver`。单测 `ThemeResolverTests` 6 项（级联优先级 + 跨租户隔离）通过。**build 0 error；单测 126/126；Golden 18/18 PASS（C:/tmp/golden_p72.json）**。
 - [x] **P7.3 渲染引擎接入主题 + 主题切换渲染测试 ✅**：`DashboardLowcodeRenderer` 消费 `context.Theme`（P7.2 级联结果）在 `DashboardRenderModel.Theme` 输出结构化 `ThemeRenderModel`（语义键→hex 的 `ColorMap`）；新增 `ThemeRenderMapper` 纯函数把组件 `StyleDsl`（Palette/Background/ShowBorder/Padding）语义键映射到具体色值/档位，合并主题 `Component` 默认值；`WidgetRenderModel.StyleSpec` 承载逐组件可落地风格。`DashboardController.Render` 按仪表盘所属租户 + `ThemeKey` 经 `IThemeResolver` 级联解析并注入 `PlatformContext.Theme`（解析兜底内置默认，渲染永不失败）。单测 `ThemeRenderTests` 6 项（ColorMap 解析 / 组件语义键映射 / 无 Style 回退主题默认 / 同 DSL 两主题 StyleSpec 不同）通过。**build 0 error；单测 131/131；Golden 18/18 PASS（C:/tmp/golden_p73.json，decision=PASS, 18/18, failedGates:None, 0 ERROR）**。
@@ -160,12 +170,14 @@
 - [x] **P7 总验收 ✅**：build 绿 + **Golden 18/18 PASS** + 主题切换渲染测试（147/147 单测 + Golden 18/18 双绿）
 
 ### P8 — AI App Builder
+
 - [x] **P8.1 App 领域模型（AppPlan/PagePlan/ComponentPlan）✅**：`AppPlan` 实体（TenantId/Code/Name/Description/Status/DslVersion/DslJson/ThemeKey，租户查询过滤 TenantId=0 放行）+ `AppDsl`（根 DSL：Version/Code/Name/Description/ThemeKey/Pages）+ `PagePlan`（Id/Name/Order/Layout/Components）+ `ComponentPlan`（Type/Id/Title/Order/Position/Binding 强类型取数 + Properties 类型专属参数 + Style 语义键）+ 常量类（AppComponentTypes/AppAggregateTypes/AppFilterOperators/AppLayoutKinds/AppStatuses/AppDslVersions）。`AppDslSerializer`（IAppDslSerializer）做序列化/反序列化/校验（HTML 红线 + 版本/唯一性/枚举/绑定校验）。`SuperBIContext` 加 `DbSet<AppPlan>` + 配置 + 迁移 `20260830053330_P8_1_AppPlan`（已应用到 SuperBuilder_Platform）。单测 `AppDslSerializerTests` 10 项（往返/空JSON/畸形/版本/重复页/不支持组件/HTML/空页/不支持聚合/默认实体）。**build 0 error；单测 157/157；Golden 18/18 PASS（C:/tmp/golden_p81.json）**。
 - [x] **P8.2 AppBuilderAgent 编排 ✅**：`IAppBuilderAgent` 端口（src/Application/Ports/AppBuilder）+ `AppBuilderAgent` 实现（src/Application/AppBuilder）。两条路径：**默认路径** `BuildFromDslAsync`（结构化 AppDsl → AppPlan，纯确定性、不调用 LLM、零回归）+ **非默认路径** `GenerateFromDescriptionAsync`（自然语言描述 → 调 `IQwenService` 生成 DSL JSON → `IAppDslSerializer` 先校验后信任 → AppPlan，仅显式传入描述时启用 LLM）。`AppBuildResult` 统一承载（Success/Plan/DslJson/Errors/UsedAi）；Code 解析优先级 explicit → dsl.Code → 名称 slug 兜底。Program.cs 注册 `IAppBuilderAgent → AppBuilderAgent`。单测 `AppBuilderAgentTests` 9 项（默认成功/空页失败/HTML红线/Code优先级/slug兜底/LLM有效/空描述/畸形JSON/不支持组件）。**build 0 error；单测 166/166（含 P8.2 新增 9）；Golden 18/18 PASS（expectedOutcomePassed 18/18，failedGates=None）**。
 - [x] **P8.3 AppBuilderController 端点 ✅**：`AppBuilderController`（src/Api/Controllers）租户作用域 CRUD（`POST/GET/PUT/DELETE /api/apps`）+ 生成端点（`POST /api/apps/generate`，非默认路径调 `GenerateFromDescriptionAsync` 启用 LLM）+ 编辑器蓝图（`GET /api/apps/editor/blueprint`，DSL 骨架+枚举清单）。编排委托 `IAppBuilderAgent`（默认路径 `BuildFromDslAsync` 确定性、非默认 `GenerateFromDescriptionAsync` 先校验后信任）。全局模板（TenantId=0）可见不可改/删；Code 同租户+全局唯一；跨租户隔离。单测 `AppBuilderControllerTests` 13 项（含 FakeQwen 覆盖生成路径、跨租户隔离、全局守卫、畸形 LLM 返回 502）。**build 0 error；单测 179/179（含 P8.3 新增 13）；Golden 18/18 PASS（expectedOutcomePassed 18/18，failedGates=None）**。
 - [x] **P8.4 P8 总验收 + 端到端应用生成冒烟 ✅**：真实运行 5032 服务端到端验证整链——`GET /api/apps/editor/blueprint`(200) → `POST /api/apps` 结构化 DSL 默认路径(201) → `GET /api/apps/{code}` 读取回填一致 → 列表包含 → 跨租户(tenant=2)隔离返回 404 → `DELETE` 清理(204)；`POST /api/apps/generate` 自然语言非默认路径因 Qwen 限流返 502（best-effort 非阻断，LLM 路径已由 P8.2/P8.3 FakeQwen 单测覆盖）。**build 0 error；单测 179/179；Golden 18/18 PASS（expectedOutcomePassed 18/18, failedGates=None）**。P8 AI App Builder 全绿闭合。
 
 ### P9 — AI Agent / Copilot
+
 - [x] **P9.1 ToolRegistry + Agent 领域模型 + 序列化器 + 持久化 ✅**：`AgentTools`/`AnalysisDimensions`/`AnalysisDirections` 常量 + `AgentDsl`/`AgentToolSelection`/`AnalysisStep`/`AgentPlan`/`AgentResult` 模型；`ToolRegistry`（工具目录 + 确定性意图解析 + 异常分析链路构建）；`AgentDslSerializer`（序列化/校验/HTML 红线）；`SuperBIContext` 加 `DbSet<AgentPlan>` + 配置 + 查询过滤（TenantId=0 放行）；迁移 `20260830073012_P9_1_AgentPlan`；`IAgentDslSerializer` 注册。单测 `ToolRegistryTests` 11 项 + `AgentDslSerializerTests` 13 项。**build 0 error；单测 203/203；Golden 18/18 PASS**。
 - [x] **P9.2 AgentPlanner 编排 ✅**：`IAgentPlanner` 端口（src/Application/Ports/Agent）+ `AgentPlanner` 实现（src/Application/Agent）。**默认路径** `PlanFromIntentAsync`（意图 → `ToolRegistry.ResolveFromIntent` 确定性工具选择 + 据异常信号附加 `BuildAnomalyChain` 异常分析链路，纯确定性、不调 LLM、零回归）+ **非默认路径** `GenerateFromDescriptionAsync`（自然语言描述 → `IQwenService` 生成 DSL JSON → `IAgentDslSerializer` 先校验后信任，仅显式描述启用 LLM）。`AgentResult` 统一承载（Success/Plan/DslJson/Errors/UsedAi）；Code 解析优先级 explicit → dsl.Code → 意图 slug 兜底。Program.cs 注册 `IAgentPlanner → AgentPlanner`。单测 `AgentPlannerTests` 11 项（含 FakeQwen 覆盖 LLM 路径、确定性同意图同工具）。**build 0 error；单测 214/214（含 P9.2 新增 11）；Golden 18/18 PASS（expectedOutcomePassed 18/18，failedGates:None）**。
 - [x] **P9.3 AgentController 端点 + 异常检测/原因分析链路 ✅**：`AgentController`（`src/Api/Controllers`，`SuperBuilder_AI.Controllers`）。端点：租户作用域 CRUD（`POST /api/agent/plan` 默认确定性路径 / `GET /api/agent/plans` / `GET /api/agent/plans/{code}` / `PUT /api/agent/plans/{code}` / `DELETE`）+ 生成（`POST /api/agent/plan/generate` 非默认 LLM 路径，失败 502）+ 工具目录（`GET /api/agent/tools`）+ 异常原因分析链路（`GET /api/agent/anomaly-chain` 确定性 6 步链，销售额→同比→环比→区域→客户→产品→渠道）+ 编辑器蓝图（`GET /api/agent/plans/blueprint`）。零回归门控：默认路径仅调 `IAgentPlanner.PlanFromIntentAsync`，不碰 LLM；全局模板（TenantId=0）可见不可改/删；Code 同租户+全局唯一。单测 `AgentControllerTests` 17 项（含 FakeQwen 覆盖 LLM 路径/畸形 502/跨租户隔离/工具目录/异常链/蓝图）。**build 0 error；单测 231/231（含 P9.3 新增 17）；Golden 18/18 PASS（expectedOutcomePassed 18/18，failedGates:None）**。
@@ -173,6 +185,7 @@
 - [x] **验收 ✅**：build 0 error + **Golden 18/18 PASS** + 工具选择测试（P9 全部子阶段）
 
 ### P10 — Enterprise / SaaS
+
 - [x] **P10.1 Identity 基础设施 ✅**：User/Role/Permission/UserRole/RolePermission 领域模型 + SuperBIContext DbSet/配置/查询过滤(TenantId=0 全局放行) + 迁移 `20260830093125_P10_1_Identity` + `IIdentityService`/`IdentityService`（幂等种子 + 确定性 RBAC 权限解析 + 角色指派/撤销，不调 LLM）+ `IdentityCatalog` 全局角色权限目录 + Program.cs 注册 + 启动期幂等种子(try/catch 不阻断)。单测 `IdentityServiceTests` 9 项。**build 0 error；单测 240/240；Golden 18/18 PASS**。
 - [x] **P10.2 Identity API 端点 ✅**：`IdentityController`（`api/identity`）租户作用域 用户/角色/权限 CRUD + 角色指派/撤销 + 权限解析 + 全局目录守卫。单测 `IdentityControllerTests` 16 项（镜像 P9.3 范式）。**build 0 error；单测 256/256；Golden 18/18 PASS**
 - [x] **P10.3 AuditLog 审计日志 ✅**：`AuditLog`（`src/Domain/Audit`）+ SuperBIContext DbSet/配置/查询过滤(TenantId=0 全局放行) + 迁移 `20260830104059_P10_3_AuditLog` + `IAuditLogService`/`AuditLogService`（结构化记录 谁/什么/何时/结果 + 租户作用域查询，确定性、不调 LLM）+ `AuditController`（`api/audit` 租户作用域查询 + 手动记录）+ `AuditMiddleware`（自动请求级审计，非阻塞、异常静默）。单测 `AuditLogServiceTests` 8 项 + `AuditControllerTests` 4 项。**build 0 error；单测 268/268；Golden 18/18 PASS**。
@@ -185,6 +198,7 @@
 ### P11 — 前端 + 平台扩展（方案 `docs/P11_Frontend_MAUI_Blazor_Plan.md`）
 
 **P11.0 后端前置（✅ 已完成 · 全为新增文件 + Program.cs 编辑，未碰 Golden 依赖 · build 0 error · 单测 308/308 · Golden 18/18 PASS）**
+
 - [x] `src/Application/Auth/TokenService.cs`：`ITokenService`（`Issue`/`Validate`）+ `TokenPrincipal`；HMAC-SHA256 手动 JWT 风格无状态令牌，**零 NuGet 依赖**
 - [x] `src/Api/Middleware/AuthMiddleware.cs`：Bearer/X-Api-Token 解析 → 校验 → 设 `HttpContext.User` + `Items["TenantId"]`；匿名白名单（`/evaluation`、`/health`、`/api/auth/login`、`/`、静态资源，**保证 Golden 不受影响**）；其余 `/api/*` 无令牌 → 401
 - [x] `src/Api/Middleware/RateLimitMiddleware.cs`：`/api/*` 按 IP/令牌固定窗口限流（120/分），异常静默
@@ -194,30 +208,40 @@
 - [x] 测试（确定性、无 LLM/DB）：`TokenServiceTests`(5) + `AuthMiddlewareTests`(5) + `AskControllerTests`(4)
 - [x] **验收**：build 0 error（仅 12 个预存 nullable 警告）；单测 308/308（原 294 + 14）；**Golden 18/18 PASS（decision=PASS, expectedOutcomePassed 18, expectedOutcomeFailed 0, failedGates=None）**
 
-**P11.1~P11.5 前端（MAUI Blazor Hybrid + Blazor Web 共享 RCL，待启动）**
-- [ ] P11.1 脚手架：RCL `SuperBuilder_AI.Components` + Blazor Web Head + MAUI Head 空壳 + Theme/Localization 骨架
-- [ ] P11.2 旗舰页：登录/租户 + Ask BI（依赖 P11.0 `api/ask`）
-- [ ] P11.3 其余页面 + 组件库页 + 主题编辑器 + ask/refine（多轮）
-- [ ] P11.4 MAUI 双端验证（Android/iOS/Windows）
+**P11.1~P11.5 前端（MAUI Blazor Hybrid + Blazor Web 共享 RCL）**
+
+- [x] **P11.1 脚手架 ✅**（三个新项目 build 0 error；现有 API src 零改动；Golden 18/18 不受影响）：
+  - [x] RCL `SuperBuilder_AI.Components`（net10.0 Razor Class Library，零 NuGet 依赖除 Components.Web/Http）：`Routes`/`MainLayout`/`NavMenu` + 全页面占位（`Login`/`Ask` 为真实调用 `api/ask`·`api/auth`，其余占位）+ `ApiClient`(`IApiClient`)+`AppState`+`ThemeService`+`LocalizationService` 运行时骨架 + `wwwroot/css/app.css` + `wwwroot/js/chart.js`
+  - [x] Web Head `SuperBuilder_AI.Web`（**Blazor Server 经典模型**：`_Host.cshtml` HTML 壳 + `MapBlazorHub` + `MapFallbackToPage`；Router 经 `AdditionalAssemblies` 扫描 RCL 页面；`dotnet run` 验证首页/CSS/JS 均 HTTP 200）
+  - [x] MAUI Head `SuperBuilder_AI.Maui`（MAUI Blazor Hybrid，Windows 目标 `net10.0-windows10.0.19041.0` 编译 **0 error**；`MainPage.BlazorWebView` 以 RCL `Routes` 为 RootComponent、`wwwroot/index.html` 为 HostPage；`WindowsPackageType=None` 免打包）
+  - [x] 图表库选型：**Chart.js**（轻量、纯 JS、Web 与 MAUI WebView 双端通用；RCL `ChartView.razor` 经 JS 互操作封装，P11.2 细化）
+  - [x] 解决方案 `SuperBulider_AI.slnx` 已纳入三个新项目（注：文件名拼写沿用历史，未改名以免破坏现有引用）
+- [ ] P11.2 旗舰页：登录/租户 + Ask BI 端到端（依赖 P11.0 `api/ask`）+ 视图层多轮调整（纯前端 DSL 变更）
+- [ ] P11.3 其余页面 + 组件库页 + 主题编辑器 + ask/refine（多轮语义调整）
+- [ ] P11.4 MAUI 双端验证（Android/iOS/Windows 原生运行/编译校验）
 - [ ] P11.5 优化轨道（体验/前端·性能/成本·安全/运维）
 
 **§12 用户自定义能力（接入 P11.3，已规划）**
+
 - [ ] ① 用户自定义组件库（需新建 Component 领域模型 + 持久化 + `api/components`，受 P8 `AppComponentTypes` 白名单约束）
 - [ ] ② 用户自定义风格/样式（P7 主题引擎已支撑 `AppDsl.ThemeKey` 引用）
 - [ ] ③ Ask 多轮调整 + 发布为应用页面（接 P8 应用工厂）
 
 **§13 平台扩展（已规划）**
+
 - [ ] 多类型数据库连接器（复用 `ISqlDialect`/`IDataSourceConnectionFactory`）
 - [ ] 多 AI 模型 BYO（用户自绑定账号；含 P11.0 登录口令/外部 IdP 补齐）
 
 ---
 
 ## 统一护栏（贯穿所有阶段）
+
 - [ ] 每个 P 阶段退出 = `Golden 18/18`
 - [ ] 触及 `src/Application/BI`、`src/Domain/{Metadata,BiQuery}`、`src/Infrastructure/{Vector,Database}`、Resolution 的每次提交都重跑 Golden
 - [ ] 契约文件 `Evaluation/Golden/query-plan-golden-v1.json` 不删不改
 - [ ] 所有大改均为 git 提交，可 `git revert` 回退
-- [ ] A4 上帝类拆分必须在 P6 之前收口
+- [x] A4 上帝类拆分必须在 P6 之前收口
 
 ---
+
 **立即下一步**：P3~P10 ✅ 全绿（用户产品路线 10 阶段全部完成，Golden 18/18 全程保持）。**P11.0 后端前置 ✅ 已完成**（api/ask + 鉴权中间件 + CORS + 限流 + /health；build 0 error；单测 308/308；Golden 18/18 PASS）。**下一步 P11.1 前端脚手架**（RCL + Blazor Web Head + MAUI Head，现有 API 零改动）。A3/A5 用户决定暂缓。

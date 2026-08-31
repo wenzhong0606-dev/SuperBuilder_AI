@@ -1,0 +1,59 @@
+@page "/"
+@page "/login"
+@inject IApiClient Api
+@inject AppState State
+@inject NavigationManager Nav
+
+<h2>@(State.IsAuthenticated ? "已登录" : "登录 / 租户选择")</h2>
+
+@if (State.IsAuthenticated)
+{
+    <div class="card">
+        <p class="ok">当前用户：@State.Username（租户 @State.TenantId，用户 @State.UserId）</p>
+        <button @onclick="Logout">退出登录</button>
+    </div>
+}
+else
+{
+    <div class="card">
+        <label>用户名<input @bind="Username" placeholder="例如 admin" /></label>
+        <label>租户 ID<input @bind="TenantId" type="number" min="1" /></label>
+        <button @onclick="DoLogin" disabled="@Busy">登录</button>
+        @if (!string.IsNullOrEmpty(Error)) { <p class="error">@Error</p> }
+        <p class="muted">P11.0 阶段登录不校验口令，仅校验「用户存在且启用」后签发令牌（BYO 口令校验见 P13）。</p>
+    </div>
+}
+
+@code {
+    private string Username = "";
+    private long TenantId = 1;
+    private bool Busy = false;
+    private string Error = "";
+
+    private async Task DoLogin()
+    {
+        Busy = true; Error = "";
+        var r = await Api.LoginAsync(Username, TenantId);
+        Busy = false;
+        if (r is null || string.IsNullOrEmpty(r.Token))
+        {
+            Error = "登录失败：用户不存在或已禁用。";
+            return;
+        }
+        State.Token = r.Token;
+        State.TenantId = r.TenantId;
+        State.UserId = r.UserId;
+        State.Username = r.Username;
+        State.Permissions = r.Permissions ?? new System.Collections.Generic.List<string>();
+        Nav.NavigateTo("/ask");
+    }
+
+    private void Logout()
+    {
+        State.Token = null;
+        State.TenantId = 0;
+        State.UserId = 0;
+        State.Username = "";
+        State.Permissions = System.Array.Empty<string>();
+    }
+}

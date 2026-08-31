@@ -1,0 +1,20 @@
+@inject IJSRuntime JS
+
+<div class="chart-view">
+    <canvas @ref="_canvas" width="640" height="360"></canvas>
+</div>
+
+@code {
+    private ElementReference _canvas;
+
+    [Parameter] public string? JsonData { get; set; }
+    [Parameter] public string ChartType { get; set; } = "bar";
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !string.IsNullOrEmpty(JsonData))
+        {
+            await JS.InvokeVoidAsync("SuperBuilder.renderChart", _canvas, ChartType, JsonData);
+        }
+    }
+}

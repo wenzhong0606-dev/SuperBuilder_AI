@@ -1,3 +1,6 @@
 <Solution>
   <Project Path="SuperBuilder_AI/SuperBuilder_AI.csproj" />
+  <Project Path="SuperBuilder_AI.Components/SuperBuilder_AI.Components.csproj" />
+  <Project Path="SuperBuilder_AI.Web/SuperBuilder_AI.Web.csproj" />
+  <Project Path="SuperBuilder_AI.Maui/SuperBuilder_AI.Maui.csproj" />
 </Solution>

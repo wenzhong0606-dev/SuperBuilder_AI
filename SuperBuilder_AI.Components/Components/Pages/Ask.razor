@@ -1,0 +1,43 @@
+@page "/ask"
+@inject IApiClient Api
+@inject AppState State
+@inject NavigationManager Nav
+
+<h2>Ask BI 智能问数（旗舰）</h2>
+
+@if (!State.IsAuthenticated)
+{
+    <p class="muted">请先 <a href="" @onclick="@(() => Nav.NavigateTo("/login"))">登录</a> 后再问数。</p>
+}
+else
+{
+    <div class="card">
+        <label>数据源 ID<input @bind="DataSourceId" type="number" min="0" /></label>
+        <label>自然语言问题<textarea @bind="Question" placeholder="例如：上个月各区域销售额对比"></textarea></label>
+        <button @onclick="DoAsk" disabled="@Busy">提问</button>
+        @if (!string.IsNullOrEmpty(Error)) { <p class="error">@Error</p> }
+    </div>
+
+    @if (!string.IsNullOrEmpty(Raw))
+    {
+        <pre class="result">@Raw</pre>
+    }
+}
+
+@code {
+    private string Question = "";
+    private long DataSourceId = 1;
+    private bool Busy = false;
+    private string Raw = "";
+    private string Error = "";
+
+    private async Task DoAsk()
+    {
+        Busy = true; Error = ""; Raw = "";
+        var r = await Api.AskRawAsync(Question, DataSourceId);
+        Busy = false;
+        if (r is null) { Error = "请求失败。"; return; }
+        if (r.StartsWith("ERROR")) { Error = r; return; }
+        Raw = r;
+    }
+}
