@@ -1,3 +1,106 @@
 @page "/admin/identity"
-<h2>管理后台 · 身份权限</h2>
-<p class="muted">接入 <code>identity</code> 端点（users/roles/permissions），计划于 P11.3 实现。</p>
+@inject IApiClient Api
+@inject Services.AppState AppState
+@using System.Text.Json
+@using SuperBuilder_AI.Components.Shared
+
+<PageHead Icon="sb-ico-shield" Title="身份与权限" Desc="管理用户、角色与权限分配，基于租户作用域的 RBAC。" />
+
+@if (_loading)
+{
+    <div class="empty-state"><div class="es-title">加载中…</div></div>
+}
+else if (_error is not null)
+{
+    <div class="alert alert-danger">@_error</div>
+}
+else
+{
+    <div class="panel">
+        <div class="panel-head"><div class="panel-title"><svg class="pt-ico"><use href="#sb-ico-shield" /></svg> 用户</div>
+            <button class="btn btn-outline-secondary btn-sm" @onclick="Reload">刷新</button></div>
+        <div class="panel-body flush">
+            @if (_users.Count == 0)
+            {
+                <div class="empty-state"><div class="es-title">暂无用户</div></div>
+            }
+            else
+            {
+                <div class="table-wrap">
+                    <table class="data-table">
+                        <thead><tr>@foreach (var c in _userCols) { <th>@TablePresenter.Friendly(c)</th> }</tr></thead>
+                        <tbody>
+                        @foreach (var u in _users)
+                        {
+                            <tr>@foreach (var c in _userCols)
+                                {
+                                    @if (TablePresenter.IsStatusColumn(c))
+                                    { <td><span class="badge @TablePresenter.StatusBadge(TablePresenter.Cell(u, c))">@TablePresenter.Cell(u, c)</span></td> }
+                                    else { <td>@TablePresenter.Cell(u, c)</td> }
+                                }</tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+
+    <div class="panel">
+        <div class="panel-head"><div class="panel-title"><svg class="pt-ico"><use href="#sb-ico-key" /></svg> 角色</div></div>
+        <div class="panel-body flush">
+            @if (_roles.Count == 0)
+            {
+                <div class="empty-state"><div class="es-title">暂无角色</div></div>
+            }
+            else
+            {
+                <div class="table-wrap">
+                    <table class="data-table">
+                        <thead><tr>@foreach (var c in _roleCols) { <th>@TablePresenter.Friendly(c)</th> }</tr></thead>
+                        <tbody>
+                        @foreach (var r in _roles)
+                        {
+                            <tr>@foreach (var c in _roleCols)
+                                {
+                                    @if (TablePresenter.IsStatusColumn(c))
+                                    { <td><span class="badge @TablePresenter.StatusBadge(TablePresenter.Cell(r, c))">@TablePresenter.Cell(r, c)</span></td> }
+                                    else { <td>@TablePresenter.Cell(r, c)</td> }
+                                }</tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    private List<JsonElement> _users = new();
+    private List<JsonElement> _roles = new();
+    private List<string> _userCols = new();
+    private List<string> _roleCols = new();
+    private string _error = "";
+    private bool _loading = true;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender) await Reload();
+    }
+
+    private async Task Reload()
+    {
+        _loading = true;
+        var tid = AppState.TenantId;
+        var (u, _, uErr) = await Api.GetJsonAsync($"api/identity/users?tenantId={tid}");
+        _error = uErr ?? "";
+        _users = u is { ValueKind: JsonValueKind.Array } ? u.Value.EnumerateArray().ToList() : new();
+        _userCols = TablePresenter.InferColumns(u);
+        var (r, _, _) = await Api.GetJsonAsync($"api/identity/roles?tenantId={tid}");
+        _roles = r is { ValueKind: JsonValueKind.Array } ? r.Value.EnumerateArray().ToList() : new();
+        _roleCols = TablePresenter.InferColumns(r);
+        _loading = false;
+        StateHasChanged();
+    }
+}

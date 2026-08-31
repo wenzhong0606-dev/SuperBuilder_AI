@@ -225,7 +225,14 @@
   - [x] **本轮增强（2026-08-31）统一错误治理 + 古风样式**：后端新增 `ApiErrors`（ErrorCodes/SuperBuilderException/ApiError）+ `UnifiedExceptionMiddleware`（捕获未处理异常→结构化 `ApiError{code,message,traceId,details}` 友好 JSON + 关联ID 结构化日志，按异常类型/消息映射错误码，**零业务抛点改动、不影响 Golden**）+ `AuthMiddleware` 401 也统一为 `ApiError`；Ask 控制器早期返回统一 `ApiError`。前端 `ApiClient.ParseApiError` 解析 + `Ask.razor` 展示「错误码+追踪ID」古风告警。
   - [x] **本轮增强 Bootstrap + 中国古风色系**：本地化 Bootstrap 5.3.3（`wwwroot/lib/bootstrap`，CSS 232KB/JS 80KB，离线可用）并在 `_Host.cshtml`/`index.html` 引入；`app.css` 重写为古风配色（宣纸底/墨字/黛蓝主/朱砂强调/藤黄/石青/黛绿），覆盖 Bootstrap `--bs-*` 变量，含 dark 古风变体 + 响应式（窄屏侧栏转顶栏）；Login/Ask/NavMenu 套用 `btn`/`form-control`/`alert` 等 Bootstrap 组件。
   - [x] **UI 现代化重构（2026-08-31，本轮）布局/PC·移动兼容/现代化**：重做应用壳层 `MainLayout`（顶栏=汉堡+品牌+主题切换+用户芯片 + 全高 flex 主体）；`NavMenu` 加 Feather 风格 SVG 图标精灵 + 分组；**≤991px 侧栏变抽屉 + 遮罩**（路由变更自动收起）；`Ask.razor` 提问栏 `sticky` 置顶 + 气泡头像 + KPI 网格/图表卡/表格层次阴影；`Login.razor` hero 分栏（品牌侧+表单侧，移动端堆叠）；明/暗主题切换经 `ThemeService` 持久化 localStorage，`_Host`/`index` 内联脚本防首屏闪烁。**注意 Blazor Server 预渲染阶段无 JS 运行时，主题读取须放 `OnAfterRenderAsync` 否则 `/` 500**。
-- [ ] P11.3 其余页面 + 组件库页 + 主题编辑器 + ask/refine（多轮语义调整）
+- [x] **P11.3 其余页面 + 组件库页 + 主题编辑器 ✅（2026-08-31，页面部分）**：新建共享 `PageHead`（图标+标题+描述+右侧操作区）与 `TablePresenter`（任意 JSON 数组 → 友好表头/单元格/状态徽章；`InferColumns`/`Cell`/`Friendly`/`StatusBadge`/`IsStatusColumn`/`StringifySafe`）；`IApiClient`+`ApiClient` 新增松类型 `GetJsonAsync`（不抛异常，HTTP 非 2xx 与网络/解析错误一律经 err 返回，便于页面优雅降级）。
+  - [x] **数据类页面**（接后端只读 GET，统一加载/错误/空态 + 响应式）：`Dashboards`(api/dashboards) · `Apps`(api/apps，卡片网格) · `BusinessModel`(api/business-model/entities+domains，统计卡 + 业务域列表 + 实体表) · `SemanticLabels`(api/semantic-labels，搜索 + 表格) · `Agent`(api/agent + api/agent/tools-catalog，智能体列表 + 工具目录)
+  - [x] **平台类页面**：`DataSources`（连接器网格 + 测试连接表单）· `ModelAccounts`（模型卡片 + BYO Key 绑定表单）· `Components`（组件库展示页，自包含）· `Themes`（主题编辑器：调色板实时预览 + 明/暗预设切换）
+  - [x] **管理后台**：`Admin/Tenants` · `Admin/Identity`(api/identity) · `Admin/Audit`(api/audit) · `Admin/Quota`(api/quota) · `Admin/Localization`(api/localization) · `Admin/Themes`
+  - [x] 设计系统扩展：`app.css` 新增 `page-head`/`stat-grid`/`stat-tile`/`panel`/`toolbar`/`badge`/`empty-state`/`field-grid`/`seg`/`row-list`/`swatch-grid` 等工具类；`NavMenu` 图标精灵补 `sb-ico-search`，现共 22 个 symbol
+  - [x] 三项目 build 0 error；Web 冒烟 **18 个页面全 200** + 静态资源（app.css/Bootstrap/chart.js）200；引用的 18 个图标全部有定义
+  - [x] **Razor 踩坑记录**：含 C# 字符串字面量的事件处理器必须用单引号作属性定界符（`@onclick='() => Toast("x")'`）；渲染名为 `code` 的变量必须写 `@(code)`，否则 `@code</span>` 被当作 `@code` 指令；void 方法直接绑定需包成 lambda（`@onclick='() => Toast("x")'` 而非 `@onclick='Toast("x")'`）
+- [ ] ask/refine（多轮语义调整）：需新增只读端点，本次未实现（避免触碰 Golden 依赖文件）
 - [ ] P11.4 MAUI 双端验证（Android/iOS/Windows 原生运行/编译校验）
 - [ ] P11.5 优化轨道（体验/前端·性能/成本·安全/运维）
 

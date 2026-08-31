@@ -1,3 +1,4 @@
+using System.Text.Json;
 using SuperBuilder_AI.Components.Models;
 
 namespace SuperBuilder_AI.Components.Services;
@@ -15,4 +16,9 @@ public interface IApiClient
     /// <summary>发布为应用：结构化 App DSL 经默认路径（P8）保存到 api/apps。</summary>
     Task<(bool Ok, string? Code, string? Error)> PublishAppAsync(long tenantId, string dslJson, string? code, CancellationToken ct = default);
     Task<T?> GetAsync<T>(string relativeUrl, CancellationToken ct = default) where T : class;
+    /// <summary>
+    /// 松类型读取：GET 任意端点并以 <see cref="JsonElement"/> 返回（数组或对象皆可）。
+    /// 不抛异常——HTTP 非 2xx 与网络/解析错误一律通过 err 返回，便于页面优雅降级。
+    /// </summary>
+    Task<(JsonElement? Data, int Status, string? Error)> GetJsonAsync(string relativeUrl, CancellationToken ct = default);
 }

@@ -1,0 +1,21 @@
+@* 页面统一页头：图标 + 标题 + 描述 + 右侧操作区 *@
+<div class="page-head">
+    <div class="ph-title">
+        <span class="ph-ico"><svg><use href="@Icon" /></svg></span>
+        <div>
+            <h2>@Title</h2>
+            @if (!string.IsNullOrWhiteSpace(Desc))
+            {
+                <p class="ph-desc">@Desc</p>
+            }
+        </div>
+    </div>
+    <div class="ph-actions">@ChildContent</div>
+</div>
+
+@code {
+    [Parameter] public string Icon { get; set; } = "";
+    [Parameter] public string Title { get; set; } = "";
+    [Parameter] public string? Desc { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

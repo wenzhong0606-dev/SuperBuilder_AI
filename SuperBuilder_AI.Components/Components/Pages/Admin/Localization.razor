@@ -1,3 +1,67 @@
 @page "/admin/localization"
-<h2>管理后台 · 多语言</h2>
-<p class="muted">接入 <code>localization</code> 端点，计划于 P11.3 实现。</p>
+@inject IApiClient Api
+@inject Services.AppState AppState
+@using System.Text.Json
+@using SuperBuilder_AI.Components.Shared
+
+<PageHead Icon="sb-ico-lang" Title="多语言" Desc="管理界面与导出的区域（Culture）、回退链与文案覆盖，支撑多语言租户。" />
+
+@if (_loading)
+{
+    <div class="empty-state"><div class="es-title">加载中…</div></div>
+}
+else if (_error is not null)
+{
+    <div class="alert alert-danger">@_error</div>
+}
+else if (_rows.Count == 0)
+{
+    <div class="panel"><div class="panel-body">
+        <div class="empty-state"><svg class="es-ico"><use href="#sb-ico-lang" /></svg>
+            <div class="es-title">暂无区域配置</div>
+            <div class="es-text">配置支持的语言区域与回退顺序，问数结果与导出文案将按区域呈现。</div>
+        </div>
+    </div></div>
+}
+else
+{
+    <div class="panel"><div class="panel-head"><div class="panel-title"><svg class="pt-ico"><use href="#sb-ico-lang" /></svg> 可用区域</div></div>
+        <div class="panel-body flush">
+            <div class="row-list">
+                @foreach (var r in _rows)
+                {
+                    <div class="row-item">
+                        <div class="ri-ico"><svg><use href="#sb-ico-lang" /></svg></div>
+                        <div class="ri-main">
+                            <div class="ri-title">@TablePresenter.Cell(r, "culture")</div>
+                            <div class="ri-sub">@TablePresenter.Cell(r, "displayName") @TablePresenter.Cell(r, "name")</div>
+                        </div>
+                        @if (TablePresenter.Cell(r, "isDefault") == "True" || TablePresenter.Cell(r, "default") == "True")
+                        { <span class="badge badge-primary">默认</span> }
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<JsonElement> _rows = new();
+    private string _error = "";
+    private bool _loading = true;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender) await Reload();
+    }
+
+    private async Task Reload()
+    {
+        _loading = true;
+        var (data, _, err) = await Api.GetJsonAsync("api/localization/locales");
+        _error = err ?? "";
+        _rows = data is { ValueKind: JsonValueKind.Array } ? data.Value.EnumerateArray().ToList() : new();
+        _loading = false;
+        StateHasChanged();
+    }
+}

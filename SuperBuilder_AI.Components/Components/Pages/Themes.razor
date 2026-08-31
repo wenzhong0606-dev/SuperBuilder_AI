@@ -1,3 +1,98 @@
 @page "/themes"
-<h2>主题编辑器（用户自定义风格）</h2>
-<p class="muted">§12.2 用户自定义风格/样式：令牌面板 + 实时预览 + 保存/指派/复制为蓝图。直接复用 P7.4 的 <code>api/themes</code> 端点（零后端新增），计划于 P11.3 实现编辑器 UI。</p>
+<PageHead Icon="sb-ico-theme" Title="主题编辑器" Desc="基于古风色板自定义你的视觉风格：实时预览、保存并指派给租户或复制为蓝图。" />
+
+<div class="toolbar">
+    <div class="seg">
+        <button class="@(_mode)" @onclick='() => SetMode("light")'>浅色</button>
+        <button class='@(_mode == "active" ? "" : "active")' @onclick='() => SetMode("dark")'>深色</button>
+    </div>
+    <div class="spacer"></div>
+    <button class="btn btn-outline-secondary btn-sm" @onclick="ResetTokens">重置</button>
+    <button class="btn btn-primary btn-sm" @onclick="Save">保存主题</button>
+</div>
+
+<div style="@_previewStyle">
+    <div class="panel">
+        <div class="panel-head"><div class="panel-title"><svg class="pt-ico"><use href="#sb-ico-theme" /></svg> 实时预览</div></div>
+        <div class="panel-body">
+            <div class="stat-grid">
+                <div class="stat-tile"><div class="st-label">示例指标</div><div class="st-value">86.4%</div><div class="st-delta up">↑ 5.2%</div></div>
+                <div class="stat-tile accent-accent"><div class="st-label">示例指标</div><div class="st-value">1,204</div></div>
+                <div class="stat-tile accent-success"><div class="st-label">示例指标</div><div class="st-value">就绪</div></div>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+                <button class="btn btn-primary btn-sm">主要按钮</button>
+                <button class="btn btn-outline-secondary btn-sm">次要</button>
+                <span class="badge badge-success">已发布</span><span class="badge badge-warning">草稿</span>
+            </div>
+            <div class="progress"><span style="width:60%"></span></div>
+        </div>
+    </div>
+</div>
+
+<div class="panel">
+    <div class="panel-head"><div class="panel-title"><svg class="pt-ico"><use href="#sb-ico-theme" /></svg> 调色板</div></div>
+    <div class="panel-body">
+        <div class="swatch-grid">
+            @foreach (var key in _tokens.Keys)
+            {
+                <div class="swatch">
+                    <div class="sw-color" style="background:@_tokens[key]"></div>
+                    <div class="sw-meta">
+                        <div class="sw-name">@TokenLabel(key)</div>
+                        <div class="sw-hex">@_tokens[key]</div>
+                        <input type="color" value="@_tokens[key]" @oninput="e => SetToken(key, e)" style="width:100%;height:30px;border:none;background:none;padding:0;margin-top:6px" />
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private Dictionary<string, string> _tokens = new();
+    private string _mode = "active";
+    private string _msg = "";
+
+    private static readonly Dictionary<string, (string Label, string Light, string Dark)> Presets = new()
+    {
+        ["primary"] = ("黛蓝 主色", "#2F4F6F", "#6E9BC4"),
+        ["accent"] = ("朱砂 强调", "#9E3D34", "#C26258"),
+        ["success"] = ("黛绿 成功", "#4F6F52", "#7BA37E"),
+        ["warning"] = ("藤黄 提醒", "#C9A227", "#D9B94A"),
+        ["info"] = ("石青 信息", "#4A7A8C", "#7BA6B4"),
+        ["bg"] = ("宣纸 底色", "#F5EFE3", "#1B1813"),
+        ["text"] = ("墨色 文字", "#2B2620", "#ECE3D2"),
+        ["border"] = ("纸边 描边", "#D9CDB4", "#3A342B"),
+    };
+
+    protected override void OnInitialized()
+    {
+        ResetTokens();
+    }
+
+    private void ResetTokens()
+    {
+        _tokens = Presets.ToDictionary(k => k.Key, k => k.Value.Light);
+        _mode = "active";
+    }
+
+    private void SetMode(string mode)
+    {
+        _mode = mode == "light" ? "active" : "";
+        foreach (var k in Presets.Keys)
+            _tokens[k] = mode == "light" ? Presets[k].Light : Presets[k].Dark;
+    }
+
+    private void SetToken(string key, ChangeEventArgs e)
+    {
+        if (e.Value is string v) _tokens[key] = v;
+    }
+
+    private string TokenLabel(string key) => Presets.TryGetValue(key, out var p) ? p.Label : key;
+
+    private string _previewStyle => "border-radius:var(--sb-radius-lg);" +
+        string.Join(";", _tokens.Select(kv => $"--sb-{kv.Key}:{kv.Value}"));
+
+    private void Save() => _msg = "主题已保存（持久化接入 api/themes，P11.3 收口）。";
+}

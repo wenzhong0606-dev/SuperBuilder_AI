@@ -149,6 +149,34 @@ public sealed class ApiClient : IApiClient
         var client = CreateClient();
         return await client.GetFromJsonAsync<T>(relativeUrl, ct);
     }
+
+    /// <summary>
+    /// 读取任意 JSON 端点为 <see cref="JsonElement"/>，失败时返回错误信息且不抛异常。
+    /// 用于在不确定后端 DTO 精确结构时安全渲染列表/详情。
+    /// </summary>
+    public async Task<(JsonElement? Data, int Status, string? Error)> GetJsonAsync(string relativeUrl, CancellationToken ct = default)
+    {
+        var client = CreateClient();
+        try
+        {
+            var resp = await client.GetAsync(relativeUrl, ct);
+            var body = await resp.Content.ReadAsStringAsync(ct);
+            if (!resp.IsSuccessStatusCode)
+            {
+                var (code, msg, _) = ParseApiError(body);
+                return (null, (int)resp.StatusCode, msg ?? $"请求失败（{(int)resp.StatusCode}）。");
+            }
+            if (string.IsNullOrWhiteSpace(body))
+                return (null, 200, null);
+            using var doc = JsonDocument.Parse(body);
+            var el = doc.RootElement.Clone();
+            return (el, 200, null);
+        }
+        catch (Exception ex)
+        {
+            return (null, 0, "网络或解析错误：" + ex.Message);
+        }
+    }
 }
 
 /// <summary>登录 / 当前用户响应（与 api/auth 的 AuthResult 字段对齐）。</summary>

@@ -1,3 +1,98 @@
 @page "/semantic-labels"
-<h2>语义标签</h2>
-<p class="muted">接入 <code>semantic-labels</code> 端点（resolve/synonyms/recall），计划于 P11.3 实现。</p>
+@inject IApiClient Api
+@inject Services.AppState AppState
+@using System.Text.Json
+@using SuperBuilder_AI.Components.Shared
+
+<PageHead Icon="sb-ico-tag" Title="语义标签" Desc="为字段与指标打上业务标签，并维护同义词与召回策略，让问数更懂你的口径。">
+    <button class="btn btn-primary btn-sm" @onclick='() => Toast("新建语义标签")'>
+        <svg class="btn-ico"><use href="#sb-ico-plus" /></svg> 新建标签
+    </button>
+</PageHead>
+
+@if (_loading)
+{
+    <div class="empty-state"><div class="es-title">加载中…</div></div>
+}
+else if (_error is not null)
+{
+    <div class="alert alert-danger">@_error</div>
+}
+else if (_rows.Count == 0)
+{
+    <div class="panel"><div class="panel-body">
+        <div class="empty-state">
+            <svg class="es-ico"><use href="#sb-ico-tag" /></svg>
+            <div class="es-title">暂无语义标签</div>
+            <div class="es-text">语义标签把「GMV」「成交额」这类同义表述归一到统一口径，减少问数歧义。</div>
+            <div class="es-actions"><button class="btn btn-outline-secondary btn-sm" @onclick="Reload">刷新</button></div>
+        </div>
+    </div></div>
+}
+else
+{
+    <div class="toolbar">
+        <div class="search">
+            <svg><use href="#sb-ico-search" /></svg>
+            <input @bind="Q" @bind:event="oninput" placeholder="搜索标签 / 同义词…" />
+        </div>
+        <div class="spacer"></div>
+        <button class="btn btn-outline-secondary btn-sm" @onclick="Reload">刷新</button>
+    </div>
+
+    <div class="panel">
+        <div class="panel-head"><div class="panel-title"><svg class="pt-ico"><use href="#sb-ico-tag" /></svg> 全部标签</div></div>
+        <div class="panel-body flush">
+            <div class="table-wrap">
+                <table class="data-table">
+                    <thead><tr>@foreach (var c in _cols) { <th>@TablePresenter.Friendly(c)</th> }</tr></thead>
+                    <tbody>
+                    @foreach (var row in Filtered)
+                    {
+                        <tr>
+                            @foreach (var c in _cols)
+                            {
+                                @if (TablePresenter.IsStatusColumn(c))
+                                { <td><span class="badge @TablePresenter.StatusBadge(TablePresenter.Cell(row, c))">@TablePresenter.Cell(row, c)</span></td> }
+                                else
+                                { <td>@TablePresenter.Cell(row, c)</td> }
+                            }
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private JsonElement? _data;
+    private List<JsonElement> _rows = new();
+    private List<string> _cols = new();
+    private string _error = "";
+    private bool _loading = true;
+    private string Q = "";
+
+    private List<JsonElement> Filtered => string.IsNullOrWhiteSpace(Q)
+        ? _rows : _rows.Where(r => _cols.Any(c => TablePresenter.Cell(r, c).Contains(Q, StringComparison.OrdinalIgnoreCase))).ToList();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender) await Reload();
+    }
+
+    private async Task Reload()
+    {
+        _loading = true;
+        var (data, _, err) = await Api.GetJsonAsync($"api/semantic-labels?tenantId={AppState.TenantId}");
+        _error = err ?? "";
+        _data = data;
+        _rows = data is { ValueKind: JsonValueKind.Array } ? data.Value.EnumerateArray().ToList() : new();
+        _cols = TablePresenter.InferColumns(_data);
+        _loading = false;
+        StateHasChanged();
+    }
+
+    private void Toast(string m) => _error = m;
+}

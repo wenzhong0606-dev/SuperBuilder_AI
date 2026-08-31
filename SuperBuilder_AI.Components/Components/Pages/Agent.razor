@@ -1,3 +1,105 @@
 @page "/agent"
-<h2>智能体 / Copilot</h2>
-<p class="muted">接入 <code>agent</code> 端点（plan/tools/anomaly-chain），计划于 P11.3 实现。</p>
+@inject IApiClient Api
+@inject Services.AppState AppState
+@using System.Text.Json
+@using SuperBuilder_AI.Components.Shared
+
+<PageHead Icon="sb-ico-agent" Title="智能体 / Copilot" Desc="编排多步分析任务的智能体：规划、调用工具链、异常归因，并与 Ask 协同。">
+    <button class="btn btn-primary btn-sm" @onclick='() => Toast("新建智能体")'>
+        <svg class="btn-ico"><use href="#sb-ico-plus" /></svg> 新建智能体
+    </button>
+</PageHead>
+
+@if (_loading)
+{
+    <div class="empty-state"><div class="es-title">加载中…</div></div>
+}
+else if (_error is not null)
+{
+    <div class="alert alert-danger">@_error</div>
+}
+else
+{
+    <div class="panel">
+        <div class="panel-head"><div class="panel-title"><svg class="pt-ico"><use href="#sb-ico-agent" /></svg> 我的智能体</div></div>
+        <div class="panel-body flush">
+            @if (_agents.Count == 0)
+            {
+                <div class="empty-state">
+                    <svg class="es-ico"><use href="#sb-ico-agent" /></svg>
+                    <div class="es-title">暂无智能体</div>
+                    <div class="es-text">智能体把「取数 → 清洗 → 归因 → 成稿」串成可复用的工作流，适合周期性经营分析。</div>
+                </div>
+            }
+            else
+            {
+                <div class="row-list">
+                    @foreach (var a in _agents)
+                    {
+                        <div class="row-item">
+                            <div class="ri-ico"><svg><use href="#sb-ico-agent" /></svg></div>
+                            <div class="ri-main">
+                                <div class="ri-title">@TablePresenter.Cell(a, "name")</div>
+                                <div class="ri-sub">@TablePresenter.Cell(a, "description")</div>
+                            </div>
+                            <div class="ri-actions">
+                                <span class="badge @TablePresenter.StatusBadge(TablePresenter.Cell(a, "status"))">@(TablePresenter.Cell(a, "status") is { Length: >0 } s ? s : "草稿")</span>
+                                <button class="btn btn-outline-secondary btn-sm" @onclick='() => Toast("运行 " + TablePresenter.Cell(a, "name"))'>运行</button>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+
+    <div class="panel">
+        <div class="panel-head"><div class="panel-title"><svg class="pt-ico"><use href="#sb-ico-comp" /></svg> 可用工具</div></div>
+        <div class="panel-body">
+            @if (_tools.Count == 0)
+            {
+                <div class="empty-state"><div class="es-title">暂无工具</div></div>
+            }
+            else
+            {
+                <div class="card-grid">
+                    @foreach (var t in _tools)
+                    {
+                        <div class="feature-card">
+                            <div class="fc-ico"><svg><use href="#sb-ico-comp" /></svg></div>
+                            <div class="fc-title">@TablePresenter.Cell(t, "name")</div>
+                            <div class="fc-desc">@TablePresenter.Cell(t, "description")</div>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    private List<JsonElement> _agents = new();
+    private List<JsonElement> _tools = new();
+    private string _error = "";
+    private bool _loading = true;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender) await Reload();
+    }
+
+    private async Task Reload()
+    {
+        _loading = true;
+        var tid = AppState.TenantId;
+        var (ag, _, aErr) = await Api.GetJsonAsync($"api/agent?tenantId={tid}");
+        _error = aErr ?? "";
+        _agents = ag is { ValueKind: JsonValueKind.Array } ? ag.Value.EnumerateArray().ToList() : new();
+        var (tools, _, _) = await Api.GetJsonAsync("api/agent/tools-catalog");
+        _tools = tools is { ValueKind: JsonValueKind.Array } ? tools.Value.EnumerateArray().ToList() : new();
+        _loading = false;
+        StateHasChanged();
+    }
+
+    private void Toast(string m) => _error = m;
+}

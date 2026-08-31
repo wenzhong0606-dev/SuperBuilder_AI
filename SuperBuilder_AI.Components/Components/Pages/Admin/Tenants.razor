@@ -1,3 +1,23 @@
 @page "/admin/tenants"
-<h2>管理后台 · 租户</h2>
-<p class="muted">接入 <code>tenant-management</code> 端点（settings），计划于 P11.3 实现。</p>
+<PageHead Icon="sb-ico-tenant" Title="租户管理" Desc="管理多租户：创建租户、配置隔离作用域与默认配额，平台运营入口。" />
+
+<div class="stat-grid">
+    <div class="stat-tile"><div class="st-label">租户总数</div><div class="st-value">—</div></div>
+    <div class="stat-tile accent-success"><div class="st-label">活跃</div><div class="st-value">—</div></div>
+    <div class="stat-tile accent-warning"><div class="st-label">待激活</div><div class="st-value">—</div></div>
+</div>
+
+<div class="panel"><div class="panel-body">
+    <div class="empty-state">
+        <svg class="es-ico"><use href="#sb-ico-tenant" /></svg>
+        <div class="es-title">租户管理后端待接入</div>
+        <div class="es-text">租户 CRUD 与隔离作用域由平台层提供，前端结构已就绪，待对应管理端点上线后自动填充。</div>
+        <div class="es-actions">
+            <button class="btn btn-primary btn-sm" @onclick='() => Toast("新建租户")'><svg class="btn-ico"><use href="#sb-ico-plus" /></svg> 新建租户</button>
+        </div>
+    </div>
+</div></div>
+
+@code {
+    private void Toast(string m) { }
+}

@@ -1,3 +1,76 @@
 @page "/admin/quota"
-<h2>管理后台 · 配额</h2>
-<p class="muted">接入 <code>quota</code> 端点（check/consume），计划于 P11.3 实现。</p>
+@inject IApiClient Api
+@inject Services.AppState AppState
+@using System.Text.Json
+@using SuperBuilder_AI.Components.Shared
+
+<PageHead Icon="sb-ico-quota" Title="配额管理" Desc="查看与配置租户资源配额：问数次数、Token、存储与并发等，超阈预警。" />
+
+@if (_loading)
+{
+    <div class="empty-state"><div class="es-title">加载中…</div></div>
+}
+else if (_error is not null)
+{
+    <div class="alert alert-danger">@_error</div>
+}
+else if (_obj is null)
+{
+    <div class="panel"><div class="panel-body">
+        <div class="empty-state"><svg class="es-ico"><use href="#sb-ico-quota" /></svg>
+            <div class="es-title">暂无配额数据</div></div>
+    </div></div>
+}
+else
+{
+    <div class="panel"><div class="panel-head"><div class="panel-title"><svg class="pt-ico"><use href="#sb-ico-quota" /></svg> 当前租户配额</div></div>
+        <div class="panel-body">
+            <dl class="kv">
+                @foreach (var p in _obj.Value.EnumerateObject())
+                {
+                    var used = p.Value.ValueKind == JsonValueKind.Number ? p.Value.GetDouble() : 0;
+                    <dt>@TablePresenter.Friendly(p.Name)</dt>
+                    <dd>
+                        @if (p.Value.ValueKind == JsonValueKind.Number)
+                        {
+                            <div style="display:flex;align-items:center;gap:10px">
+                                <div class="progress" style="flex:1;max-width:220px"><span style="width:@Width(p.Name, used)"></span></div>
+                                <span class="tiny muted">@p.Value.GetRawText()</span>
+                            </div>
+                        }
+                        else { @TablePresenter.StringifySafe(p.Value) }
+                    </dd>
+                }
+            </dl>
+        </div>
+    </div>
+}
+
+@code {
+    private JsonElement? _obj;
+    private string _error = "";
+    private bool _loading = true;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender) await Reload();
+    }
+
+    private async Task Reload()
+    {
+        _loading = true;
+        var (data, _, err) = await Api.GetJsonAsync($"api/quota?tenantId={AppState.TenantId}");
+        _error = err ?? "";
+        _obj = data is { ValueKind: JsonValueKind.Object } ? data : null;
+        _loading = false;
+        StateHasChanged();
+    }
+
+    private static string Width(string name, double v)
+    {
+        // 仅作可视化示意：取对数映射，避免数值悬殊导致条满
+        if (v <= 0) return "0%";
+        var pct = Math.Min(100, 20 + Math.Log10(v + 1) * 30);
+        return pct.ToString("0") + "%";
+    }
+}

@@ -1,3 +1,76 @@
 @page "/components"
-<h2>组件库（用户自定义）</h2>
-<p class="muted">§12.1 用户自定义组件库：组件 DSL 编辑 + 可视化预览 + 复用。后端 <code>api/components</code> 设计态 CRUD 计划于 P11.3 新增（新文件，不碰 Golden）。</p>
+<PageHead Icon="sb-ico-comp" Title="组件库" Desc="SuperBuilder 设计系统一览：基于中国古风色板与 Bootstrap 的通用组件，全站统一复用。" />
+
+<div class="showcase">
+    <div class="demo">
+        <div class="d-label">按钮</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+            <button class="btn btn-primary btn-sm">主要</button>
+            <button class="btn btn-outline-secondary btn-sm">次要</button>
+            <button class="btn btn-ghost btn-sm">幽灵</button>
+            <button class="btn btn-danger btn-sm">危险</button>
+            <button class="btn btn-primary" disabled>禁用</button>
+        </div>
+    </div>
+    <div class="demo">
+        <div class="d-label">徽标</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <span class="badge badge-primary">主要</span>
+            <span class="badge badge-success">已发布</span>
+            <span class="badge badge-warning">草稿</span>
+            <span class="badge badge-danger">失败</span>
+            <span class="badge badge-info">全局</span>
+            <span class="badge badge-muted">默认</span>
+        </div>
+    </div>
+    <div class="demo">
+        <div class="d-label">表单控件</div>
+        <label>文本框<input value="示例文本" /></label>
+        <label>下拉<select><option>选项 A</option><option>选项 B</option></select></label>
+    </div>
+    <div class="demo">
+        <div class="d-label">进度条</div>
+        <div class="progress"><span style="width:68%"></span></div>
+        <div style="margin-top:8px" class="muted tiny">已用 68%</div>
+    </div>
+    <div class="demo">
+        <div class="d-label">分段控件</div>
+        <div class="seg">
+            <button class="active">日</button><button>周</button><button>月</button>
+        </div>
+    </div>
+    <div class="demo">
+        <div class="d-label">告警</div>
+        <div class="alert alert-info tiny" style="padding:8px 12px">信息提示</div>
+        <div class="alert alert-warning tiny" style="padding:8px 12px">注意提示</div>
+    </div>
+</div>
+
+<div class="stat-grid">
+    <div class="stat-tile"><div class="st-label">今日问数</div><div class="st-value">1,284</div><div class="st-delta up">↑ 12.4%</div></div>
+    <div class="stat-tile accent-success"><div class="st-label">命中率</div><div class="st-value">93.6%</div><div class="st-delta up">↑ 2.1%</div></div>
+    <div class="stat-tile accent-warning"><div class="st-label">待复核</div><div class="st-value">17</div><div class="st-delta down">↓ 3</div></div>
+    <div class="stat-tile accent-info"><div class="st-label">活跃租户</div><div class="st-value">42</div></div>
+</div>
+
+<div class="panel">
+    <div class="panel-head"><div class="panel-title"><svg class="pt-ico"><use href="#sb-ico-db" /></svg> 示例表格</div></div>
+    <div class="panel-body flush">
+        <div class="table-wrap">
+            <table class="data-table">
+                <thead><tr><th>编码</th><th>名称</th><th>状态</th><th>租户</th></tr></thead>
+                <tbody>
+                    <tr><td>demo-sales</td><td>销售看板</td><td><span class="badge badge-success">已发布</span></td><td>租户</td></tr>
+                    <tr><td>demo-stock</td><td>库存预警</td><td><span class="badge badge-warning">草稿</span></td><td>全局</td></tr>
+                    <tr><td>demo-fin</td><td>财务月报</td><td><span class="badge badge-info">全局</span></td><td>全局</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="card-grid">
+    <div class="feature-card"><div class="fc-ico"><svg><use href="#sb-ico-ask" /></svg></div><div class="fc-title">Ask BI</div><div class="fc-desc">自然语言问数的旗舰入口。</div></div>
+    <div class="feature-card"><div class="fc-ico"><svg><use href="#sb-ico-dash" /></svg></div><div class="fc-title">仪表盘</div><div class="fc-desc">固化可复用的可视化看板。</div></div>
+    <div class="feature-card"><div class="fc-ico"><svg><use href="#sb-ico-app" /></svg></div><div class="fc-title">应用工厂</div><div class="fc-desc">把会话沉淀为 BI 应用。</div></div>
+</div>

@@ -1,3 +1,109 @@
 @page "/apps"
-<h2>应用工厂</h2>
-<p class="muted">接入 <code>apps</code> 端点（generate/editor/blueprint），计划于 P11.3 实现；支持由 Ask 会话发布为应用（§12.4）。</p>
+@inject IApiClient Api
+@inject Services.AppState AppState
+@using System.Text.Json
+@using SuperBuilder_AI.Components.Shared
+
+<PageHead Icon="sb-ico-app" Title="应用工厂" Desc="将问数会话沉淀为可复用的 BI 应用：可视化编辑器、DSL 蓝图与一键发布。">
+    <button class="btn btn-primary btn-sm" @onclick='() => Toast("打开应用编辑器（蓝图已就绪）")'>
+        <svg class="btn-ico"><use href="#sb-ico-plus" /></svg> 新建应用
+    </button>
+    <button class="btn btn-outline-secondary btn-sm" @onclick='() => Toast("从 Ask 会话发布为应用")'>
+        <svg class="btn-ico"><use href="#sb-ico-play" /></svg> 从 Ask 发布
+    </button>
+</PageHead>
+
+@if (!string.IsNullOrEmpty(_msg))
+{
+    <div class="alert alert-info">@_msg</div>
+}
+
+@if (_loading)
+{
+    <div class="empty-state"><div class="es-title">加载中…</div></div>
+}
+else if (_error is not null)
+{
+    <div class="alert alert-danger">@_error</div>
+}
+else if (_rows.Count == 0)
+{
+    <div class="panel"><div class="panel-body">
+        <div class="empty-state">
+            <svg class="es-ico"><use href="#sb-ico-app" /></svg>
+            <div class="es-title">还没有应用</div>
+            <div class="es-text">应用是问数能力的封装：把一次典型分析固化为卡片、图表与筛选器，分享给团队即可复用。</div>
+            <div class="es-actions">
+                <button class="btn btn-primary btn-sm" @onclick='() => Toast("从 Ask 会话发布为应用")'>从 Ask 发布</button>
+                <button class="btn btn-outline-secondary btn-sm" @onclick="Reload">刷新</button>
+            </div>
+        </div>
+    </div></div>
+}
+else
+{
+    <div class="toolbar">
+        <div class="search">
+            <svg><use href="#sb-ico-search" /></svg>
+            <input @bind="Q" @bind:event="oninput" placeholder="搜索应用编码 / 名称…" />
+        </div>
+        <div class="spacer"></div>
+        <div class="seg">
+            <button class="@(_scope)">全部</button>
+        </div>
+        <button class="btn btn-outline-secondary btn-sm" @onclick="Reload">刷新</button>
+    </div>
+
+    <div class="card-grid">
+        @foreach (var row in Filtered)
+        {
+            var code = TablePresenter.Cell(row, "code");
+            var name = TablePresenter.Cell(row, "name");
+            var desc = TablePresenter.Cell(row, "description");
+            var global = TablePresenter.Cell(row, "tenantId") == "0";
+            <div class="feature-card" @onclick='() => Toast($"打开应用 {name}")'>
+                <div class="fc-ico"><svg><use href="#sb-ico-app" /></svg></div>
+                <div class="fc-title">@(string.IsNullOrEmpty(name) ? code : name)</div>
+                <div class="fc-desc">@(string.IsNullOrEmpty(desc) ? "（暂无描述）" : desc)</div>
+                <div>
+                    <span class="badge @(global ? "badge-info" : "badge-success")">@(global ? "全局模板" : "租户")</span>
+                    @if (!string.IsNullOrEmpty(code)) { <span class="badge badge-muted">@(code)</span> }
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private JsonElement? _data;
+    private List<JsonElement> _rows = new();
+    private List<string> _cols = new();
+    private string _error = "";
+    private bool _loading = true;
+    private string Q = "";
+    private string _scope = "active";
+    private string _msg = "";
+
+    private List<JsonElement> Filtered => string.IsNullOrWhiteSpace(Q)
+        ? _rows : _rows.Where(r => new[] { "code", "name", "description" }
+            .Any(c => TablePresenter.Cell(r, c).Contains(Q, StringComparison.OrdinalIgnoreCase))).ToList();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender) await Reload();
+    }
+
+    private async Task Reload()
+    {
+        _loading = true;
+        var (data, _, err) = await Api.GetJsonAsync($"api/apps?tenantId={AppState.TenantId}");
+        _error = err ?? "";
+        _data = data;
+        _rows = data is { ValueKind: JsonValueKind.Array } ? data.Value.EnumerateArray().ToList() : new();
+        _cols = TablePresenter.InferColumns(_data);
+        _loading = false;
+        StateHasChanged();
+    }
+
+    private void Toast(string m) => _msg = m;
+}

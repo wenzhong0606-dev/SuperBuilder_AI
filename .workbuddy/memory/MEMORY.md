@@ -12,7 +12,7 @@
 - **Stage 0 基础/运行时**：✅ 全完成；Golden 18/18 PASS
 - **Stage 1 架构治理**：🟡 A1/A2/A4 ✅；A3/A5 ⬜（用户指令暂缓「先不做」）
 - **Stage 2 产品演进 P3~P10**：✅ 全绿（每阶段退出门槛 = Golden 18/18，硬约束）
-- **P11 前端（MAUI Blazor Hybrid + Web 共享 RCL）**：✅ P11.0/P11.1/P11.2 完成；本轮新增「UI 现代化重构」(见下)；P11.3~P11.5 待启动
+- **P11 前端（MAUI Blazor Hybrid + Web 共享 RCL）**：✅ P11.0/P11.1/P11.2 + UI 现代化重构；✅ P11.3 页面部分（15 页 + 组件库页 + 主题编辑器）；⬜ P11.3 遗留 `ask/refine`、P11.4 MAUI 双端验证、P11.5 优化轨道
 
 ## 可复用零回归手法（核心）
 - **门控隔离**：多语言/AI 路径一律「非默认才启用」短路，默认路径逐字节不变 → 触碰 Golden 依赖文件也安全
@@ -32,6 +32,18 @@
 - 主题：明/暗切换 `ThemeService`→`SuperBuilder.setTheme`，持久化 localStorage；`_Host.cshtml`+MAUI `index.html` 内联脚本防首屏闪烁(no-FOUC)
 - **⚠️ 预渲染陷阱**：Blazor Server `ServerPrerendered` 阶段无 JS 运行时，`MainLayout.OnInitializedAsync` 内调用 `IJSRuntime.InvokeAsync` 会抛 500；主题读取/应用必须移到 `OnAfterRenderAsync(firstRender)`（初始 data-theme 由内联脚本设，无闪烁）
 - 设计文档 `docs/P11_Frontend_MAUI_Blazor_Plan.md`
+
+### P11.3 其余页面（2026-08-31）
+- 共享基建：`Components/Shared/PageHead.razor`（页头：图标+标题+描述+右侧操作区）、`Shared/TablePresenter.cs`（任意 JSON 数组 → 友好表头/单元格/状态徽章）
+- `IApiClient`/`ApiClient` 新增松类型 `GetJsonAsync` → `(JsonElement? Data, int Status, string? Error)`，不抛异常，页面优雅降级
+- 15 个页面：数据类 Dashboards/Apps/BusinessModel/SemanticLabels/Agent；平台类 DataSources/ModelAccounts/Components(组件库)/Themes(主题编辑器)；管理后台 Admin/{Tenants,Identity,Audit,Quota,Localization,Themes}
+- 设计系统工具类：`page-head`/`stat-grid`/`stat-tile`/`panel`/`toolbar`/`badge`/`empty-state`/`field-grid`/`seg`/`row-list`/`swatch-grid`；`NavMenu` 图标精灵共 22 symbol
+
+### ⚠️ Blazor/Razor 踩坑（务必遵守，已付学费）
+1. **事件处理器含 C# 字符串 → 属性用单引号定界**：`@onclick='() => Toast("文本")'` ✅；`@onclick="() => Toast('文本')"` ❌（单引号变 char 字面量 → CS1012）；`$"..."` 内嵌双引号会提前闭合属性 → CS1056/CS1026。
+2. **渲染名为 `code` 的变量必须写 `@(code)`**：`@code</span>` 被当作 `@code` 指令 → RZ2005/RZ1017。
+3. **void 方法不能直接绑 `@onclick='Toast("x")'`**（CS1503 void→EventCallback）→ 包 lambda `'() => Toast("x")'`。
+4. **DI：页面只能注入 `IApiClient`**（注册为 `AddScoped<IApiClient, ApiClient>()`）；注入具体类 `Services.ApiClient` 会 500「无注册服务」。**新增方法必须同步加到 `IApiClient` 接口**，否则改用接口注入后编译不过。
 
 ## 架构治理 Phase 4
 - 234 .cs 已迁至 `src/` 四层(Domain 79/Application 109/Infrastructure 29/Api 17)；旧顶层目录清空

@@ -1,3 +1,54 @@
 @page "/data-sources"
-<h2>数据源管理</h2>
-<p class="muted">§13.1 多类型数据库接入（Multi-DB Connector）前端入口：选择连接器类型、填写连接串/凭据、测试连接、触发扫描。后端 <code>IDataSourceConnector</code> 抽象扩展计划于 P12 实现。</p>
+<PageHead Icon="sb-ico-db" Title="数据源管理" Desc="接入多种数据库：选择连接器、填写连接信息、测试连通性并触发元数据扫描。" />
+
+<div class="card-grid">
+    @foreach (var c in _connectors)
+    {
+        <div class="feature-card" @onclick="() => Select(c.Name)">
+            <div class="fc-ico"><svg><use href="#sb-ico-db" /></svg></div>
+            <div class="fc-title">@c.Name</div>
+            <div class="fc-desc">@c.Desc</div>
+            <span class="badge @(c.Ready ? "badge-success" : "badge-muted")">@(c.Ready ? "可用" : "规划中")</span>
+        </div>
+    }
+</div>
+
+<div class="panel">
+    <div class="panel-head"><div class="panel-title"><svg class="pt-ico"><use href="#sb-ico-plus" /></svg> 新建数据源</div></div>
+    <div class="panel-body">
+        <div class="field-grid">
+            <label>数据源名称<input @bind="Name" placeholder="如：WMS 生产库" /></label>
+            <label>连接器类型
+                <select @bind="Type">
+                    @foreach (var c in _connectors) { <option value="@c.Name">@c.Name</option> }
+                </select>
+            </label>
+            <label class="full">连接串<input @bind="ConnStr" placeholder="Server=host;Database=db;User=...;" /></label>
+            <label>用户名<input @bind="User" /></label>
+            <label>密码<input type="password" @bind="Pass" placeholder="••••••" /></label>
+        </div>
+        <div class="toolbar" style="margin-top:16px;margin-bottom:0">
+            <button class="btn btn-outline-secondary btn-sm" @onclick="TestConn">测试连接</button>
+            <button class="btn btn-primary btn-sm" @onclick="Save">保存并扫描</button>
+            <span class="muted tiny">@_msg</span>
+        </div>
+    </div>
+</div>
+
+@code {
+    private record Connector(string Name, string Desc, bool Ready);
+    private List<Connector> _connectors = new()
+    {
+        new("SQL Server", "企业主流关系型数据库", true),
+        new("MySQL", "WMS 等业务常用", true),
+        new("PostgreSQL", "开源关系型数据库", true),
+        new("Oracle", "大型事务系统", false),
+        new("ClickHouse", "列式分析型数据库", false),
+        new("MongoDB", "文档型 NoSQL", false),
+    };
+    private string Name = "", Type = "MySQL", ConnStr = "", User = "", Pass = "", _msg = "";
+
+    private void Select(string n) { Type = n; _msg = $"已选择连接器：{n}"; }
+    private void TestConn() => _msg = "连通性测试已提交（Multi-DB Connector 后端计划于 P12 实现）。";
+    private void Save() => _msg = "保存并触发扫描（后端 IDataSourceConnector 计划于 P12 实现）。";
+}

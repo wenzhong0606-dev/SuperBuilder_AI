@@ -1,3 +1,122 @@
 @page "/business-model"
-<h2>语义模型</h2>
-<p class="muted">接入 <code>business-model</code> 端点（entities/domains/resolve），计划于 P11.3 实现。</p>
+@inject IApiClient Api
+@inject Services.AppState AppState
+@using System.Text.Json
+@using SuperBuilder_AI.Components.Shared
+
+<PageHead Icon="sb-ico-model" Title="语义模型" Desc="把物理表结构映射为业务语言：实体、业务域与字段同义词，让自然语言问数更精准。">
+    <button class="btn btn-primary btn-sm" @onclick='() => Toast("新建实体")'>
+        <svg class="btn-ico"><use href="#sb-ico-plus" /></svg> 新建实体
+    </button>
+</PageHead>
+
+@if (_loading)
+{
+    <div class="empty-state"><div class="es-title">加载中…</div></div>
+}
+else if (_error is not null)
+{
+    <div class="alert alert-danger">@_error</div>
+}
+else
+{
+    <div class="stat-grid">
+        <div class="stat-tile"><div class="st-label">业务域</div><div class="st-value">@_domains.Count</div></div>
+        <div class="stat-tile accent-info"><div class="st-label">实体</div><div class="st-value">@_entities.Count</div></div>
+        <div class="stat-tile accent-success"><div class="st-label">已解析语义</div><div class="st-value">@_entities.Count(e => IsResolved(e))</div></div>
+    </div>
+
+    <div class="panel">
+        <div class="panel-head"><div class="panel-title"><svg class="pt-ico"><use href="#sb-ico-model" /></svg> 业务域</div></div>
+        <div class="panel-body flush">
+            @if (_domains.Count == 0)
+            {
+                <div class="empty-state"><div class="es-title">暂无业务域</div><div class="es-text">业务域用于组织对实体的分类，例如「销售」「库存」「财务」。</div></div>
+            }
+            else
+            {
+                <div class="row-list">
+                    @foreach (var d in _domains)
+                    {
+                        <div class="row-item">
+                            <div class="ri-ico"><svg><use href="#sb-ico-model" /></svg></div>
+                            <div class="ri-main">
+                                <div class="ri-title">@TablePresenter.Cell(d, "name")</div>
+                                <div class="ri-sub">@TablePresenter.Cell(d, "description")</div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+
+    <div class="panel">
+        <div class="panel-head"><div class="panel-title"><svg class="pt-ico"><use href="#sb-ico-db" /></svg> 实体</div></div>
+        <div class="panel-body flush">
+            @if (_entities.Count == 0)
+            {
+                <div class="empty-state"><div class="es-title">暂无实体</div><div class="es-text">实体对应一张业务表（如「客户」「订单」），解析后可在 Ask 中直接以业务名提问。</div></div>
+            }
+            else
+            {
+                <div class="table-wrap">
+                    <table class="data-table">
+                        <thead><tr>@foreach (var c in _entityCols) { <th>@TablePresenter.Friendly(c)</th> }</tr></thead>
+                        <tbody>
+                        @foreach (var e in _entities)
+                        {
+                            <tr>
+                                @foreach (var c in _entityCols)
+                                {
+                                    @if (TablePresenter.IsStatusColumn(c))
+                                    { <td><span class="badge @TablePresenter.StatusBadge(TablePresenter.Cell(e, c))">@TablePresenter.Cell(e, c)</span></td> }
+                                    else
+                                    { <td>@TablePresenter.Cell(e, c)</td> }
+                                }
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    private List<JsonElement> _entities = new();
+    private List<JsonElement> _domains = new();
+    private List<string> _entityCols = new();
+    private JsonElement? _entityData;
+    private string _error = "";
+    private bool _loading = true;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender) await Reload();
+    }
+
+    private async Task Reload()
+    {
+        _loading = true;
+        var tid = AppState.TenantId;
+        var (ent, _, eErr) = await Api.GetJsonAsync($"api/business-model/entities?tenantId={tid}");
+        var (dom, _, _) = await Api.GetJsonAsync($"api/business-model/domains?tenantId={tid}");
+        _error = eErr ?? "";
+        _entityData = ent;
+        _entities = ent is { ValueKind: JsonValueKind.Array } ? ent.Value.EnumerateArray().ToList() : new();
+        _entityCols = TablePresenter.InferColumns(_entityData);
+        _domains = dom is { ValueKind: JsonValueKind.Array } ? dom.Value.EnumerateArray().ToList() : new();
+        _loading = false;
+        StateHasChanged();
+    }
+
+    private static bool IsResolved(JsonElement row)
+    {
+        var s = TablePresenter.Cell(row, "status");
+        return !string.IsNullOrEmpty(s) && s != "0";
+    }
+
+    private void Toast(string m) => _error = m;
+}

@@ -1,3 +1,84 @@
 @page "/admin/audit"
-<h2>管理后台 · 审计</h2>
-<p class="muted">接入 <code>audit</code> 端点（logs），计划于 P11.3 实现。</p>
+@inject IApiClient Api
+@inject Services.AppState AppState
+@using System.Text.Json
+@using SuperBuilder_AI.Components.Shared
+
+<PageHead Icon="sb-ico-audit" Title="审计日志" Desc="记录关键操作与访问轨迹，支持按租户、时间检索，满足合规要求。" />
+
+@if (_loading)
+{
+    <div class="empty-state"><div class="es-title">加载中…</div></div>
+}
+else if (_error is not null)
+{
+    <div class="alert alert-danger">@_error</div>
+}
+else if (_rows.Count == 0)
+{
+    <div class="panel"><div class="panel-body">
+        <div class="empty-state">
+            <svg class="es-ico"><use href="#sb-ico-audit" /></svg>
+            <div class="es-title">暂无审计记录</div>
+            <div class="es-text">关键写操作与登录事件会被记录到这里，便于追溯与合规审查。</div>
+        </div>
+    </div></div>
+}
+else
+{
+    <div class="toolbar">
+        <div class="search">
+            <svg><use href="#sb-ico-search" /></svg>
+            <input @bind="Q" @bind:event="oninput" placeholder="搜索操作 / 用户…" />
+        </div>
+        <div class="spacer"></div>
+        <button class="btn btn-outline-secondary btn-sm" @onclick="Reload">刷新</button>
+    </div>
+    <div class="panel"><div class="panel-body flush">
+        <div class="table-wrap">
+            <table class="data-table">
+                <thead><tr>@foreach (var c in _cols) { <th>@TablePresenter.Friendly(c)</th> }</tr></thead>
+                <tbody>
+                @foreach (var row in Filtered)
+                {
+                    <tr>@foreach (var c in _cols)
+                        {
+                            @if (TablePresenter.IsStatusColumn(c))
+                            { <td><span class="badge @TablePresenter.StatusBadge(TablePresenter.Cell(row, c))">@TablePresenter.Cell(row, c)</span></td> }
+                            else { <td>@TablePresenter.Cell(row, c)</td> }
+                        }</tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    </div></div>
+}
+
+@code {
+    private JsonElement? _data;
+    private List<JsonElement> _rows = new();
+    private List<string> _cols = new();
+    private string _error = "";
+    private bool _loading = true;
+    private string Q = "";
+
+    private List<JsonElement> Filtered => string.IsNullOrWhiteSpace(Q)
+        ? _rows : _rows.Where(r => _cols.Any(c => TablePresenter.Cell(r, c).Contains(Q, StringComparison.OrdinalIgnoreCase))).ToList();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender) await Reload();
+    }
+
+    private async Task Reload()
+    {
+        _loading = true;
+        var (data, _, err) = await Api.GetJsonAsync($"api/audit/logs?tenantId={AppState.TenantId}");
+        _error = err ?? "";
+        _data = data;
+        _rows = data is { ValueKind: JsonValueKind.Array } ? data.Value.EnumerateArray().ToList() : new();
+        _cols = TablePresenter.InferColumns(_data);
+        _loading = false;
+        StateHasChanged();
+    }
+}
