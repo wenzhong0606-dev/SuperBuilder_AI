@@ -232,7 +232,7 @@
   - [x] 设计系统扩展：`app.css` 新增 `page-head`/`stat-grid`/`stat-tile`/`panel`/`toolbar`/`badge`/`empty-state`/`field-grid`/`seg`/`row-list`/`swatch-grid` 等工具类；`NavMenu` 图标精灵补 `sb-ico-search`，现共 22 个 symbol
   - [x] 三项目 build 0 error；Web 冒烟 **18 个页面全 200** + 静态资源（app.css/Bootstrap/chart.js）200；引用的 18 个图标全部有定义
   - [x] **Razor 踩坑记录**：含 C# 字符串字面量的事件处理器必须用单引号作属性定界符（`@onclick='() => Toast("x")'`）；渲染名为 `code` 的变量必须写 `@(code)`，否则 `@code</span>` 被当作 `@code` 指令；void 方法直接绑定需包成 lambda（`@onclick='() => Toast("x")'` 而非 `@onclick='Toast("x")'`）
-- [ ] ask/refine（多轮语义调整）：需新增只读端点，本次未实现（避免触碰 Golden 依赖文件）
+- [x] **ask/refine（多轮语义调整）✅（2026-08-31）**：后端新增 `POST api/ask/refine`（`AskController.Refine` + `AskRefineRequest`/`AskRefineTurn`）；`ComposeRefinedQuestion` 将「原始问题 + 历史(user 轮次) + 指令」合成为独立中文问题再复用既有 BI 链路。**门控隔离**：仅显式调用该端点时启用，默认 `api/ask` 路径逐字节不变，不触碰 Golden 依赖文件。`Ask.razor` 新增「语义细化」输入框，结果作为子轮次（`IsRefine` 左侧高亮）追加，共享 `ApplyOutcome` 错误处理。三项目 build 0 error；`api/ask/refine` 已注册可达（缺令牌返回 400，与 `api/ask` 一致的非回归鉴权行为）。
 - [ ] P11.4 MAUI 双端验证（Android/iOS/Windows 原生运行/编译校验）
 - [ ] P11.5 优化轨道（体验/前端·性能/成本·安全/运维）
 

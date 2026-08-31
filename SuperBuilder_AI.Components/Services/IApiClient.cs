@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Text.Json;
 using SuperBuilder_AI.Components.Models;
 
@@ -13,6 +14,11 @@ public interface IApiClient
     Task<string?> AskRawAsync(string question, long? dataSourceId, CancellationToken ct = default);
     /// <summary>类型化问数：返回 <see cref="BIResponse"/> 并区分传输错误。</summary>
     Task<AskOutcome> AskAsync(string question, long? dataSourceId, CancellationToken ct = default);
+    /// <summary>
+    /// 多轮语义调整：在已有问题（+ 历史上下文）上追加细化指令，重新走完整 BI 链路。
+    /// 仅在用户显式发起「细化」时调用（<c>POST api/ask/refine</c>）；默认问数路径 <c>api/ask</c> 不变。
+    /// </summary>
+    Task<AskOutcome> RefineAsync(string? question, string instruction, IEnumerable<RefineTurn>? history, long? dataSourceId, CancellationToken ct = default);
     /// <summary>发布为应用：结构化 App DSL 经默认路径（P8）保存到 api/apps。</summary>
     Task<(bool Ok, string? Code, string? Error)> PublishAppAsync(long tenantId, string dslJson, string? code, CancellationToken ct = default);
     Task<T?> GetAsync<T>(string relativeUrl, CancellationToken ct = default) where T : class;

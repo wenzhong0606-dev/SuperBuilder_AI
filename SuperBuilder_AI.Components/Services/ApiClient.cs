@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using System.Linq;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -73,6 +75,59 @@ public sealed class ApiClient : IApiClient
                 Code = code,
                 TraceId = trace,
                 Error = msg ?? $"问数失败（{(int)resp.StatusCode}）。"
+            };
+        }
+
+        var raw = await resp.Content.ReadAsStringAsync(ct);
+        if (string.IsNullOrEmpty(raw))
+            return new AskOutcome { Error = "请求失败：空响应。" };
+
+        try
+        {
+            var opt = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+            var response = JsonSerializer.Deserialize<BIResponse>(raw, opt);
+            if (response is null)
+                return new AskOutcome { Error = "响应解析失败。" };
+            return new AskOutcome { Response = response };
+        }
+        catch (JsonException ex)
+        {
+            return new AskOutcome { Error = "响应解析失败：" + ex.Message };
+        }
+    }
+
+    /// <summary>
+    /// 多轮语义调整：在已有问题（+ 历史上下文）上追加细化指令，重新走完整 BI 链路。
+    /// 仅在用户显式发起「细化」时调用（对应 <c>POST api/ask/refine</c>）；默认问数路径 <c>api/ask</c> 不变。
+    /// </summary>
+    /// <param name="question">原始问题，可空（仅凭历史 + 指令亦可）。</param>
+    /// <param name="instruction">本轮细化指令，必填。如「只看华东地区」。</param>
+    /// <param name="history">可选历史轮次，用于补全指代；仅 role=user 参与后端问题合成。</param>
+    public async Task<AskOutcome> RefineAsync(
+        string? question,
+        string instruction,
+        IEnumerable<RefineTurn>? history,
+        long? dataSourceId,
+        CancellationToken ct = default)
+    {
+        var client = CreateClient();
+        var payload = new
+        {
+            question,
+            instruction,
+            history = history?.Select(t => new { role = t.Role, content = t.Content }).ToList(),
+            dataSourceId = dataSourceId ?? 0L
+        };
+
+        var resp = await client.PostAsJsonAsync("api/ask/refine", payload, ct);
+        if (!resp.IsSuccessStatusCode)
+        {
+            var (code, msg, trace) = ParseApiError(await resp.Content.ReadAsStringAsync(ct));
+            return new AskOutcome
+            {
+                Code = code,
+                TraceId = trace,
+                Error = msg ?? $"语义调整失败（{(int)resp.StatusCode}）。"
             };
         }
 
@@ -177,6 +232,19 @@ public sealed class ApiClient : IApiClient
             return (null, 0, "网络或解析错误：" + ex.Message);
         }
     }
+}
+
+/// <summary>
+/// 多轮语义调整中的一轮对话（对应后端 <c>AskRefineTurn</c>）。
+/// 仅 <c>Role=user</c> 的轮次参与后端问题合成；助手轮次仅用于前端展示。
+/// </summary>
+public sealed class RefineTurn
+{
+    public string Role { get; set; } = "user";
+    public string? Content { get; set; }
+
+    public static RefineTurn User(string content) => new() { Role = "user", Content = content };
+    public static RefineTurn Assistant(string content) => new() { Role = "assistant", Content = content };
 }
 
 /// <summary>登录 / 当前用户响应（与 api/auth 的 AuthResult 字段对齐）。</summary>

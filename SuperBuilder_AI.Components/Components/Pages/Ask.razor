@@ -32,7 +32,7 @@ else
     {
         var turn = Turns[ti];
         var tIndex = ti;
-        <div class="turn">
+        <div class="turn @(turn.IsRefine ? "refine" : "")">
             <div class="bubble user"><span class="who">我</span>@turn.Question</div>
 
             @if (!string.IsNullOrEmpty(turn.Error))
@@ -144,6 +144,15 @@ else
                     @if (!string.IsNullOrEmpty(turn.RefineMsg)) { <span class="muted tiny">@turn.RefineMsg</span> }
                 </div>
 
+                @* 多轮语义细化（后端 LLM 重新查询，补全指代/省略） *@
+                <div class="refine-box semantic">
+                    <input class="form-control" @bind="turn.RefineInstruction" placeholder="基于本轮结果继续追问，如：只看华东地区 / 改成按月统计" />
+                    <button class="btn btn-sm btn-primary" @onclick="() => DoRefine(turn)" disabled="@turn.RefineBusy">语义细化</button>
+                    @if (turn.RefineBusy) { <span class="muted tiny">查询中…</span> }
+                    @if (!string.IsNullOrEmpty(turn.RefineInfo)) { <span class="ok tiny">@turn.RefineInfo</span> }
+                    @if (!string.IsNullOrEmpty(turn.RefineError)) { <span class="error tiny">@turn.RefineError</span> }
+                </div>
+
                 @* 发布为应用（P11.2 基础骨架：序列化 → P8 BuildFromDslAsync） *@
                 <div class="publish-box">
                     <button class="btn btn-outline-secondary" @onclick="() => Publish(turn)" disabled="@turn.PublishBusy">发布为应用</button>
@@ -173,6 +182,11 @@ else
         public Dictionary<int, VizOverride> Overrides { get; } = new();
         public string RefineCmd { get; set; } = "";
         public string? RefineMsg { get; set; }
+        public string RefineInstruction { get; set; } = "";
+        public bool RefineBusy { get; set; }
+        public string? RefineInfo { get; set; }
+        public string? RefineError { get; set; }
+        public bool IsRefine { get; set; }
         public bool PublishBusy { get; set; }
         public string? PublishInfo { get; set; }
         public string? PublishError { get; set; }
@@ -199,21 +213,53 @@ else
         Turns.Add(turn);
         var q = Question; Question = "";
         var outcome = await Api.AskAsync(q, DataSourceId);
+        ApplyOutcome(turn, outcome);
+        Busy = false;
+    }
+
+    /// <summary>多轮语义细化（P11.3）：以「原始问题 + 历史 + 指令」经后端重新查询，结果作为子轮次追加。</summary>
+    private async Task DoRefine(AskTurn turn)
+    {
+        var instr = turn.RefineInstruction?.Trim();
+        if (string.IsNullOrWhiteSpace(instr)) { turn.RefineError = "请输入细化指令。"; return; }
+        turn.RefineBusy = true; turn.RefineError = null; turn.RefineInfo = null;
+        try
+        {
+            var history = Turns
+                .TakeWhile(t => t != turn)
+                .Where(t => !string.IsNullOrWhiteSpace(t.Question))
+                .Select(t => RefineTurn.User(t.Question))
+                .ToList();
+            var outcome = await Api.RefineAsync(turn.Question, instr, history, DataSourceId);
+            var child = new AskTurn { Question = $"{turn.Question} → {instr}", IsRefine = true };
+            ApplyOutcome(child, outcome);
+            Turns.Add(child);
+            turn.RefineInfo = "已基于本轮结果重新查询（多轮语义调整）。";
+        }
+        catch (Exception ex)
+        {
+            turn.RefineError = "细化异常：" + ex.Message;
+        }
+        finally
+        {
+            turn.RefineBusy = false;
+        }
+    }
+
+    private static void ApplyOutcome(AskTurn turn, AskOutcome outcome)
+    {
         if (!outcome.HasResponse)
         {
             turn.Error = outcome.Error ?? "问数失败。";
             turn.Code = outcome.Code;
             turn.TraceId = outcome.TraceId;
+            return;
         }
-        else
-        {
-            turn.Response = outcome.Response;
-            if (!outcome.Response.Success && string.IsNullOrEmpty(outcome.Response.ErrorMessage) && outcome.Response.Answer is null)
-                turn.Error = "问数未返回有效结果。";
-            else if (!string.IsNullOrEmpty(outcome.Response.ErrorMessage))
-                turn.Error = outcome.Response.ErrorMessage;
-        }
-        Busy = false;
+        turn.Response = outcome.Response;
+        if (!outcome.Response.Success && string.IsNullOrEmpty(outcome.Response.ErrorMessage) && outcome.Response.Answer is null)
+            turn.Error = "问数未返回有效结果。";
+        else if (!string.IsNullOrEmpty(outcome.Response.ErrorMessage))
+            turn.Error = outcome.Response.ErrorMessage;
     }
 
     private void ClearChat()

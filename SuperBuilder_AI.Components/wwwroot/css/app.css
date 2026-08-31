@@ -414,6 +414,9 @@ button.mini { padding: 4px 10px; font-size: 12px; border-radius: var(--sb-radius
 
 .refine-box, .publish-box { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; max-width: 780px; }
 .refine-box input { flex: 1; min-width: 220px; }
+.refine-box.semantic { margin-top: 4px; padding: 10px 12px; border: 1px dashed var(--sb-accent-soft); border-radius: var(--sb-radius); background: var(--sb-accent-wash); }
+.turn.refine { margin-left: 28px; border-left: 3px solid var(--sb-accent); padding-left: 16px; }
+.turn.refine .bubble.user .who { background: var(--sb-accent); }
 
 .chart-view {
     background: var(--sb-surface);
