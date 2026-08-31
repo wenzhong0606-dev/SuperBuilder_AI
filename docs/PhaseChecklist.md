@@ -236,9 +236,11 @@
 - [x] **P11.4 MAUI 验证 ✅（2026-08-31，配置就绪 + 双端现状）**：
   - **Windows 端**：`SuperBuilder_AI.Maui -f net10.0-windows10.0.19041.0` 构建 **0 error**（复验通过）；`MauiProgram.cs` 用 `AddMauiBlazorWebView()` + 注册 `IApiClient/AppState/ThemeService` 等同 Web 的 Scoped 服务；`wwwroot/index.html` 引用与 Web 完全相同的 RCL 资源（Bootstrap/app.css/chart.js/blazor.webview.js）并含 no-FOUC 主题脚本。
   - **共享 RCL 正确性**：MAUI WebView 渲染的组件与 Web Head 完全同源；Web 已渲染 18 页面全 200 → 组件层面对 MAUI 同样成立（0 error 已证）。
-  - **Android/iOS 端（降级结论）**：`dotnet workload list` 已装 android/ios/maccatalyst/macos/maui-windows；但本沙箱**无法完整编译/运行验证**——RCL 仅单目标 `net10.0`，MAUI Android/iOS 需头项目 + RCL 均多目标（`net10.0-android;net10.0-ios;net10.0-windows10.0.19041.0`）并重新还原；且 iOS 需 Mac 宿主、Android 需模拟器/设备。属**项目配置项（非代码缺陷）**，启用步骤已记录。
+  - **Android/iOS 端（已打通原生构建，2026-08-31 本轮）**：RCL 改多目标 `net10.0;net10.0-android;net10.0-ios`，MAUI 头改 `net10.0-android;net10.0-ios;net10.0-windows10.0.19041.0`，补齐 `Platforms/Android`（MainActivity/MainApplication/AndroidManifest）与 `Platforms/iOS`（AppDelegate/Program）、`Resources/AppIcon`、`Resources/Splash`。
+    - **Android ✅ 真原生产物**：`dotnet build -f net10.0-android` **0 error**，产出 `SuperBuilder_AI.Maui.apk` + `-Signed.apk`（约 16MB）。
+    - **iOS ✅ 编译链打通**：`dotnet build -f net10.0-ios` **0 error**，完成托管编译 + AOT + 原生静态库链接（`libextension-dotnet.a`/`libmono-*`）+ 多语言资源收集 + codesign 清单；**最终 `.app` 打包/签名需配对 Mac 宿主**（Windows 上 `_CreateAppBundle` 为空操作），属平台限制非代码缺陷。
+  - **⚠️ 关键坑：RCL 不可引用 `Microsoft.AspNetCore.Components.WebView.Maui`**。该包会随 RCL 发布 `_framework/blazor.modules.json` 等静态宿主资源，与引用 RCL 的 MAUI 应用自身资源冲突（`StaticWebAsset SourceType: Project` 重复，且 `StaticWebAsset Remove` 无法拦截——包资源在构建期才注入）。RCL 统一只引 `Microsoft.AspNetCore.Components.Web` + `Microsoft.Extensions.Http`（全 TFM），WebView 宿主能力由 MAUI 头项目自身提供。
   - **运行时配置提示**：`MauiProgram.cs` 中 `HttpClient.BaseAddress = https://localhost:5032`；Android 模拟器内 `localhost` 指向模拟器自身，真机/模拟器联调应改为 `http://10.0.2.2:5032`（宿主回环），待 P11.5 或真机联调时处理。
-- [ ] P11.5 优化轨道（体验/前端·性能/成本·安全/运维）
 - [ ] P11.5 优化轨道（体验/前端·性能/成本·安全/运维）
 
 **§12 用户自定义能力（接入 P11.3，已规划）**
