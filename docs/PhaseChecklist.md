@@ -224,6 +224,7 @@
   - [x] `app.css` 补充：KPI 卡 / 数据表 / 对话气泡 / 答案块 / 视图工具栏 / 迷你按钮 等
   - [x] **本轮增强（2026-08-31）统一错误治理 + 古风样式**：后端新增 `ApiErrors`（ErrorCodes/SuperBuilderException/ApiError）+ `UnifiedExceptionMiddleware`（捕获未处理异常→结构化 `ApiError{code,message,traceId,details}` 友好 JSON + 关联ID 结构化日志，按异常类型/消息映射错误码，**零业务抛点改动、不影响 Golden**）+ `AuthMiddleware` 401 也统一为 `ApiError`；Ask 控制器早期返回统一 `ApiError`。前端 `ApiClient.ParseApiError` 解析 + `Ask.razor` 展示「错误码+追踪ID」古风告警。
   - [x] **本轮增强 Bootstrap + 中国古风色系**：本地化 Bootstrap 5.3.3（`wwwroot/lib/bootstrap`，CSS 232KB/JS 80KB，离线可用）并在 `_Host.cshtml`/`index.html` 引入；`app.css` 重写为古风配色（宣纸底/墨字/黛蓝主/朱砂强调/藤黄/石青/黛绿），覆盖 Bootstrap `--bs-*` 变量，含 dark 古风变体 + 响应式（窄屏侧栏转顶栏）；Login/Ask/NavMenu 套用 `btn`/`form-control`/`alert` 等 Bootstrap 组件。
+  - [x] **UI 现代化重构（2026-08-31，本轮）布局/PC·移动兼容/现代化**：重做应用壳层 `MainLayout`（顶栏=汉堡+品牌+主题切换+用户芯片 + 全高 flex 主体）；`NavMenu` 加 Feather 风格 SVG 图标精灵 + 分组；**≤991px 侧栏变抽屉 + 遮罩**（路由变更自动收起）；`Ask.razor` 提问栏 `sticky` 置顶 + 气泡头像 + KPI 网格/图表卡/表格层次阴影；`Login.razor` hero 分栏（品牌侧+表单侧，移动端堆叠）；明/暗主题切换经 `ThemeService` 持久化 localStorage，`_Host`/`index` 内联脚本防首屏闪烁。**注意 Blazor Server 预渲染阶段无 JS 运行时，主题读取须放 `OnAfterRenderAsync` 否则 `/` 500**。
 - [ ] P11.3 其余页面 + 组件库页 + 主题编辑器 + ask/refine（多轮语义调整）
 - [ ] P11.4 MAUI 双端验证（Android/iOS/Windows 原生运行/编译校验）
 - [ ] P11.5 优化轨道（体验/前端·性能/成本·安全/运维）

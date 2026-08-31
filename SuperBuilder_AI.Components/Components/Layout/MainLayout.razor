@@ -1,8 +1,81 @@
 @inherits LayoutComponentBase
+@inject ThemeService Theme
+@inject NavigationManager Nav
+@inject AppState State
+@inject IJSRuntime JS
 
-<div class="app-shell">
-    <NavMenu />
-    <main class="content">
-        @Body
-    </main>
+<div class="app-shell @(NavOpen ? "nav-open" : "")">
+    <header class="app-header">
+        <button class="icon-btn menu-btn" @onclick="ToggleNav" aria-label="菜单" title="菜单">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+        </button>
+        <div class="app-header-brand">SuperBuilder <span>AI</span><small>智能问数平台</small></div>
+        <div class="app-header-spacer"></div>
+
+        <button class="icon-btn theme-btn" @onclick="ToggleTheme" aria-label="切换主题" title="@(IsDark ? "切换到浅色" : "切换到深色")">
+            @if (IsDark)
+            {
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 2v2.5M12 19.5V22M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2 12h2.5M19.5 12H22M4.2 19.8l1.8-1.8M18 6l1.8-1.8"/></svg>
+            }
+            else
+            {
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+            }
+        </button>
+
+        @if (State.IsAuthenticated)
+        {
+            <div class="user-chip" title="当前用户">
+                <span class="avatar">@(string.IsNullOrEmpty(State.Username) ? "?" : State.Username.Substring(0, 1).ToUpper())</span>
+                <span class="uname">@State.Username</span>
+            </div>
+        }
+    </header>
+
+    <div class="app-body">
+        <NavMenu />
+        <div class="nav-scrim" @onclick="CloseNav"></div>
+        <main class="content">
+            @Body
+        </main>
+    </div>
 </div>
+
+@code {
+    private bool NavOpen = false;
+    private bool IsDark = false;
+
+    protected override void OnInitialized()
+    {
+        Nav.LocationChanged += OnLocationChanged;
+    }
+
+    // 主题读取/应用需在浏览器中执行（预渲染阶段无 JS 运行时）。
+    // 初始主题已由 _Host/index 内联脚本写入 data-theme，避免首屏闪烁。
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        var theme = await JS.InvokeAsync<string>("SuperBuilder.getTheme");
+        IsDark = theme == "dark";
+        await Theme.ApplyAsync(theme);
+        StateHasChanged();
+    }
+
+    private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
+    {
+        if (NavOpen)
+        {
+            NavOpen = false;
+            _ = InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private void ToggleNav() => NavOpen = !NavOpen;
+    private void CloseNav() => NavOpen = false;
+
+    private async Task ToggleTheme()
+    {
+        IsDark = !IsDark;
+        await Theme.ApplyAsync(IsDark ? "dark" : "light");
+    }
+}

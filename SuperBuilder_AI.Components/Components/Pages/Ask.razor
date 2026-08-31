@@ -33,7 +33,7 @@ else
         var turn = Turns[ti];
         var tIndex = ti;
         <div class="turn">
-            <div class="bubble user">@turn.Question</div>
+            <div class="bubble user"><span class="who">我</span>@turn.Question</div>
 
             @if (!string.IsNullOrEmpty(turn.Error))
             {

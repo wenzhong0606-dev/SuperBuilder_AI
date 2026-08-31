@@ -1,9 +1,16 @@
 // SuperBuilder 前端运行时脚本（RCL 共享，Web 与 MAUI WebView 均加载）
 window.SuperBuilder = window.SuperBuilder || {};
 
-// 切换主题：写入根元素 data-theme，CSS 变量随之切换
+// 切换主题：写入根元素 data-theme，CSS 变量随之切换，并持久化到 localStorage
 window.SuperBuilder.setTheme = function (theme) {
-    document.documentElement.setAttribute('data-theme', theme || 'light');
+    theme = theme || 'light';
+    document.documentElement.setAttribute('data-theme', theme);
+    try { localStorage.setItem('sb-theme', theme); } catch (e) {}
+};
+
+// 读取持久化主题（MainLayout 初始化时调用）
+window.SuperBuilder.getTheme = function () {
+    try { return localStorage.getItem('sb-theme') || 'light'; } catch (e) { return 'light'; }
 };
 
 // 渲染图表：spec 为结构化对象 { type, data:{labels,datasets}, options }

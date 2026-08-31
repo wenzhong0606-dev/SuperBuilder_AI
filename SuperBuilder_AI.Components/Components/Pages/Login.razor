@@ -4,25 +4,40 @@
 @inject AppState State
 @inject NavigationManager Nav
 
-<h2>@(State.IsAuthenticated ? "已登录" : "登录 / 租户选择")</h2>
+<div class="login-wrap">
+    <section class="login-hero">
+        <h1>SuperBuilder AI</h1>
+        <p class="sub">自然语言驱动的智能问数平台 —— 对话即分析，所见即洞察。</p>
+        <div class="tags">
+            <span>AI Native BI</span>
+            <span>多租户</span>
+            <span>多语言</span>
+            <span>低代码</span>
+            <span>企业级 SaaS</span>
+        </div>
+    </section>
 
-@if (State.IsAuthenticated)
-{
-    <div class="card">
-        <p class="ok">当前用户：@State.Username（租户 @State.TenantId，用户 @State.UserId）</p>
-        <button class="btn btn-outline-secondary" @onclick="Logout">退出登录</button>
-    </div>
-}
-else
-{
-    <div class="card">
-        <label>用户名<input class="form-control" @bind="Username" placeholder="例如 admin" /></label>
-        <label>租户 ID<input class="form-control" @bind="TenantId" type="number" min="1" /></label>
-        <button class="btn btn-primary" @onclick="DoLogin" disabled="@Busy">登录</button>
-        @if (!string.IsNullOrEmpty(Error)) { <div class="alert alert-danger">@Error</div> }
-        <p class="muted">P11.0 阶段登录不校验口令，仅校验「用户存在且启用」后签发令牌（BYO 口令校验见 P13）。</p>
-    </div>
-}
+    <section class="login-form">
+        @if (State.IsAuthenticated)
+        {
+            <div class="card">
+                <p class="ok">当前用户：@State.Username（租户 @State.TenantId，用户 @State.UserId）</p>
+                <button class="btn btn-outline-secondary" @onclick="Logout">退出登录</button>
+            </div>
+        }
+        else
+        {
+            <div class="card">
+                <h2 style="margin:0 0 4px;">登录 / 租户选择</h2>
+                <label>用户名<input class="form-control" @bind="Username" placeholder="例如 admin" /></label>
+                <label>租户 ID<input class="form-control" @bind="TenantId" type="number" min="1" /></label>
+                <button class="btn btn-primary" @onclick="DoLogin" disabled="@Busy">登录</button>
+                @if (!string.IsNullOrEmpty(Error)) { <div class="alert alert-danger">@Error</div> }
+                <p class="muted tiny">P11.0 阶段登录不校验口令，仅校验「用户存在且启用」后签发令牌（BYO 口令校验见 P13）。</p>
+            </div>
+        }
+    </section>
+</div>
 
 @code {
     private string Username = "";
