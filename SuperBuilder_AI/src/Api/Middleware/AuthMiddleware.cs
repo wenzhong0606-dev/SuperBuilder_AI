@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Security.Claims;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
+using SuperBuilder_AI.Api.Errors;
 using SuperBuilder_AI.Services.Auth;
 
 namespace SuperBuilder_AI.Middleware;
@@ -53,7 +54,7 @@ public sealed class AuthMiddleware
 			if (context.Request.Path.StartsWithSegments("/api"))
 			{
 				context.Response.StatusCode = StatusCodes.Status401Unauthorized;
-				await WriteJsonAsync(context, new { error = "未授权：缺少或无效的访问令牌。" });
+				await WriteJsonAsync(context, new ApiError { Code = ErrorCodes.Unauthorized, Message = "未授权：缺少或无效的访问令牌。" });
 				return;
 			}
 

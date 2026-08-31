@@ -8,7 +8,7 @@ namespace SuperBuilder_AI.Components.Services;
 /// </summary>
 public interface IApiClient
 {
-    Task<AuthResult?> LoginAsync(string username, long tenantId, CancellationToken ct = default);
+    Task<(AuthResult? Result, string? Error)> LoginAsync(string username, long tenantId, CancellationToken ct = default);
     Task<string?> AskRawAsync(string question, long? dataSourceId, CancellationToken ct = default);
     /// <summary>类型化问数：返回 <see cref="BIResponse"/> 并区分传输错误。</summary>
     Task<AskOutcome> AskAsync(string question, long? dataSourceId, CancellationToken ct = default);

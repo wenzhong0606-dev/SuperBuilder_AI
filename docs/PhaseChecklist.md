@@ -222,6 +222,8 @@
   - [x] `ChartView.razor` 重写：参数化图表规格（Type/Labels/Datasets/Title/ShowLegend/Palette），参数变化即即时重渲染
   - [x] `Ask.razor` 重写（旗舰）：多轮对话列表 + 端到端渲染（AI 解读 / KPI 卡(Summary) / Chart.js 图表(Visualizations) / 数据表 / SQL 折叠）+ **视图层多轮调整**（每图工具栏：柱状/折线/饼图·图例开关·换配色；+ 自然语言指令框「改成柱状图/隐藏图例/配色换绿」→ 纯前端 DSL 变更、零后端调用、即时重渲染）+ **发布为应用**（序列化为 App DSL v1.0 POST `api/apps`，复用 P8 `BuildFromDslAsync` 确定性路径）
   - [x] `app.css` 补充：KPI 卡 / 数据表 / 对话气泡 / 答案块 / 视图工具栏 / 迷你按钮 等
+  - [x] **本轮增强（2026-08-31）统一错误治理 + 古风样式**：后端新增 `ApiErrors`（ErrorCodes/SuperBuilderException/ApiError）+ `UnifiedExceptionMiddleware`（捕获未处理异常→结构化 `ApiError{code,message,traceId,details}` 友好 JSON + 关联ID 结构化日志，按异常类型/消息映射错误码，**零业务抛点改动、不影响 Golden**）+ `AuthMiddleware` 401 也统一为 `ApiError`；Ask 控制器早期返回统一 `ApiError`。前端 `ApiClient.ParseApiError` 解析 + `Ask.razor` 展示「错误码+追踪ID」古风告警。
+  - [x] **本轮增强 Bootstrap + 中国古风色系**：本地化 Bootstrap 5.3.3（`wwwroot/lib/bootstrap`，CSS 232KB/JS 80KB，离线可用）并在 `_Host.cshtml`/`index.html` 引入；`app.css` 重写为古风配色（宣纸底/墨字/黛蓝主/朱砂强调/藤黄/石青/黛绿），覆盖 Bootstrap `--bs-*` 变量，含 dark 古风变体 + 响应式（窄屏侧栏转顶栏）；Login/Ask/NavMenu 套用 `btn`/`form-control`/`alert` 等 Bootstrap 组件。
 - [ ] P11.3 其余页面 + 组件库页 + 主题编辑器 + ask/refine（多轮语义调整）
 - [ ] P11.4 MAUI 双端验证（Android/iOS/Windows 原生运行/编译校验）
 - [ ] P11.5 优化轨道（体验/前端·性能/成本·安全/运维）
@@ -245,7 +247,7 @@
 - [ ] 触及 `src/Application/BI`、`src/Domain/{Metadata,BiQuery}`、`src/Infrastructure/{Vector,Database}`、Resolution 的每次提交都重跑 Golden
 - [ ] 契约文件 `Evaluation/Golden/query-plan-golden-v1.json` 不删不改
 - [ ] 所有大改均为 git 提交，可 `git revert` 回退
-- [x] A4 上帝类拆分必须在 P6 之前收口
+- [ ] A4 上帝类拆分必须在 P6 之前收口
 
 ---
 

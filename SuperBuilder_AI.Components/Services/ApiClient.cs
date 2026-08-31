@@ -34,12 +34,17 @@ public sealed class ApiClient : IApiClient
         return client;
     }
 
-    public async Task<AuthResult?> LoginAsync(string username, long tenantId, CancellationToken ct = default)
+    public async Task<(AuthResult? Result, string? Error)> LoginAsync(string username, long tenantId, CancellationToken ct = default)
     {
         var client = _factory.CreateClient("SuperBuilderApi");
         var resp = await client.PostAsJsonAsync("api/auth/login", new { username, tenantId }, ct);
-        if (!resp.IsSuccessStatusCode) return null;
-        return await resp.Content.ReadFromJsonAsync<AuthResult>(ct);
+        if (!resp.IsSuccessStatusCode)
+        {
+            var (code, msg, _) = ParseApiError(await resp.Content.ReadAsStringAsync(ct));
+            return (null, msg ?? $"登录失败（{(int)resp.StatusCode}）。");
+        }
+        var r = await resp.Content.ReadFromJsonAsync<AuthResult>(ct);
+        return (r, null);
     }
 
     public async Task<string?> AskRawAsync(string question, long? dataSourceId, CancellationToken ct = default)
@@ -55,27 +60,64 @@ public sealed class ApiClient : IApiClient
         return await resp.Content.ReadAsStringAsync(ct);
     }
 
-    /// <summary>类型化问数：反序列化为 <see cref="BIResponse"/>，并区分传输错误。</summary>
+    /// <summary>类型化问数：反序列化为 <see cref="BIResponse"/>，并对非成功状态解析统一错误码。</summary>
     public async Task<AskOutcome> AskAsync(string question, long? dataSourceId, CancellationToken ct = default)
     {
-        var raw = await AskRawAsync(question, dataSourceId, ct);
+        var client = CreateClient();
+        var resp = await client.PostAsJsonAsync("api/ask", new { question, dataSourceId = dataSourceId ?? 0L }, ct);
+        if (!resp.IsSuccessStatusCode)
+        {
+            var (code, msg, trace) = ParseApiError(await resp.Content.ReadAsStringAsync(ct));
+            return new AskOutcome
+            {
+                Code = code,
+                TraceId = trace,
+                Error = msg ?? $"问数失败（{(int)resp.StatusCode}）。"
+            };
+        }
+
+        var raw = await resp.Content.ReadAsStringAsync(ct);
         if (string.IsNullOrEmpty(raw))
             return new AskOutcome { Error = "请求失败：空响应。" };
-        if (raw.StartsWith("ERROR", StringComparison.Ordinal))
-            return new AskOutcome { Error = raw };
 
         try
         {
             var opt = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-            var resp = JsonSerializer.Deserialize<BIResponse>(raw, opt);
-            if (resp is null)
+            var response = JsonSerializer.Deserialize<BIResponse>(raw, opt);
+            if (response is null)
                 return new AskOutcome { Error = "响应解析失败。" };
-            return new AskOutcome { Response = resp };
+            return new AskOutcome { Response = response };
         }
         catch (JsonException ex)
         {
             return new AskOutcome { Error = "响应解析失败：" + ex.Message };
         }
+    }
+
+    /// <summary>
+    /// 解析后端统一错误体：优先 <see cref="ApiError"/>(code/message/traceId)，
+    /// 其次兼容旧 <c>{ error }</c> 形状，最后回退到原始文本（截断避免过长）。
+    /// </summary>
+    private static (string? Code, string? Message, string? TraceId) ParseApiError(string body)
+    {
+        if (string.IsNullOrWhiteSpace(body)) return (null, null, null);
+        try
+        {
+            var opt = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+            var e = JsonSerializer.Deserialize<ApiError>(body, opt);
+            if (e is not null && (!string.IsNullOrEmpty(e.Code) || !string.IsNullOrEmpty(e.Message)))
+                return (e.Code, e.Message, e.TraceId);
+            // 兼容旧 { error: "..." }
+            var raw = JsonSerializer.Deserialize<JsonElement>(body, opt);
+            if (raw.ValueKind == JsonValueKind.Object && raw.TryGetProperty("error", out var ev) && ev.ValueKind == JsonValueKind.String)
+                return (null, ev.GetString(), null);
+        }
+        catch
+        {
+            // 非 JSON 则回退原始文本
+        }
+        var trimmed = body.Length > 240 ? body[..240] + "…" : body;
+        return (null, trimmed, null);
     }
 
     /// <summary>发布为应用：将结构化 App DSL 经默认路径（P8 <c>BuildFromDslAsync</c>）保存到 <c>api/apps</c>。</summary>

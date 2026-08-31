@@ -251,6 +251,8 @@ using (var quotaScope = app.Services.CreateScope())
 if (!app.Environment.IsDevelopment()) { app.UseExceptionHandler("/Home/Error"); app.UseHsts(); }
 app.UseHttpsRedirection();
 app.UseRouting();
+// P11 错误治理：统一异常 → 结构化友好 JSON（错误码 + 关联ID），须位于路由之后、端点之前，包裹后续所有中间件
+app.UseMiddleware<UnifiedExceptionMiddleware>();
 // P11.0 安全轨道：CORS → 限流 → 鉴权（顺序：路由之后、授权之前；与 Observability/Audit 互不干扰）
 app.UseCors("P11Cors");
 app.UseMiddleware<RateLimitMiddleware>();

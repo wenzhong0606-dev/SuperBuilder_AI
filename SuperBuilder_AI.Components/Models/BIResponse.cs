@@ -55,11 +55,22 @@ public sealed class VisualizationSuggestion
 	public string? Reason { get; set; }
 }
 
-/// <summary>问数结果封装：区分「成功响应」与「传输/服务端错误」。</summary>
+/// <summary>统一错误响应（对齐后端 <c>ApiError</c>：code / message / traceId / details）。</summary>
+public sealed class ApiError
+{
+	public string? Code { get; set; }
+	public string? Message { get; set; }
+	public string? TraceId { get; set; }
+	public string? Details { get; set; }
+}
+
+/// <summary>问数结果封装：区分「成功响应」与「传输/服务端错误（统一错误码）」。</summary>
 public sealed class AskOutcome
 {
 	public BIResponse? Response { get; init; }
 	public string? Error { get; init; }
+	public string? Code { get; init; }
+	public string? TraceId { get; init; }
 	public bool HasResponse => Response is not null;
 }
 

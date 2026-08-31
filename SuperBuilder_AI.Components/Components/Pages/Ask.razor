@@ -14,11 +14,11 @@
 else
 {
     <div class="card ask-bar">
-        <label>数据源 ID<input @bind="DataSourceId" type="number" min="0" /></label>
-        <label>自然语言问题<textarea @bind="Question" placeholder="例如：上个月各区域销售额对比"></textarea></label>
+        <label>数据源 ID<input class="form-control" @bind="DataSourceId" type="number" min="0" /></label>
+        <label>自然语言问题<textarea class="form-control" @bind="Question" placeholder="例如：上个月各区域销售额对比"></textarea></label>
         <div class="ask-actions">
-            <button @onclick="DoAsk" disabled="@Busy">提问</button>
-            <button class="ghost" @onclick="ClearChat" disabled="@Busy">清空对话</button>
+            <button class="btn btn-primary" @onclick="DoAsk" disabled="@Busy">提问</button>
+            <button class="btn btn-outline-secondary" @onclick="ClearChat" disabled="@Busy">清空对话</button>
             @if (!string.IsNullOrEmpty(GlobalError)) { <span class="error">@GlobalError</span> }
         </div>
     </div>
@@ -37,7 +37,13 @@ else
 
             @if (!string.IsNullOrEmpty(turn.Error))
             {
-                <p class="error">@turn.Error</p>
+                <div class="alert alert-warning ask-error" role="alert">
+                    <div class="ask-error-msg">@turn.Error</div>
+                    @if (!string.IsNullOrEmpty(turn.Code))
+                    {
+                        <div class="ask-error-meta">错误码：<code>@turn.Code</code>@if (!string.IsNullOrEmpty(turn.TraceId)) { <text> · 追踪 ID：<code>@turn.TraceId</code></text> }</div>
+                    }
+                </div>
             }
             else if (turn.Response is not null)
             {
@@ -90,11 +96,11 @@ else
                             }
                             <div class="viz-toolbar">
                                 <span class="tiny">视图调整：</span>
-                                <button class="mini" @onclick='() => SetType(turn, vIndex, "bar")'>柱状</button>
-                                <button class="mini" @onclick='() => SetType(turn, vIndex, "line")'>折线</button>
-                                <button class="mini" @onclick='() => SetType(turn, vIndex, "pie")'>饼图</button>
-                                <button class="mini" @onclick="() => ToggleLegend(turn, vIndex)">@(EffLegend(ov) ? "隐藏图例" : "显示图例")</button>
-                                <button class="mini" @onclick="() => CyclePalette(turn, vIndex)">换配色</button>
+                                <button class="btn btn-sm btn-outline-secondary" @onclick='() => SetType(turn, vIndex, "bar")'>柱状</button>
+                                <button class="btn btn-sm btn-outline-secondary" @onclick='() => SetType(turn, vIndex, "line")'>折线</button>
+                                <button class="btn btn-sm btn-outline-secondary" @onclick='() => SetType(turn, vIndex, "pie")'>饼图</button>
+                                <button class="btn btn-sm btn-outline-secondary" @onclick="() => ToggleLegend(turn, vIndex)">@(EffLegend(ov) ? "隐藏图例" : "显示图例")</button>
+                                <button class="btn btn-sm btn-outline-secondary" @onclick="() => CyclePalette(turn, vIndex)">换配色</button>
                             </div>
                         </div>
                     }
@@ -133,14 +139,14 @@ else
 
                 @* 视图层多轮调整指令（纯前端 DSL 变更，零后端调用） *@
                 <div class="refine-box">
-                    <input @bind="turn.RefineCmd" placeholder="例如：改成柱状图 / 隐藏图例 / 配色换成绿色" />
-                    <button class="mini" @onclick="() => ApplyViewCommand(turn)">应用调整</button>
+                    <input class="form-control" @bind="turn.RefineCmd" placeholder="例如：改成柱状图 / 隐藏图例 / 配色换成绿色" />
+                    <button class="btn btn-sm btn-outline-secondary" @onclick="() => ApplyViewCommand(turn)">应用调整</button>
                     @if (!string.IsNullOrEmpty(turn.RefineMsg)) { <span class="muted tiny">@turn.RefineMsg</span> }
                 </div>
 
                 @* 发布为应用（P11.2 基础骨架：序列化 → P8 BuildFromDslAsync） *@
                 <div class="publish-box">
-                    <button class="ghost" @onclick="() => Publish(turn)" disabled="@turn.PublishBusy">发布为应用</button>
+                    <button class="btn btn-outline-secondary" @onclick="() => Publish(turn)" disabled="@turn.PublishBusy">发布为应用</button>
                     @if (turn.PublishBusy) { <span class="muted tiny">发布中…</span> }
                     @if (!string.IsNullOrEmpty(turn.PublishInfo)) { <span class="ok tiny">@turn.PublishInfo</span> }
                     @if (!string.IsNullOrEmpty(turn.PublishError)) { <span class="error tiny">@turn.PublishError</span> }
@@ -162,6 +168,8 @@ else
         public string Question = "";
         public BIResponse? Response;
         public string? Error;
+        public string? Code;
+        public string? TraceId;
         public Dictionary<int, VizOverride> Overrides { get; } = new();
         public string RefineCmd { get; set; } = "";
         public string? RefineMsg { get; set; }
@@ -194,6 +202,8 @@ else
         if (!outcome.HasResponse)
         {
             turn.Error = outcome.Error ?? "问数失败。";
+            turn.Code = outcome.Code;
+            turn.TraceId = outcome.TraceId;
         }
         else
         {

@@ -2,6 +2,7 @@ using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
+using SuperBuilder_AI.Api.Errors;
 using SuperBuilder_AI.Interfaces.BI;
 using SuperBuilder_AI.Interfaces.Identity;
 using SuperBuilder_AI.Models.Identity;
@@ -43,20 +44,20 @@ public sealed class AskController : ControllerBase
 		[FromBody] AskRequest request,
 		CancellationToken cancellationToken = default)
 	{
-		if (request is null) return BadRequest(new { error = "请求体不能为空。" });
+		if (request is null) return BadRequest(new ApiError { Code = ErrorCodes.BadRequest, Message = "请求体不能为空。" });
 		if (string.IsNullOrWhiteSpace(request.Question))
-			return BadRequest(new { error = "question 必填。" });
+			return BadRequest(new ApiError { Code = ErrorCodes.BadRequest, Message = "question 必填。" });
 
 		if (User?.Identity is not { IsAuthenticated: true })
-			return Unauthorized(new { error = "未授权：缺少访问令牌。" });
+			return Unauthorized(new ApiError { Code = ErrorCodes.Unauthorized, Message = "未授权：缺少访问令牌。" });
 
 		var tenantId = ResolveTenantId();
 		var userId = ResolveUserId();
 		if (tenantId <= 0 || userId <= 0)
-			return Unauthorized(new { error = "未授权：令牌声明缺失。" });
+			return Unauthorized(new ApiError { Code = ErrorCodes.Unauthorized, Message = "未授权：令牌声明缺失。" });
 
 		if (!await _identity.HasPermissionAsync(tenantId, userId, IdentityPermissions.DashboardView, cancellationToken))
-			return StatusCode(403, new { error = "禁止：缺少 dashboard:view 权限。" });
+			return StatusCode(403, new ApiError { Code = ErrorCodes.Forbidden, Message = "禁止：缺少 dashboard:view 权限。" });
 
 		var response = await _bi.AskAsync(request.Question, tenantId);
 		return Ok(response);
