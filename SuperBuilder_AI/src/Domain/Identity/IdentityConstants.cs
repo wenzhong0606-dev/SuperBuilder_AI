@@ -43,6 +43,14 @@ public static class IdentityPermissions
     public const string BillingManage = "billing:manage";
 
     public const string IdentityManage = "identity:manage";
+
+    public const string PlatformDiagnosticsView = "platform:diagnostics:view";
+    public const string PlatformDiagnosticsManage = "platform:diagnostics:manage";
+    public const string PlatformTenantView = "platform:tenant:view";
+    public const string PlatformTenantManage = "platform:tenant:manage";
+    public const string PlatformTenantSettingsManage = "platform:tenant-settings:manage";
+    public const string PlatformAuditView = "platform:audit:view";
+    public const string PlatformQuotaManage = "platform:quota:manage";
 }
 
 /// <summary>权限定义（种子用）。</summary>
@@ -87,21 +95,24 @@ public static class IdentityCatalog
         new(IdentityPermissions.BillingManage, "管理账单", "billing", "管理账单与配额"),
 
         new(IdentityPermissions.IdentityManage, "管理身份", "identity", "管理用户与角色"),
+
+        new(IdentityPermissions.PlatformDiagnosticsView, "查看平台诊断", "platform", "查看平台指标与诊断状态"),
+        new(IdentityPermissions.PlatformDiagnosticsManage, "管理平台诊断", "platform", "运行测试与重建平台诊断索引"),
+        new(IdentityPermissions.PlatformTenantView, "查看租户", "platform", "查看平台租户目录"),
+        new(IdentityPermissions.PlatformTenantManage, "管理租户", "platform", "创建、启用和停用租户"),
+        new(IdentityPermissions.PlatformTenantSettingsManage, "管理租户设置", "platform", "管理目标租户的平台设置"),
+        new(IdentityPermissions.PlatformAuditView, "查看平台审计", "platform", "查看平台治理审计"),
+        new(IdentityPermissions.PlatformQuotaManage, "管理平台配额", "platform", "管理租户配额策略"),
     };
 
     public static readonly IReadOnlyList<RoleDef> Roles = new List<RoleDef>
     {
-        new(IdentityRoles.PlatformAdmin, "平台超级管理员", "平台级全权限", new[]
+        new(IdentityRoles.PlatformAdmin, "平台治理管理员", "仅限平台治理面的最小权限", new[]
         {
-            IdentityPermissions.DashboardView, IdentityPermissions.DashboardCreate, IdentityPermissions.DashboardEdit,
-            IdentityPermissions.DashboardPublish, IdentityPermissions.DashboardDelete,
-            IdentityPermissions.AppView, IdentityPermissions.AppCreate, IdentityPermissions.AppEdit,
-            IdentityPermissions.AppPublish, IdentityPermissions.AppDelete,
-            IdentityPermissions.AgentView, IdentityPermissions.AgentCreate, IdentityPermissions.AgentManage, IdentityPermissions.AgentDelete,
-            IdentityPermissions.ThemeView, IdentityPermissions.ThemeEdit, IdentityPermissions.ThemePublish,
-            IdentityPermissions.MetadataView, IdentityPermissions.MetadataEdit, IdentityPermissions.MetadataScan,
-            IdentityPermissions.AuditView, IdentityPermissions.BillingView, IdentityPermissions.BillingManage,
-            IdentityPermissions.IdentityManage,
+            IdentityPermissions.PlatformDiagnosticsView, IdentityPermissions.PlatformDiagnosticsManage,
+            IdentityPermissions.PlatformTenantView, IdentityPermissions.PlatformTenantManage,
+            IdentityPermissions.PlatformTenantSettingsManage, IdentityPermissions.PlatformAuditView,
+            IdentityPermissions.PlatformQuotaManage,
         }),
         new(IdentityRoles.TenantAdmin, "租户管理员", "租户内管理权限（不含平台账单）", new[]
         {

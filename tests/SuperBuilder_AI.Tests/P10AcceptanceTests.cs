@@ -9,6 +9,7 @@ using SuperBuilder_AI.Interfaces.Quota;
 using SuperBuilder_AI.Models.Identity;
 using SuperBuilder_AI.Models.Quota;
 using SuperBuilder_AI.Services.Audit;
+using SuperBuilder_AI.Services.Auth;
 using SuperBuilder_AI.Services.Identity;
 using SuperBuilder_AI.Services.Quota;
 using Xunit;
@@ -38,7 +39,7 @@ public class P10AcceptanceTests
     public async Task RBAC_Deny_By_Default_For_User_With_No_Role()
     {
         using var ctx = CreateContext(out var conn);
-        var identity = new IdentityService(ctx);
+        var identity = new IdentityService(ctx, new PasswordHasher());
         await identity.SeedAsync();
 
         var created = await identity.CreateUserAsync(Tenant1, "alice", "Alice", "a@x.com", null);
@@ -52,10 +53,10 @@ public class P10AcceptanceTests
     }
 
     [Fact]
-    public async Task RBAC_Viewer_Cannot_Manage_Identity_But_PlatformAdmin_Can()
+    public async Task RBAC_Viewer_And_Tenant_User_Cannot_Acquire_PlatformAdmin()
     {
         using var ctx = CreateContext(out var conn);
-        var identity = new IdentityService(ctx);
+        var identity = new IdentityService(ctx, new PasswordHasher());
         await identity.SeedAsync();
 
         var viewer = await identity.CreateUserAsync(Tenant1, "viewer1", "V", "v@x.com", new[] { IdentityRoles.Viewer });
@@ -68,20 +69,19 @@ public class P10AcceptanceTests
         Assert.False(await identity.HasPermissionAsync(Tenant1, viewer.Id.Value, IdentityPermissions.IdentityManage));
         Assert.False(await identity.HasPermissionAsync(Tenant1, viewer.Id.Value, IdentityPermissions.DashboardDelete));
 
-        // platform-admin: 全权限
-        Assert.True(await identity.HasPermissionAsync(Tenant1, admin.Id!.Value, IdentityPermissions.IdentityManage));
-        Assert.True(await identity.HasPermissionAsync(Tenant1, admin.Id.Value, IdentityPermissions.DashboardDelete));
-        Assert.True(await identity.HasPermissionAsync(Tenant1, admin.Id.Value, IdentityPermissions.BillingManage));
+        // platform-admin 是平台租户专属治理角色，普通租户创建入口必须忽略该角色。
+        Assert.Empty(await identity.GetPermissionsAsync(Tenant1, admin.Id!.Value));
+        Assert.False(await identity.HasPermissionAsync(Tenant1, admin.Id.Value, IdentityPermissions.PlatformTenantManage));
     }
 
     [Fact]
     public async Task RBAC_Permissions_Are_Tenant_Scoped()
     {
         using var ctx = CreateContext(out var conn);
-        var identity = new IdentityService(ctx);
+        var identity = new IdentityService(ctx, new PasswordHasher());
         await identity.SeedAsync();
 
-        var created = await identity.CreateUserAsync(Tenant1, "bob", "Bob", "b@x.com", new[] { IdentityRoles.PlatformAdmin });
+        var created = await identity.CreateUserAsync(Tenant1, "bob", "Bob", "b@x.com", new[] { IdentityRoles.Member });
         Assert.True(created.Success);
 
         var inTenant1 = await identity.GetPermissionsAsync(Tenant1, created.Id!.Value);

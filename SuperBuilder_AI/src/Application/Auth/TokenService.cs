@@ -13,7 +13,11 @@ public sealed record TokenPrincipal(
 	long UserId,
 	long TenantId,
 	string Username,
-	IReadOnlyList<string> Permissions);
+	IReadOnlyList<string> Permissions)
+{
+	/// <summary>安全戳（P0-04B 令牌吊销）。令牌签发时的用户安全戳；为空表示遗留令牌（无吊销校验）。</summary>
+	public string? SecurityStamp { get; init; }
+}
 
 /// <summary>
 /// 令牌服务端口。
@@ -21,7 +25,7 @@ public sealed record TokenPrincipal(
 public interface ITokenService
 {
 	/// <summary>为指定主体签发一个 HMAC 签名令牌。</summary>
-	string Issue(long tenantId, long userId, string username, IEnumerable<string> permissions);
+	string Issue(long tenantId, long userId, string username, IEnumerable<string> permissions, string? securityStamp = null);
 
 	/// <summary>校验令牌；无效或过期返回 null。</summary>
 	TokenPrincipal? Validate(string? token);
@@ -42,7 +46,7 @@ public interface ITokenService
 /// </list>
 /// </para>
 ///
-/// <para>签名密钥来自配置 <c>Auth:SigningKey</c>；缺失时使用开发期默认值（生产必须显式配置）。</para>
+/// <para>签名密钥来自配置 <c>Auth:SigningKey</c>；调用方必须先完成环境级校验，本服务不提供默认值。</para>
 /// </summary>
 public sealed class TokenService : ITokenService
 {
@@ -51,11 +55,14 @@ public sealed class TokenService : ITokenService
 
 	public TokenService(string? signingKey)
 	{
-		var key = signingKey ?? "dev-insecure-signing-key-P11-change-in-prod";
+		if (string.IsNullOrWhiteSpace(signingKey))
+			throw new ArgumentException("A non-empty signing key is required.", nameof(signingKey));
+
+		var key = signingKey.Trim();
 		_key = Encoding.UTF8.GetBytes(key);
 	}
 
-	public string Issue(long tenantId, long userId, string username, IEnumerable<string> permissions)
+	public string Issue(long tenantId, long userId, string username, IEnumerable<string> permissions, string? securityStamp = null)
 	{
 		var now = DateTimeOffset.UtcNow;
 		var payload = new TokenPayload
@@ -64,6 +71,7 @@ public sealed class TokenService : ITokenService
 			Tid = tenantId,
 			Name = username,
 			Perms = permissions as List<string> ?? new List<string>(permissions),
+			Sec = securityStamp,
 			Iat = now.ToUnixTimeSeconds(),
 			Exp = now.Add(_lifetime).ToUnixTimeSeconds(),
 		};
@@ -106,7 +114,10 @@ public sealed class TokenService : ITokenService
 			payload.Sub,
 			payload.Tid,
 			payload.Name ?? string.Empty,
-			payload.Perms ?? new List<string>());
+			payload.Perms ?? new List<string>())
+		{
+			SecurityStamp = payload.Sec,
+		};
 	}
 
 	private byte[] Hmac(string signingInput)
@@ -134,6 +145,7 @@ public sealed class TokenService : ITokenService
 		public long Tid { get; set; }
 		public string? Name { get; set; }
 		public List<string>? Perms { get; set; }
+		public string? Sec { get; set; }
 		public long Iat { get; set; }
 		public long Exp { get; set; }
 	}

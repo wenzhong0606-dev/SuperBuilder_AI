@@ -194,7 +194,7 @@ public class SqlQueryBuilder : ISqlQueryBuilder
         QueryPlan plan,
         ISqlDialect dialect)
     {
-        if (plan.Filters.Count == 0)
+        if (plan.Filters.Count == 0 && plan.MandatoryRowFilters.Count == 0)
             return;
 
         var conditions = new List<string>();
@@ -239,9 +239,65 @@ public class SqlQueryBuilder : ISqlQueryBuilder
             parameters[parameterName] = ConvertParameterValue(filter.Value, dataType);
         }
 
+		// P0-06: security filters live in a separate collection and are always ANDed
+		// with user conditions. Applicable Allow policies on one table are ORed;
+		// Deny policies are enforced as NOT predicates and cannot be removed by input.
+		var rlsIndex = 100000;
+		foreach (var group in plan.MandatoryRowFilters.GroupBy(x => x.MetadataTableId))
+		{
+			var allow = new List<string>();
+			var deny = new List<string>();
+			foreach (var filter in group)
+			{
+				var predicate = BuildMandatoryPredicate(filter, dialect, parameters, ref rlsIndex);
+				if (filter.Deny) deny.Add($"NOT ({predicate})"); else allow.Add(predicate);
+			}
+			if (allow.Count == 0)
+				throw new InvalidOperationException("RLS 治理表缺少适用的 Allow 条件。");
+			conditions.Add($"({string.Join(" OR ", allow)})");
+			conditions.AddRange(deny);
+		}
+
         if (conditions.Count > 0)
             sql.Append(" WHERE ").Append(string.Join(" AND ", conditions));
     }
+
+	private static string BuildMandatoryPredicate(
+		MandatoryRowFilter filter,
+		ISqlDialect dialect,
+		Dictionary<string, object?> parameters,
+		ref int parameterIndex)
+	{
+		if (string.IsNullOrWhiteSpace(filter.TableName) || string.IsNullOrWhiteSpace(filter.Field))
+			throw new InvalidOperationException("RLS 策略缺少物理表或字段绑定。");
+		var field = dialect.EscapeIdentifier(filter.TableName) + "." + dialect.EscapeIdentifier(filter.Field);
+		var operation = NormalizeMandatoryOperator(filter.Operator);
+		if (operation is "IS NULL" or "IS NOT NULL") return $"{field} {operation}";
+		if (operation == "IN")
+		{
+			var values = ParseInValues(filter.Value);
+			if (values.Count == 0) throw new InvalidOperationException("RLS IN 策略值不能为空。");
+			var names = new List<string>();
+			foreach (var value in values)
+			{
+				var name = dialect.GetParameterName(parameterIndex++);
+				names.Add(name);
+				parameters[name] = ConvertParameterValue(value, filter.DataType);
+			}
+			return $"{field} IN ({string.Join(", ", names)})";
+		}
+		var parameter = dialect.GetParameterName(parameterIndex++);
+		parameters[parameter] = ConvertParameterValue(filter.Value, filter.DataType);
+		return $"{field} {operation} {parameter}";
+	}
+
+	private static string NormalizeMandatoryOperator(string? value) =>
+		(value ?? string.Empty).Trim().ToUpperInvariant() switch
+		{
+			"=" => "=", "<>" => "<>", "!=" => "<>", ">" => ">", ">=" => ">=", "<" => "<", "<=" => "<=",
+			"LIKE" => "LIKE", "IN" => "IN", "IS NULL" => "IS NULL", "IS NOT NULL" => "IS NOT NULL",
+			_ => throw new InvalidOperationException("RLS 策略包含不支持的操作符。")
+		};
 
     private static void BuildGroupBy(
         StringBuilder sql,

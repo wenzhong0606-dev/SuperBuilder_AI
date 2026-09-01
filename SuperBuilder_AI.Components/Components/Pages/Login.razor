@@ -31,10 +31,11 @@
             <div class="card">
                 <h2 style="margin:0 0 4px;">登录 / 租户选择</h2>
                 <label>用户名<input class="form-control" @bind="Username" placeholder="例如 admin" /></label>
+                <label>口令<input class="form-control" @bind="Password" type="password" placeholder="账户口令" /></label>
                 <label>租户 ID<input class="form-control" @bind="TenantId" type="number" min="1" /></label>
                 <button class="btn btn-primary" @onclick="DoLogin" disabled="@Busy">登录</button>
                 @if (!string.IsNullOrEmpty(Error)) { <div class="alert alert-danger">@Error</div> }
-                <p class="muted tiny">P11.0 阶段登录不校验口令，仅校验「用户存在且启用」后签发令牌（BYO 口令校验见 P13）。</p>
+                <p class="muted tiny">P0-04A 起登录校验口令：未设置口令的账户需先由管理员初始化。令牌携带安全戳，口令/角色变更后旧令牌立即失效。</p>
             </div>
         }
     </section>
@@ -42,6 +43,7 @@
 
 @code {
     private string Username = "";
+    private string Password = "";
     private long TenantId = 1;
     private bool Busy = false;
     private string Error = "";
@@ -49,7 +51,7 @@
     private async Task DoLogin()
     {
         Busy = true; Error = "";
-        var (r, loginErr) = await Api.LoginAsync(Username, TenantId);
+        var (r, loginErr) = await Api.LoginAsync(Username, TenantId, Password);
         Busy = false;
         if (r is null || string.IsNullOrEmpty(r.Token))
         {

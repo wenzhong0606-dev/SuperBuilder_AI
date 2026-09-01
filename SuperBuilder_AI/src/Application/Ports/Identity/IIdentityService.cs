@@ -20,6 +20,9 @@ public interface IIdentityService
     /// <summary>撤销用户角色。</summary>
     Task<IdentityResult> RevokeRoleAsync(long tenantId, long userId, string roleCode, CancellationToken ct = default);
 
+    /// <summary>设置/重置用户口令（P0-04A），并更新安全戳使旧令牌失效。</summary>
+    Task<IdentityResult> SetPasswordAsync(long tenantId, long userId, string password, CancellationToken ct = default);
+
     /// <summary>解析用户经角色聚合后的全部权限码（去重）。</summary>
     Task<IReadOnlyList<string>> GetPermissionsAsync(long tenantId, long userId, CancellationToken ct = default);
 

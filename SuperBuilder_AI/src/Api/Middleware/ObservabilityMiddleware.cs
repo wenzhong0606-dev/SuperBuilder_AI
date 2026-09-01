@@ -2,15 +2,21 @@ using System;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
+using SuperBuilder_AI.Api.Security;
 
 namespace SuperBuilder_AI.Middleware;
 
 /// <summary>
 /// 可观测性中间件（P10.5 Enterprise SaaS 治理面）。
 /// 为每个 HTTP 请求分配/透传关联 ID（<c>X-Correlation-Id</c>），
-/// 记录请求入口与响应出口日志（方法 / 路径 / 租户 / 状态码 / 耗时），
+/// 记录请求入口与响应出口日志（方法 / 路径 / 租户上下文 / 状态码 / 耗时），
 /// 全程非阻塞、异常静默，不修改响应体，不影响 Golden 行为契约。
-/// 租户从 query <c>tenantId</c> 或 header <c>X-Tenant-Id</c> 提取，缺失则记为平台级(0)。
+/// <para>
+/// P0-02B：租户事实源改为 <see cref="TenantDataPlanePolicy.ReadObserved"/>——
+/// 认证/生效租户取自令牌（或执行层写盘的解析结果），query <c>tenantId</c> 与
+/// header <c>X-Tenant-Id</c> 仅作为「请求值(RequestedTenantId)」打标，绝不作为生效租户，
+/// 杜绝伪造该值污染日志中的真实执行租户。
+/// </para>
 /// </summary>
 public sealed class ObservabilityMiddleware
 {
@@ -32,14 +38,18 @@ public sealed class ObservabilityMiddleware
         context.Items[CorrelationItemKey] = correlationId;
         TrySetResponseHeader(context, correlationId);
 
-        var tenantId = ResolveTenantId(context);
+        // P0-02B：唯一事实源——认证/生效租户取自令牌或执行层写盘结果，绝不用 query/header 值
+        var tenantCtx = TenantDataPlanePolicy.ReadObserved(context);
         var started = DateTime.UtcNow;
 
         try
         {
             TryLog(logger, LogLevel.Information,
-                "REQ {CorrelationId} {Method} {Path} tenant={Tenant}",
-                correlationId, context.Request.Method, context.Request.Path, tenantId);
+                "REQ {CorrelationId} {Method} {Path} authTenant={AuthTenant} effTenant={EffTenant} reqTenant={ReqTenant} switchAuth={SwitchAuth} mgmtTarget={MgmtTarget}",
+                correlationId, context.Request.Method, context.Request.Path,
+                tenantCtx.AuthenticatedTenantId, tenantCtx.EffectiveTenantId,
+                tenantCtx.RequestedTenantId, tenantCtx.TenantSwitchAuthorized,
+                tenantCtx.ManagementTargetTenantId);
             await _next(context);
         }
         finally
@@ -95,15 +105,6 @@ public sealed class ObservabilityMiddleware
         {
             // 异常静默
         }
-    }
-
-    private static long ResolveTenantId(HttpContext context)
-    {
-        if (context.Request.Query.TryGetValue("tenantId", out var q) && long.TryParse(q.ToString(), out var qt))
-            return qt;
-        if (context.Request.Headers.TryGetValue("X-Tenant-Id", out var h) && long.TryParse(h.ToString(), out var ht))
-            return ht;
-        return 0;
     }
 
     /// <summary>

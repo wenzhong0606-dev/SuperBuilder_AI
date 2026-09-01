@@ -7,6 +7,7 @@ using SuperBuilder_AI.Interfaces.Database;
 using SuperBuilder_AI.Models.AI;
 using SuperBuilder_AI.Models.BI;
 using SuperBuilder_AI.Interfaces.Platform;
+using SuperBuilder_AI.Interfaces.Identity;
 using SuperBuilder_AI.Models.Organization;
 
 namespace SuperBuilder_AI.Services.BI;
@@ -87,6 +88,9 @@ public class BIConversationService
 
 	private readonly IPlatformContextAccessor?
 		_platformContextAccessor;
+	private readonly IRowLevelSecurityService? _rowSecurity;
+	private readonly IDataSourceExecutionIdentityAccessor? _executionIdentity;
+	private readonly IQueryPlanSecurityGate? _securityGate;
 
 
 	public BIConversationService(
@@ -97,7 +101,10 @@ public class BIConversationService
 		SuperBIContext superBIContext,
 		IQueryExecutionService queryExecutionService,
 		IResultUnderstandingService resultUnderstandingService,
-		IPlatformContextAccessor? platformContextAccessor = null)
+		IPlatformContextAccessor? platformContextAccessor = null,
+		IRowLevelSecurityService? rowSecurity = null,
+		IDataSourceExecutionIdentityAccessor? executionIdentity = null,
+		IQueryPlanSecurityGate? securityGate = null)
 	{
 		_queryUnderstandingService =
 			queryUnderstandingService;
@@ -122,23 +129,30 @@ public class BIConversationService
 
 		_platformContextAccessor =
 			platformContextAccessor;
+		_rowSecurity = rowSecurity;
+		_executionIdentity = executionIdentity;
+		_securityGate = securityGate;
 	}
 
 
 	public async Task<BIResponse> AskAsync(
 		string question,
-		long tenantId)
+		long tenantId,
+		long? requestedDataSourceId = null,
+		IReadOnlyCollection<long>? authorizedDataSourceIds = null)
 	{
 		return await ExecuteAsync(
 			question,
-			tenantId);
+			tenantId,
+			requestedDataSourceId,
+			authorizedDataSourceIds);
 	}
 
 
 	/// <summary>
 	/// 执行一次 BI 查询。
 	///
-	/// Phase 2.2.5:
+	/// Phase 2.2.5：
 	///
 	/// Validate
 	///     ↓
@@ -146,13 +160,13 @@ public class BIConversationService
 	///     ↓
 	/// ReValidate
 	///
-	/// Phase 2.4:
+	/// Phase 2.4：
 	///
 	/// Confidence
 	///     ↓
 	/// Decision Gate
 	///
-	/// Phase 2.5:
+	/// Phase 2.5：
 	///
 	/// Explainability
 	///     ↓
@@ -161,7 +175,9 @@ public class BIConversationService
 	public async Task<BIResponse>
 		ExecuteAsync(
 			string question,
-			long tenantId)
+			long tenantId,
+			long? requestedDataSourceId = null,
+			IReadOnlyCollection<long>? authorizedDataSourceIds = null)
 	{
 		/*
 		 * Step 0（P4）
@@ -210,7 +226,9 @@ public class BIConversationService
 			await _queryPlanPipeline
 				.RunAsync(
 					question,
-					intent);
+					intent,
+					requestedDataSourceId,
+					authorizedDataSourceIds);
 
 		if (pipelineResult.EarlyResponse != null)
 		{
@@ -222,6 +240,28 @@ public class BIConversationService
 
 		var explanation =
 			pipelineResult.Explanation;
+
+		// P0-05 最终闸门：即使计划被伪造或前置过滤回归，也不能进入 SQL 生成与执行。
+		if (authorizedDataSourceIds is not null &&
+			!authorizedDataSourceIds.Contains(plan.DataSourceId))
+		{
+			throw SuperBuilder_AI.Api.Errors.SuperBuilderException.FromCode(
+				SuperBuilder_AI.Api.Errors.ErrorCodes.DataSourceForbidden, 403);
+		}
+
+		// P0-06 固定落点：Plan 已成型、SQL Builder 尚未调用。
+		// 认证 API 必须具备执行身份；Golden/内部兼容路径的授权集合为 null，不进入 RLS。
+		if (authorizedDataSourceIds is not null && _rowSecurity is not null)
+		{
+			var caller = _executionIdentity?.Current;
+			if (caller is null || caller.TenantId != tenantId)
+				throw SuperBuilder_AI.Api.Errors.SuperBuilderException.FromCode(
+					SuperBuilder_AI.Api.Errors.ErrorCodes.RowPolicyForbidden, 403);
+			plan.EffectiveTenantId = tenantId;
+			await _rowSecurity.ApplyAsync(plan, tenantId, caller.UserId);
+			if (_securityGate is not null)
+				await _securityGate.ValidateAsync(plan, tenantId, caller.UserId);
+		}
 
 
 		/*
@@ -241,7 +281,7 @@ public class BIConversationService
 			await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions
 				.FirstAsync(
 					_superBIContext.DataSources,
-					x => x.Id == plan.DataSourceId);
+					x => x.Id == plan.DataSourceId && x.TenantId == tenantId && x.Enabled == true);
 
 
 		var dialect =

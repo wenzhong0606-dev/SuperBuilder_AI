@@ -117,7 +117,9 @@ public partial class QueryPlanBuilder : IQueryPlanBuilder
 	/// </summary>
 	public async Task<QueryPlan>
 		BuildAsync(
-			QueryIntent intent)
+			QueryIntent intent,
+			long? requestedDataSourceId = null,
+			IReadOnlyCollection<long>? authorizedDataSourceIds = null)
 	{
 
 
@@ -231,9 +233,59 @@ public partial class QueryPlanBuilder : IQueryPlanBuilder
 			await SearchMetadataAsync(
 				businessTerms);
 
+		// P0-05：在选表前收敛到当前用户被显式授权的数据源集合。
+		// null 仅用于 Golden / 内部兼容路径；认证 API 必须传入非 null 集合。
+		if (authorizedDataSourceIds is not null)
+		{
+			var allowed = authorizedDataSourceIds.Where(id => id > 0).ToHashSet();
+			metadataResults = metadataResults
+				.Where(r => r.Table != null && allowed.Contains(r.Table.DataSourceId))
+				.ToList();
+
+			if (metadataResults.Count == 0)
+				throw SuperBuilder_AI.Api.Errors.SuperBuilderException.FromCode(
+					SuperBuilder_AI.Api.Errors.ErrorCodes.DataSourceForbidden, 403);
+		}
 
 
 
+
+
+
+		/*
+		 * ============================================================
+		 * Step 2.5（P0-01）
+		 *
+		 * 显式指定数据源时，约束元数据搜索 / 选表范围。
+		 *
+		 * 必须在 SelectBestTable 之前生效：仅保留属于该数据源的候选
+		 * （表 / 列 / 语义向量均通过 MetadataTable.DataSourceId 关联到父表，
+		 * 因此按 Table.DataSourceId 过滤即可把整个结果集收敛到目标数据源）。
+		 *
+		 * 由此保证：
+		 *   - 选中主表的 DataSourceId == requestedDataSourceId；
+		 *   - plan.DataSourceId（Step 5 由选中表回填）== requestedDataSourceId；
+		 *   - 缓存键（请求方使用的同一 DataSourceId）、执行连接、计划三者同源，
+		 *     彻底消除“B 表 + plan.DataSourceId=A”的静默错误答案。
+		 *
+		 * requestedDataSourceId 为 null 或 <=0 时保持原有推断行为（Golden / 默认路径不变）。
+		 * 指定数据源但其中无任何匹配表时，明确报错而非静默回退到其它数据源。
+		 * ============================================================
+		 */
+		if (requestedDataSourceId is { } dsId && dsId > 0)
+		{
+			var scopedResults = metadataResults
+				.Where(r => r.Table != null && r.Table.DataSourceId == dsId)
+				.ToList();
+
+			if (scopedResults.Count == 0)
+			{
+				throw new InvalidOperationException(
+					$"所选数据源（Id={dsId}）下未找到与问题相关的表：{intent.OriginalQuestion}");
+			}
+
+			metadataResults = scopedResults;
+		}
 
 
 		if (metadataResults.Count == 0)

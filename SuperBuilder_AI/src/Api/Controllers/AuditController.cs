@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using SuperBuilder_AI.Data;
+using SuperBuilder_AI.Api.Security;
 using SuperBuilder_AI.Interfaces.Audit;
 using SuperBuilder_AI.Models.Audit;
 
@@ -33,11 +34,19 @@ public sealed class AuditController : ControllerBase
     }
 
     /// <summary>在当前请求作用域内开启租户隔离，返回解析出的租户 Id。</summary>
+    /// <summary>在当前请求作用域内开启租户隔离：有效租户恒为认证租户，跨租户显式请求直接拒绝。</summary>
     private long ScopeTo(long requestedTenantId)
     {
-        var tenantId = requestedTenantId > 0 ? requestedTenantId : 0;
-        _db.ApplyTenantScope(tenantId);
-        return tenantId;
+        var resolution = TenantDataPlanePolicy.ResolvePlatformScope(User, requestedTenantId);
+        // P0-02B：把解析出的租户上下文写盘，供审计/可观测中间件读取；治理角色管理他租户时另记管理目标
+        TenantDataPlanePolicy.StorePlatformScope(HttpContext, resolution, "Audit");
+        if (!resolution.Authorized)
+            throw new SuperBuilder_AI.Api.Errors.SuperBuilderException(
+                SuperBuilder_AI.Api.Errors.ErrorCodes.TenantIsolated,
+                "禁止：租户作用域请求只能访问认证租户的数据，跨租户访问被拒绝。",
+                403);
+        _db.ApplyTenantScope(resolution.EffectiveTenantId);
+        return resolution.EffectiveTenantId;
     }
 
     /// <summary>租户作用域查询审计日志（按时间倒序）。</summary>

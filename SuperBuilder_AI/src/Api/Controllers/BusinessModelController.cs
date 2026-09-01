@@ -1,4 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
+using SuperBuilder_AI.Api.Errors;
+using SuperBuilder_AI.Api.Security;
 using SuperBuilder_AI.Interfaces.BI.Entity;
 
 namespace SuperBuilder_AI.Controllers;
@@ -22,19 +24,34 @@ public sealed class BusinessModelController : ControllerBase
     }
 
     [HttpGet("entities")]
-    public async Task<IActionResult> ListEntities([FromQuery] long tenantId, CancellationToken cancellationToken = default)
-        => Ok(await _registry.ListEntitiesAsync(tenantId, cancellationToken));
+    public async Task<IActionResult> ListEntities([FromQuery] long? tenantId, CancellationToken cancellationToken = default)
+    {
+		var resolution = TenantDataPlanePolicy.Resolve(User, tenantId);
+		if (!resolution.Authorized) return TenantMismatch();
+		return Ok(await _registry.ListEntitiesAsync(resolution.EffectiveTenantId, cancellationToken));
+	}
 
     [HttpGet("domains")]
-    public async Task<IActionResult> ListDomains([FromQuery] long tenantId, CancellationToken cancellationToken = default)
-        => Ok(await _registry.ListDomainsAsync(tenantId, cancellationToken));
+    public async Task<IActionResult> ListDomains([FromQuery] long? tenantId, CancellationToken cancellationToken = default)
+    {
+		var resolution = TenantDataPlanePolicy.Resolve(User, tenantId);
+		if (!resolution.Authorized) return TenantMismatch();
+		return Ok(await _registry.ListDomainsAsync(resolution.EffectiveTenantId, cancellationToken));
+	}
 
     [HttpGet("resolve")]
     public async Task<IActionResult> Resolve(
-        [FromQuery] long tenantId,
+        [FromQuery] long? tenantId,
         [FromQuery] long dataSourceId,
         [FromQuery] string q,
         [FromQuery] int topPerDomain = 3,
         CancellationToken cancellationToken = default)
-        => Ok(await _mapper.ResolveAsync(tenantId, dataSourceId, q, topPerDomain, cancellationToken));
+    {
+		var resolution = TenantDataPlanePolicy.Resolve(User, tenantId);
+		if (!resolution.Authorized) return TenantMismatch();
+		return Ok(await _mapper.ResolveAsync(resolution.EffectiveTenantId, dataSourceId, q, topPerDomain, cancellationToken));
+	}
+
+	private ObjectResult TenantMismatch() => StatusCode(403,
+		new ApiError { Code = ErrorCodes.TenantIsolated, Message = "禁止：数据面请求租户必须与认证租户一致。" });
 }

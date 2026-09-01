@@ -5,6 +5,7 @@ using Npgsql;
 using Microsoft.EntityFrameworkCore;
 using SuperBuilder_AI.Data;
 using SuperBuilder_AI.Interfaces.Database;
+using SuperBuilder_AI.Interfaces.Identity;
 
 
 namespace SuperBuilder_AI.Services.Database;
@@ -30,6 +31,8 @@ public class DataSourceConnectionFactory
 
 
 	private readonly SuperBIContext _context;
+	private readonly IDataSourceAuthorizationService? _authorization;
+	private readonly IDataSourceExecutionIdentityAccessor? _executionIdentity;
 
 
 
@@ -37,10 +40,14 @@ public class DataSourceConnectionFactory
 	/// 构造函数。
 	/// </summary>
 	public DataSourceConnectionFactory(
-		SuperBIContext context)
+		SuperBIContext context,
+		IDataSourceAuthorizationService? authorization = null,
+		IDataSourceExecutionIdentityAccessor? executionIdentity = null)
 	{
 
 		_context = context;
+		_authorization = authorization;
+		_executionIdentity = executionIdentity;
 
 	}
 
@@ -70,6 +77,15 @@ public class DataSourceConnectionFactory
 		{
 			throw new InvalidOperationException(
 				$"不存在数据源:{dataSourceId}");
+		}
+
+		var caller = _executionIdentity?.Current;
+		if (caller is not null &&
+			(dataSource.TenantId != caller.TenantId || dataSource.Enabled != true ||
+			 _authorization is null ||
+			 !await _authorization.IsAuthorizedAsync(caller.TenantId, caller.UserId, dataSourceId)))
+		{
+			throw new UnauthorizedAccessException("当前账号无权执行所选数据源。");
 		}
 
 

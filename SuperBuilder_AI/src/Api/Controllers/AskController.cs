@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Security.Claims;
+using System.Security.Cryptography;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
@@ -35,12 +37,21 @@ public sealed class AskController : ControllerBase
 	private readonly IBIConversationService _bi;
 	private readonly IIdentityService _identity;
 	private readonly IAskResponseCache? _cache;
+	private readonly IDataSourceAuthorizationService? _dataSourceAuthorization;
+	private readonly IRowLevelSecurityService? _rowSecurity;
 
-	public AskController(IBIConversationService bi, IIdentityService identity, IAskResponseCache? cache = null)
+	public AskController(
+		IBIConversationService bi,
+		IIdentityService identity,
+		IAskResponseCache? cache = null,
+		IDataSourceAuthorizationService? dataSourceAuthorization = null,
+		IRowLevelSecurityService? rowSecurity = null)
 	{
 		_bi = bi;
 		_identity = identity;
 		_cache = cache;
+		_dataSourceAuthorization = dataSourceAuthorization;
+		_rowSecurity = rowSecurity;
 	}
 
 	/// <summary>提交一个自然语言问题并执行 BI 查询。</summary>
@@ -64,12 +75,19 @@ public sealed class AskController : ControllerBase
 		if (!await _identity.HasPermissionAsync(tenantId, userId, IdentityPermissions.DashboardView, cancellationToken))
 			return StatusCode(403, new ApiError { Code = ErrorCodes.Forbidden, Message = "禁止：缺少 dashboard:view 权限。" });
 
+		var access = await ResolveDataSourceAccessAsync(tenantId, userId, request.DataSourceId, cancellationToken);
+		if (access.ForbiddenResult is not null) return access.ForbiddenResult;
+
 		// P11.5.1 语义缓存：命中则直接返回，跳过整条 BI 链路（仅作用于 api/ask；Golden 走独立端点不受影响）。
 		// ?noCache=1 旁路，便于联调/强制刷新。
-		var bypass = BypassCache();
+		var bypass = BypassCache() || access.BypassCache;
+		var policyFingerprint = _rowSecurity is null
+			? "legacy"
+			: await _rowSecurity.GetPolicyFingerprintAsync(tenantId, userId, cancellationToken);
+		var cacheQuestion = string.Concat(request.Question!, "\u001fperm:", access.PermissionFingerprint ?? "legacy", "\u001fpolicy:", policyFingerprint);
 		if (_cache is not null && !bypass)
 		{
-			var cached = _cache.Get(tenantId, request.Question!, request.DataSourceId);
+			var cached = _cache.Get(tenantId, cacheQuestion, access.EffectiveDataSourceId ?? 0);
 			if (cached is not null)
 			{
 				Response.Headers["X-Cache"] = "HIT";
@@ -78,9 +96,13 @@ public sealed class AskController : ControllerBase
 			Response.Headers["X-Cache"] = "MISS";
 		}
 
-		var response = await _bi.AskAsync(request.Question, tenantId);
+		var response = await _bi.AskAsync(
+			request.Question,
+			tenantId,
+			access.EffectiveDataSourceId,
+			access.AuthorizedDataSourceIds);
 
-		if (_cache is not null && !bypass) _cache.Set(tenantId, request.Question!, request.DataSourceId, response);
+		if (_cache is not null && !bypass) _cache.Set(tenantId, cacheQuestion, access.EffectiveDataSourceId ?? 0, response);
 		return Ok(response);
 	}
 
@@ -121,13 +143,62 @@ public sealed class AskController : ControllerBase
 		if (!await _identity.HasPermissionAsync(tenantId, userId, IdentityPermissions.DashboardView, cancellationToken))
 			return StatusCode(403, new ApiError { Code = ErrorCodes.Forbidden, Message = "禁止：缺少 dashboard:view 权限。" });
 
+		var access = await ResolveDataSourceAccessAsync(tenantId, userId, request.DataSourceId, cancellationToken);
+		if (access.ForbiddenResult is not null) return access.ForbiddenResult;
+
 		var composed = ComposeRefinedQuestion(request);
 		if (string.IsNullOrWhiteSpace(composed))
 			return BadRequest(new ApiError { Code = ErrorCodes.BadRequest, Message = "缺少可用于查询的问题内容。" });
 
-		var response = await _bi.AskAsync(composed, tenantId);
+		var response = await _bi.AskAsync(
+			composed,
+			tenantId,
+			access.EffectiveDataSourceId,
+			access.AuthorizedDataSourceIds);
 		return Ok(response);
 	}
+
+	private async Task<DataSourceAccessResolution> ResolveDataSourceAccessAsync(
+		long tenantId,
+		long userId,
+		long requestedDataSourceId,
+		CancellationToken cancellationToken)
+	{
+		// 兼容纯单元测试和 Golden 内部路径；生产依赖注入始终提供授权服务。
+		if (_dataSourceAuthorization is null)
+			return new DataSourceAccessResolution(
+				requestedDataSourceId > 0 ? requestedDataSourceId : null, null, null, false, null);
+
+		var allowed = await _dataSourceAuthorization
+			.GetAuthorizedDataSourceIdsAsync(tenantId, userId, cancellationToken);
+		if (allowed.Count == 0 || (requestedDataSourceId > 0 && !allowed.Contains(requestedDataSourceId)))
+		{
+			return new DataSourceAccessResolution(null, allowed, null, true,
+				StatusCode(403, new ApiError
+				{
+					Code = ErrorCodes.DataSourceForbidden,
+					Message = ErrorCodes.Message(ErrorCodes.DataSourceForbidden)
+				}));
+		}
+
+		var fingerprint = Convert.ToHexString(SHA256.HashData(
+			Encoding.UTF8.GetBytes(string.Join(",", allowed.OrderBy(id => id)))));
+		if (requestedDataSourceId > 0)
+			return new DataSourceAccessResolution(requestedDataSourceId, allowed, fingerprint, false, null);
+
+		// 未指定且仅有一个授权源时，可将其变成显式约束并安全缓存；多授权源下
+		// 计划可能选择任一来源，因此绕过旧的 DataSourceId=0 缓存，避免撤权后复用旧答案。
+		return allowed.Count == 1
+			? new DataSourceAccessResolution(allowed[0], allowed, fingerprint, false, null)
+			: new DataSourceAccessResolution(null, allowed, fingerprint, true, null);
+	}
+
+	private sealed record DataSourceAccessResolution(
+		long? EffectiveDataSourceId,
+		IReadOnlyCollection<long>? AuthorizedDataSourceIds,
+		string? PermissionFingerprint,
+		bool BypassCache,
+		IActionResult? ForbiddenResult);
 
 	/// <summary>
 	/// 将「原始问题 + 历史用户轮次 + 本轮细化指令」合成为一条独立可理解的自然语言问题。

@@ -34,6 +34,9 @@ public static class ErrorCodes
     // 平台（多租户 / 配额 / 审计）
     public const string QuotaExceeded = "SB_PFM_001";
     public const string TenantIsolated = "SB_PFM_002";
+    public const string DataSourceForbidden = "SB_AUTHZ_001";
+    public const string RowPolicyForbidden = "SB_AUTHZ_002";
+    public const string QueryPlanSecurityRejected = "SB_SECURITY_001";
 
     /// <summary>友好提示文案（无匹配时回退到通用提示）。</summary>
     private static readonly Dictionary<string, string> Friendly = new()
@@ -55,6 +58,9 @@ public static class ErrorCodes
         [AgentNoContent] = "智能体未返回有效内容，请重新描述任务。",
         [QuotaExceeded] = "当前租户配额已用尽，请升级套餐或联系管理员。",
         [TenantIsolated] = "操作越过了租户边界，已被安全策略拒绝。",
+        [DataSourceForbidden] = "当前账号无权访问所选数据源。",
+        [RowPolicyForbidden] = "当前账号没有满足行级数据策略的访问范围。",
+        [QueryPlanSecurityRejected] = "查询计划未通过最终安全校验，已在执行前阻断。",
     };
 
     /// <summary>取错误码对应的友好中文提示；缺省回退到通用内部错误提示。</summary>

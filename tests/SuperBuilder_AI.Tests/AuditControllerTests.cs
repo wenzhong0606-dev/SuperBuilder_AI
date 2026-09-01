@@ -72,7 +72,7 @@ public class AuditControllerTests
     }
 
     [Fact]
-    public async Task ListLogs_TenantScoped_OnlyOwn_And_Global()
+    public async Task ListLogs_TenantScoped_OnlyOwn_NotPlatformGlobal()
     {
         var ctx = CreateContext(out var connection);
         await using var _ = connection;
@@ -86,9 +86,8 @@ public class AuditControllerTests
         var result = await ctrl.ListLogs(Tenant7, cancellationToken: CancellationToken.None) as Microsoft.AspNetCore.Mvc.OkObjectResult;
         Assert.NotNull(result);
         var logs = Assert.IsAssignableFrom<IEnumerable<AuditController.AuditLogSummary>>(result!.Value).ToList();
-        Assert.Equal(2, logs.Count);
-        Assert.Contains(logs, l => l.TenantId == Tenant7);
-        Assert.Contains(logs, l => l.TenantId == 0);
+		Assert.Single(logs);
+		Assert.Equal(Tenant7, logs[0].TenantId);
     }
 
     [Fact]

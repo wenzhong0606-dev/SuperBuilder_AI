@@ -24,13 +24,18 @@ public interface IQueryPlanPipeline
 	/// </summary>
 	/// <param name="question">用户原始问题。</param>
 	/// <param name="intent">已理解的查询意图。</param>
+	/// <param name="requestedDataSourceId">
+	/// 可选数据源约束，透传给 <see cref="IQueryPlanBuilder"/>。为 null 或 &lt;=0 时保持原有行为。
+	/// </param>
 	/// <returns>
 	/// 成功时返回 Plan / Confidence / Decision / Explanation；
 	/// 当验证失败或 Decision Gate 阻断而提前结束时，EarlyResponse 非空，调用方应直接返回它。
 	/// </returns>
 	Task<QueryPlanPipelineResult> RunAsync(
 		string question,
-		QueryIntent intent);
+		QueryIntent intent,
+		long? requestedDataSourceId = null,
+		IReadOnlyCollection<long>? authorizedDataSourceIds = null);
 }
 
 /// <summary>

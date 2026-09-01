@@ -36,7 +36,12 @@ using SuperBuilder_AI.Middleware;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddControllersWithViews();
+builder.Services.AddControllersWithViews(options =>
+{
+	// SB-P0-09: Golden/evaluation controllers are Development-only infrastructure.
+	if (!builder.Environment.IsDevelopment())
+		options.Conventions.Add(new SuperBuilder_AI.Api.Security.ProductionEvaluationRouteConvention());
+});
 builder.Services.AddHttpClient();
 
 builder.Services.AddDbContext<SuperBIContext>(options =>
@@ -179,6 +184,10 @@ builder.Services.AddScoped<IAgentPlanner, AgentPlanner>();
 
 // P10.1 Identity / RBAC（确定性，不调 LLM）
 builder.Services.AddScoped<IIdentityService, IdentityService>();
+builder.Services.AddScoped<IDataSourceAuthorizationService, DataSourceAuthorizationService>();
+builder.Services.AddScoped<IDataSourceExecutionIdentityAccessor, DataSourceExecutionIdentityAccessor>();
+builder.Services.AddScoped<IRowLevelSecurityService, RowLevelSecurityService>();
+builder.Services.AddScoped<IQueryPlanSecurityGate, QueryPlanSecurityGate>();
 
 // P10.3 Audit Log（确定性，不调 LLM）
 builder.Services.AddScoped<IAuditLogService, AuditLogService>();
@@ -203,19 +212,26 @@ builder.Services.AddScoped<MetadataSearchService>();
 builder.Services.AddScoped<IMetadataSearchService>(sp => sp.GetRequiredService<MetadataSearchService>());
 builder.Services.AddScoped<GoldenBaselineComparisonService>();
 
-// P11.0 安全轨道：无状态令牌服务（单例；密钥取自配置 Auth:SigningKey，缺失用开发默认值）
-var authSigningKey = builder.Configuration["Auth:SigningKey"];
+// SB-P0-03：所有环境均须显式配置 SigningKey；非开发环境额外执行强度校验并 fail-fast。
+var authSigningKey = SuperBuilder_AI.Services.Auth.AuthSigningKeyPolicy.Validate(
+	builder.Configuration["Auth:SigningKey"],
+	builder.Environment.IsDevelopment());
 builder.Services.AddSingleton<SuperBuilder_AI.Services.Auth.ITokenService>(
 	new SuperBuilder_AI.Services.Auth.TokenService(authSigningKey));
+builder.Services.AddSingleton<SuperBuilder_AI.Services.Auth.IPasswordHasher>(
+	new SuperBuilder_AI.Services.Auth.PasswordHasher());
 
-// P11.0 CORS 策略（MAUI / Blazor Web 跨源联调；生产须显式配置 Cors:AllowedOrigins）
-var corsOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>();
+// SB-P0-08：开放跨域仅允许 Development 显式启用；其他环境必须提供有限白名单并 fail-fast。
+var corsPolicy = SuperBuilder_AI.Api.Security.CorsOriginPolicy.Resolve(
+	builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>(),
+	builder.Configuration.GetValue<bool>("Cors:AllowAnyOrigin"),
+	builder.Environment.IsDevelopment());
 builder.Services.AddCors(o => o.AddPolicy("P11Cors", p =>
 {
-	if (corsOrigins is { Length: > 0 })
-		p.WithOrigins(corsOrigins).AllowAnyHeader().AllowAnyMethod();
-	else
+	if (corsPolicy.AllowAnyOrigin)
 		p.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod();
+	else
+		p.WithOrigins(corsPolicy.AllowedOrigins.ToArray()).AllowAnyHeader().AllowAnyMethod();
 }));
 
 // P11.5.1 性能/成本轨：Ask 语义响应缓存（租户 + 归一化问题为键，TTL 默认 60s，LRU 淘汰）
@@ -268,6 +284,8 @@ app.UseHttpsRedirection();
 app.UseRouting();
 // P11 错误治理：统一异常 → 结构化友好 JSON（错误码 + 关联ID），须位于路由之后、端点之前，包裹后续所有中间件
 app.UseMiddleware<UnifiedExceptionMiddleware>();
+// P0-10：审计必须包裹鉴权/限流/端点，确保入口拒绝与异常拒绝均入账。
+app.UseMiddleware<AuditMiddleware>();
 // P11.0 安全轨道：CORS → 限流 → 鉴权（顺序：路由之后、授权之前；与 Observability/Audit 互不干扰）
 app.UseCors("P11Cors");
 app.UseMiddleware<RateLimitMiddleware>();
@@ -275,13 +293,11 @@ app.UseMiddleware<AuthMiddleware>();
 app.UseAuthorization();
 // P10.5 可观测性中间件（关联ID透传 + 请求/响应日志 + 耗时，非阻塞、异常静默，不影响 Golden 行为契约）
 app.UseMiddleware<ObservabilityMiddleware>();
-// P10.3 自动请求级审计中间件（非阻塞、异常静默，不影响 Golden 行为契约）
-app.UseMiddleware<AuditMiddleware>();
 app.MapStaticAssets();
 app.MapControllerRoute(name: "default", pattern: "{controller=Home}/{action=Index}/{id?}").WithStaticAssets();
 // P11.0 健康探测（匿名白名单，供运维/可观测面使用）
 app.MapGet("/health", () => new { status = "healthy", ts = System.DateTime.UtcNow });
-// P11.5.2 请求指标端点（匿名白名单，供运维/可观测面拉取；异常静默降级为空快照）
+// SB-P0-09 请求指标端点：由 AuthMiddleware 强制 platform:diagnostics:view 权限。
 app.MapGet("/metrics", (SuperBuilder_AI.Middleware.RequestMetricsCollector metrics,
 		SuperBuilder_AI.Api.Caching.IAskResponseCache cache) =>
 {

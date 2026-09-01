@@ -7,6 +7,10 @@
 /// </summary>
 public class QueryPlan
 {
+    /// <summary>
+    /// 安全边界确定的有效租户。该值由认证编排层写入，不接受语义模型推断。
+    /// </summary>
+    public long? EffectiveTenantId { get; set; }
     public QueryIntent? Intent { get; set; }
     public long DataSourceId { get; set; }
     public List<QueryTable> Tables { get; set; } = new();
@@ -14,6 +18,8 @@ public class QueryPlan
     public List<QueryMetric> Metrics { get; set; } = new();
     public List<QueryDimension> Dimensions { get; set; } = new();
     public List<QueryFilter> Filters { get; set; } = new();
+    public List<MandatoryRowFilter> MandatoryRowFilters { get; set; } = new();
+    public string? DataPolicyFingerprint { get; set; }
     public List<QueryOrder> Orders { get; set; } = new();
     public List<QueryJoin> Joins { get; set; } = new();
     public bool IsAggregate { get; set; }

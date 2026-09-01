@@ -1,6 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using SuperBuilder_AI.Api.Errors;
+using SuperBuilder_AI.Api.Security;
 using SuperBuilder_AI.Data;
+using SuperBuilder_AI.Models.Identity;
 using SuperBuilder_AI.Models.Organization;
 
 namespace SuperBuilder_AI.Controllers;
@@ -23,9 +26,23 @@ public sealed class TenantManagementController : ControllerBase
 		_db = db;
 	}
 
+	/// <summary>
+	/// SB-P0-02A 平台治理面权限门禁：租户生命周期操作属平台级管理面，调用者令牌须携带
+	/// 对应的 <c>platform:tenant:*</c> 权限码（由 SB-P0-11 的治理角色授予），否则 403。
+	/// 本控制器只读写为 <c>Organization.Tenant</c> / <c>TenantSettings</c> 全局表，不触碰任何
+	/// 租户业务数据与 Golden 契约，不影响 Golden 18/18 行为契约。
+	/// </summary>
+	private IActionResult? RequirePlatformPermission(string permission)
+	{
+		if (!User.HasClaim("perm", permission))
+			return StatusCode(403, new ApiError { Code = ErrorCodes.Forbidden, Message = $"禁止：缺少 {permission} 权限。" });
+		return null;
+	}
+
 	[HttpGet]
 	public async Task<IActionResult> List(CancellationToken cancellationToken = default)
 	{
+		if (RequirePlatformPermission(IdentityPermissions.PlatformTenantView) is { } denied) return denied;
 		var tenants = await _db.Tenants
 			.AsNoTracking()
 			.OrderBy(t => t.Id)
@@ -37,6 +54,9 @@ public sealed class TenantManagementController : ControllerBase
 	[HttpGet("{id:long}")]
 	public async Task<IActionResult> Get(long id, CancellationToken cancellationToken = default)
 	{
+		if (RequirePlatformPermission(IdentityPermissions.PlatformTenantView) is { } denied) return denied;
+		// P0-02B：治理角色读取具体租户 B，记录管理目标（不记为 TenantSwitch）
+		TenantDataPlanePolicy.StoreManagementTarget(HttpContext, id, "tenant.read", true);
 		var t = await _db.Tenants
 			.AsNoTracking()
 			.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
@@ -49,6 +69,7 @@ public sealed class TenantManagementController : ControllerBase
 		[FromBody] CreateTenantRequest request,
 		CancellationToken cancellationToken = default)
 	{
+		if (RequirePlatformPermission(IdentityPermissions.PlatformTenantManage) is { } denied) return denied;
 		var code = (request.TenantCode ?? string.Empty).Trim();
 		if (code.Length == 0)
 			return BadRequest("TenantCode 不能为空。");
@@ -77,6 +98,10 @@ public sealed class TenantManagementController : ControllerBase
 
 	private async Task<IActionResult> SetEnabledAsync(long id, bool enabled, CancellationToken cancellationToken)
 	{
+		if (RequirePlatformPermission(IdentityPermissions.PlatformTenantManage) is { } denied) return denied;
+		// P0-02B：治理角色启用/停用具体租户 B，记录管理目标与动作（不记为 TenantSwitch）
+		TenantDataPlanePolicy.StoreManagementTarget(
+			HttpContext, id, enabled ? "tenant.enable" : "tenant.disable", true);
 		var t = await _db.Tenants.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
 		if (t is null) return NotFound();
 		t.Enabled = enabled;
@@ -87,6 +112,9 @@ public sealed class TenantManagementController : ControllerBase
 	[HttpGet("{id:long}/settings")]
 	public async Task<IActionResult> ListSettings(long id, CancellationToken cancellationToken = default)
 	{
+		if (RequirePlatformPermission(IdentityPermissions.PlatformTenantView) is { } denied) return denied;
+		// P0-02B：治理角色读取具体租户 B 的配置，记录管理目标（不记为 TenantSwitch）
+		TenantDataPlanePolicy.StoreManagementTarget(HttpContext, id, "tenant.settings.read", true);
 		if (!await _db.Tenants.AnyAsync(t => t.Id == id, cancellationToken))
 			return NotFound($"租户 {id} 不存在。");
 
@@ -105,6 +133,9 @@ public sealed class TenantManagementController : ControllerBase
 		[FromBody] UpsertTenantSettingRequest request,
 		CancellationToken cancellationToken = default)
 	{
+		if (RequirePlatformPermission(IdentityPermissions.PlatformTenantManage) is { } denied) return denied;
+		// P0-02B：治理角色写入具体租户 B 的配置，记录管理目标与动作（不记为 TenantSwitch）
+		TenantDataPlanePolicy.StoreManagementTarget(HttpContext, id, "tenant.settings.upsert", true);
 		var key = (request.Key ?? string.Empty).Trim();
 		if (key.Length == 0)
 			return BadRequest("Key 不能为空。");

@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SuperBuilder_AI.Data;
+using SuperBuilder_AI.Api.Security;
 using SuperBuilder_AI.Interfaces.BI;
 using SuperBuilder_AI.Interfaces.BI.Dashboard;
 using SuperBuilder_AI.Interfaces.Platform;
@@ -67,14 +68,21 @@ public sealed class DashboardController : ControllerBase
 	/// 其次回退到访问器中已作用域的租户；二者皆无则视为系统/全局上下文（不施加隔离）。
 	/// 同时把解析出的上下文写回访问器，供下游（渲染取数链路）一致读取。
 	/// </summary>
+	/// <summary>
+	/// 在当前请求作用域内解析并开启租户隔离：有效租户恒为认证租户（数据面单租户恒等），
+	/// 跨租户显式请求直接拒绝。同时把解析出的上下文写回访问器，供下游（渲染取数链路）一致读取。
+	/// </summary>
 	private (long TenantId, PlatformContext Context) ScopeTo(long requestedTenantId)
 	{
-		var tenantId = requestedTenantId > 0
-			? requestedTenantId
-			: _accessor.Current?.Tenant?.IsScoped == true
-				? _accessor.Current.Tenant.TenantId
-				: 0;
-
+		var resolution = TenantDataPlanePolicy.ResolvePlatformScope(User, requestedTenantId);
+		// P0-02B：把解析出的租户上下文写盘，供审计/可观测中间件读取；治理角色管理他租户时另记管理目标
+		TenantDataPlanePolicy.StorePlatformScope(HttpContext, resolution, "Dashboard");
+		if (!resolution.Authorized)
+			throw new SuperBuilder_AI.Api.Errors.SuperBuilderException(
+				SuperBuilder_AI.Api.Errors.ErrorCodes.TenantIsolated,
+				"禁止：租户作用域请求只能访问认证租户的数据，跨租户访问被拒绝。",
+				403);
+		var tenantId = resolution.EffectiveTenantId;
 		var context = tenantId > 0 ? PlatformContext.FromTenant(tenantId) : PlatformContext.System;
 		_accessor.Current = context;
 		_db.ApplyTenantScope(tenantId);

@@ -3,7 +3,12 @@ using System.Collections.Generic;
 using System.Security.Claims;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using SuperBuilder_AI.Api.Errors;
+using SuperBuilder_AI.Api.Security;
+using SuperBuilder_AI.Data;
+using SuperBuilder_AI.Interfaces.Identity;
 using SuperBuilder_AI.Services.Auth;
 
 namespace SuperBuilder_AI.Middleware;
@@ -49,10 +54,12 @@ public sealed class AuthMiddleware
 		var raw = ExtractToken(context);
 		var principal = raw is null ? null : _tokenService.Validate(raw);
 
+		var diagnosticsPermission = DiagnosticsAccessPolicy.GetRequiredPermission(context.Request.Path);
 		if (principal is null)
 		{
-			if (context.Request.Path.StartsWithSegments("/api"))
+			if (context.Request.Path.StartsWithSegments("/api") || diagnosticsPermission is not null)
 			{
+				SecurityAuditContext.Reject(context, ErrorCodes.Unauthorized, "missing-or-invalid-token");
 				context.Response.StatusCode = StatusCodes.Status401Unauthorized;
 				await WriteJsonAsync(context, new ApiError { Code = ErrorCodes.Unauthorized, Message = "未授权：缺少或无效的访问令牌。" });
 				return;
@@ -61,6 +68,32 @@ public sealed class AuthMiddleware
 			// 非 api 的受保护路径（如 /Home）无令牌时放行，交由后续处理（通常是 404）。
 			await _next(context);
 			return;
+		}
+
+		// P0-04B：令牌吊销校验。令牌携带安全戳时，与当前用户库中的安全戳比对；
+		// 不一致（口令/角色变更已轮换，或用户已删除）即视为已吊销，返回 401。
+		// 遗留令牌（未携带安全戳）不做此校验，避免阻断既有会话（迁移窗口内自然随 60min 过期）。
+		if (principal.SecurityStamp is not null)
+		{
+			var db = context.RequestServices.GetService<SuperBIContext>();
+			if (db is not null)
+			{
+				var currentStamp = await db.Users.AsNoTracking()
+					.Where(u => u.Id == principal.UserId && u.TenantId == principal.TenantId)
+					.Select(u => u.SecurityStamp)
+					.FirstOrDefaultAsync();
+				if (currentStamp != principal.SecurityStamp)
+				{
+					SecurityAuditContext.Reject(context, ErrorCodes.Unauthorized, "token-revoked", principal.TenantId, principal.UserId);
+					context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+					await WriteJsonAsync(context, new ApiError
+					{
+						Code = ErrorCodes.Unauthorized,
+						Message = "未授权：令牌已失效，请重新登录。"
+					});
+					return;
+				}
+			}
 		}
 
 		var claims = new List<Claim>
@@ -75,6 +108,58 @@ public sealed class AuthMiddleware
 		var identity = new ClaimsIdentity(claims, "Bearer");
 		context.User = new ClaimsPrincipal(identity);
 		context.Items[TenantIdItemKey] = principal.TenantId;
+		var executionIdentity = context.RequestServices?.GetService<IDataSourceExecutionIdentityAccessor>();
+		if (executionIdentity is not null)
+			executionIdentity.Current = new DataSourceExecutionIdentity(principal.TenantId, principal.UserId);
+
+		if (TenantDataPlanePolicy.IsDataPlanePath(context.Request.Path))
+		{
+			var queryTenant = context.Request.Query.ContainsKey("tenantId")
+				? TenantDataPlanePolicy.ParseRequestedTenant(context.Request.Query["tenantId"].ToString())
+				: null;
+			var headerTenant = context.Request.Headers.ContainsKey("X-Tenant-Id")
+				? TenantDataPlanePolicy.ParseRequestedTenant(context.Request.Headers["X-Tenant-Id"].ToString())
+				: null;
+			var tenantResolution = TenantDataPlanePolicy.Resolve(context.User, queryTenant, headerTenant);
+			TenantDataPlanePolicy.Store(context, tenantResolution);
+			if (!tenantResolution.Authorized)
+			{
+				SecurityAuditContext.Reject(context, ErrorCodes.TenantIsolated, "cross-tenant-data-plane", principal.TenantId, principal.UserId);
+				context.Response.StatusCode = StatusCodes.Status403Forbidden;
+				await WriteJsonAsync(context, new ApiError
+				{
+					Code = ErrorCodes.TenantIsolated,
+					Message = "禁止：数据面请求租户必须与认证租户一致。"
+				});
+				return;
+			}
+		}
+
+		if (diagnosticsPermission is not null &&
+			!DiagnosticsAccessPolicy.HasPermission(context.User, diagnosticsPermission))
+		{
+			SecurityAuditContext.Reject(context, ErrorCodes.Forbidden, $"missing-permission:{diagnosticsPermission}", principal.TenantId, principal.UserId);
+			context.Response.StatusCode = StatusCodes.Status403Forbidden;
+			await WriteJsonAsync(context, new ApiError
+			{
+				Code = ErrorCodes.Forbidden,
+				Message = $"禁止：缺少 {diagnosticsPermission} 权限。"
+			});
+			return;
+		}
+
+		if (GovernanceDataPlanePolicy.IsGovernancePrincipal(context.User) &&
+			GovernanceDataPlanePolicy.IsForbiddenDataPlane(context.Request.Path))
+		{
+			SecurityAuditContext.Reject(context, ErrorCodes.Forbidden, "governance-data-plane-denied", principal.TenantId, principal.UserId);
+			context.Response.StatusCode = StatusCodes.Status403Forbidden;
+			await WriteJsonAsync(context, new ApiError
+			{
+				Code = ErrorCodes.Forbidden,
+				Message = "禁止：平台治理身份不得访问租户数据面。"
+			});
+			return;
+		}
 
 		await _next(context);
 	}

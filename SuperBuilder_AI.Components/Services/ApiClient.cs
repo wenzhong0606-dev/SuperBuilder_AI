@@ -12,8 +12,13 @@ namespace SuperBuilder_AI.Components.Services;
 
 /// <summary>
 /// 基于命名 HttpClient 的 API 客户端实现。Head 项目负责注册名为 "SuperBuilderApi" 的 HttpClient（BaseAddress=API 地址）。
-/// 租户隔离由 <see cref="AppState.TenantId"/> 经 X-Tenant-Id 头透传，与现有控制器约定一致。
+/// 租户隔离由服务端从令牌 <c>tid</c> 声明派生（数据面单租户恒等），前端不再发送 X-Tenant-Id 头。
 /// </summary>
+/// <remarks>
+/// SB-P0-02C：已移除 <c>X-Tenant-Id</c> 自动头。因不存在合法跨租户切换，移除后无需替代通道；
+/// 后端 <c>AuthMiddleware</c> / <c>TenantDataPlanePolicy</c> 一律以令牌租户为唯一事实源，
+/// 请求中的租户值即便存在也只会被记为「请求值(RequestedTenantId)」，不影响执行租户。
+/// </remarks>
 public sealed class ApiClient : IApiClient
 {
     private readonly IHttpClientFactory _factory;
@@ -29,11 +34,9 @@ public sealed class ApiClient : IApiClient
     {
         var client = _factory.CreateClient("SuperBuilderApi");
         client.DefaultRequestHeaders.Authorization = null;
-        client.DefaultRequestHeaders.Remove("X-Tenant-Id");
+        // SB-P0-02C：不再发送 X-Tenant-Id（租户恒由令牌承载，前端无替代通道）
         if (!string.IsNullOrEmpty(_appState.Token))
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _appState.Token);
-        if (_appState.TenantId > 0)
-            client.DefaultRequestHeaders.Add("X-Tenant-Id", _appState.TenantId.ToString());
         return client;
     }
 
@@ -48,10 +51,10 @@ public sealed class ApiClient : IApiClient
         _appState.NotifySessionExpired();
     }
 
-    public async Task<(AuthResult? Result, string? Error)> LoginAsync(string username, long tenantId, CancellationToken ct = default)
+    public async Task<(AuthResult? Result, string? Error)> LoginAsync(string username, long tenantId, string? password = null, CancellationToken ct = default)
     {
         var client = _factory.CreateClient("SuperBuilderApi");
-        var resp = await client.PostAsJsonAsync("api/auth/login", new { username, tenantId }, ct);
+        var resp = await client.PostAsJsonAsync("api/auth/login", new { username, tenantId, password }, ct);
         if (!resp.IsSuccessStatusCode)
         {
             var (code, msg, _) = ParseApiError(await resp.Content.ReadAsStringAsync(ct));

@@ -1,4 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
+using SuperBuilder_AI.Api.Errors;
+using SuperBuilder_AI.Api.Security;
 using SuperBuilder_AI.Interfaces.Platform;
 using SuperBuilder_AI.Models.Localization;
 
@@ -51,11 +53,13 @@ public sealed class SemanticLabelController : ControllerBase
 		[FromQuery] long conceptId,
 		[FromQuery] string labelKind,
 		[FromQuery] string? culture = null,
-		[FromQuery] long tenantId = 0,
+		[FromQuery] long? tenantId = null,
 		CancellationToken cancellationToken = default)
 	{
+		var tenant = TenantDataPlanePolicy.Resolve(User, tenantId);
+		if (!tenant.Authorized) return TenantMismatch();
 		var value = await _labels.ResolveAsync(
-			conceptType, conceptId, labelKind, culture, tenantId, cancellationToken);
+			conceptType, conceptId, labelKind, culture, tenant.EffectiveTenantId, cancellationToken);
 
 		return Ok(new SemanticLabelResolution(
 			ConceptType: conceptType,
@@ -73,11 +77,13 @@ public sealed class SemanticLabelController : ControllerBase
 		[FromQuery] string conceptType,
 		[FromQuery] long conceptId,
 		[FromQuery] string? culture = null,
-		[FromQuery] long tenantId = 0,
+		[FromQuery] long? tenantId = null,
 		CancellationToken cancellationToken = default)
 	{
+		var tenant = TenantDataPlanePolicy.Resolve(User, tenantId);
+		if (!tenant.Authorized) return TenantMismatch();
 		var synonyms = await _labels.ResolveSynonymsAsync(
-			conceptType, conceptId, culture, tenantId, cancellationToken);
+			conceptType, conceptId, culture, tenant.EffectiveTenantId, cancellationToken);
 
 		return Ok(new SynonymResolution(conceptType, conceptId, _localization.Resolve(culture).Culture, synonyms));
 	}
@@ -113,6 +119,8 @@ public sealed class SemanticLabelController : ControllerBase
 		CancellationToken cancellationToken = default)
 	{
 		if (request is null) return BadRequest("请求体不能为空。");
+		var tenant = TenantDataPlanePolicy.Resolve(User, request.TenantId);
+		if (!tenant.Authorized) return TenantMismatch();
 
 		try
 		{
@@ -124,6 +132,9 @@ public sealed class SemanticLabelController : ControllerBase
 			return BadRequest(ex.Message);
 		}
 	}
+
+	private ObjectResult TenantMismatch() => StatusCode(403,
+		new ApiError { Code = ErrorCodes.TenantIsolated, Message = "禁止：数据面请求租户必须与认证租户一致。" });
 
 	private static SemanticLabelSummary ToSummary(SemanticLabel l)
 		=> new(l.Id, l.TenantId, l.ConceptType, l.ConceptId, l.Culture, l.LabelKind, l.Value, l.Source, l.SortOrder);

@@ -6,6 +6,7 @@ using SuperBuilder_AI.Interfaces.BI;
 using SuperBuilder_AI.Interfaces.BI.Dashboard;
 using SuperBuilder_AI.Interfaces.BI.Planning;
 using SuperBuilder_AI.Interfaces.Database;
+using SuperBuilder_AI.Interfaces.Identity;
 using SuperBuilder_AI.Models.BI;
 using SuperBuilder_AI.Models.Dashboard;
 using SuperBuilder_AI.Models.Organization;
@@ -28,6 +29,10 @@ public sealed class QueryPlanWidgetDataResolver : IWidgetDataResolver
 	private readonly ISqlDialectResolver _dialectResolver;
 	private readonly ISqlQueryBuilder _sqlBuilder;
 	private readonly IQueryExecutionService _exec;
+	private readonly IDataSourceAuthorizationService? _dataSourceAuthorization;
+	private readonly IRowLevelSecurityService? _rowSecurity;
+	private readonly IDataSourceExecutionIdentityAccessor? _executionIdentity;
+	private readonly IQueryPlanSecurityGate? _securityGate;
 
 	public QueryPlanWidgetDataResolver(
 		IQueryUnderstandingService understanding,
@@ -35,7 +40,11 @@ public sealed class QueryPlanWidgetDataResolver : IWidgetDataResolver
 		SuperBIContext db,
 		ISqlDialectResolver dialectResolver,
 		ISqlQueryBuilder sqlBuilder,
-		IQueryExecutionService exec)
+		IQueryExecutionService exec,
+		IDataSourceAuthorizationService? dataSourceAuthorization = null,
+		IRowLevelSecurityService? rowSecurity = null,
+		IDataSourceExecutionIdentityAccessor? executionIdentity = null,
+		IQueryPlanSecurityGate? securityGate = null)
 	{
 		_understanding = understanding ?? throw new ArgumentNullException(nameof(understanding));
 		_pipeline = pipeline ?? throw new ArgumentNullException(nameof(pipeline));
@@ -43,6 +52,10 @@ public sealed class QueryPlanWidgetDataResolver : IWidgetDataResolver
 		_dialectResolver = dialectResolver ?? throw new ArgumentNullException(nameof(dialectResolver));
 		_sqlBuilder = sqlBuilder ?? throw new ArgumentNullException(nameof(sqlBuilder));
 		_exec = exec ?? throw new ArgumentNullException(nameof(exec));
+		_dataSourceAuthorization = dataSourceAuthorization;
+		_rowSecurity = rowSecurity;
+		_executionIdentity = executionIdentity;
+		_securityGate = securityGate;
 	}
 
 	/// <inheritdoc />
@@ -83,8 +96,27 @@ public sealed class QueryPlanWidgetDataResolver : IWidgetDataResolver
 			});
 		}
 
+		IReadOnlyCollection<long>? allowedSources = null;
+		var caller = _executionIdentity?.Current;
+		if (_dataSourceAuthorization is not null)
+		{
+			if (caller is null || caller.TenantId != context.Tenant.TenantId)
+			{
+				result.Decision = "Blocked";
+				result.Error = "当前账号缺少有效的数据源执行身份。";
+				return result;
+			}
+			allowedSources = await _dataSourceAuthorization.GetAuthorizedDataSourceIdsAsync(context.Tenant.TenantId, caller.UserId, cancellationToken);
+			if (allowedSources.Count == 0)
+			{
+				result.Decision = "Blocked";
+				result.Error = "当前账号无权访问仪表盘数据源。";
+				return result;
+			}
+		}
+
 		// 3. 过 QueryPlanPipeline（语义验证 + 自动修复 + Confidence + Decision Gate）。
-		var pipelineResult = await _pipeline.RunAsync(intent.OriginalQuestion, intent);
+		var pipelineResult = await _pipeline.RunAsync(intent.OriginalQuestion, intent, authorizedDataSourceIds: allowedSources);
 		if (pipelineResult.EarlyResponse is not null)
 		{
 			result.Decision = "Blocked";
@@ -94,12 +126,20 @@ public sealed class QueryPlanWidgetDataResolver : IWidgetDataResolver
 		}
 
 		var plan = pipelineResult.Plan;
+		if (_rowSecurity is not null && allowedSources is not null && caller is not null)
+		{
+			plan.EffectiveTenantId = context.Tenant.TenantId;
+			await _rowSecurity.ApplyAsync(plan, context.Tenant.TenantId, caller.UserId, cancellationToken);
+			if (_securityGate is not null)
+				await _securityGate.ValidateAsync(plan, context.Tenant.TenantId, caller.UserId, cancellationToken);
+		}
 
 		// 4. 数据源 → 方言 → SQL → 执行。
 		try
 		{
 			var dataSource = await _db.DataSources
-				.FirstAsync(x => x.Id == plan.DataSourceId, cancellationToken);
+				.FirstAsync(x => x.Id == plan.DataSourceId &&
+					(allowedSources == null || (x.TenantId == context.Tenant.TenantId && x.Enabled == true)), cancellationToken);
 			var dialect = _dialectResolver.Resolve(dataSource.DbType ?? "sqlserver");
 			var sql = await _sqlBuilder.BuildAsync(plan, dialect);
 			var data = await _exec.ExecuteAsync(sql, plan.DataSourceId);

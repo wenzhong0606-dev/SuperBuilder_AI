@@ -9,10 +9,14 @@ using SuperBuilder_AI.Interfaces.BI;
 using SuperBuilder_AI.Interfaces.BI.Dashboard;
 using SuperBuilder_AI.Interfaces.BI.Planning;
 using SuperBuilder_AI.Interfaces.Database;
+using SuperBuilder_AI.Interfaces.Identity;
 using SuperBuilder_AI.Infrastructure.Database;
+using SuperBuilder_AI.Api.Errors;
+using SuperBuilder_AI.Models.Identity;
 using SuperBuilder_AI.Models.BI;
 using SuperBuilder_AI.Models.Dashboard;
 using SuperBuilder_AI.Models.Organization;
+using SuperBuilder_AI.Services.Identity;
 using Xunit;
 
 namespace SuperBuilder_AI.Tests;
@@ -36,7 +40,7 @@ public class QueryPlanWidgetDataResolverTests
 	{
 		private readonly QueryPlanPipelineResult _result;
 		public FakePipeline(QueryPlanPipelineResult result) => _result = result;
-		public Task<QueryPlanPipelineResult> RunAsync(string question, QueryIntent intent) =>
+		public Task<QueryPlanPipelineResult> RunAsync(string question, QueryIntent intent, long? requestedDataSourceId = null, IReadOnlyCollection<long>? authorizedDataSourceIds = null) =>
 			Task.FromResult(_result);
 	}
 
@@ -47,18 +51,54 @@ public class QueryPlanWidgetDataResolverTests
 
 	private sealed class FakeSqlBuilder : ISqlQueryBuilder
 	{
+		public int Calls { get; private set; }
 		public Task<SqlQuery> BuildAsync(QueryPlan plan, ISqlDialect dialect) =>
-			Task.FromResult(new SqlQuery { Sql = "select 1" });
+			Task.FromResult(Build());
+		private SqlQuery Build()
+		{
+			Calls++;
+			return new SqlQuery { Sql = "select 1" };
+		}
 	}
 
 	private sealed class FakeExec : IQueryExecutionService
 	{
+		public int Calls { get; private set; }
 		public Task<QueryResult> ExecuteAsync(SqlQuery query, long dataSourceId) =>
-			Task.FromResult(new QueryResult
+			Task.FromResult(Execute());
+		private QueryResult Execute()
+		{
+			Calls++;
+			return new QueryResult
 			{
 				Success = true,
 				Rows = { new Dictionary<string, object?> { ["region"] = "East", ["amount"] = 100 } },
-			});
+			};
+		}
+	}
+
+	private sealed class AllowAuthorization : IDataSourceAuthorizationService
+	{
+		public Task<IReadOnlyList<long>> GetAuthorizedDataSourceIdsAsync(long tenantId, long userId, CancellationToken ct = default) => Task.FromResult<IReadOnlyList<long>>(new[] { 1L });
+		public Task<bool> IsAuthorizedAsync(long tenantId, long userId, long dataSourceId, CancellationToken ct = default) => Task.FromResult(true);
+		public Task GrantAsync(long tenantId, long dataSourceId, DataSourceGrantSubjectType subjectType, long subjectId, CancellationToken ct = default) => Task.CompletedTask;
+		public Task RevokeAsync(long tenantId, long dataSourceId, DataSourceGrantSubjectType subjectType, long subjectId, CancellationToken ct = default) => Task.CompletedTask;
+	}
+
+	private sealed class NoOpRowSecurity : IRowLevelSecurityService
+	{
+		public Task<string> GetPolicyFingerprintAsync(long tenantId, long userId, CancellationToken ct = default) => Task.FromResult("current");
+		public Task ApplyAsync(QueryPlan plan, long tenantId, long userId, CancellationToken ct = default)
+		{
+			plan.DataPolicyFingerprint = "current";
+			return Task.CompletedTask;
+		}
+	}
+
+	private sealed class RejectingSecurityGate : IQueryPlanSecurityGate
+	{
+		public Task ValidateAsync(QueryPlan plan, long tenantId, long userId, CancellationToken ct = default) =>
+			Task.FromException(SuperBuilderException.FromCode(ErrorCodes.QueryPlanSecurityRejected, 403));
 	}
 
 	private static SuperBIContext CreateContext(out SqliteConnection connection)
@@ -155,5 +195,34 @@ public class QueryPlanWidgetDataResolverTests
 		Assert.True(result.Resolved);
 		Assert.Equal(1, result.Rows.Count);
 		Assert.Contains("region", result.Columns);
+	}
+
+	[Fact]
+	public async Task Resolve_FinalSecurityGateRejects_DownstreamIsNeverCalled()
+	{
+		var ctx = CreateContext(out var connection);
+		await using var _ = connection;
+		await using var __ = ctx;
+		var sql = new FakeSqlBuilder();
+		var exec = new FakeExec();
+		var identity = new DataSourceExecutionIdentityAccessor { Current = new DataSourceExecutionIdentity(1, 10) };
+		var resolver = new SuperBuilder_AI.Services.BI.Dashboard.QueryPlanWidgetDataResolver(
+			new FakeUnderstanding(),
+			new FakePipeline(new QueryPlanPipelineResult { Plan = new QueryPlan { DataSourceId = 1 } }),
+			ctx,
+			new FakeDialectResolver(),
+			sql,
+			exec,
+			new AllowAuthorization(),
+			new NoOpRowSecurity(),
+			identity,
+			new RejectingSecurityGate());
+
+		var ex = await Assert.ThrowsAsync<SuperBuilderException>(() => resolver.ResolveAsync(
+			new WidgetQueryDsl { Question = "各区域销售额" }, PlatformContext.FromTenant(1), new List<FilterDsl>()));
+
+		Assert.Equal(ErrorCodes.QueryPlanSecurityRejected, ex.ErrorCode);
+		Assert.Equal(0, sql.Calls);
+		Assert.Equal(0, exec.Calls);
 	}
 }

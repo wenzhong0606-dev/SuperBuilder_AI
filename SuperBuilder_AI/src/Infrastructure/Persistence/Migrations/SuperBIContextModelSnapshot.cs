@@ -17,7 +17,7 @@ namespace SuperBuilder_AI.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.10")
+                .HasAnnotation("ProductVersion", "10.0.11")
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
@@ -702,6 +702,43 @@ namespace SuperBuilder_AI.Migrations
                         });
                 });
 
+            modelBuilder.Entity("SuperBuilder_AI.Models.Identity.DataSourceAccessGrant", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasComment("主键");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime>("CreatedTime")
+                        .HasColumnType("datetime2")
+                        .HasComment("创建时间");
+
+                    b.Property<long>("DataSourceId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("SubjectId")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("SubjectType")
+                        .HasColumnType("int");
+
+                    b.Property<long>("TenantId")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DataSourceId");
+
+                    b.HasIndex("TenantId", "SubjectType", "SubjectId");
+
+                    b.HasIndex("TenantId", "DataSourceId", "SubjectType", "SubjectId")
+                        .IsUnique();
+
+                    b.ToTable("DataSourceAccessGrants", (string)null);
+                });
+
             modelBuilder.Entity("SuperBuilder_AI.Models.Identity.Permission", b =>
                 {
                     b.Property<long>("Id")
@@ -825,6 +862,78 @@ namespace SuperBuilder_AI.Migrations
                         });
                 });
 
+            modelBuilder.Entity("SuperBuilder_AI.Models.Identity.RowLevelSecurityPolicy", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasComment("主键");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("DataSourceId")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("Effect")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("Enabled")
+                        .HasColumnType("bit");
+
+                    b.Property<long>("MetadataColumnId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("MetadataTableId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Operator")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.Property<long?>("SubjectId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("SubjectKey")
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<int>("SubjectType")
+                        .HasColumnType("int");
+
+                    b.Property<string>("SubjectValue")
+                        .HasMaxLength(512)
+                        .HasColumnType("nvarchar(512)");
+
+                    b.Property<long>("TenantId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime>("UpdatedTime")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Value")
+                        .IsRequired()
+                        .HasMaxLength(2048)
+                        .HasColumnType("nvarchar(2048)");
+
+                    b.Property<long>("Version")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DataSourceId");
+
+                    b.HasIndex("MetadataColumnId");
+
+                    b.HasIndex("MetadataTableId");
+
+                    b.HasIndex("TenantId", "SubjectType", "SubjectId");
+
+                    b.HasIndex("TenantId", "DataSourceId", "MetadataTableId", "Enabled");
+
+                    b.ToTable("RowLevelSecurityPolicies", (string)null);
+                });
+
             modelBuilder.Entity("SuperBuilder_AI.Models.Identity.User", b =>
                 {
                     b.Property<long>("Id")
@@ -851,7 +960,14 @@ namespace SuperBuilder_AI.Migrations
                         .HasComment("邮箱");
 
                     b.Property<string>("PasswordHash")
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)")
+                        .HasComment("口令哈希（PBKDF2，可选）");
+
+                    b.Property<string>("SecurityStamp")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)")
+                        .HasComment("安全戳（令牌吊销用）");
 
                     b.Property<int>("Status")
                         .HasColumnType("int")
@@ -1599,6 +1715,36 @@ namespace SuperBuilder_AI.Migrations
                     b.Navigation("MetadataColumn");
 
                     b.Navigation("MetadataTable");
+                });
+
+            modelBuilder.Entity("SuperBuilder_AI.Models.Identity.DataSourceAccessGrant", b =>
+                {
+                    b.HasOne("SuperBuilder_AI.Models.Metadata.DataSource", null)
+                        .WithMany()
+                        .HasForeignKey("DataSourceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("SuperBuilder_AI.Models.Identity.RowLevelSecurityPolicy", b =>
+                {
+                    b.HasOne("SuperBuilder_AI.Models.Metadata.DataSource", null)
+                        .WithMany()
+                        .HasForeignKey("DataSourceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SuperBuilder_AI.Models.Metadata.MetadataColumn", null)
+                        .WithMany()
+                        .HasForeignKey("MetadataColumnId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SuperBuilder_AI.Models.Metadata.MetadataTable", null)
+                        .WithMany()
+                        .HasForeignKey("MetadataTableId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("SuperBuilder_AI.Models.Metadata.DataSource", b =>

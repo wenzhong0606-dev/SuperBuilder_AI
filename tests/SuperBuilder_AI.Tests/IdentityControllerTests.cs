@@ -1,13 +1,18 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
+using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using SuperBuilder_AI.Api.Errors;
 using SuperBuilder_AI.Controllers;
 using SuperBuilder_AI.Data;
 using SuperBuilder_AI.Interfaces.Identity;
+using SuperBuilder_AI.Services.Auth;
 using SuperBuilder_AI.Services.Identity;
 using Xunit;
 
@@ -35,11 +40,14 @@ public class IdentityControllerTests
 
 	private static IdentityController Build(SuperBIContext db)
 	{
-		var svc = new IdentityService(db);
+		var svc = new IdentityService(db, new PasswordHasher());
 		// 幂等种子全局目录（与启动期一致），使角色/权限解析可工作。
 		svc.SeedAsync(CancellationToken.None).GetAwaiter().GetResult();
 		return new IdentityController(db, svc);
 	}
+
+	private static ClaimsPrincipal Principal(long tenantId) =>
+		new(new ClaimsIdentity(new[] { new Claim("tid", tenantId.ToString()) }, "Bearer"));
 
 	private static async Task<long> CreateUserAsync(SuperBIContext db, long tenantId, string username, string[]? roles = null)
 	{
@@ -137,6 +145,26 @@ public class IdentityControllerTests
 	}
 
 	[Fact]
+	public async Task GetUser_CrossTenant_WithAuthenticatedToken_Rejected403()
+	{
+		// 生产路径：携带租户 A 令牌、却以请求参数指定租户 B 访问 → 数据面单租户恒等拒绝（403）。
+		var ctx = CreateContext(out var connection);
+		await using var _ = connection;
+		await using var __ = ctx;
+
+		var id = await CreateUserAsync(ctx, Tenant6, "dave");
+		var ctrl = Build(ctx);
+		ctrl.ControllerContext = new ControllerContext
+		{
+			HttpContext = new DefaultHttpContext { User = Principal(Tenant5) }
+		};
+
+		var ex = await Assert.ThrowsAsync<SuperBuilderException>(() => ctrl.GetUser(id, Tenant6, CancellationToken.None));
+		Assert.Equal(403, ex.StatusCode);
+		Assert.Equal(ErrorCodes.TenantIsolated, ex.ErrorCode);
+	}
+
+	[Fact]
 	public async Task ListUsers_TenantScoped_OnlyOwn()
 	{
 		var ctx = CreateContext(out var connection);
@@ -231,9 +259,9 @@ public class IdentityControllerTests
 		var list = await ctrl.ListRoles(Tenant5, CancellationToken.None) as Microsoft.AspNetCore.Mvc.OkObjectResult;
 		Assert.NotNull(list);
 		var roles = Assert.IsAssignableFrom<IEnumerable<IdentityController.RoleSummary>>(list!.Value).ToList();
-		// 4 全局 + 1 租户
-		Assert.Equal(5, roles.Count);
-		Assert.Contains(roles, r => r.Code == "platform-admin" && r.TenantId == 0);
+		// platform-admin 对租户目录隐藏：3 个业务全局角色 + 1 个租户角色。
+		Assert.Equal(4, roles.Count);
+		Assert.DoesNotContain(roles, r => r.Code == "platform-admin");
 		Assert.Contains(roles, r => r.Code == "ops" && r.TenantId == Tenant5);
 	}
 
@@ -320,11 +348,12 @@ public class IdentityControllerTests
 		var result = await ctrl.ListPermissions(Tenant5, CancellationToken.None) as Microsoft.AspNetCore.Mvc.OkObjectResult;
 		Assert.NotNull(result);
 		var perms = Assert.IsAssignableFrom<IEnumerable<IdentityController.PermissionSummary>>(result!.Value).ToList();
-		// IdentityCatalog.Permissions 共 24 项（全部 TenantId=0）
+		// 普通租户目录隐藏 7 项 platform:* 治理权限。
 		Assert.Equal(24, perms.Count);
 		Assert.All(perms, p => Assert.Equal(0, p.TenantId));
 		Assert.Contains(perms, p => p.Code == "dashboard:view");
 		Assert.Contains(perms, p => p.Code == "identity:manage");
+		Assert.DoesNotContain(perms, p => p.Code.StartsWith("platform:"));
 	}
 
 	[Fact]

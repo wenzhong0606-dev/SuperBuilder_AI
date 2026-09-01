@@ -7,6 +7,7 @@ using Microsoft.EntityFrameworkCore;
 using SuperBuilder_AI.Data;
 using SuperBuilder_AI.Interfaces.Identity;
 using SuperBuilder_AI.Models.Identity;
+using SuperBuilder_AI.Services.Auth;
 using SuperBuilder_AI.Services.Identity;
 using Xunit;
 
@@ -31,7 +32,7 @@ public class IdentityServiceTests
         return ctx;
     }
 
-    private static IdentityService CreateService(SuperBIContext ctx) => new(ctx);
+    private static IdentityService CreateService(SuperBIContext ctx) => new(ctx, new PasswordHasher());
 
     [Fact]
     public async Task SeedAsync_Is_Idempotent()
@@ -43,8 +44,9 @@ public class IdentityServiceTests
 
         var permCount = await ctx.Permissions.CountAsync(p => p.TenantId == 0);
         var roleCount = await ctx.Roles.CountAsync(r => r.TenantId == 0);
-        Assert.Equal(24, permCount);
+        Assert.Equal(31, permCount);
         Assert.Equal(4, roleCount);
+		Assert.Single(await ctx.Tenants.Where(t => t.TenantCode == IdentityService.PlatformTenantCode).ToListAsync());
     }
 
     [Fact]
@@ -63,6 +65,8 @@ public class IdentityServiceTests
         Assert.Contains(IdentityPermissions.DashboardView, permCodes);
         Assert.Contains(IdentityPermissions.IdentityManage, permCodes);
         Assert.Contains(IdentityPermissions.BillingManage, permCodes);
+        Assert.Contains(IdentityPermissions.PlatformDiagnosticsView, permCodes);
+        Assert.Contains(IdentityPermissions.PlatformDiagnosticsManage, permCodes);
     }
 
     [Fact]
@@ -177,4 +181,48 @@ public class IdentityServiceTests
         var perms = await svc.GetPermissionsAsync(Tenant200, r.Id!.Value);
         Assert.Contains(IdentityPermissions.MetadataView, perms); // 全局 viewer 角色对租户 200 生效
     }
+
+	[Fact]
+	public async Task PlatformAdmin_IsPureGovernanceAndCannotBeAssignedToTenantUsers()
+	{
+		using var ctx = CreateContext(out var conn);
+		var svc = CreateService(ctx);
+		await svc.SeedAsync();
+
+		var role = await ctx.Roles.SingleAsync(r => r.Code == IdentityRoles.PlatformAdmin);
+		var permissionCodes = await (from rp in ctx.RolePermissions
+			join p in ctx.Permissions on rp.PermissionId equals p.Id
+			where rp.RoleId == role.Id
+			select p.Code).ToListAsync();
+		Assert.NotEmpty(permissionCodes);
+		Assert.All(permissionCodes, code => Assert.StartsWith("platform:", code));
+
+		var user = await svc.CreateUserAsync(Tenant100, "tenant-governor", "Tenant", "", new[] { IdentityRoles.PlatformAdmin });
+		Assert.Empty(await svc.GetPermissionsAsync(Tenant100, user.Id!.Value));
+		Assert.False((await svc.AssignRoleAsync(Tenant100, user.Id.Value, IdentityRoles.PlatformAdmin)).Success);
+	}
+
+	[Fact]
+	public async Task Seed_RevokesHistoricalBusinessPermissionAndTenantUserBinding()
+	{
+		using var ctx = CreateContext(out var conn);
+		var svc = CreateService(ctx);
+		await svc.SeedAsync();
+
+		var role = await ctx.Roles.SingleAsync(r => r.Code == IdentityRoles.PlatformAdmin);
+		var businessPermission = await ctx.Permissions.SingleAsync(p => p.Code == IdentityPermissions.DashboardView);
+		var tenantUser = new User { TenantId = Tenant100, Username = "legacy-admin", DisplayName = "Legacy" };
+		ctx.Users.Add(tenantUser);
+		await ctx.SaveChangesAsync();
+		ctx.RolePermissions.Add(new RolePermission { TenantId = 0, RoleId = role.Id, PermissionId = businessPermission.Id });
+		ctx.UserRoles.Add(new UserRole { TenantId = Tenant100, UserId = tenantUser.Id, RoleId = role.Id });
+		await ctx.SaveChangesAsync();
+
+		await svc.SeedAsync();
+
+		Assert.False(await ctx.RolePermissions.AnyAsync(rp => rp.RoleId == role.Id && rp.PermissionId == businessPermission.Id));
+		Assert.False(await ctx.UserRoles.AnyAsync(ur => ur.UserId == tenantUser.Id && ur.RoleId == role.Id));
+		var platformTenant = await ctx.Tenants.SingleAsync(t => t.TenantCode == IdentityService.PlatformTenantCode);
+		Assert.True(platformTenant.Id > 0);
+	}
 }

@@ -7,6 +7,8 @@ using Microsoft.EntityFrameworkCore;
 using SuperBuilder_AI.Data;
 using SuperBuilder_AI.Interfaces.Identity;
 using SuperBuilder_AI.Models.Identity;
+using SuperBuilder_AI.Models.Organization;
+using SuperBuilder_AI.Services.Auth;
 
 namespace SuperBuilder_AI.Services.Identity;
 
@@ -17,17 +19,48 @@ namespace SuperBuilder_AI.Services.Identity;
 /// </summary>
 public class IdentityService : IIdentityService
 {
+	public const string PlatformTenantCode = "platform";
     private readonly SuperBIContext _ctx;
+    private readonly IPasswordHasher _hasher;
 
-    public IdentityService(SuperBIContext ctx) => _ctx = ctx;
+    public IdentityService(SuperBIContext ctx, IPasswordHasher hasher)
+    {
+        _ctx = ctx;
+        _hasher = hasher;
+    }
 
     public async Task SeedAsync(CancellationToken ct = default)
     {
         await EnsureGlobalCatalog(ct);
+        await BackfillSecurityStampsAsync(ct);
+    }
+
+    /// <summary>
+    /// P0-04B 兼容回填：为尚未生成 <see cref="User.SecurityStamp"/> 的存量用户补发安全戳，
+    /// 使吊销校验对全体用户生效。幂等（仅处理 NULL）。
+    /// </summary>
+    private async Task BackfillSecurityStampsAsync(CancellationToken ct)
+    {
+        var needStamp = await _ctx.Users
+            .Where(u => u.SecurityStamp == null || u.SecurityStamp == string.Empty)
+            .ToListAsync(ct);
+        foreach (var u in needStamp)
+            u.SecurityStamp = Guid.NewGuid().ToString("N");
+        if (needStamp.Count > 0)
+            await _ctx.SaveChangesAsync(ct);
     }
 
     private async Task EnsureGlobalCatalog(CancellationToken ct)
     {
+		var platformTenant = await _ctx.Tenants.IgnoreQueryFilters()
+			.FirstOrDefaultAsync(t => t.TenantCode == PlatformTenantCode, ct);
+		if (platformTenant is null)
+		{
+			platformTenant = new Tenant { TenantCode = PlatformTenantCode, TenantName = "Platform Governance", Enabled = true };
+			_ctx.Tenants.Add(platformTenant);
+			await _ctx.SaveChangesAsync(ct);
+		}
+
         // 1) 权限
         var existingPerms = new HashSet<string>(
             await _ctx.Permissions.Where(p => p.TenantId == 0).Select(p => p.Code).ToListAsync(ct));
@@ -63,6 +96,7 @@ public class IdentityService : IIdentityService
                 });
             }
         }
+
         await _ctx.SaveChangesAsync(ct);
 
         // 3) 角色→权限绑定（幂等，按 (RoleId, PermissionId) 去重）
@@ -93,6 +127,24 @@ public class IdentityService : IIdentityService
                 }
             }
         }
+
+		// Built-in role bindings are authoritative. This removes the historical
+		// business permissions from platform-admin instead of leaving additive residue.
+		var platformRoleId = roleEntities[IdentityRoles.PlatformAdmin];
+		var platformPermissionIds = IdentityCatalog.Roles
+			.Single(r => r.Code == IdentityRoles.PlatformAdmin).Permissions
+			.Select(code => permEntities[code]).ToHashSet();
+		var obsoletePlatformBindings = await _ctx.RolePermissions
+			.Where(rp => rp.RoleId == platformRoleId && !platformPermissionIds.Contains(rp.PermissionId))
+			.ToListAsync(ct);
+		_ctx.RolePermissions.RemoveRange(obsoletePlatformBindings);
+
+		// Governance role membership is valid only for users owned by the positive-id
+		// platform tenant. Historical tenant-user bindings are revoked during seeding.
+		var invalidGovernanceBindings = await _ctx.UserRoles
+			.Where(ur => ur.RoleId == platformRoleId && ur.TenantId != platformTenant.Id)
+			.ToListAsync(ct);
+		_ctx.UserRoles.RemoveRange(invalidGovernanceBindings);
         await _ctx.SaveChangesAsync(ct);
     }
 
@@ -109,6 +161,7 @@ public class IdentityService : IIdentityService
             Username = username,
             DisplayName = displayName ?? username,
             Email = email ?? string.Empty,
+            SecurityStamp = Guid.NewGuid().ToString("N"),
         };
         _ctx.Users.Add(user);
         await _ctx.SaveChangesAsync(ct);
@@ -140,6 +193,7 @@ public class IdentityService : IIdentityService
 
         _ctx.UserRoles.Add(new UserRole { TenantId = tenantId, UserId = userId, RoleId = roleId.Value });
         await _ctx.SaveChangesAsync(ct);
+        await RotateSecurityStampAsync(tenantId, userId, ct);
         return IdentityResult.Ok(userId);
     }
 
@@ -157,7 +211,36 @@ public class IdentityService : IIdentityService
 
         _ctx.UserRoles.Remove(link);
         await _ctx.SaveChangesAsync(ct);
+        await RotateSecurityStampAsync(tenantId, userId, ct);
         return IdentityResult.Ok(userId);
+    }
+
+    public async Task<IdentityResult> SetPasswordAsync(long tenantId, long userId, string password, CancellationToken ct = default)
+    {
+        if (tenantId <= 0) return IdentityResult.Fail("tenantId 必须大于 0");
+        if (string.IsNullOrWhiteSpace(password)) return IdentityResult.Fail("password 必填");
+        if (!await _ctx.Users.AnyAsync(u => u.Id == userId && u.TenantId == tenantId, ct))
+            return IdentityResult.Fail($"用户不存在: {userId}");
+
+        var user = await _ctx.Users.FirstAsync(u => u.Id == userId && u.TenantId == tenantId, ct);
+        user.PasswordHash = _hasher.Hash(password);
+        // 口令变更即轮换安全戳，使所有旧令牌失效（P0-04B）。
+        user.SecurityStamp = Guid.NewGuid().ToString("N");
+        await _ctx.SaveChangesAsync(ct);
+        return IdentityResult.Ok(userId);
+    }
+
+    /// <summary>
+    /// P0-04B 吊销：角色/权限变更后轮换用户安全戳，使既有令牌立即失效（下次请求 401，须重新登录）。
+    /// 用户不存在时静默跳过（调用方已先行校验）。
+    /// </summary>
+    private async Task RotateSecurityStampAsync(long tenantId, long userId, CancellationToken ct)
+    {
+        var rows = await _ctx.Users
+            .Where(u => u.Id == userId && u.TenantId == tenantId)
+            .ExecuteUpdateAsync(u => u.SetProperty(x => x.SecurityStamp, Guid.NewGuid().ToString("N")), ct);
+        // ExecuteUpdateAsync 在部分提供程序返回受影响行数；用户存在性已由调用方保证。
+        _ = rows;
     }
 
     public async Task<IReadOnlyList<string>> GetPermissionsAsync(long tenantId, long userId, CancellationToken ct = default)
@@ -189,7 +272,7 @@ public class IdentityService : IIdentityService
 
     private async Task<List<long>> ResolveRoleIdsAsync(long tenantId, IEnumerable<string> roleCodes, CancellationToken ct)
     {
-        var codes = roleCodes.ToList();
+		var codes = roleCodes.Where(code => code != IdentityRoles.PlatformAdmin).ToList();
         return await _ctx.Roles
             .Where(r => (r.TenantId == tenantId || r.TenantId == 0) && codes.Contains(r.Code))
             .Select(r => r.Id).ToListAsync(ct);
@@ -197,6 +280,7 @@ public class IdentityService : IIdentityService
 
     private async Task<long?> ResolveRoleIdAsync(long tenantId, string roleCode, CancellationToken ct)
     {
+		if (roleCode == IdentityRoles.PlatformAdmin) return null;
         return await _ctx.Roles
             .Where(r => (r.TenantId == tenantId || r.TenantId == 0) && r.Code == roleCode)
             .Select(r => (long?)r.Id).FirstOrDefaultAsync(ct);

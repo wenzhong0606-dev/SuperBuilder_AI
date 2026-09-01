@@ -44,13 +44,20 @@ public interface IBIConversationService
 	/// <param name="question">
 	/// 用户自然语言问题。
 	/// </param>
-	/// <param name="dataSourceId">
-	/// 查询使用的数据源Id。
+	/// <param name="tenantId">
+	/// 执行该查询的租户Id（由鉴权令牌的 <c>tid</c> 声明驱动，不是数据源Id）。
+	/// </param>
+	/// <param name="requestedDataSourceId">
+	/// 可选数据源约束。为 null 或 &lt;=0 时表示由系统根据问题推断数据源（默认行为）；
+	/// 显式指定时查询结果必须限定在该数据源内，且缓存键、执行连接与计划
+	/// <see cref="QueryPlan.DataSourceId"/> 必须同源。P0-01：修复缓存键与执行连接不同源缺陷。
 	/// </param>
 	/// <returns>
 	/// 完整BI查询响应。
 	/// </returns>
 	Task<BIResponse> AskAsync(
 		string question,
-		long dataSourceId);
+		long tenantId,
+		long? requestedDataSourceId = null,
+		IReadOnlyCollection<long>? authorizedDataSourceIds = null);
 }

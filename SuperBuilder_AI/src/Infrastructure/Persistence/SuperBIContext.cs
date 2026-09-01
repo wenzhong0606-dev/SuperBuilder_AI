@@ -37,6 +37,26 @@ public class SuperBIContext : DbContext
     }
     #endregion
 
+	/// <summary>审计日志为追加写存储：已持久化记录禁止通过 EF 更新或删除。</summary>
+	private void EnforceAuditAppendOnly()
+	{
+		if (ChangeTracker.Entries<AuditLog>().Any(x =>
+			x.State is EntityState.Modified or EntityState.Deleted))
+			throw new InvalidOperationException("AuditLog is append-only and cannot be updated or deleted.");
+	}
+
+	public override int SaveChanges(bool acceptAllChangesOnSuccess)
+	{
+		EnforceAuditAppendOnly();
+		return base.SaveChanges(acceptAllChangesOnSuccess);
+	}
+
+	public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
+	{
+		EnforceAuditAppendOnly();
+		return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+	}
+
     #region Organization
     public DbSet<Tenant> Tenants { get; set; }
     public DbSet<DataSource> DataSources { get; set; }
@@ -76,6 +96,8 @@ public class SuperBIContext : DbContext
         public DbSet<Permission> Permissions { get; set; }
         public DbSet<UserRole> UserRoles { get; set; }
         public DbSet<RolePermission> RolePermissions { get; set; }
+        public DbSet<DataSourceAccessGrant> DataSourceAccessGrants { get; set; }
+        public DbSet<RowLevelSecurityPolicy> RowLevelSecurityPolicies { get; set; }
         #endregion
 
         #region P10.3 Audit
@@ -257,6 +279,8 @@ public class SuperBIContext : DbContext
         builder.Entity<User>().Property(u => u.DisplayName).IsRequired().HasMaxLength(128).HasComment("显示名");
         builder.Entity<User>().Property(u => u.Email).HasMaxLength(256).HasComment("邮箱");
         builder.Entity<User>().Property(u => u.Status).HasComment("状态");
+        builder.Entity<User>().Property(u => u.PasswordHash).HasMaxLength(256).HasComment("口令哈希（PBKDF2，可选）");
+        builder.Entity<User>().Property(u => u.SecurityStamp).HasMaxLength(64).HasComment("安全戳（令牌吊销用）");
 
         // Role：TenantId=0 为平台全局角色；同租户内 Code 唯一。
         builder.Entity<Role>().ToTable(tb => tb.HasComment("角色"));
@@ -280,6 +304,20 @@ public class SuperBIContext : DbContext
         // RolePermission：同租户内 (Role, Permission) 唯一。
         builder.Entity<RolePermission>().ToTable(tb => tb.HasComment("角色-权限关联"));
         builder.Entity<RolePermission>().HasIndex(rp => new { rp.TenantId, rp.RoleId, rp.PermissionId }).IsUnique();
+		builder.Entity<DataSourceAccessGrant>().ToTable("DataSourceAccessGrants");
+		builder.Entity<DataSourceAccessGrant>().HasIndex(x => new { x.TenantId, x.DataSourceId, x.SubjectType, x.SubjectId }).IsUnique();
+		builder.Entity<DataSourceAccessGrant>().HasIndex(x => new { x.TenantId, x.SubjectType, x.SubjectId });
+		builder.Entity<DataSourceAccessGrant>().HasOne<DataSource>().WithMany().HasForeignKey(x => x.DataSourceId).OnDelete(DeleteBehavior.Cascade);
+		builder.Entity<RowLevelSecurityPolicy>().ToTable("RowLevelSecurityPolicies");
+		builder.Entity<RowLevelSecurityPolicy>().HasIndex(x => new { x.TenantId, x.DataSourceId, x.MetadataTableId, x.Enabled });
+		builder.Entity<RowLevelSecurityPolicy>().HasIndex(x => new { x.TenantId, x.SubjectType, x.SubjectId });
+		builder.Entity<RowLevelSecurityPolicy>().Property(x => x.Operator).HasMaxLength(16).IsRequired();
+		builder.Entity<RowLevelSecurityPolicy>().Property(x => x.Value).HasMaxLength(2048).IsRequired();
+		builder.Entity<RowLevelSecurityPolicy>().Property(x => x.SubjectKey).HasMaxLength(128);
+		builder.Entity<RowLevelSecurityPolicy>().Property(x => x.SubjectValue).HasMaxLength(512);
+		builder.Entity<RowLevelSecurityPolicy>().HasOne<DataSource>().WithMany().HasForeignKey(x => x.DataSourceId).OnDelete(DeleteBehavior.Restrict);
+		builder.Entity<RowLevelSecurityPolicy>().HasOne<MetadataTable>().WithMany().HasForeignKey(x => x.MetadataTableId).OnDelete(DeleteBehavior.Cascade);
+		builder.Entity<RowLevelSecurityPolicy>().HasOne<MetadataColumn>().WithMany().HasForeignKey(x => x.MetadataColumnId).OnDelete(DeleteBehavior.Restrict);
         #endregion
 
         #region P10.3 Audit

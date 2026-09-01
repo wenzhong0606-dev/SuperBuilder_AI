@@ -103,7 +103,9 @@ public sealed class QueryPlanPipeline : IQueryPlanPipeline
 	/// <inheritdoc />
 	public async Task<QueryPlanPipelineResult> RunAsync(
 		string question,
-		QueryIntent intent)
+		QueryIntent intent,
+		long? requestedDataSourceId = null,
+		IReadOnlyCollection<long>? authorizedDataSourceIds = null)
 	{
 		/*
          * Step 2
@@ -112,7 +114,7 @@ public sealed class QueryPlanPipeline : IQueryPlanPipeline
          */
 		var plan =
 			await _queryPlanBuilder
-				.BuildAsync(intent);
+				.BuildAsync(intent, requestedDataSourceId, authorizedDataSourceIds);
 
 
 		/*

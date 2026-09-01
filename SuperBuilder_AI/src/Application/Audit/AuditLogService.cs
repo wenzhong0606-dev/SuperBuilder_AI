@@ -54,8 +54,8 @@ public class AuditLogService : IAuditLogService
 
         if (query.TenantId.HasValue)
         {
-            // 本租户 + 全局(0) 可见（与全局角色/权限一致）
-            q = q.Where(a => a.TenantId == query.TenantId.Value || a.TenantId == 0);
+			// 租户审计严格只读本租户；平台治理审计不得作为“全局记录”泄露给普通租户。
+            q = q.Where(a => a.TenantId == query.TenantId.Value);
         }
         if (query.UserId.HasValue)
             q = q.Where(a => a.UserId == query.UserId.Value);

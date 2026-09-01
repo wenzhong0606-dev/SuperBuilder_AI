@@ -1,5 +1,6 @@
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
+using SuperBuilder_AI.Api.Security;
 using SuperBuilder_AI.Middleware;
 using SuperBuilder_AI.Services.Auth;
 using Xunit;
@@ -79,5 +80,114 @@ public class AuthMiddlewareTests
 		await mw.InvokeAsync(ctx);
 
 		Assert.True(nextCalled);
+	}
+
+	[Theory]
+	[InlineData("/test/understand")]
+	[InlineData("/metrics")]
+	public async Task Diagnostics_Path_Without_Token_Returns_401(string path)
+	{
+		var nextCalled = false;
+		var mw = Build(_ => { nextCalled = true; return Task.CompletedTask; });
+		var ctx = new DefaultHttpContext { Request = { Path = path } };
+
+		await mw.InvokeAsync(ctx);
+
+		Assert.False(nextCalled);
+		Assert.Equal(StatusCodes.Status401Unauthorized, ctx.Response.StatusCode);
+	}
+
+	[Theory]
+	[InlineData("/test/sql")]
+	[InlineData("/metrics")]
+	[InlineData("/api/metadata-vector/status")]
+	[InlineData("/api/metadata-vector/rebuild")]
+	public async Task Diagnostics_Path_With_Ordinary_Token_Returns_403(string path)
+	{
+		var nextCalled = false;
+		var mw = Build(_ => { nextCalled = true; return Task.CompletedTask; });
+		var token = new TokenService(Key).Issue(9, 11, "carol", new[] { "dashboard:view" });
+		var ctx = new DefaultHttpContext { Request = { Path = path } };
+		ctx.Request.Headers["Authorization"] = "Bearer " + token;
+
+		await mw.InvokeAsync(ctx);
+
+		Assert.False(nextCalled);
+		Assert.Equal(StatusCodes.Status403Forbidden, ctx.Response.StatusCode);
+	}
+
+	[Theory]
+	[InlineData("/test/sql")]
+	[InlineData("/metrics")]
+	[InlineData("/api/metadata-vector/status")]
+	[InlineData("/api/metadata-vector/rebuild")]
+	public async Task Diagnostics_Path_With_Governance_Token_Passes(string path)
+	{
+		var nextCalled = false;
+		var mw = Build(_ => { nextCalled = true; return Task.CompletedTask; });
+		var token = new TokenService(Key).Issue(0, 1, "governor", new[] { "platform:diagnostics:manage" });
+		var ctx = new DefaultHttpContext { Request = { Path = path } };
+		ctx.Request.Headers["Authorization"] = "Bearer " + token;
+
+		await mw.InvokeAsync(ctx);
+
+		Assert.True(nextCalled);
+		Assert.Equal(StatusCodes.Status200OK, ctx.Response.StatusCode);
+	}
+
+	[Theory]
+	[InlineData("/api/ask")]
+	[InlineData("/api/metadata")]
+	[InlineData("/api/data-sources")]
+	public async Task Governance_Token_Is_Forbidden_From_DataPlane(string path)
+	{
+		var nextCalled = false;
+		var mw = Build(_ => { nextCalled = true; return Task.CompletedTask; });
+		var token = new TokenService(Key).Issue(1, 1, "governor", new[] { "platform:tenant:manage" });
+		var ctx = new DefaultHttpContext { Request = { Path = path } };
+		ctx.Request.Headers["Authorization"] = "Bearer " + token;
+
+		await mw.InvokeAsync(ctx);
+
+		Assert.False(nextCalled);
+		Assert.Equal(StatusCodes.Status403Forbidden, ctx.Response.StatusCode);
+	}
+
+	[Theory]
+	[InlineData("/api/ask", "tenantId", "10")]
+	[InlineData("/api/business-model/entities", "tenantId", "10")]
+	[InlineData("/api/semantic-labels/resolve", "X-Tenant-Id", "10")]
+	public async Task DataPlane_CrossTenant_Request_Returns_403_WithoutCallingDownstream(string path, string source, string value)
+	{
+		var nextCalled = false;
+		var mw = Build(_ => { nextCalled = true; return Task.CompletedTask; });
+		var token = new TokenService(Key).Issue(9, 11, "carol", new[] { "dashboard:view" });
+		var ctx = new DefaultHttpContext { Request = { Path = path } };
+		ctx.Request.Headers["Authorization"] = "Bearer " + token;
+		if (source == "tenantId") ctx.Request.QueryString = new QueryString("?tenantId=" + value);
+		else ctx.Request.Headers[source] = value;
+
+		await mw.InvokeAsync(ctx);
+
+		Assert.False(nextCalled);
+		Assert.Equal(StatusCodes.Status403Forbidden, ctx.Response.StatusCode);
+		Assert.Equal(9L, ctx.Items[TenantDataPlanePolicy.AuthenticatedTenantItem]);
+		Assert.Equal(9L, ctx.Items[TenantDataPlanePolicy.EffectiveTenantItem]);
+		Assert.Equal(false, ctx.Items[TenantDataPlanePolicy.TenantSwitchAuthorizedItem]);
+	}
+
+	[Fact]
+	public async Task DataPlane_SameTenant_Request_Passes_AndStoresEffectiveTenant()
+	{
+		var nextCalled = false;
+		var mw = Build(_ => { nextCalled = true; return Task.CompletedTask; });
+		var token = new TokenService(Key).Issue(9, 11, "carol", new[] { "dashboard:view" });
+		var ctx = new DefaultHttpContext { Request = { Path = "/api/ask", QueryString = new QueryString("?tenantId=9") } };
+		ctx.Request.Headers["Authorization"] = "Bearer " + token;
+
+		await mw.InvokeAsync(ctx);
+
+		Assert.True(nextCalled);
+		Assert.Equal(9L, ctx.Items[TenantDataPlanePolicy.EffectiveTenantItem]);
 	}
 }

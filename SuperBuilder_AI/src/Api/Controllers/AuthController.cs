@@ -7,6 +7,8 @@ using SuperBuilder_AI.Data;
 using SuperBuilder_AI.Interfaces.Identity;
 using SuperBuilder_AI.Models.Identity;
 using SuperBuilder_AI.Services.Auth;
+using SuperBuilder_AI.Api.Errors;
+using SuperBuilder_AI.Api.Security;
 
 namespace SuperBuilder_AI.Controllers;
 
@@ -15,14 +17,16 @@ namespace SuperBuilder_AI.Controllers;
 ///
 /// <para>
 /// <list type="bullet">
-/// <item><c>POST /api/auth/login</c>：以 <c>username + tenantId</c> 换取无状态访问令牌（匿名白名单，无需令牌）。</item>
+/// <item><c>POST /api/auth/login</c>：以 <c>username + tenantId + password</c> 换取无状态访问令牌（匿名白名单，无需令牌）。</item>
 /// <item><c>GET /api/auth/me</c>：返回当前已认证主体信息（需有效令牌）。</item>
 /// </list>
 /// </para>
 ///
 /// <para>
-/// 注：本阶段登录不校验口令（<see cref="User.PasswordHash"/> 已建模但认证流程在后续阶段补齐，见 P13 BYO），
-/// 仅做「用户存在且启用」校验后签发令牌。生产环境必须配合口令/外部 IdP 校验与 TLS。
+/// P0-04A 正式口令认证：<see cref="User.PasswordHash"/> 已设置的账号必须校验口令（PBKDF2，见 <see cref="IPasswordHasher"/>）；
+/// <see cref="User.PasswordHash"/> 为空的账号视为「尚未初始化口令」，登录被拒绝并提示初始化（fail-closed，避免无口令账号被直接登录）。
+/// 校验通过后签发携带用户 <see cref="User.SecurityStamp"/> 的令牌，供 P0-04B 吊销校验。
+/// 生产环境必须配合 TLS；外部 IdP/SSO 作为后续扩展点保留。
 /// </para>
 /// </summary>
 [ApiController]
@@ -32,12 +36,14 @@ public sealed class AuthController : ControllerBase
 	private readonly SuperBIContext _db;
 	private readonly IIdentityService _identity;
 	private readonly ITokenService _token;
+	private readonly IPasswordHasher _hasher;
 
-	public AuthController(SuperBIContext db, IIdentityService identity, ITokenService token)
+	public AuthController(SuperBIContext db, IIdentityService identity, ITokenService token, IPasswordHasher hasher)
 	{
 		_db = db;
 		_identity = identity;
 		_token = token;
+		_hasher = hasher;
 	}
 
 	/// <summary>登录并签发访问令牌。</summary>
@@ -58,10 +64,25 @@ public sealed class AuthController : ControllerBase
 				cancellationToken);
 
 		if (user is null || user.Status != UserStatus.Active)
+		{
+			SecurityAuditContext.Reject(HttpContext, ErrorCodes.AuthInvalidCredential, "invalid-credential", request.TenantId);
 			return Unauthorized(new { error = "用户不存在或已禁用。" });
+		}
+
+		// P0-04A：正式口令认证。
+		if (string.IsNullOrEmpty(user.PasswordHash))
+		{
+			SecurityAuditContext.Reject(HttpContext, ErrorCodes.AuthInvalidCredential, "password-not-initialized", request.TenantId, user.Id);
+			return Unauthorized(new { error = "账户尚未设置口令，请联系管理员初始化后再登录。" });
+		}
+		if (string.IsNullOrEmpty(request.Password) || !_hasher.Verify(request.Password, user.PasswordHash))
+		{
+			SecurityAuditContext.Reject(HttpContext, ErrorCodes.AuthInvalidCredential, "invalid-credential", request.TenantId, user.Id);
+			return Unauthorized(new { error = "用户名或口令错误。" });
+		}
 
 		var perms = await _identity.GetPermissionsAsync(request.TenantId, user.Id, cancellationToken);
-		var token = _token.Issue(request.TenantId, user.Id, user.Username, perms);
+		var token = _token.Issue(request.TenantId, user.Id, user.Username, perms, user.SecurityStamp);
 
 		return Ok(new AuthResult
 		{
@@ -106,6 +127,8 @@ public sealed class LoginRequest
 {
 	public string? Username { get; set; }
 	public long TenantId { get; set; }
+	/// <summary>明文口令（P0-04A 起必填；空值或错误口令将被拒绝）。</summary>
+	public string? Password { get; set; }
 }
 
 /// <summary>登录/当前用户响应。</summary>

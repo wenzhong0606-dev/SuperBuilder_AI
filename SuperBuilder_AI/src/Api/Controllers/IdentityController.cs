@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SuperBuilder_AI.Data;
+using SuperBuilder_AI.Api.Security;
 using SuperBuilder_AI.Interfaces.Identity;
 using SuperBuilder_AI.Models.Identity;
 using SuperBuilder_AI.Services.Identity;
@@ -53,11 +54,19 @@ public sealed class IdentityController : ControllerBase
 	}
 
 	/// <summary>在当前请求作用域内开启租户隔离，返回解析出的租户 Id。</summary>
+	/// <summary>在当前请求作用域内开启租户隔离：有效租户恒为认证租户，跨租户显式请求直接拒绝。</summary>
 	private long ScopeTo(long requestedTenantId)
 	{
-		var tenantId = requestedTenantId > 0 ? requestedTenantId : 0;
-		_db.ApplyTenantScope(tenantId);
-		return tenantId;
+		var resolution = TenantDataPlanePolicy.ResolvePlatformScope(User, requestedTenantId);
+		// P0-02B：把解析出的租户上下文写盘，供审计/可观测中间件读取；治理角色管理他租户时另记管理目标
+		TenantDataPlanePolicy.StorePlatformScope(HttpContext, resolution, "Identity");
+		if (!resolution.Authorized)
+			throw new SuperBuilder_AI.Api.Errors.SuperBuilderException(
+				SuperBuilder_AI.Api.Errors.ErrorCodes.TenantIsolated,
+				"禁止：租户作用域请求只能访问认证租户的数据，跨租户访问被拒绝。",
+				403);
+		_db.ApplyTenantScope(resolution.EffectiveTenantId);
+		return resolution.EffectiveTenantId;
 	}
 
 	/// <summary>创建租户用户（默认路径，确定性、不调 LLM），可选同时指派角色。</summary>
@@ -164,6 +173,7 @@ public sealed class IdentityController : ControllerBase
 	{
 		ScopeTo(tenantId);
 		var items = await _db.Roles.AsNoTracking()
+			.Where(r => r.Code != IdentityRoles.PlatformAdmin)
 			.OrderBy(r => r.TenantId) // 全局(0) 在前，租户自有在后
 			.ThenBy(r => r.Code)
 			.ToListAsync(cancellationToken);
@@ -178,6 +188,7 @@ public sealed class IdentityController : ControllerBase
 		CancellationToken cancellationToken = default)
 	{
 		if (string.IsNullOrWhiteSpace(code)) return BadRequest("角色编码不能为空。");
+		if (code == IdentityRoles.PlatformAdmin) return NotFound();
 		ScopeTo(tenantId);
 
 		var role = await _db.Roles.AsNoTracking().FirstOrDefaultAsync(r => r.Code == code, cancellationToken);
@@ -213,7 +224,7 @@ public sealed class IdentityController : ControllerBase
 		if (request.Permissions is { Length: > 0 })
 		{
 			var permIds = await _db.Permissions
-				.Where(p => (p.TenantId == tenantId || p.TenantId == 0) && request.Permissions.Contains(p.Code))
+				.Where(p => !p.Code.StartsWith("platform:") && (p.TenantId == tenantId || p.TenantId == 0) && request.Permissions.Contains(p.Code))
 				.Select(p => p.Id).Distinct().ToListAsync(cancellationToken);
 			foreach (var permId in permIds)
 				_db.RolePermissions.Add(new RolePermission { TenantId = tenantId, RoleId = role.Id, PermissionId = permId });
@@ -243,7 +254,7 @@ public sealed class IdentityController : ControllerBase
 		if (role.TenantId != tid) return NotFound();
 
 		var permIds = await _db.Permissions
-			.Where(p => (p.TenantId == tid || p.TenantId == 0) && (request.Permissions ?? new string[0]).Contains(p.Code))
+			.Where(p => !p.Code.StartsWith("platform:") && (p.TenantId == tid || p.TenantId == 0) && (request.Permissions ?? new string[0]).Contains(p.Code))
 			.Select(p => p.Id).Distinct().ToListAsync(cancellationToken);
 
 		var existing = await _db.RolePermissions.Where(rp => rp.RoleId == role.Id).ToListAsync(cancellationToken);
@@ -263,6 +274,7 @@ public sealed class IdentityController : ControllerBase
 	{
 		ScopeTo(tenantId);
 		var items = await _db.Permissions.AsNoTracking()
+			.Where(p => !p.Code.StartsWith("platform:"))
 			.OrderBy(p => p.TenantId).ThenBy(p => p.Category).ThenBy(p => p.Code)
 			.ToListAsync(cancellationToken);
 		return Ok(items.Select(p => new PermissionSummary(p.Id, p.TenantId, p.Code, p.Name, p.Category, p.Description)).ToList());
