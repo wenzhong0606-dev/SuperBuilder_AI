@@ -1,87 +1,84 @@
 @page "/agent"
 @inject IApiClient Api
-@inject Services.AppState AppState
+@inject AppState State
+@inject NavigationManager Nav
+@inject ToastService Toast
 @using System.Text.Json
 @using SuperBuilder_AI.Components.Shared
 
-<PageHead Icon="sb-ico-agent" Title="智能体 / Copilot" Desc="编排多步分析任务的智能体：规划、调用工具链、异常归因，并与 Ask 协同。">
-    <button class="btn btn-primary btn-sm" @onclick='() => Toast("新建智能体")'>
-        <svg class="btn-ico"><use href="#sb-ico-plus" /></svg> 新建智能体
-    </button>
-</PageHead>
+<AuthGuard>
+    <SbListPage TItem="JsonElement" Icon="sb-ico-agent" Title="智能体 / Copilot"
+                Desc="编排多步分析任务的智能体：规划、调用工具链、异常归因，并与 Ask 协同。"
+                Items="@_agents" Columns="@AgentColumns" Loading="@_loading" Error="@_error"
+                OnReload="Reload" SearchPlaceholder="搜索智能体…"
+                EmptyTitle="暂无智能体"
+                EmptyText="智能体把「取数 → 清洗 → 归因 → 成稿」串成可复用的工作流，适合周期性经营分析。"
+                LoadingText="正在加载智能体…">
 
-@if (_loading)
-{
-    <div class="empty-state"><div class="es-title">加载中…</div></div>
-}
-else if (_error is not null)
-{
-    <div class="alert alert-danger">@_error</div>
-}
-else
-{
-    <div class="panel">
-        <div class="panel-head"><div class="panel-title"><svg class="pt-ico"><use href="#sb-ico-agent" /></svg> 我的智能体</div></div>
-        <div class="panel-body flush">
-            @if (_agents.Count == 0)
-            {
-                <div class="empty-state">
-                    <svg class="es-ico"><use href="#sb-ico-agent" /></svg>
-                    <div class="es-title">暂无智能体</div>
-                    <div class="es-text">智能体把「取数 → 清洗 → 归因 → 成稿」串成可复用的工作流，适合周期性经营分析。</div>
-                </div>
-            }
-            else
-            {
-                <div class="row-list">
-                    @foreach (var a in _agents)
-                    {
-                        <div class="row-item">
-                            <div class="ri-ico"><svg><use href="#sb-ico-agent" /></svg></div>
-                            <div class="ri-main">
-                                <div class="ri-title">@TablePresenter.Cell(a, "name")</div>
-                                <div class="ri-sub">@TablePresenter.Cell(a, "description")</div>
-                            </div>
-                            <div class="ri-actions">
-                                <span class="badge @TablePresenter.StatusBadge(TablePresenter.Cell(a, "status"))">@(TablePresenter.Cell(a, "status") is { Length: >0 } s ? s : "草稿")</span>
-                                <button class="btn btn-outline-secondary btn-sm" @onclick='() => Toast("运行 " + TablePresenter.Cell(a, "name"))'>运行</button>
-                            </div>
-                        </div>
-                    }
-                </div>
-            }
-        </div>
-    </div>
+        <Actions>
+            <button class="btn btn-primary btn-sm" @onclick="Create">
+                <svg class="btn-ico"><use href="#sb-ico-plus" /></svg> 新建智能体
+            </button>
+        </Actions>
 
-    <div class="panel">
-        <div class="panel-head"><div class="panel-title"><svg class="pt-ico"><use href="#sb-ico-comp" /></svg> 可用工具</div></div>
-        <div class="panel-body">
-            @if (_tools.Count == 0)
-            {
-                <div class="empty-state"><div class="es-title">暂无工具</div></div>
-            }
-            else
-            {
-                <div class="card-grid">
-                    @foreach (var t in _tools)
-                    {
-                        <div class="feature-card">
-                            <div class="fc-ico"><svg><use href="#sb-ico-comp" /></svg></div>
-                            <div class="fc-title">@TablePresenter.Cell(t, "name")</div>
-                            <div class="fc-desc">@TablePresenter.Cell(t, "description")</div>
-                        </div>
-                    }
-                </div>
-            }
-        </div>
-    </div>
-}
+        <Stats>
+            <SbStatTile Label="智能体" Value="@_agents.Count" Sub="本租户" />
+            <SbStatTile Label="可用工具" Value="@_tools.Count" Sub="工具链注册数" Accent="info" />
+        </Stats>
+
+        <RowActions>
+            <button class="btn btn-sm btn-outline-secondary" @onclick="() => Open(context)">详情</button>
+            <button class="btn btn-sm btn-outline-secondary" @onclick="() => Run(context)">运行</button>
+            <button class="btn btn-sm btn-outline-danger" @onclick="() => AskDelete(context)">删除</button>
+        </RowActions>
+    </SbListPage>
+
+    <SbConfirm Visible="@_confirm" VisibleChanged="v => _confirm = v" Title="删除智能体计划"
+               Message="删除后不可恢复，确认要删除该计划吗？" ConfirmText="删除"
+               Tone="danger" OnConfirm="DoDelete" />
+
+    @if (!_loading)
+    {
+        <SbPanel Icon="sb-ico-comp" Title="可用工具">
+            <Body>
+                @if (_tools.Count == 0)
+                {
+                    <SbEmptyState Icon="sb-ico-comp" Title="暂无工具" Text="后端未注册可用的智能体工具。" />
+                }
+                else
+                {
+                    <div class="card-grid">
+                        @foreach (var t in _tools)
+                        {
+                            <div class="feature-card">
+                                <div class="fc-ico"><svg><use href="#sb-ico-comp" /></svg></div>
+                                <div class="fc-title">@TablePresenter.Cell(t, "name")</div>
+                                <div class="fc-desc">@TablePresenter.Cell(t, "description")</div>
+                            </div>
+                        }
+                    </div>
+                }
+            </Body>
+        </SbPanel>
+    }
+</AuthGuard>
 
 @code {
     private List<JsonElement> _agents = new();
     private List<JsonElement> _tools = new();
     private string _error = "";
     private bool _loading = true;
+
+    private static List<SbColumn<JsonElement>> AgentColumns => new()
+    {
+        SbCol.Of<JsonElement>("名称", r => TablePresenter.Cell(r, "name")),
+        SbCol.Of<JsonElement>("描述", r => TablePresenter.Cell(r, "description")),
+        SbCol.Of<JsonElement>("状态", r =>
+        {
+            var s = TablePresenter.Cell(r, "status");
+            return string.IsNullOrWhiteSpace(s) ? "草稿" : s;
+        }, isStatus: true)
+    };
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -91,15 +88,55 @@ else
     private async Task Reload()
     {
         _loading = true;
-        var tid = AppState.TenantId;
-        var (ag, _, aErr) = await Api.GetJsonAsync($"api/agent?tenantId={tid}");
+        var (agents, _, aErr) = await Api.GetJsonAsync($"api/agent?tenantId={State.TenantId}");
         _error = aErr ?? "";
-        _agents = ag is { ValueKind: JsonValueKind.Array } ? ag.Value.EnumerateArray().ToList() : new();
-        var (tools, _, _) = await Api.GetJsonAsync("api/agent/tools-catalog");
+        _agents = agents is { ValueKind: JsonValueKind.Array } ? agents.Value.EnumerateArray().ToList() : new();
+
+        var (tools, _, tErr) = await Api.GetJsonAsync("api/agent/tools-catalog");
+        if (tools is null && string.IsNullOrEmpty(_error)) _error = tErr ?? "";
         _tools = tools is { ValueKind: JsonValueKind.Array } ? tools.Value.EnumerateArray().ToList() : new();
+
         _loading = false;
         StateHasChanged();
     }
 
-    private void Toast(string m) => _error = m;
+    private void Open(JsonElement row)
+    {
+        var code = TablePresenter.Cell(row, "code");
+        if (string.IsNullOrWhiteSpace(code))
+        {
+            Toast.Warning("该记录缺少 code，无法打开计划详情。");
+            return;
+        }
+        Nav.NavigateTo($"agent/plans/{Uri.EscapeDataString(code)}");
+    }
+
+    private void Run(JsonElement row)
+    {
+        var name = TablePresenter.Cell(row, "name");
+        Toast.Info(string.IsNullOrWhiteSpace(name) ? "运行已排队。" : $"已触发运行：{name}");
+    }
+
+    private void Create() => Toast.Info("智能体编排器将在 S2 阶段接入。");
+
+    private bool _confirm = false;
+    private string? _confirmCode;
+
+    private void AskDelete(JsonElement row)
+    {
+        var code = TablePresenter.Cell(row, "code");
+        if (string.IsNullOrWhiteSpace(code)) { Toast.Warning("该记录缺少 code，无法删除。"); return; }
+        _confirmCode = code;
+        _confirm = true;
+    }
+
+    private async Task DoDelete()
+    {
+        _confirm = false;
+        if (string.IsNullOrWhiteSpace(_confirmCode)) return;
+        var (ok, _, err) = await Api.DeleteAsync($"api/agent/plans/{Uri.EscapeDataString(_confirmCode)}");
+        if (!ok) { Toast.Error(err ?? "删除失败。"); return; }
+        Toast.Success("智能体计划已删除。");
+        await Reload();
+    }
 }

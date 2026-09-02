@@ -8,6 +8,8 @@
 - 业务库 WMS MySQL `192.168.16.120:3306`（用户确认现已可达）
 - 主交付文档：`docs/DevelopmentPlan.md` + `docs/PhaseChecklist.md` + `docs/ARCHITECTURE.md`
 
+- **P11.6 前端结构与开发清单（2026-09-02，未提交）**：页面六组化 + 通用组件库 + Layout 层 + 9 个新页面（S0 ✅）+ S1 组件化改造全部完成（S1-1~S1-5 ✅）+ S2 写操作闭环全部可补项完成（S2-1/2/3/4/5/6 ✅：删除·新建·启停·DSL 编辑器·角色权限·租户设置 Upsert·字段级 SbField.Error+服务端 errors 友好化；S2-7 后端无写端点⬜）。文档 `docs/Frontend_Structure_Plan.md` + `docs/Frontend_DevChecklist.md`（S0/S1/S2 ✅，S3~S5 ⬜）。三端 build 0 error。
+
 ## 阶段状态（截至 2026-08-31）
 - **Stage 0 基础/运行时**：✅ 全完成；Golden 18/18 PASS
 - **Stage 1 架构治理**：🟡 A1/A2/A4 ✅；A3/A5 ⬜（用户指令暂缓「先不做」）
@@ -52,7 +54,18 @@
 - **前端 token 链路**：`Login.razor`→`AuthStore.SetFromLoginAsync`（写 `AppState`+持久化 localStorage）；`MainLayout` 启动 `RestoreAsync`+`ValidateAsync(/api/auth/me)` 自举；`ApiClient` 401→`AppState.NotifySessionExpired`→`MainLayout` 跳 `/login`。`AuthStore`/`AppState` 须在两个 Head(Web+MAUI) 注册 `AddScoped`；`AppState` 现含 `event Action? SessionExpired` + `ClearSession()`。
 - **验证**：三端(API/Web/MAUI-Win) build 0 error；单测 308/308；运行时实测 无 token→401 / 坏 token→401 / 合法 token→200 / `/metrics`→200。Golden 走独立 `evaluation/golden-runtime` 端点隔离。
 
+### P11.6 前端结构（2026-09-02）
+- 目录：`Pages/{Analysis,Design,Platform,Admin,Account,Errors}`；`Shared/{UI,BI,Feedback,Guard}`；`Layout/{MainLayout,BlankLayout,NavMenu,NavMenuItems,AppBreadcrumb,IconSprite}`。新增目录必须同步两个 Head 的 `_Imports.razor`，且目录内至少有一个组件（空目录 → CS0234 命名空间不存在）
+- 导航单一事实来源 `Layout/NavMenuItems.cs`（Href/Title/Icon/Permission）；`EnforcePermissions` **默认 false**，避免权限码未对齐时把管理菜单全隐藏（对齐后置 true）
+- 服务新增：`ToastService`（Scoped，需在 Web/Program.cs 与 Maui/MauiProgram.cs 同时注册）；`AppState.SessionRestored` 由 `AuthStore.RestoreAsync` 的 finally 置位
+- `IApiClient` 已补 `SendAsync/PostAsync/PutAsync/PatchAsync/DeleteAsync/GetTextAsync`，写操作可直接在页面使用
+- 根路由修正：`/` = Home 工作台，`/login` 专用（原 Login 同时占两个路由，导致侧栏「首页」跳登录）
+
 ### ⚠️ Blazor/Razor 踩坑（务必遵守，已付学费）
+5. **属性引号**：内联 `Nav.NavigateTo("x")` 的事件处理器属性必须用单引号定界 `@onclick='() => Nav.NavigateTo("x")'`，双引号会提前闭合属性 → 生成代码 CS1026
+6. **`<details>` 不支持 `@bind-open`**（RZ9991）；同理 HTML 属性绑定只支持 `bind` / `bind-value` 形式
+7. **登录判定必须等 `AppState.SessionRestored`**：子组件 `OnAfterRender` 早于 `MainLayout` 的会话自举，只看 `IsAuthenticated` 会误判
+8. **串行 build**：并行 `dotnet build` 同一解决方案会因 bin 文件被对方重建删除而报 MSB3030
 1. **事件处理器含 C# 字符串 → 属性用单引号定界**：`@onclick='() => Toast("文本")'` ✅；`@onclick="() => Toast('文本')"` ❌（单引号变 char 字面量 → CS1012）；`$"..."` 内嵌双引号会提前闭合属性 → CS1056/CS1026。
 2. **渲染名为 `code` 的变量必须写 `@(code)`**：`@code</span>` 被当作 `@code` 指令 → RZ2005/RZ1017。
 3. **void 方法不能直接绑 `@onclick='Toast("x")'`**（CS1503 void→EventCallback）→ 包 lambda `'() => Toast("x")'`。

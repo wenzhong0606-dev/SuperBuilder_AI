@@ -1,49 +1,51 @@
 @page "/admin/localization"
 @inject IApiClient Api
-@inject Services.AppState AppState
+@inject ToastService Toast
 @using System.Text.Json
 @using SuperBuilder_AI.Components.Shared
 
-<PageHead Icon="sb-ico-lang" Title="多语言" Desc="管理界面与导出的区域（Culture）、回退链与文案覆盖，支撑多语言租户。" />
+<AuthGuard>
+    <PageHead Icon="sb-ico-lang" Title="多语言" Desc="管理界面与导出的区域（Culture）、回退链与文案覆盖，支撑多语言租户。" />
 
-@if (_loading)
-{
-    <div class="empty-state"><div class="es-title">加载中…</div></div>
-}
-else if (_error is not null)
-{
-    <div class="alert alert-danger">@_error</div>
-}
-else if (_rows.Count == 0)
-{
-    <div class="panel"><div class="panel-body">
-        <div class="empty-state"><svg class="es-ico"><use href="#sb-ico-lang" /></svg>
-            <div class="es-title">暂无区域配置</div>
-            <div class="es-text">配置支持的语言区域与回退顺序，问数结果与导出文案将按区域呈现。</div>
-        </div>
-    </div></div>
-}
-else
-{
-    <div class="panel"><div class="panel-head"><div class="panel-title"><svg class="pt-ico"><use href="#sb-ico-lang" /></svg> 可用区域</div></div>
-        <div class="panel-body flush">
-            <div class="row-list">
-                @foreach (var r in _rows)
-                {
-                    <div class="row-item">
-                        <div class="ri-ico"><svg><use href="#sb-ico-lang" /></svg></div>
-                        <div class="ri-main">
-                            <div class="ri-title">@TablePresenter.Cell(r, "culture")</div>
-                            <div class="ri-sub">@TablePresenter.Cell(r, "displayName") @TablePresenter.Cell(r, "name")</div>
+    @if (_loading)
+    {
+        <LoadingState Text="正在加载区域配置…" />
+    }
+    else if (!string.IsNullOrWhiteSpace(_error))
+    {
+        <ErrorState Message="@_error" OnRetry="Reload" />
+    }
+    else if (_rows.Count == 0)
+    {
+        <SbPanel Icon="sb-ico-lang" Title="可用区域">
+            <Body>
+                <SbEmptyState Icon="sb-ico-lang" Title="暂无区域配置"
+                              Text="配置支持的语言区域与回退顺序，问数结果与导出文案将按区域呈现。" />
+            </Body>
+        </SbPanel>
+    }
+    else
+    {
+        <SbPanel Icon="sb-ico-lang" Title="可用区域" Flush="true">
+            <Body>
+                <div class="row-list">
+                    @foreach (var r in _rows)
+                    {
+                        <div class="row-item">
+                            <div class="ri-ico"><svg><use href="#sb-ico-lang" /></svg></div>
+                            <div class="ri-main">
+                                <div class="ri-title">@TablePresenter.Cell(r, "culture")</div>
+                                <div class="ri-sub">@TablePresenter.Cell(r, "displayName") @TablePresenter.Cell(r, "name")</div>
+                            </div>
+                            @if (TablePresenter.Cell(r, "isDefault") == "True" || TablePresenter.Cell(r, "default") == "True")
+                            { <span class="badge badge-primary">默认</span> }
                         </div>
-                        @if (TablePresenter.Cell(r, "isDefault") == "True" || TablePresenter.Cell(r, "default") == "True")
-                        { <span class="badge badge-primary">默认</span> }
-                    </div>
-                }
-            </div>
-        </div>
-    </div>
-}
+                    }
+                </div>
+            </Body>
+        </SbPanel>
+    }
+</AuthGuard>
 
 @code {
     private List<JsonElement> _rows = new();

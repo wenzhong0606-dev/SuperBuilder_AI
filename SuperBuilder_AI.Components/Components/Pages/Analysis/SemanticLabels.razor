@@ -1,81 +1,97 @@
 @page "/semantic-labels"
 @inject IApiClient Api
-@inject Services.AppState AppState
+@inject AppState State
+@inject NavigationManager Nav
+@inject ToastService Toast
 @using System.Text.Json
 @using SuperBuilder_AI.Components.Shared
 
-<PageHead Icon="sb-ico-tag" Title="语义标签" Desc="为字段与指标打上业务标签，并维护同义词与召回策略，让问数更懂你的口径。">
-    <button class="btn btn-primary btn-sm" @onclick='() => Toast("新建语义标签")'>
-        <svg class="btn-ico"><use href="#sb-ico-plus" /></svg> 新建标签
-    </button>
-</PageHead>
+<AuthGuard>
+    <SbListPage TItem="JsonElement" Icon="sb-ico-tag" Title="语义标签"
+                Desc="为字段与指标打上业务标签，并维护同义词与召回策略，让问数更懂你的口径。"
+                Items="@_rows" Columns="@Columns" Loading="@_loading" Error="@_error"
+                OnReload="Reload" SearchPlaceholder="搜索标签 / 同义词…"
+                EmptyTitle="暂无语义标签"
+                EmptyText="语义标签把「GMV」「成交额」这类同义表述归一到统一口径，减少问数歧义。"
+                LoadingText="正在加载语义标签…">
 
-@if (_loading)
-{
-    <div class="empty-state"><div class="es-title">加载中…</div></div>
-}
-else if (_error is not null)
-{
-    <div class="alert alert-danger">@_error</div>
-}
-else if (_rows.Count == 0)
-{
-    <div class="panel"><div class="panel-body">
-        <div class="empty-state">
-            <svg class="es-ico"><use href="#sb-ico-tag" /></svg>
-            <div class="es-title">暂无语义标签</div>
-            <div class="es-text">语义标签把「GMV」「成交额」这类同义表述归一到统一口径，减少问数歧义。</div>
-            <div class="es-actions"><button class="btn btn-outline-secondary btn-sm" @onclick="Reload">刷新</button></div>
-        </div>
-    </div></div>
-}
-else
-{
-    <div class="toolbar">
-        <div class="search">
-            <svg><use href="#sb-ico-search" /></svg>
-            <input @bind="Q" @bind:event="oninput" placeholder="搜索标签 / 同义词…" />
-        </div>
-        <div class="spacer"></div>
-        <button class="btn btn-outline-secondary btn-sm" @onclick="Reload">刷新</button>
-    </div>
+        <Actions>
+            <button class="btn btn-primary btn-sm" @onclick="Create">
+                <svg class="btn-ico"><use href="#sb-ico-plus" /></svg> 新建标签
+            </button>
+        </Actions>
 
-    <div class="panel">
-        <div class="panel-head"><div class="panel-title"><svg class="pt-ico"><use href="#sb-ico-tag" /></svg> 全部标签</div></div>
-        <div class="panel-body flush">
-            <div class="table-wrap">
-                <table class="data-table">
-                    <thead><tr>@foreach (var c in _cols) { <th>@TablePresenter.Friendly(c)</th> }</tr></thead>
-                    <tbody>
-                    @foreach (var row in Filtered)
-                    {
-                        <tr>
-                            @foreach (var c in _cols)
-                            {
-                                @if (TablePresenter.IsStatusColumn(c))
-                                { <td><span class="badge @TablePresenter.StatusBadge(TablePresenter.Cell(row, c))">@TablePresenter.Cell(row, c)</span></td> }
-                                else
-                                { <td>@TablePresenter.Cell(row, c)</td> }
-                            }
-                        </tr>
-                    }
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-}
+        <Stats>
+            <SbStatTile Label="标签总数" Value="@_rows.Count" Sub="当前租户" />
+            <SbStatTile Label="已启用" Value="@_rows.Count(IsEnabled)" Sub="参与召回" Accent="success" />
+            <SbStatTile Label="已停用" Value="@_rows.Count(r => !IsEnabled(r))" Sub="不参与解析" Accent="muted" />
+        </Stats>
+
+        <RowActions>
+            <button class="btn btn-sm btn-outline-secondary" @onclick="() => Open(context)">详情</button>
+        </RowActions>
+
+        <EmptyActions>
+            <button class="btn btn-primary btn-sm" @onclick="Create">新建标签</button>
+        </EmptyActions>
+    </SbListPage>
+
+    <SbModal Visible="@_creating" VisibleChanged="v => _creating = v" Title="新建语义标签">
+        <Body>
+            <SbField Label="概念类型" Full="true">
+                <select @bind="_ct">
+                    <option value="MetadataSemantic">字段级语义</option>
+                    <option value="BusinessEntity">业务实体</option>
+                    <option value="BusinessEntityAttribute">业务实体属性</option>
+                    <option value="BusinessEntityMetric">业务实体指标</option>
+                    <option value="BusinessDomain">业务域</option>
+                </select>
+            </SbField>
+            <SbField Label="概念 ID" Full="true" Required="true" Error="@_cidErr"><input @bind="_cid" placeholder="如：1001" /></SbField>
+            <SbField Label="区域 (Culture)" Full="true"><input @bind="_culture" placeholder="如：zh-CN" /></SbField>
+            <SbField Label="标签种类" Full="true">
+                <select @bind="_kind">
+                    <option value="DisplayName">展示名</option>
+                    <option value="Description">描述</option>
+                    <option value="Synonym">同义词</option>
+                    <option value="Question">示例问句</option>
+                </select>
+            </SbField>
+            <SbField Label="标签值" Full="true" Required="true" Error="@_valueErr"><input @bind="_value" placeholder="如：销售额" /></SbField>
+            <SbField Label="来源" Full="true"><input @bind="_source" placeholder="如：manual" /></SbField>
+            @if (!string.IsNullOrWhiteSpace(_createErr)) { <div class="alert alert-danger tiny" style="padding:8px 12px">@_createErr</div> }
+        </Body>
+        <Footer>
+            <button class="btn btn-outline-secondary btn-sm" @onclick="() => _creating = false">取消</button>
+            <button class="btn btn-primary btn-sm" @onclick="SaveCreate" disabled="@_saving">保存</button>
+        </Footer>
+    </SbModal>
+</AuthGuard>
 
 @code {
-    private JsonElement? _data;
     private List<JsonElement> _rows = new();
     private List<string> _cols = new();
     private string _error = "";
     private bool _loading = true;
-    private string Q = "";
 
-    private List<JsonElement> Filtered => string.IsNullOrWhiteSpace(Q)
-        ? _rows : _rows.Where(r => _cols.Any(c => TablePresenter.Cell(r, c).Contains(Q, StringComparison.OrdinalIgnoreCase))).ToList();
+    private bool _creating = false;
+    private bool _saving = false;
+    private string _createErr = "";
+    private string _cidErr = "";
+    private string _valueErr = "";
+    private string _ct = "MetadataSemantic";
+    private string _cid = "";
+    private string _culture = "zh-CN";
+    private string _kind = "DisplayName";
+    private string _value = "";
+    private string _source = "manual";
+
+    /// <summary>列定义由后端返回结构推断。</summary>
+    private List<SbColumn<JsonElement>> Columns =>
+        _cols.Select(c => SbCol.Of<JsonElement>(
+            TablePresenter.Friendly(c),
+            r => TablePresenter.Cell(r, c),
+            isStatus: TablePresenter.IsStatusColumn(c))).ToList();
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -85,14 +101,63 @@ else
     private async Task Reload()
     {
         _loading = true;
-        var (data, _, err) = await Api.GetJsonAsync($"api/semantic-labels?tenantId={AppState.TenantId}");
+        var (data, _, err) = await Api.GetJsonAsync($"api/semantic-labels?tenantId={State.TenantId}");
         _error = err ?? "";
-        _data = data;
         _rows = data is { ValueKind: JsonValueKind.Array } ? data.Value.EnumerateArray().ToList() : new();
-        _cols = TablePresenter.InferColumns(_data);
+        _cols = TablePresenter.InferColumns(data);
         _loading = false;
         StateHasChanged();
     }
 
-    private void Toast(string m) => _error = m;
+    private void Open(JsonElement row)
+    {
+        var id = TablePresenter.Cell(row, "id");
+        if (string.IsNullOrWhiteSpace(id))
+        {
+            Toast.Warning("该记录缺少 id，无法打开详情。");
+            return;
+        }
+        Nav.NavigateTo($"semantic-labels/{id}");
+    }
+
+    private void Create() => _creating = true;
+
+    private async Task SaveCreate()
+    {
+        _cidErr = ""; _valueErr = ""; _createErr = "";
+        if (string.IsNullOrWhiteSpace(_cid)) _cidErr = "概念 ID 必填。";
+        if (string.IsNullOrWhiteSpace(_value)) _valueErr = "标签值必填。";
+        if (!string.IsNullOrWhiteSpace(_cid) && !long.TryParse(_cid, out _)) _cidErr = "概念 ID 必须为数字。";
+        if (!string.IsNullOrWhiteSpace(_cidErr) || !string.IsNullOrWhiteSpace(_valueErr))
+        {
+            return;
+        }
+        var cid = long.Parse(_cid, System.Globalization.CultureInfo.InvariantCulture);
+        _saving = true;
+        var body = new
+        {
+            tenantId = State.TenantId,
+            conceptType = _ct,
+            conceptId = cid,
+            culture = _culture,
+            labelKind = _kind,
+            value = _value,
+            source = _source,
+            sortOrder = 0
+        };
+        var (ok, _, err) = await Api.PostAsync("api/semantic-labels", body);
+        _saving = false;
+        if (!ok) { _createErr = err ?? "保存失败。"; return; }
+        _creating = false;
+        Toast.Success("语义标签已保存。");
+        await Reload();
+    }
+
+    private static bool IsEnabled(JsonElement row)
+    {
+        var s = TablePresenter.Cell(row, "status");
+        return s.Equals("enabled", StringComparison.OrdinalIgnoreCase)
+            || s.Equals("active", StringComparison.OrdinalIgnoreCase)
+            || s.Equals("true", StringComparison.OrdinalIgnoreCase);
+    }
 }

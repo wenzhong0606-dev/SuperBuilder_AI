@@ -1,4 +1,5 @@
 @page "/themes"
+@inject ToastService Toast
 <PageHead Icon="sb-ico-theme" Title="主题编辑器" Desc="基于古风色板自定义你的视觉风格：实时预览、保存并指派给租户或复制为蓝图。" />
 
 <div class="toolbar">
@@ -52,7 +53,6 @@
 @code {
     private Dictionary<string, string> _tokens = new();
     private string _mode = "active";
-    private string _msg = "";
 
     private static readonly Dictionary<string, (string Label, string Light, string Dark)> Presets = new()
     {
@@ -94,5 +94,5 @@
     private string _previewStyle => "border-radius:var(--sb-radius-lg);" +
         string.Join(";", _tokens.Select(kv => $"--sb-{kv.Key}:{kv.Value}"));
 
-    private void Save() => _msg = "主题已保存（持久化接入 api/themes，P11.3 收口）。";
+    private void Save() => Toast.Info("主题已保存（持久化接入 api/themes，P11.3 收口）。");
 }

@@ -1,0 +1,68 @@
+@page "/semantic-labels/{Id:long}"
+@inject IApiClient Api
+@inject AppState State
+@inject NavigationManager Nav
+@inject ToastService Toast
+@using System.Text.Json
+@using SuperBuilder_AI.Components.Shared
+
+<AuthGuard>
+    <PageHead Icon="sb-ico-tag" Title="语义标签详情" Desc="查看标签口径、同义词与召回策略。" />
+
+    @if (_loading)
+    {
+        <LoadingState Text="正在加载标签详情…" />
+    }
+    else if (!string.IsNullOrWhiteSpace(_error))
+    {
+        <ErrorState Message="@_error" OnRetry="Reload" />
+    }
+    else if (_obj is null)
+    {
+        <SbPanel Icon="sb-ico-tag" Title="详情">
+            <Body>
+                <SbEmptyState Icon="sb-ico-tag" Title="未找到该标签" Text="标签可能已被删除，或后端详情端点尚未接入。" />
+            </Body>
+        </SbPanel>
+    }
+    else
+    {
+        <SbPanel Icon="sb-ico-tag" Title="标签信息">
+            <Body>
+                <SbKeyValue Items="@_kv" />
+            </Body>
+        </SbPanel>
+    }
+
+    <div class="toolbar" style="margin-bottom:0">
+        <button class="btn btn-outline-secondary btn-sm" @onclick="Back">返回列表</button>
+    </div>
+</AuthGuard>
+
+@code {
+    [Parameter] public long Id { get; set; }
+    private JsonElement? _obj;
+    private string _error = "";
+    private bool _loading = true;
+    private List<KeyValuePair<string, string>> _kv = new();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender) await Reload();
+    }
+
+    private async Task Reload()
+    {
+        _loading = true;
+        var (data, _, err) = await Api.GetJsonAsync($"api/semantic-labels/{Id}?tenantId={State.TenantId}");
+        _error = err ?? "";
+        _obj = data is { ValueKind: JsonValueKind.Object } ? data : null;
+        _kv = _obj is null ? new() : _obj.Value.EnumerateObject()
+            .Select(p => new KeyValuePair<string, string>(TablePresenter.Friendly(p.Name), TablePresenter.StringifySafe(p.Value)))
+            .ToList();
+        _loading = false;
+        StateHasChanged();
+    }
+
+    private void Back() => Nav.NavigateTo("semantic-labels");
+}

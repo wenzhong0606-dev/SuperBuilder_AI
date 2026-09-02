@@ -1,0 +1,23 @@
+@* 空状态：图标 + 标题 + 说明 + 操作区 *@
+<div class="empty-state">
+    @if (!string.IsNullOrWhiteSpace(Icon))
+    {
+        <svg class="es-ico"><use href="@Icon" /></svg>
+    }
+    <div class="es-title">@Title</div>
+    @if (!string.IsNullOrWhiteSpace(Text))
+    {
+        <div class="es-text">@Text</div>
+    }
+    @if (Actions is not null)
+    {
+        <div class="es-actions">@Actions</div>
+    }
+</div>
+
+@code {
+    [Parameter] public string? Icon { get; set; }
+    [Parameter] public string Title { get; set; } = "暂无数据";
+    [Parameter] public string? Text { get; set; }
+    [Parameter] public RenderFragment? Actions { get; set; }
+}

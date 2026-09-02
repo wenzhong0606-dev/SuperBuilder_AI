@@ -1,0 +1,27 @@
+@inherits LayoutComponentBase
+@inject ThemeService Theme
+@inject AppState State
+@inject AuthStore Session
+@inject IJSRuntime JS
+@* 无壳布局：登录、错误页等独立页面使用（无顶栏/侧栏）。
+   与 MainLayout 一样执行主题应用与会话自举，保证直接访问这些页面时登录态正确。 *@
+<IconSprite />
+
+<div class="blank-shell">
+    <main class="blank-content">
+        @Body
+    </main>
+</div>
+
+@code {
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        var theme = await JS.InvokeAsync<string>("SuperBuilder.getTheme");
+        await Theme.ApplyAsync(theme);
+
+        await Session.RestoreAsync();
+        if (State.IsAuthenticated) await Session.ValidateAsync();
+        StateHasChanged();
+    }
+}

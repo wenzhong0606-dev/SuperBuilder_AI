@@ -1,0 +1,79 @@
+@page "/settings"
+@inject AppState State
+@inject AuthStore Session
+@inject ThemeService Theme
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+
+<AuthGuard>
+    <PageHead Icon="sb-ico-settings" Title="个人设置" Desc="查看账号与租户信息，调整界面偏好。">
+        <button class="btn btn-outline-secondary btn-sm" @onclick="Logout">退出登录</button>
+    </PageHead>
+
+    <div class="field-grid">
+        <SbPanel Icon="sb-ico-user" Title="账号信息">
+            <Body>
+                <SbKeyValue Items="@AccountInfo" />
+                <div class="mt-3">
+                    <div class="st-label">权限</div>
+                    <div class="sb-badge-wrap">
+                        @if (State.Permissions.Count == 0)
+                        {
+                            <SbBadge Tone="muted">无显式权限</SbBadge>
+                        }
+                        else
+                        {
+                            @foreach (var p in State.Permissions)
+                            {
+                                <SbBadge Tone="info">@p</SbBadge>
+                            }
+                        }
+                    </div>
+                </div>
+            </Body>
+        </SbPanel>
+
+        <SbPanel Icon="sb-ico-theme" Title="界面偏好">
+            <Body>
+                <SbField Label="主题" Hint="偏好会保存在本地，下次进入自动应用。">
+                    <SbSegmented TValue="string" Items="@_themes" Value="@_theme"
+                                 TextSelector="@(t => t == "dark" ? "深色" : "浅色")"
+                                 ValueChanged="OnThemeChanged" />
+                </SbField>
+            </Body>
+        </SbPanel>
+    </div>
+</AuthGuard>
+
+@code {
+    private readonly string[] _themes = { "light", "dark" };
+    private string _theme = "light";
+
+    private List<KeyValuePair<string, string>> AccountInfo => new()
+    {
+        new KeyValuePair<string, string>("用户名", State.Username),
+        new KeyValuePair<string, string>("用户 ID", State.UserId.ToString()),
+        new KeyValuePair<string, string>("租户 ID", State.TenantId.ToString()),
+        new KeyValuePair<string, string>("登录状态", State.IsAuthenticated ? "已登录" : "未登录")
+    };
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        _theme = await JS.InvokeAsync<string>("SuperBuilder.getTheme");
+        StateHasChanged();
+    }
+
+    private async Task OnThemeChanged(string theme)
+    {
+        _theme = theme;
+        await Theme.ApplyAsync(theme);
+    }
+
+    private async Task Logout()
+    {
+        await Session.ClearAsync();
+        State.ClearSession();
+        Nav.NavigateTo("/login", forceLoad: true);
+    }
+}

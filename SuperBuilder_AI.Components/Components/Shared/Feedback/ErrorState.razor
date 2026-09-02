@@ -1,0 +1,30 @@
+@* 统一错误态：错误码 + 追踪 ID + 可选重试（对齐后端 ApiError） *@
+<div class="alert alert-warning" role="alert">
+    <div class="ask-error-msg">@Message</div>
+    @if (!string.IsNullOrWhiteSpace(Code) || !string.IsNullOrWhiteSpace(TraceId))
+    {
+        <div class="ask-error-meta">
+            @if (!string.IsNullOrWhiteSpace(Code))
+            {
+                <text>错误码：<code>@Code</code></text>
+            }
+            @if (!string.IsNullOrWhiteSpace(TraceId))
+            {
+                <text> · 追踪 ID：<code>@TraceId</code></text>
+            }
+        </div>
+    }
+    @if (OnRetry.HasDelegate)
+    {
+        <div class="mt-2">
+            <button class="btn btn-sm btn-outline-secondary" @onclick="OnRetry">重试</button>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public string Message { get; set; } = "操作失败。";
+    [Parameter] public string? Code { get; set; }
+    [Parameter] public string? TraceId { get; set; }
+    [Parameter] public EventCallback OnRetry { get; set; }
+}

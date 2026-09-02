@@ -1,0 +1,27 @@
+@* 搜索输入：带图标与清除按钮，输入即时回调 *@
+<div class="search">
+    <svg><use href="#sb-ico-search" /></svg>
+    <input value="@Value" @oninput="OnInput" placeholder="@Placeholder" aria-label="搜索" />
+    @if (!string.IsNullOrEmpty(Value))
+    {
+        <button type="button" class="sb-search-clear" @onclick="Clear" aria-label="清空">×</button>
+    }
+</div>
+
+@code {
+    [Parameter] public string Value { get; set; } = "";
+    [Parameter] public EventCallback<string> ValueChanged { get; set; }
+    [Parameter] public string Placeholder { get; set; } = "搜索…";
+
+    private async Task OnInput(ChangeEventArgs e)
+    {
+        Value = e.Value?.ToString() ?? "";
+        if (ValueChanged.HasDelegate) await ValueChanged.InvokeAsync(Value);
+    }
+
+    private async Task Clear()
+    {
+        Value = "";
+        if (ValueChanged.HasDelegate) await ValueChanged.InvokeAsync(Value);
+    }
+}

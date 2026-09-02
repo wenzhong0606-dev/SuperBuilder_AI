@@ -50,7 +50,7 @@
 
 > **第一阶段目标**：不会因为身份、租户、数据源和数据权限问题查错库、越权或泄露数据。
 >
-> **2026-09-01 实施进度快照**：SB-P0-01、02、02A、02B、02C、03、04A、04B、05、06、07、08、09、11 已完成；SB-P0-10 待闭合。最新门禁：全量测试 **408/408**、Golden **18/18 PASS**。本快照用于恢复期间保全已验收状态，后续完成 P0-10 时同步归档各行明细。
+> **2026-09-02 实施进度快照**：P0 阶段全部条目已闭合。最新门禁：全量测试 **411/411**、Golden **18/18 PASS**。
 
 | ID | 优先级 | 模块 | 开发任务 | 核心改造点 | 验收标准 | 状态 |
 |---|---|---|---|---|---|---|
@@ -67,7 +67,7 @@
 | **SB-P0-07** | P0 | Security | 最终 QueryPlan Security Gate | 在 RLS 注入后、SqlQueryBuilder 前验证**最终 Plan**的 EffectiveTenant、ResolvedDataSource、Table、Column、Row Policy 与策略版本；失败必须短路，SQL Builder 和 Execution 均不可被调用。执行层继续保留 DataSource/租户兜底，形成纵深防御 | ① 未通过 Gate 的 Plan 永不进入 SQL Builder/Execution；② 篡改、缺失/过期策略、跨租户表列、RLS 注入异常均拒绝并审计；③ 测试验证下游 mock 零调用；④ Golden 18/18 | ✅ 已完成｜最终门禁 408/408｜最终 Plan Security Gate｜Golden 18/18 |
 | **SB-P0-08** | P0 | Security | 非开发环境 CORS 收口 | Production、Staging、未知/自定义托管环境禁止无配置时 `AllowAnyOrigin`；允许无浏览器跨域需求的服务采取 deny-by-default | ① 非 Development 未设置白名单时启动失败或拒绝跨域；② Development 联调配置显式可见；③ 不允许 Origin 反射或通配凭据组合 | ✅ 已完成｜`CorsOriginPolicy`｜非 Development fail-closed |
 | **SB-P0-09** | P0 | Diagnostics | 诊断/管理接口分级隔离 | ① `/test/*` 与 `/metrics` 立即纳入鉴权：无令牌 401、非治理角色 403；② `api/metadata-vector` 补平台治理权限；③ `/evaluation/*` 保持 Golden 调用契约，但 **Production 默认不映射路由**。显式启用时必须使用独立内部监听端口/独立诊断进程，或由受控反向代理按路径实施网络 ACL；不得用可伪造 Header 判断“内网”。若依赖来源 IP，须配置可信代理与 Forwarded Headers。权限绑定到 SB-P0-11 | ① `/test/*`、`/metrics` 无令牌 401、普通 Token 403；② metadata-vector 非治理角色 403；③ Production 默认访问 `/evaluation/*` 为 404；④ 显式启用后仅内部监听或网络 ACL 可达；⑤ Development/Test Golden 18/18 不变；⑥ 部署配置与回滚方式有文档 | ✅ 已完成｜DiagnosticsAccessPolicy + ProductionEvaluationRouteConvention｜Golden 18/18 |
-| **SB-P0-10** | P0 | Audit | 安全事件审计 | 登录失败、越权拒绝、租户切换失败、QueryPlan 拒绝、**平台治理角色全部操作**进入审计；敏感请求体、密码、Token、连接串必须脱敏/禁止入账，审计存储采用追加写约束 | 高风险拒绝含 UserId / AuthenticatedTenantId / EffectiveTenantId / TraceId / Reason；数据面切换意图记录 RequestedTenantId；管理面操作记录 ManagementTargetTenantId/Action/Authorized；普通租户不可读取平台治理审计或其他租户审计 | ⬜ 待闭合｜当前唯一未完成 P0 |
+| **SB-P0-10** | P0 | Audit | 安全事件审计 | 登录失败、越权拒绝、租户切换失败、QueryPlan 拒绝、**平台治理角色全部操作**进入审计；敏感请求体、密码、Token、连接串必须脱敏/禁止入账，审计存储采用追加写约束 | 高风险拒绝含 UserId / AuthenticatedTenantId / EffectiveTenantId / TraceId / Reason；数据面切换意图记录 RequestedTenantId；管理面操作记录 ManagementTargetTenantId/Action/Authorized；普通租户不可读取平台治理审计或其他租户审计 | ✅ 已完成（2026-09-02）：`AuditMiddleware` 前移并包裹鉴权、限流和端点，401/403 与端点异常均能按真实状态入账；登录失败、Token 失效、缺权限、跨租户、治理身份数据面拒绝及 `SB_SECURITY_001` QueryPlan 拒绝均记录稳定原因。高风险事件结构化保存 UserId、Authenticated/Requested/EffectiveTenantId、TraceId、ReasonCode/Reason 及管理目标/动作/授权结果；治理角色所有请求独立分类。审计链不读取请求体、Authorization 或连接串，外部手工记录强制绑定认证租户/用户并丢弃调用方快照、Actor 和 Message。租户查询严格排除平台与他租户日志；`SuperBIContext` 禁止修改或删除既有 `AuditLog`，保留追加写语义。全量 **411/411**，Golden **18/18 PASS**。 |
 | **SB-P0-11** | P0 | Identity | 重构平台超级管理员为纯治理角色 | Seed 正 Id 的平台租户（如 `TenantCode=platform`），治理用户归属该租户；定义最小 `platform:*` 权限目录。**必须重定义或废弃当前 `TenantId=0`、拥有业务全权限且可分配给普通租户用户的 `platform-admin`**：移除 Dashboard/Metadata/DataSource 等业务权限，阻止普通租户 Identity API 枚举/授予/撤销治理角色，并迁移既有绑定与修正测试。首个治理账号只能通过受控部署 Seed/CLI/密钥管理初始化，不提供匿名 bootstrap API | ① 治理角色可执行租户、诊断、平台审计/配额治理；② 普通租户用户不能发现或获得治理角色；③ 既有全权限绑定已迁移/撤销；④ 治理账号请求 Ask、元数据业务读取或任意租户 DataSource 均 403；⑤ 所有治理操作入审计且不可绕过；⑥ 初始化可重复、凭据不进源码/日志；⑦ 不改 `User` 模型、不加成员表 | ✅ 已完成｜`platform-admin` 已重定义为纯治理角色｜业务权限剥离 |
 
 ---

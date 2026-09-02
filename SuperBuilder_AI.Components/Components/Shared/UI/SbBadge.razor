@@ -1,0 +1,8 @@
+@* 状态徽章：tone = primary|success|warning|danger|info|muted *@
+<span class="badge badge-@Tone" title="@Title">@ChildContent</span>
+
+@code {
+    [Parameter] public string Tone { get; set; } = "muted";
+    [Parameter] public string? Title { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

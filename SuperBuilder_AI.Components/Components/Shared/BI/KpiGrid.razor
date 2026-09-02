@@ -1,0 +1,17 @@
+@* KPI 卡片网格：直接消费 QueryAnswer.Summary *@
+@if (Summary is { Count: > 0 })
+{
+    <div class="kpi-row">
+        @foreach (var kv in Summary)
+        {
+            <div class="kpi-card">
+                <div class="kpi-label">@kv.Key</div>
+                <div class="kpi-value">@JsonValue.AsString(kv.Value)</div>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public Dictionary<string, object?>? Summary { get; set; }
+}

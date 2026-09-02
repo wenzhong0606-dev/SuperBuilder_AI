@@ -1,0 +1,25 @@
+@typeparam TValue
+@* 分段控件：在若干候选项中单选 *@
+<div class="seg" role="group">
+    @foreach (var item in Items)
+    {
+        <button type="button" class="@(IsActive(item) ? "active" : "")" @onclick="() => Select(item)">@ItemText(item)</button>
+    }
+</div>
+
+@code {
+    [Parameter] public IReadOnlyList<TValue> Items { get; set; } = Array.Empty<TValue>();
+    [Parameter] public TValue? Value { get; set; }
+    [Parameter] public EventCallback<TValue> ValueChanged { get; set; }
+    [Parameter] public Func<TValue, string>? TextSelector { get; set; }
+
+    private string ItemText(TValue item) => TextSelector?.Invoke(item) ?? item?.ToString() ?? "";
+
+    private bool IsActive(TValue item) => EqualityComparer<TValue?>.Default.Equals(item, Value);
+
+    private async Task Select(TValue item)
+    {
+        Value = item;
+        if (ValueChanged.HasDelegate) await ValueChanged.InvokeAsync(item);
+    }
+}

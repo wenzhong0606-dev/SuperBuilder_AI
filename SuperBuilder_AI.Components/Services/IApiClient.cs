@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Net.Http;
 using System.Text.Json;
 using SuperBuilder_AI.Components.Models;
 
@@ -23,9 +24,33 @@ public interface IApiClient
     /// <summary>发布为应用：结构化 App DSL 经默认路径（P8）保存到 api/apps。</summary>
     Task<(bool Ok, string? Code, string? Error)> PublishAppAsync(long tenantId, string dslJson, string? code, CancellationToken ct = default);
     Task<T?> GetAsync<T>(string relativeUrl, CancellationToken ct = default) where T : class;
+
+    /// <summary>
+    /// 通用写操作（POST/PUT/PATCH/DELETE）：成功返回 Ok=true，否则返回 Status 与统一错误体中的 message。
+    /// 401 由实现统一触发会话失效回收（与读路径一致）。
+    /// </summary>
+    Task<(bool Ok, int Status, string? Error)> SendAsync(HttpMethod method, string relativeUrl, object? body = null, CancellationToken ct = default);
+
+    /// <summary>POST JSON（body 为 null 时发送空请求）。</summary>
+    Task<(bool Ok, int Status, string? Error)> PostAsync(string relativeUrl, object? body = null, CancellationToken ct = default);
+
+    /// <summary>PUT JSON（整体更新）。</summary>
+    Task<(bool Ok, int Status, string? Error)> PutAsync(string relativeUrl, object? body, CancellationToken ct = default);
+
+    /// <summary>PATCH JSON（局部更新，如启用/禁用）。</summary>
+    Task<(bool Ok, int Status, string? Error)> PatchAsync(string relativeUrl, object? body = null, CancellationToken ct = default);
+
+    /// <summary>DELETE。</summary>
+    Task<(bool Ok, int Status, string? Error)> DeleteAsync(string relativeUrl, CancellationToken ct = default);
     /// <summary>
     /// 松类型读取：GET 任意端点并以 <see cref="JsonElement"/> 返回（数组或对象皆可）。
     /// 不抛异常——HTTP 非 2xx 与网络/解析错误一律通过 err 返回，便于页面优雅降级。
     /// </summary>
     Task<(JsonElement? Data, int Status, string? Error)> GetJsonAsync(string relativeUrl, CancellationToken ct = default);
+
+    /// <summary>
+    /// 纯文本读取（如 <c>/metrics</c> 的 Prometheus 文本、<c>/health</c> 的探针响应）。
+    /// 与 <see cref="GetJsonAsync"/> 的区别是不做 JSON 解析，非 2xx 返回错误信息而非抛出。
+    /// </summary>
+    Task<(string? Text, int Status, string? Error)> GetTextAsync(string relativeUrl, CancellationToken ct = default);
 }

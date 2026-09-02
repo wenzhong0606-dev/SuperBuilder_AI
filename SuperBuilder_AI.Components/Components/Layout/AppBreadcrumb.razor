@@ -1,0 +1,46 @@
+@implements IDisposable
+@inject NavigationManager Nav
+@* 面包屑：分组 / 当前页；详情页（带 id、code 参数）显示为「列表 / 详情」 *@
+@{
+    var current = NavMenuItems.FindByHref(CurrentPath);
+    var group = current is null ? null : NavMenuItems.FindGroup(current);
+}
+@if (current is not null)
+{
+    <nav class="sb-crumb" aria-label="面包屑">
+        @if (group is not null)
+        {
+            <span class="sb-crumb-seg">@group.Title</span>
+            <span class="sb-crumb-sep">/</span>
+        }
+        @if (Parent is not null)
+        {
+            <a href="@Parent.Href" class="sb-crumb-link">@Parent.Title</a>
+            <span class="sb-crumb-sep">/</span>
+        }
+        <span class="sb-crumb-cur">@current.Title</span>
+    </nav>
+}
+
+@code {
+    private string CurrentPath => new Uri(Nav.Uri).AbsolutePath.Trim('/');
+
+    /// <summary>详情页父级：由路由首段推断（如 dashboards/12 → dashboards）。</summary>
+    private NavItem? Parent
+    {
+        get
+        {
+            var seg = CurrentPath.Split('/', StringSplitOptions.RemoveEmptyEntries);
+            if (seg.Length < 2) return null;
+            var parent = NavMenuItems.FindByHref(seg[0]);
+            return parent is not null && parent.Href != CurrentPath ? parent : null;
+        }
+    }
+
+    protected override void OnInitialized() => Nav.LocationChanged += OnLocationChanged;
+
+    private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
+        => InvokeAsync(StateHasChanged);
+
+    public void Dispose() => Nav.LocationChanged -= OnLocationChanged;
+}

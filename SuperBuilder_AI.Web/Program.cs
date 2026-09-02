@@ -12,7 +12,11 @@ builder.Services.AddScoped<AppState>();
 builder.Services.AddScoped<AuthStore>();
 builder.Services.AddScoped<ThemeService>();
 builder.Services.AddScoped<LocalizationService>();
+// 全局轻提示（由 MainLayout 中的 SbToastHost 统一渲染）
+builder.Services.AddScoped<ToastService>();
 builder.Services.AddScoped<IApiClient, ApiClient>();
+builder.Services.AddScoped<AskSessionStore>();
+builder.Services.AddScoped<FileDownloadService>();
 
 // API 基地址：默认本机 5032（P11.0 起的 API），可用 appsettings:ApiBaseUrl 覆盖
 builder.Services.AddHttpClient("SuperBuilderApi", client =>

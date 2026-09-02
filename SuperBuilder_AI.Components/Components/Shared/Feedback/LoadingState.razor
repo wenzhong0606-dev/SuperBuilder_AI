@@ -1,0 +1,12 @@
+@* 统一加载态：面板/区块级占位 *@
+<div class="sb-loading @(Block ? "block" : "")">
+    <SbSpinner Size="@Size" />
+    <span class="muted tiny">@Text</span>
+</div>
+
+@code {
+    [Parameter] public string Text { get; set; } = "加载中…";
+    [Parameter] public string Size { get; set; } = "md";
+    /// <summary>块级（占据较大区域并有背景）还是行内。</summary>
+    [Parameter] public bool Block { get; set; } = true;
+}

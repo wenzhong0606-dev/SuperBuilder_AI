@@ -1,0 +1,28 @@
+@* 表单字段：标签 + 控件 + 说明/错误 ；full 表示在 field-grid 中整行 *@
+<label class="sb-field @(Full ? "full" : "")">
+    <span class="sb-field-label">
+        @Label
+        @if (Required)
+        {
+            <span class="sb-req">*</span>
+        }
+    </span>
+    @ChildContent
+    @if (!string.IsNullOrWhiteSpace(Error))
+    {
+        <span class="sb-field-error">@Error</span>
+    }
+    else if (!string.IsNullOrWhiteSpace(Hint))
+    {
+        <span class="sb-field-hint">@Hint</span>
+    }
+</label>
+
+@code {
+    [Parameter] public string Label { get; set; } = "";
+    [Parameter] public bool Required { get; set; }
+    [Parameter] public bool Full { get; set; }
+    [Parameter] public string? Hint { get; set; }
+    [Parameter] public string? Error { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

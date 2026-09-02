@@ -1,0 +1,118 @@
+@typeparam TItem
+@* 列表页骨架：页头 + 统计区 + 工具栏（搜索/操作） + 表格或卡片墙 + 加载/错误/空态。
+   页面只需提供数据与列定义，交互与状态呈现由本组件统一负责。 *@
+
+<PageHead Icon="@Icon" Title="@Title" Desc="@Desc">
+    @Actions
+</PageHead>
+
+@if (Stats is not null)
+{
+    <div class="stat-grid">@Stats</div>
+}
+
+@if (Loading)
+{
+    <LoadingState Text="@LoadingText" />
+}
+else if (!string.IsNullOrWhiteSpace(Error))
+{
+    <ErrorState Message="@(Error ?? string.Empty)" Code="@ErrorCode" TraceId="@TraceId" OnRetry="OnReload" />
+}
+else if (Items.Count == 0)
+{
+    <SbPanel Icon="@Icon" Title="@(string.IsNullOrWhiteSpace(PanelTitle) ? Title : PanelTitle)">
+        <Body>
+            <SbEmptyState Icon="@Icon" Title="@EmptyTitle" Text="@EmptyText">
+                <Actions>
+                    @if (EmptyActions is not null)
+                    {
+                        @EmptyActions
+                    }
+                    @if (OnReload.HasDelegate)
+                    {
+                        <button class="btn btn-outline-secondary btn-sm" @onclick="OnReload">刷新</button>
+                    }
+                </Actions>
+            </SbEmptyState>
+        </Body>
+    </SbPanel>
+}
+else
+{
+    if (Searchable || ToolbarRight is not null)
+    {
+        <SbToolbar>
+            <Left>
+                @if (Searchable)
+                {
+                    <SbSearch Value="@_query" ValueChanged="OnQueryChanged" Placeholder="@SearchPlaceholder" />
+                }
+            </Left>
+            <Right>
+                @ToolbarRight
+                @if (OnReload.HasDelegate)
+                {
+                    <button class="btn btn-outline-secondary btn-sm" @onclick="OnReload">刷新</button>
+                }
+            </Right>
+        </SbToolbar>
+    }
+
+    @if (CardTemplate is not null)
+    {
+        <div class="card-grid">
+            @foreach (var item in Filtered)
+            {
+                @CardTemplate(item)
+            }
+        </div>
+    }
+    else
+    {
+        <SbPanel Icon="@Icon" Title="@(string.IsNullOrWhiteSpace(PanelTitle) ? Title : PanelTitle)" Flush="true">
+            <Body>
+                <SbDataTable Items="@Filtered" Columns="@Columns" RowActions="@RowActions"
+                             PageSize="@PageSize" EnablePaging="@EnablePaging"
+                             EmptyTitle="@EmptyTitle" EmptyText="@EmptyText" Icon="@Icon" />
+            </Body>
+        </SbPanel>
+    }
+}
+
+@code {
+    [Parameter] public string Icon { get; set; } = "";
+    [Parameter] public string Title { get; set; } = "";
+    [Parameter] public string? Desc { get; set; }
+    [Parameter] public IReadOnlyList<TItem> Items { get; set; } = Array.Empty<TItem>();
+    [Parameter] public IReadOnlyList<SbColumn<TItem>> Columns { get; set; } = Array.Empty<SbColumn<TItem>>();
+    [Parameter] public RenderFragment<TItem>? CardTemplate { get; set; }
+    [Parameter] public RenderFragment<TItem>? RowActions { get; set; }
+    [Parameter] public RenderFragment? Actions { get; set; }
+    [Parameter] public RenderFragment? Stats { get; set; }
+    [Parameter] public RenderFragment? ToolbarRight { get; set; }
+    [Parameter] public RenderFragment? EmptyActions { get; set; }
+    [Parameter] public bool Loading { get; set; }
+    [Parameter] public string? Error { get; set; }
+    [Parameter] public string? ErrorCode { get; set; }
+    [Parameter] public string? TraceId { get; set; }
+    [Parameter] public EventCallback OnReload { get; set; }
+    [Parameter] public bool Searchable { get; set; } = true;
+    [Parameter] public string SearchPlaceholder { get; set; } = "搜索…";
+    [Parameter] public string EmptyTitle { get; set; } = "暂无数据";
+    [Parameter] public string? EmptyText { get; set; }
+    [Parameter] public string? LoadingText { get; set; }
+    [Parameter] public string? PanelTitle { get; set; }
+    [Parameter] public int PageSize { get; set; } = 20;
+    [Parameter] public bool EnablePaging { get; set; } = true;
+
+    private string _query = "";
+
+    /// <summary>本地搜索：按列取值文本包含匹配（大小写不敏感）。</summary>
+    private IReadOnlyList<TItem> Filtered =>
+        string.IsNullOrWhiteSpace(_query) || Columns.Count == 0
+            ? Items
+            : Items.Where(i => Columns.Any(c => c.Value(i).Contains(_query, StringComparison.OrdinalIgnoreCase))).ToList();
+
+    private void OnQueryChanged(string value) => _query = value;
+}

@@ -1,0 +1,121 @@
+@page "/apps/{Code}"
+@inject IApiClient Api
+@inject NavigationManager Nav
+@inject ToastService Toast
+@using System.Text.Json
+@using SuperBuilder_AI.Components.Shared
+
+<AuthGuard>
+    <PageHead Icon="sb-ico-app" Title="@(_title)" Desc="应用详情：DSL 结构、页面与组件清单。">
+        <button class="btn btn-outline-secondary btn-sm" @onclick='() => Nav.NavigateTo("apps")'>返回列表</button>
+        <button class="btn btn-outline-secondary btn-sm" @onclick="() => Load()">刷新</button>
+        <button class="btn btn-danger btn-sm" @onclick="() => _confirmOpen = true">删除</button>
+    </PageHead>
+
+    @if (_loading)
+    {
+        <LoadingState Text="正在加载应用…" />
+    }
+    else if (_error is not null)
+    {
+        <ErrorState Message="@_error" OnRetry="() => Load()" />
+    }
+    else
+    {
+        <SbTabs>
+            <SbTab Title="概览">
+                <SbPanel Icon="sb-ico-app" Title="基本信息">
+                    <Body><SbKeyValue Items="@JsonRows.Scalars(_detail)" /></Body>
+                </SbPanel>
+            </SbTab>
+            <SbTab Title="页面与组件" Badge="@_components.Count.ToString()">
+                <SbPanel Icon="sb-ico-comp" Title="组件清单" Flush="true">
+                    <Body>
+                        @if (_components.Count == 0)
+                        {
+                            <div class="panel-body">
+                                <SbEmptyState Icon="sb-ico-comp" Title="未解析到组件" Text="该应用的 DSL 中暂无可解析的组件定义。" />
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="row-list">
+                                @foreach (var c in _components)
+                                {
+                                    <div class="row-item">
+                                        <span class="ri-ico"><svg><use href="#sb-ico-comp" /></svg></span>
+                                        <div class="ri-main">
+                                            <div class="ri-title">@(string.IsNullOrWhiteSpace(c.Title) ? c.Type : c.Title)</div>
+                                            <div class="ri-sub">@c.Type · @c.Id</div>
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </Body>
+                </SbPanel>
+            </SbTab>
+            <SbTab Title="DSL">
+                <SbPanel Title="App DSL（只读）">
+                    <Body><pre class="sb-pre">@_dslText</pre></Body>
+                </SbPanel>
+            </SbTab>
+        </SbTabs>
+    }
+
+    <SbConfirm @bind-Visible="_confirmOpen" Title="删除应用" Tone="danger"
+               Message="@($"确认删除应用「{_title}」？该操作不可撤销。")"
+               ConfirmText="删除" OnConfirm="DoDelete" />
+</AuthGuard>
+
+@code {
+    [Parameter] public string Code { get; set; } = "";
+
+    private string _title = "应用详情";
+    private JsonElement? _detail;
+    private List<DashboardDetail.Comp> _components = new();
+    private string _dslText = "";
+    private string? _error;
+    private bool _loading = true;
+    private bool _confirmOpen;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        await Load();
+    }
+
+    private async Task Load()
+    {
+        _loading = true;
+        _error = null;
+        var (data, status, err) = await Api.GetJsonAsync($"api/apps/{Uri.EscapeDataString(Code)}");
+        _loading = false;
+        if (data is null)
+        {
+            _error = err ?? $"加载失败（{status}）。";
+            return;
+        }
+        _detail = data;
+        _title = JsonRows.Scalar(data, "name", "title", "code");
+        if (string.IsNullOrWhiteSpace(_title)) _title = Code;
+        _components = DashboardDetail.ExtractComponents(data);
+        if (data.Value.TryGetProperty("dslJson", out var dsl) && dsl.ValueKind == JsonValueKind.String)
+            _dslText = dsl.GetString() ?? "";
+        StateHasChanged();
+    }
+
+    private async Task DoDelete()
+    {
+        var (ok, status, err) = await Api.DeleteAsync($"api/apps/{Uri.EscapeDataString(Code)}");
+        if (ok)
+        {
+            Toast.Success("应用已删除。");
+            Nav.NavigateTo("apps");
+        }
+        else
+        {
+            Toast.Error(err ?? $"删除失败（{status}）。");
+        }
+    }
+}

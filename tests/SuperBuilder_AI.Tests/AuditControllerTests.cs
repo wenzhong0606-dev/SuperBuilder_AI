@@ -5,6 +5,9 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 using SuperBuilder_AI.Controllers;
 using SuperBuilder_AI.Data;
 using SuperBuilder_AI.Services.Audit;
@@ -31,10 +34,21 @@ public class AuditControllerTests
         return ctx;
     }
 
-    private static AuditController Build(SuperBIContext db)
+	private static AuditController Build(SuperBIContext db, long tenantId = Tenant7)
     {
         var svc = new AuditLogService(db);
-        return new AuditController(db, svc);
+		var controller = new AuditController(db, svc)
+		{
+			ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() }
+		};
+		controller.ControllerContext.HttpContext.User = new ClaimsPrincipal(new ClaimsIdentity(new[]
+		{
+			new Claim(ClaimTypes.NameIdentifier, "99"),
+			new Claim(ClaimTypes.Name, "auditor"),
+			new Claim("tid", tenantId.ToString()),
+			new Claim("perm", "audit:view")
+		}, "Bearer"));
+		return controller;
     }
 
     [Fact]
@@ -53,7 +67,8 @@ public class AuditControllerTests
         Assert.Equal((int)HttpStatusCode.Created, result!.StatusCode);
         var summary = Assert.IsType<AuditController.AuditLogSummary>(result.Value);
         Assert.Equal(Tenant7, summary.TenantId);
-        Assert.Equal("user.create", summary.Action);
+		Assert.Equal("user.create", summary.Action);
+		Assert.Equal("auditor", summary.Actor);
     }
 
     [Fact]
@@ -78,10 +93,11 @@ public class AuditControllerTests
         await using var _ = connection;
         await using var __ = ctx;
 
-        var ctrl = Build(ctx);
-        await ctrl.Record(new AuditController.RecordAuditRequest(Tenant7, "user.create", "User"), CancellationToken.None);
-        await ctrl.Record(new AuditController.RecordAuditRequest(Tenant8, "user.create", "User"), CancellationToken.None);
-        await ctrl.Record(new AuditController.RecordAuditRequest(0, "system.boot", "System"), CancellationToken.None);
+		var ctrl = Build(ctx);
+		var svc = new AuditLogService(ctx);
+		await svc.LogAsync(new SuperBuilder_AI.Interfaces.Audit.AuditLogEntry(Tenant7, "user.create", "User"));
+		await svc.LogAsync(new SuperBuilder_AI.Interfaces.Audit.AuditLogEntry(Tenant8, "user.create", "User"));
+		await svc.LogAsync(new SuperBuilder_AI.Interfaces.Audit.AuditLogEntry(0, "system.boot", "System"));
 
         var result = await ctrl.ListLogs(Tenant7, cancellationToken: CancellationToken.None) as Microsoft.AspNetCore.Mvc.OkObjectResult;
         Assert.NotNull(result);

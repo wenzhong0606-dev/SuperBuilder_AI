@@ -1,0 +1,24 @@
+@implements IDisposable
+@* 单个标签页：必须放在 SbTabs 内部 *@
+@if (IsActive)
+{
+    <div class="sb-tab-pane">@ChildContent</div>
+}
+
+@code {
+    [CascadingParameter] private SbTabs? Parent { get; set; }
+
+    [Parameter] public string Title { get; set; } = "";
+    /// <summary>右侧小标记（如数量）。</summary>
+    [Parameter] public string? Badge { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    internal bool IsActive => Parent?.IsActive(this) ?? false;
+
+    protected override void OnInitialized()
+    {
+        Parent?.Register(this);
+    }
+
+    public void Dispose() => Parent?.Unregister(this);
+}

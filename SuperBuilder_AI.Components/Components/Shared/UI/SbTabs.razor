@@ -1,0 +1,50 @@
+@* 标签页容器：与 SbTab 配合，默认激活第一项 *@
+<div class="sb-tabs">
+    <div class="sb-tabs-bar" role="tablist">
+        @foreach (var tab in _tabs)
+        {
+            <button type="button" role="tab" class="sb-tab @(IsActive(tab) ? "active" : "")" @onclick="() => Activate(tab)">
+                @tab.Title
+                @if (!string.IsNullOrWhiteSpace(tab.Badge))
+                {
+                    <span class="sb-tab-badge">@tab.Badge</span>
+                }
+            </button>
+        }
+    </div>
+    <div class="sb-tabs-body">
+        <CascadingValue Value="this" IsFixed="true">
+            @ChildContent
+        </CascadingValue>
+    </div>
+</div>
+
+@code {
+    private readonly List<SbTab> _tabs = new();
+    private SbTab? _active;
+
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    internal void Register(SbTab tab)
+    {
+        if (_tabs.Contains(tab)) return;
+        _tabs.Add(tab);
+        _active ??= tab;
+        StateHasChanged();
+    }
+
+    internal void Unregister(SbTab tab)
+    {
+        if (!_tabs.Remove(tab)) return;
+        if (_active == tab) _active = _tabs.FirstOrDefault();
+        StateHasChanged();
+    }
+
+    internal bool IsActive(SbTab tab) => ReferenceEquals(_active, tab);
+
+    internal void Activate(SbTab tab)
+    {
+        _active = tab;
+        StateHasChanged();
+    }
+}

@@ -1,0 +1,26 @@
+@* 分页控件：页码由外部持有，组件只负责翻页事件 *@
+@if (TotalPages > 1)
+{
+    <div class="sb-pager">
+        <button class="btn btn-sm btn-outline-secondary" disabled="@(Page <= 1)" @onclick="() => Go(Page - 1)">上一页</button>
+        <span class="muted tiny">第 @Page / @TotalPages 页 · 共 @TotalCount 条</span>
+        <button class="btn btn-sm btn-outline-secondary" disabled="@(Page >= TotalPages)" @onclick="() => Go(Page + 1)">下一页</button>
+    </div>
+}
+
+@code {
+    [Parameter] public int Page { get; set; } = 1;
+    [Parameter] public int PageSize { get; set; } = 20;
+    [Parameter] public int TotalCount { get; set; }
+    [Parameter] public EventCallback<int> PageChanged { get; set; }
+
+    private int TotalPages => PageSize <= 0 ? 1 : Math.Max(1, (int)Math.Ceiling(TotalCount / (double)PageSize));
+
+    private async Task Go(int page)
+    {
+        var next = Math.Max(1, Math.Min(TotalPages, page));
+        if (next == Page) return;
+        Page = next;
+        if (PageChanged.HasDelegate) await PageChanged.InvokeAsync(next);
+    }
+}

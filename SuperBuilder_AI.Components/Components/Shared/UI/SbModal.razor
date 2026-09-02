@@ -1,0 +1,41 @@
+@* 模态框：Visible 控制显隐；Size = sm|md|lg *@
+@if (Visible)
+{
+    <div class="sb-modal-scrim" @onclick="OnScrimClick">
+        <div class="sb-modal sb-modal-@Size" role="dialog" aria-modal="true" @onclick:stopPropagation="true">
+            <div class="sb-modal-head">
+                <h3>@Title</h3>
+                <button type="button" class="sb-modal-close" @onclick="Close" aria-label="关闭">×</button>
+            </div>
+            <div class="sb-modal-body">@Body</div>
+            @if (Footer is not null)
+            {
+                <div class="sb-modal-foot">@Footer</div>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool Visible { get; set; }
+    [Parameter] public EventCallback<bool> VisibleChanged { get; set; }
+    [Parameter] public string Title { get; set; } = "";
+    [Parameter] public string Size { get; set; } = "md";
+    /// <summary>点击遮罩是否关闭。</summary>
+    [Parameter] public bool CloseOnScrim { get; set; } = true;
+    [Parameter] public RenderFragment? Body { get; set; }
+    [Parameter] public RenderFragment? Footer { get; set; }
+    [Parameter] public EventCallback OnClosed { get; set; }
+
+    private async Task Close()
+    {
+        Visible = false;
+        if (VisibleChanged.HasDelegate) await VisibleChanged.InvokeAsync(false);
+        if (OnClosed.HasDelegate) await OnClosed.InvokeAsync();
+    }
+
+    private async Task OnScrimClick()
+    {
+        if (CloseOnScrim) await Close();
+    }
+}

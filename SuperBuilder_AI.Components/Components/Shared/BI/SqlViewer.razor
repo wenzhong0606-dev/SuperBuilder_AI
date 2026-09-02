@@ -1,0 +1,37 @@
+@inject IJSRuntime JS
+@* SQL 查看器：折叠展示 + 一键复制 *@
+@if (!string.IsNullOrWhiteSpace(Sql))
+{
+    <details class="sql-block">
+        <summary>@(string.IsNullOrWhiteSpace(Title) ? "查看生成的 SQL" : Title)</summary>
+        <pre>@Sql</pre>
+        <div class="mt-2">
+            <button class="btn btn-sm btn-outline-secondary" @onclick="Copy">复制 SQL</button>
+            @if (!string.IsNullOrWhiteSpace(_msg))
+            {
+                <span class="muted tiny">@_msg</span>
+            }
+        </div>
+    </details>
+}
+
+@code {
+    [Parameter] public string? Sql { get; set; }
+    [Parameter] public string? Title { get; set; }
+
+    private string? _msg;
+
+    private async Task Copy()
+    {
+        if (string.IsNullOrWhiteSpace(Sql)) return;
+        try
+        {
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", Sql);
+            _msg = "已复制";
+        }
+        catch
+        {
+            _msg = "复制失败，请手动选择";
+        }
+    }
+}

@@ -1,0 +1,13 @@
+@page "/404"
+@layout BlankLayout
+@inject NavigationManager Nav
+
+<div class="sb-error-page">
+    <div class="sb-error-code">404</div>
+    <h2>页面不存在</h2>
+    <p class="muted">该地址没有对应的页面，可能是链接已失效或输入有误。</p>
+    <div class="sb-error-actions">
+        <button class="btn btn-primary" @onclick='() => Nav.NavigateTo("")'>返回工作台</button>
+        <button class="btn btn-outline-secondary" @onclick='() => Nav.NavigateTo("ask")'>去提问</button>
+    </div>
+</div>

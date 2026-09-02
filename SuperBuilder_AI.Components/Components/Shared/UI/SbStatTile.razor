@@ -1,0 +1,23 @@
+@* 指标卡：标签 + 数值 + 副标题 + 变化量。accent = accent|success|warning|info（可选） *@
+<div class="stat-tile @(string.IsNullOrWhiteSpace(Accent) ? "" : "accent-" + Accent)">
+    <div class="st-label">@Label</div>
+    <div class="st-value">@Value</div>
+    @if (!string.IsNullOrWhiteSpace(Sub))
+    {
+        <div class="st-sub">@Sub</div>
+    }
+    @if (!string.IsNullOrWhiteSpace(Delta))
+    {
+        <div class="st-delta @(DeltaUp ? "up" : "down")">@Delta</div>
+    }
+</div>
+
+@code {
+    [Parameter] public string Label { get; set; } = "";
+    [Parameter] public object? Value { get; set; }
+    [Parameter] public string? Sub { get; set; }
+    [Parameter] public string? Delta { get; set; }
+    /// <summary>true → 上升（绿）；false → 下降（红）。</summary>
+    [Parameter] public bool DeltaUp { get; set; } = true;
+    [Parameter] public string? Accent { get; set; }
+}

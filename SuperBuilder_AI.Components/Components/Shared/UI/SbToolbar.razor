@@ -1,0 +1,17 @@
+@* 工具栏：左侧（通常放搜索）与右侧操作区，中间自动撑开 *@
+<div class="toolbar">
+    @if (Left is not null)
+    {
+        @Left
+    }
+    <div class="spacer"></div>
+    @if (Right is not null)
+    {
+        @Right
+    }
+</div>
+
+@code {
+    [Parameter] public RenderFragment? Left { get; set; }
+    [Parameter] public RenderFragment? Right { get; set; }
+}

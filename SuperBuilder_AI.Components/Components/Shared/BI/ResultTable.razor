@@ -1,0 +1,58 @@
+@* 结果表格：任意「字段名→值」字典列表 → 友好表头 + 单元格（复用 TablePresenter） *@
+@using SuperBuilder_AI.Components.Shared
+
+@if (Rows is { Count: > 0 })
+{
+    <div class="table-wrap">
+        <table class="data-table">
+            <thead>
+                <tr>@foreach (var c in Columns) { <th>@TablePresenter.Friendly(c)</th> }</tr>
+            </thead>
+            <tbody>
+                @foreach (var row in Rows)
+                {
+                    <tr>
+                        @foreach (var c in Columns)
+                        {
+                            @if (TablePresenter.IsStatusColumn(c))
+                            {
+                                <td><span class="badge @TablePresenter.StatusBadge(JsonValue.AsString(row.GetValueOrDefault(c)))">@JsonValue.AsString(row.GetValueOrDefault(c))</span></td>
+                            }
+                            else
+                            {
+                                <td>@JsonValue.AsString(row.GetValueOrDefault(c))</td>
+                            }
+                        }
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+    @if (!string.IsNullOrWhiteSpace(Footer))
+    {
+        <div class="muted tiny mt-2">@Footer</div>
+    }
+}
+else
+{
+    <SbEmptyState Icon="sb-ico-db" Title="没有返回数据" Text="@(string.IsNullOrWhiteSpace(EmptyText) ? "本次查询未返回任何行。" : EmptyText)" />
+}
+
+@code {
+    [Parameter] public List<Dictionary<string, object?>>? Rows { get; set; }
+    [Parameter] public string? Footer { get; set; }
+    [Parameter] public string? EmptyText { get; set; }
+
+    /// <summary>列顺序按首次出现顺序取并集。</summary>
+    private List<string> Columns
+    {
+        get
+        {
+            var cols = new List<string>();
+            foreach (var r in Rows ?? new())
+                foreach (var k in r.Keys)
+                    if (!cols.Contains(k)) cols.Add(k);
+            return cols;
+        }
+    }
+}

@@ -1,88 +1,226 @@
 @page "/admin/identity"
 @inject IApiClient Api
-@inject Services.AppState AppState
+@inject AppState State
+@inject ToastService Toast
 @using System.Text.Json
 @using SuperBuilder_AI.Components.Shared
 
-<PageHead Icon="sb-ico-shield" Title="身份与权限" Desc="管理用户、角色与权限分配，基于租户作用域的 RBAC。" />
+<AuthGuard>
+    <PageHead Icon="sb-ico-shield" Title="身份与权限" Desc="管理用户、角色与权限分配，基于租户作用域的 RBAC。">
+        <button class="btn btn-primary btn-sm" @onclick="OpenCreateUser">新建用户</button>
+        <button class="btn btn-outline-secondary btn-sm" @onclick="OpenCreateRole">新建角色</button>
+        <button class="btn btn-outline-secondary btn-sm" @onclick="Reload">刷新</button>
+    </PageHead>
 
-@if (_loading)
-{
-    <div class="empty-state"><div class="es-title">加载中…</div></div>
-}
-else if (_error is not null)
-{
-    <div class="alert alert-danger">@_error</div>
-}
-else
-{
-    <div class="panel">
-        <div class="panel-head"><div class="panel-title"><svg class="pt-ico"><use href="#sb-ico-shield" /></svg> 用户</div>
-            <button class="btn btn-outline-secondary btn-sm" @onclick="Reload">刷新</button></div>
-        <div class="panel-body flush">
-            @if (_users.Count == 0)
-            {
-                <div class="empty-state"><div class="es-title">暂无用户</div></div>
-            }
-            else
-            {
-                <div class="table-wrap">
-                    <table class="data-table">
-                        <thead><tr>@foreach (var c in _userCols) { <th>@TablePresenter.Friendly(c)</th> }</tr></thead>
-                        <tbody>
-                        @foreach (var u in _users)
-                        {
-                            <tr>@foreach (var c in _userCols)
-                                {
-                                    @if (TablePresenter.IsStatusColumn(c))
-                                    { <td><span class="badge @TablePresenter.StatusBadge(TablePresenter.Cell(u, c))">@TablePresenter.Cell(u, c)</span></td> }
-                                    else { <td>@TablePresenter.Cell(u, c)</td> }
-                                }</tr>
-                        }
-                        </tbody>
-                    </table>
+    @if (_loading)
+    {
+        <LoadingState Text="正在加载身份与权限…" />
+    }
+    else if (!string.IsNullOrWhiteSpace(_error))
+    {
+        <ErrorState Message="@_error" OnRetry="Reload" />
+    }
+    else
+    {
+        <div class="stat-grid">
+            <SbStatTile Label="用户" Value="@_users.Count" Sub="当前租户" />
+            <SbStatTile Label="角色" Value="@_roles.Count" Sub="RBAC" Accent="info" />
+            <SbStatTile Label="权限点" Value="@_permissions.Count" Sub="可授予" Accent="warning" />
+        </div>
+
+        <SbPanel Icon="sb-ico-shield" Title="用户" Flush="true">
+            <Body>
+                @if (_users.Count == 0)
+                {
+                    <SbEmptyState Icon="sb-ico-shield" Title="暂无用户" Text="用户是租户内可登录与操作的账号主体。" />
+                }
+                else
+                {
+                    <SbDataTable Items="@_users" Columns="@UserColumns" PageSize="20" EmptyTitle="无匹配用户">
+                        <RowActions>
+                            <button class="btn btn-sm btn-outline-secondary" @onclick='() => OpenAssign(context)'>分配角色</button>
+                        </RowActions>
+                    </SbDataTable>
+                }
+            </Body>
+        </SbPanel>
+
+        <SbPanel Icon="sb-ico-key" Title="角色" Flush="true">
+            <Body>
+                @if (_roles.Count == 0)
+                {
+                    <SbEmptyState Icon="sb-ico-key" Title="暂无角色" Text="角色聚合一组权限，可批量授予用户。" />
+                }
+                else
+                {
+                    <SbDataTable Items="@_roles" Columns="@RoleColumns" PageSize="20" EmptyTitle="无匹配角色">
+                        <RowActions>
+                            <button class="btn btn-sm btn-outline-secondary" @onclick='() => OpenPerms(context)'>编辑权限</button>
+                        </RowActions>
+                    </SbDataTable>
+                }
+            </Body>
+        </SbPanel>
+    }
+</AuthGuard>
+
+<SbModal Visible="@_userModal" VisibleChanged="v => _userModal = v" Title="新建用户" Size="md">
+    <Body>
+        <div class="form-stack">
+            <SbField Label="用户名" Required="true" Error="@_userErr">
+                <input class="form-control" @bind="_newUser" placeholder="登录账号" />
+            </SbField>
+            <SbField Label="显示名">
+                <input class="form-control" @bind="_newName" placeholder="可选" />
+            </SbField>
+            <SbField Label="邮箱">
+                <input class="form-control" @bind="_newEmail" placeholder="可选" />
+            </SbField>
+            <SbField Label="初始角色">
+                <div class="chk-grid">
+                    @foreach (var role in _roles)
+                    {
+                        var code = TablePresenter.Cell(role, "code");
+                        <label class="chk"><input type="checkbox" checked="@_newUserRoles.Contains(code)" @onchange='(e) => ToggleSet(_newUserRoles, code, (bool)e.Value!)' /> @TablePresenter.Cell(role, "name")</label>
+                    }
+                    @if (_roles.Count == 0)
+                    {
+                        <span class="muted">暂无可选角色</span>
+                    }
                 </div>
+            </SbField>
+        </div>
+    </Body>
+    <Footer>
+        <button class="btn btn-outline-secondary btn-sm" @onclick="() => _userModal = false">取消</button>
+        <button class="btn btn-primary btn-sm" @onclick="CreateUser">创建</button>
+    </Footer>
+</SbModal>
+
+<SbModal Visible="@_roleModal" VisibleChanged="v => _roleModal = v" Title="新建角色" Size="md">
+    <Body>
+        <div class="form-stack">
+            <SbField Label="角色编码" Required="true" Error="@_roleErr">
+                <input class="form-control" @bind="_newRoleCode" placeholder="如 order.manager" />
+            </SbField>
+            <SbField Label="名称">
+                <input class="form-control" @bind="_newRoleName" placeholder="可选" />
+            </SbField>
+            <SbField Label="描述">
+                <input class="form-control" @bind="_newRoleDesc" placeholder="可选" />
+            </SbField>
+            <SbField Label="权限点">
+                <div class="chk-grid">
+                    @foreach (var perm in _permissions)
+                    {
+                        var code = TablePresenter.Cell(perm, "code");
+                        <label class="chk"><input type="checkbox" checked="@_newRolePerms.Contains(code)" @onchange='(e) => ToggleSet(_newRolePerms, code, (bool)e.Value!)' /> @TablePresenter.Cell(perm, "name")</label>
+                    }
+                    @if (_permissions.Count == 0)
+                    {
+                        <span class="muted">暂无可选权限</span>
+                    }
+                </div>
+            </SbField>
+        </div>
+    </Body>
+    <Footer>
+        <button class="btn btn-outline-secondary btn-sm" @onclick="() => _roleModal = false">取消</button>
+        <button class="btn btn-primary btn-sm" @onclick="CreateRole">创建</button>
+    </Footer>
+</SbModal>
+
+<SbModal Visible="@_assignModal" VisibleChanged="v => _assignModal = v" Title="分配角色" Size="sm">
+    <Body>
+        <p class="muted">为用户 <strong>@_assignUserName</strong> 指派角色（角色可为全局或本租户）。</p>
+        <SbField Label="角色" Required="true">
+            <select class="form-select" @bind="_assignRoleCode">
+                <option value="">— 选择角色 —</option>
+                @foreach (var role in _roles)
+                {
+                    <option value="@TablePresenter.Cell(role, "code")">@TablePresenter.Cell(role, "name")</option>
+                }
+            </select>
+        </SbField>
+        @if (!string.IsNullOrWhiteSpace(_assignErr))
+        {
+            <div class="alert alert-warning">@_assignErr</div>
+        }
+    </Body>
+    <Footer>
+        <button class="btn btn-outline-secondary btn-sm" @onclick="() => _assignModal = false">取消</button>
+        <button class="btn btn-primary btn-sm" @onclick="AssignRole">添加</button>
+    </Footer>
+</SbModal>
+
+<SbModal Visible="@_permModal" VisibleChanged="v => _permModal = v" Title="编辑角色权限" Size="md">
+    <Body>
+        <p class="muted">角色 <strong>@_permRoleName</strong>（@_permRoleCode）的权限集（全量替换）。</p>
+        <div class="chk-grid">
+            @foreach (var perm in _permissions)
+            {
+                var code = TablePresenter.Cell(perm, "code");
+                <label class="chk"><input type="checkbox" checked="@_permSelected.Contains(code)" @onchange='(e) => ToggleSet(_permSelected, code, (bool)e.Value!)' /> @TablePresenter.Cell(perm, "name")</label>
+            }
+            @if (_permissions.Count == 0)
+            {
+                <span class="muted">暂无可选权限</span>
             }
         </div>
-    </div>
-
-    <div class="panel">
-        <div class="panel-head"><div class="panel-title"><svg class="pt-ico"><use href="#sb-ico-key" /></svg> 角色</div></div>
-        <div class="panel-body flush">
-            @if (_roles.Count == 0)
-            {
-                <div class="empty-state"><div class="es-title">暂无角色</div></div>
-            }
-            else
-            {
-                <div class="table-wrap">
-                    <table class="data-table">
-                        <thead><tr>@foreach (var c in _roleCols) { <th>@TablePresenter.Friendly(c)</th> }</tr></thead>
-                        <tbody>
-                        @foreach (var r in _roles)
-                        {
-                            <tr>@foreach (var c in _roleCols)
-                                {
-                                    @if (TablePresenter.IsStatusColumn(c))
-                                    { <td><span class="badge @TablePresenter.StatusBadge(TablePresenter.Cell(r, c))">@TablePresenter.Cell(r, c)</span></td> }
-                                    else { <td>@TablePresenter.Cell(r, c)</td> }
-                                }</tr>
-                        }
-                        </tbody>
-                    </table>
-                </div>
-            }
-        </div>
-    </div>
-}
+    </Body>
+    <Footer>
+        <button class="btn btn-outline-secondary btn-sm" @onclick="() => _permModal = false">取消</button>
+        <button class="btn btn-primary btn-sm" @onclick="SavePerms">保存</button>
+    </Footer>
+</SbModal>
 
 @code {
     private List<JsonElement> _users = new();
     private List<JsonElement> _roles = new();
+    private List<JsonElement> _permissions = new();
     private List<string> _userCols = new();
     private List<string> _roleCols = new();
     private string _error = "";
     private bool _loading = true;
+
+    // 新建用户
+    private bool _userModal;
+    private string _newUser = "";
+    private string _newName = "";
+    private string _newEmail = "";
+    private HashSet<string> _newUserRoles = new();
+    private string _userErr = "";
+
+    // 新建角色
+    private bool _roleModal;
+    private string _newRoleCode = "";
+    private string _newRoleName = "";
+    private string _newRoleDesc = "";
+    private HashSet<string> _newRolePerms = new();
+    private string _roleErr = "";
+
+    // 分配角色
+    private bool _assignModal;
+    private long _assignUserId;
+    private string _assignUserName = "";
+    private string _assignRoleCode = "";
+    private string _assignErr = "";
+
+    // 编辑权限
+    private bool _permModal;
+    private string _permRoleCode = "";
+    private string _permRoleName = "";
+    private HashSet<string> _permSelected = new();
+
+    private List<SbColumn<JsonElement>> UserColumns =>
+        _userCols.Select(c => SbCol.Of<JsonElement>(
+            TablePresenter.Friendly(c), r => TablePresenter.Cell(r, c),
+            isStatus: TablePresenter.IsStatusColumn(c))).ToList();
+
+    private List<SbColumn<JsonElement>> RoleColumns =>
+        _roleCols.Select(c => SbCol.Of<JsonElement>(
+            TablePresenter.Friendly(c), r => TablePresenter.Cell(r, c),
+            isStatus: TablePresenter.IsStatusColumn(c))).ToList();
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -92,7 +230,7 @@ else
     private async Task Reload()
     {
         _loading = true;
-        var tid = AppState.TenantId;
+        var tid = State.TenantId;
         var (u, _, uErr) = await Api.GetJsonAsync($"api/identity/users?tenantId={tid}");
         _error = uErr ?? "";
         _users = u is { ValueKind: JsonValueKind.Array } ? u.Value.EnumerateArray().ToList() : new();
@@ -100,7 +238,141 @@ else
         var (r, _, _) = await Api.GetJsonAsync($"api/identity/roles?tenantId={tid}");
         _roles = r is { ValueKind: JsonValueKind.Array } ? r.Value.EnumerateArray().ToList() : new();
         _roleCols = TablePresenter.InferColumns(r);
+        var (p, _, _) = await Api.GetJsonAsync("api/identity/permissions");
+        _permissions = p is { ValueKind: JsonValueKind.Array } ? p.Value.EnumerateArray().ToList() : new();
         _loading = false;
         StateHasChanged();
+    }
+
+    // ---- helpers ----
+    private void ToggleSet(HashSet<string> set, string code, bool on)
+    {
+        if (on) set.Add(code);
+        else set.Remove(code);
+    }
+
+    // ---- 新建用户 ----
+    private void OpenCreateUser()
+    {
+        _newUser = ""; _newName = ""; _newEmail = ""; _newUserRoles.Clear(); _userErr = "";
+        _userModal = true;
+    }
+
+    private async Task CreateUser()
+    {
+        if (string.IsNullOrWhiteSpace(_newUser))
+        {
+            _userErr = "用户名必填。";
+            return;
+        }
+        var (_, status, err) = await Api.PostAsync("api/identity/users", new
+        {
+            tenantId = State.TenantId,
+            username = _newUser,
+            displayName = string.IsNullOrWhiteSpace(_newName) ? null : _newName,
+            email = string.IsNullOrWhiteSpace(_newEmail) ? null : _newEmail,
+            roleCodes = _newUserRoles.ToArray()
+        });
+        if (status is >= 200 and < 300)
+        {
+            Toast.Success($"用户 {_newUser} 已创建。");
+            _userModal = false;
+            await Reload();
+        }
+        else
+        {
+            _userErr = err ?? $"创建失败（HTTP {status}）。";
+        }
+    }
+
+    // ---- 新建角色 ----
+    private void OpenCreateRole()
+    {
+        _newRoleCode = ""; _newRoleName = ""; _newRoleDesc = ""; _newRolePerms.Clear(); _roleErr = "";
+        _roleModal = true;
+    }
+
+    private async Task CreateRole()
+    {
+        if (string.IsNullOrWhiteSpace(_newRoleCode))
+        {
+            _roleErr = "角色编码必填。";
+            return;
+        }
+        var (_, status, err) = await Api.PostAsync("api/identity/roles", new
+        {
+            tenantId = State.TenantId,
+            code = _newRoleCode,
+            name = string.IsNullOrWhiteSpace(_newRoleName) ? null : _newRoleName,
+            description = string.IsNullOrWhiteSpace(_newRoleDesc) ? null : _newRoleDesc,
+            permissions = _newRolePerms.ToArray()
+        });
+        if (status is >= 200 and < 300)
+        {
+            Toast.Success($"角色 {_newRoleCode} 已创建。");
+            _roleModal = false;
+            await Reload();
+        }
+        else
+        {
+            _roleErr = err ?? $"创建失败（HTTP {status}）。";
+        }
+    }
+
+    // ---- 分配角色 ----
+    private void OpenAssign(JsonElement row)
+    {
+        _assignUserId = long.Parse(TablePresenter.Cell(row, "id"));
+        _assignUserName = TablePresenter.Cell(row, "username");
+        _assignRoleCode = ""; _assignErr = "";
+        _assignModal = true;
+    }
+
+    private async Task AssignRole()
+    {
+        if (string.IsNullOrWhiteSpace(_assignRoleCode))
+        {
+            _assignErr = "请选择角色。";
+            return;
+        }
+        var (_, status, err) = await Api.PostAsync($"api/identity/users/{_assignUserId}/roles", new { roleCode = _assignRoleCode });
+        if (status is >= 200 and < 300)
+        {
+            Toast.Success($"已为 {_assignUserName} 指派角色 {_assignRoleCode}。");
+            _assignModal = false;
+        }
+        else
+        {
+            _assignErr = err ?? $"指派失败（HTTP {status}）。";
+        }
+    }
+
+    // ---- 编辑角色权限 ----
+    private void OpenPerms(JsonElement row)
+    {
+        _permRoleCode = TablePresenter.Cell(row, "code");
+        _permRoleName = TablePresenter.Cell(row, "name");
+        _permSelected = new HashSet<string>();
+        if (row.TryGetProperty("permissions", out var perms) && perms.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var p in perms.EnumerateArray())
+                if (p.ValueKind == JsonValueKind.String) _permSelected.Add(p.GetString()!);
+        }
+        _permModal = true;
+    }
+
+    private async Task SavePerms()
+    {
+        var (_, status, err) = await Api.PutAsync($"api/identity/roles/{_permRoleCode}/permissions", new { permissions = _permSelected.ToArray() });
+        if (status is >= 200 and < 300)
+        {
+            Toast.Success($"角色 {_permRoleCode} 权限已更新。");
+            _permModal = false;
+            await Reload();
+        }
+        else
+        {
+            Toast.Error(err ?? $"保存失败（HTTP {status}）。");
+        }
     }
 }

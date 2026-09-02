@@ -1,0 +1,123 @@
+@typeparam TItem
+@* 通用数据表格：排序 + 分页 + 空态 + 行操作列 *@
+@using SuperBuilder_AI.Components.Shared
+
+@if (Loading)
+{
+    <div class="panel-body">
+        <SbEmptyState Title="加载中…" Text="@LoadingText" />
+    </div>
+}
+else if (View.Count == 0)
+{
+    <div class="panel-body">
+        <SbEmptyState Icon="@Icon" Title="@EmptyTitle" Text="@EmptyText">
+            <Actions>@EmptyActions</Actions>
+        </SbEmptyState>
+    </div>
+}
+else
+{
+    <div class="table-wrap">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    @foreach (var col in Columns)
+                    {
+                        <th class="@col.AlignCss" style="@(string.IsNullOrWhiteSpace(col.Width) ? "" : "width:" + col.Width)"
+                            @onclick="() => SortBy(col)">
+                            @col.Title
+                            @if (col.Sortable && _sortCol == col)
+                            {
+                                <span class="sb-sort">@(_sortAsc ? "▲" : "▼")</span>
+                            }
+                        </th>
+                    }
+                    @if (RowActions is not null)
+                    {
+                        <th class="ta-right">操作</th>
+                    }
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var item in View)
+                {
+                    <tr>
+                        @foreach (var col in Columns)
+                        {
+                            <td class="@col.AlignCss">
+                                @if (col.Cell is not null)
+                                {
+                                    @col.Cell(item)
+                                }
+                                else if (col.IsStatus)
+                                {
+                                    var text = col.Value(item);
+                                    <span class="badge @TablePresenter.StatusBadge(text)">@text</span>
+                                }
+                                else
+                                {
+                                    @col.Value(item)
+                                }
+                            </td>
+                        }
+                        @if (RowActions is not null)
+                        {
+                            <td class="ta-right sb-row-actions">@RowActions(item)</td>
+                        }
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    @if (EnablePaging)
+    {
+        <div class="sb-pager-wrap">
+            <SbPagination Page="_page" PageSize="PageSize" TotalCount="Items.Count"
+                          PageChanged="EventCallback.Factory.Create<int>(this, p => _page = p)" />
+        </div>
+    }
+}
+
+@code {
+    [Parameter] public IReadOnlyList<TItem> Items { get; set; } = Array.Empty<TItem>();
+    [Parameter] public IReadOnlyList<SbColumn<TItem>> Columns { get; set; } = Array.Empty<SbColumn<TItem>>();
+    [Parameter] public RenderFragment<TItem>? RowActions { get; set; }
+    [Parameter] public bool Loading { get; set; }
+    [Parameter] public bool EnablePaging { get; set; } = true;
+    [Parameter] public int PageSize { get; set; } = 20;
+    [Parameter] public string EmptyTitle { get; set; } = "暂无数据";
+    [Parameter] public string? EmptyText { get; set; }
+    [Parameter] public string? LoadingText { get; set; }
+    [Parameter] public string? Icon { get; set; }
+    [Parameter] public RenderFragment? EmptyActions { get; set; }
+
+    private SbColumn<TItem>? _sortCol;
+    private bool _sortAsc = true;
+    private int _page = 1;
+
+    private IReadOnlyList<TItem> View
+    {
+        get
+        {
+            IEnumerable<TItem> seq = Items;
+            if (_sortCol is not null)
+            {
+                seq = _sortAsc
+                    ? seq.OrderBy(x => _sortCol.Value(x), StringComparer.CurrentCultureIgnoreCase)
+                    : seq.OrderByDescending(x => _sortCol.Value(x), StringComparer.CurrentCultureIgnoreCase);
+            }
+            if (!EnablePaging || PageSize <= 0) return seq.ToList();
+            return seq.Skip((_page - 1) * PageSize).Take(PageSize).ToList();
+        }
+    }
+
+    private void SortBy(SbColumn<TItem> col)
+    {
+        if (!col.Sortable) return;
+        if (_sortCol == col) _sortAsc = !_sortAsc;
+        else { _sortCol = col; _sortAsc = true; }
+        _page = 1;
+    }
+}

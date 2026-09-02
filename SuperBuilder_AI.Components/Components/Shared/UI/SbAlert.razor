@@ -1,0 +1,40 @@
+@* 提示条：tone = info|warning|danger|success；可选关闭按钮 *@
+@if (Visible)
+{
+    <div class="alert alert-@CssTone" role="alert">
+        <div class="sb-alert-body">
+            @if (!string.IsNullOrWhiteSpace(Title))
+            {
+                <strong>@Title</strong>
+            }
+            <div>@ChildContent</div>
+        </div>
+        @if (Dismissible)
+        {
+            <button type="button" class="sb-alert-close" @onclick="Dismiss" aria-label="关闭">×</button>
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public string Tone { get; set; } = "info";
+    [Parameter] public string? Title { get; set; }
+    [Parameter] public bool Dismissible { get; set; }
+    [Parameter] public bool Visible { get; set; } = true;
+    [Parameter] public EventCallback OnDismiss { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    private string CssTone => Tone switch
+    {
+        "success" => "info",
+        "danger" => "danger",
+        "warning" => "warning",
+        _ => "info"
+    };
+
+    private async Task Dismiss()
+    {
+        Visible = false;
+        if (OnDismiss.HasDelegate) await OnDismiss.InvokeAsync();
+    }
+}

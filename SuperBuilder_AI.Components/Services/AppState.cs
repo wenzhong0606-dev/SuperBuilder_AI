@@ -12,8 +12,24 @@ public sealed class AppState
 
     public bool IsAuthenticated => !string.IsNullOrEmpty(Token);
 
+    /// <summary>
+    /// 会话自举是否已完成（localStorage 还原结束）。
+    /// 页面级守卫必须等待该标志为 true 后再判定登录态，否则预渲染/首帧会误判为未登录。
+    /// </summary>
+    public bool SessionRestored { get; private set; }
+
+    public event Action? SessionRestoredChanged;
+
     /// <summary>会话失效（如 token 过期/被服务端拒绝）时由 ApiClient 触发，供壳层回收并跳登录。</summary>
     public event Action? SessionExpired;
+
+    /// <summary>由 <see cref="AuthStore"/> 在还原结束后调用，通知守卫可以判定登录态。</summary>
+    public void MarkSessionRestored()
+    {
+        if (SessionRestored) return;
+        SessionRestored = true;
+        SessionRestoredChanged?.Invoke();
+    }
 
     /// <summary>清空本地会话态（不触碰持久化存储；存储清理由 <see cref="AuthStore"/> 负责）。</summary>
     public void ClearSession()
@@ -23,6 +39,7 @@ public sealed class AppState
         UserId = 0;
         Username = "";
         Permissions = System.Array.Empty<string>();
+        SessionRestored = false;
     }
 
     /// <summary>通知监听方会话已失效。</summary>

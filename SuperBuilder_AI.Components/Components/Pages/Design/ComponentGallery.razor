@@ -1,4 +1,7 @@
 @page "/components"
+@inject ToastService Toast
+@using System.Text.Json
+@using SuperBuilder_AI.Components.Shared
 <PageHead Icon="sb-ico-comp" Title="组件库" Desc="SuperBuilder 设计系统一览：基于中国古风色板与 Bootstrap 的通用组件，全站统一复用。" />
 
 <div class="showcase">
@@ -74,3 +77,81 @@
     <div class="feature-card"><div class="fc-ico"><svg><use href="#sb-ico-dash" /></svg></div><div class="fc-title">仪表盘</div><div class="fc-desc">固化可复用的可视化看板。</div></div>
     <div class="feature-card"><div class="fc-ico"><svg><use href="#sb-ico-app" /></svg></div><div class="fc-title">应用工厂</div><div class="fc-desc">把会话沉淀为 BI 应用。</div></div>
 </div>
+
+<div class="showcase">
+    <div class="demo">
+        <div class="d-label">标签页 SbTabs</div>
+        <SbTabs>
+            <SbTab Title="概览"><div class="tiny muted" style="padding:8px 2px">概览内容区，用于聚合多视图。</div></SbTab>
+            <SbTab Title="明细"><div class="tiny muted" style="padding:8px 2px">明细内容区。</div></SbTab>
+            <SbTab Title="设置"><div class="tiny muted" style="padding:8px 2px">设置内容区。</div></SbTab>
+        </SbTabs>
+    </div>
+
+    <div class="demo">
+        <div class="d-label">数据表格 SbDataTable</div>
+        <SbDataTable Items="@_rows" Columns="@_cols" PageSize="3" EmptyTitle="无数据" />
+    </div>
+
+    <div class="demo">
+        <div class="d-label">弹窗 SbModal / SbConfirm</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn btn-outline-secondary btn-sm" @onclick="() => _modal = true">打开弹窗</button>
+            <button class="btn btn-danger btn-sm" @onclick="() => _confirm = true">删除确认</button>
+        </div>
+        <SbModal Visible="@_modal" VisibleChanged="v => _modal = v" Title="示例弹窗">
+            <Body><p class="tiny">弹窗用于承载表单或详情，支持遮罩点击关闭与自定义底部操作。</p></Body>
+            <Footer><button class="btn btn-primary btn-sm" @onclick="() => _modal = false">知道了</button></Footer>
+        </SbModal>
+        <SbConfirm Visible="@_confirm" VisibleChanged="v => _confirm = v" Title="删除确认"
+                   Message="此操作不可撤销，确定要删除该记录吗？" ConfirmText="删除"
+                   Tone="danger" OnConfirm="OnConfirmDelete" />
+    </div>
+
+    <div class="demo">
+        <div class="d-label">轻提示 Toast</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn btn-outline-secondary btn-sm" @onclick='() => Toast.Info("信息提示")'>Info</button>
+            <button class="btn btn-outline-secondary btn-sm" @onclick='() => Toast.Success("操作成功")'>Success</button>
+            <button class="btn btn-outline-secondary btn-sm" @onclick='() => Toast.Warning("请注意")'>Warning</button>
+            <button class="btn btn-outline-secondary btn-sm" @onclick='() => Toast.Error("出错了")'>Error</button>
+        </div>
+    </div>
+
+    <div class="demo">
+        <div class="d-label">守卫 Guard</div>
+        <div class="tiny muted">AuthGuard 等待会话自举完成后渲染子内容；PermissionGuard 按权限码门控（当前未强制，见 NavMenuItems.EnforcePermissions）。</div>
+        <div style="margin-top:8px">
+            <PermissionGuard Require="@(new[] { "demo:write" })" Mode="Any">
+                <span class="badge badge-success">你拥有 demo:write 权限</span>
+            </PermissionGuard>
+        </div>
+    </div>
+</div>
+
+@code {
+    private bool _modal = false;
+    private bool _confirm = false;
+
+    private record DemoRow(string Code, string Name, string Status);
+    private List<DemoRow> _rows = new()
+    {
+        new("demo-sales", "销售看板", "已发布"),
+        new("demo-stock", "库存预警", "草稿"),
+        new("demo-fin", "财务月报", "全局"),
+        new("demo-hr", "人力看板", "已发布"),
+        new("demo-ops", "运维大盘", "草稿"),
+    };
+    private List<SbColumn<DemoRow>> _cols = new()
+    {
+        SbCol.Of<DemoRow>("编码", r => r.Code),
+        SbCol.Of<DemoRow>("名称", r => r.Name),
+        SbCol.Of<DemoRow>("状态", r => r.Status, isStatus: true),
+    };
+
+    private void OnConfirmDelete()
+    {
+        _confirm = false;
+        Toast.Success("已确认删除（演示）。");
+    }
+}

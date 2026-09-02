@@ -1,0 +1,43 @@
+@inject AppState State
+@* 权限守卫：RequireAny 为所需权限码集合；Mode = Any（任一命中）| All（全部命中） *@
+@if (Allowed)
+{
+    @ChildContent
+}
+else if (Fallback is not null)
+{
+    @Fallback
+}
+else
+{
+    <SbEmptyState Icon="sb-ico-shield" Title="无访问权限" Text="@DenyText">
+        <Actions>
+            <button class="btn btn-outline-secondary btn-sm" @onclick='() => Nav.NavigateTo("")'>返回首页</button>
+        </Actions>
+    </SbEmptyState>
+}
+
+@code {
+    [Inject] private NavigationManager Nav { get; set; } = default!;
+
+    [Parameter] public IReadOnlyList<string> Require { get; set; } = Array.Empty<string>();
+    [Parameter] public string Mode { get; set; } = "Any";
+    [Parameter] public string DenyText { get; set; } = "当前账号缺少访问该页面所需的权限，请联系管理员。";
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public RenderFragment? Fallback { get; set; }
+
+    private bool Allowed
+    {
+        get
+        {
+            if (Require.Count == 0) return true;
+            // 权限码体系未与后端对齐前不过度拦截（见 NavMenuItems.EnforcePermissions）
+            if (!SuperBuilder_AI.Components.Components.Layout.NavMenuItems.EnforcePermissions) return true;
+            var owned = State.Permissions ?? Array.Empty<string>();
+            if (owned.Count == 0) return true;
+            return Mode.Equals("All", StringComparison.OrdinalIgnoreCase)
+                ? Require.All(p => owned.Contains(p))
+                : Require.Any(p => owned.Contains(p));
+        }
+    }
+}

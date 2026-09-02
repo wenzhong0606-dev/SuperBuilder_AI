@@ -8,6 +8,8 @@ using SuperBuilder_AI.Data;
 using SuperBuilder_AI.Api.Security;
 using SuperBuilder_AI.Interfaces.Audit;
 using SuperBuilder_AI.Models.Audit;
+using SuperBuilder_AI.Models.Identity;
+using System.Security.Claims;
 
 namespace SuperBuilder_AI.Controllers;
 
@@ -58,8 +60,10 @@ public sealed class AuditController : ControllerBase
         [FromQuery] int limit = 100,
         CancellationToken cancellationToken = default)
     {
-        ScopeTo(tenantId);
-        var query = new AuditLogQuery(TenantId: tenantId, Action: action, EntityType: entityType, Limit: limit);
+		if (!HasAuditPermission())
+			return StatusCode(403, new { code = SuperBuilder_AI.Api.Errors.ErrorCodes.Forbidden });
+		var effectiveTenantId = ScopeTo(tenantId);
+        var query = new AuditLogQuery(TenantId: effectiveTenantId, Action: action, EntityType: entityType, Limit: limit);
         var items = await _audit.QueryAsync(query, cancellationToken);
         return Ok(items.Select(ToSummary).ToList());
     }
@@ -71,30 +75,39 @@ public sealed class AuditController : ControllerBase
         CancellationToken cancellationToken = default)
     {
         if (request is null) return BadRequest("请求体不能为空。");
-        if (request.TenantId < 0) return BadRequest("tenantId 不能为负。");
+		if (!HasAuditPermission())
+			return StatusCode(403, new { code = SuperBuilder_AI.Api.Errors.ErrorCodes.Forbidden });
+		if (request.TenantId <= 0) return BadRequest("tenantId 必须大于 0。");
         if (string.IsNullOrWhiteSpace(request.Action)) return BadRequest("action 必填。");
         if (string.IsNullOrWhiteSpace(request.EntityType)) return BadRequest("entityType 必填。");
+		var effectiveTenantId = ScopeTo(request.TenantId);
+		var authenticatedUserId = long.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var uid) ? uid : (long?)null;
+		var authenticatedActor = User.Identity?.Name ?? "authenticated";
 
         var entry = new AuditLogEntry(
-            TenantId: request.TenantId,
+			TenantId: effectiveTenantId,
             Action: request.Action,
             EntityType: request.EntityType,
-            UserId: request.UserId,
-            Actor: request.Actor ?? "system",
+			UserId: authenticatedUserId,
+			Actor: authenticatedActor,
             EntityId: request.EntityId,
-            BeforeJson: request.BeforeJson,
-            AfterJson: request.AfterJson,
+			// 外部请求不得把任意快照/敏感信息写入审计存储。
+			BeforeJson: null,
+			AfterJson: null,
             Result: request.Result ?? "success",
-            Message: request.Message,
+			Message: null,
             Timestamp: request.Timestamp);
 
         var id = await _audit.LogAsync(entry, cancellationToken);
         var ts = request.Timestamp ?? DateTime.UtcNow;
         return CreatedAtAction(
             nameof(ListLogs),
-            new { tenantId = request.TenantId },
-            new AuditLogSummary(id, request.TenantId, request.Action, request.EntityType, request.Actor ?? "system", request.Result ?? "success", ts, request.Message));
+			new { tenantId = effectiveTenantId },
+			new AuditLogSummary(id, effectiveTenantId, request.Action, request.EntityType, authenticatedActor, request.Result ?? "success", ts, null));
     }
+
+	private bool HasAuditPermission() =>
+		User.HasClaim("perm", IdentityPermissions.AuditView) || User.HasClaim("perm", IdentityPermissions.PlatformAuditView);
 
     private static AuditLogSummary ToSummary(AuditLog a) =>
         new(a.Id, a.TenantId, a.Action, a.EntityType, a.Actor, a.Result, a.Timestamp, a.Message);

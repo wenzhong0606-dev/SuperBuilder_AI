@@ -1,0 +1,16 @@
+@* 进度条：Percent 0-100，超过阈值按语义色显示 *@
+<div class="progress" role="progressbar" aria-valuenow="@Percent" aria-valuemin="0" aria-valuemax="100">
+    <span style="width: @(Clamped)%; background: @BarColor;"></span>
+</div>
+
+@code {
+    [Parameter] public double Percent { get; set; }
+    [Parameter] public int WarningThreshold { get; set; } = 75;
+    [Parameter] public int DangerThreshold { get; set; } = 90;
+
+    private double Clamped => Math.Max(0, Math.Min(100, Percent));
+
+    private string BarColor => Clamped >= DangerThreshold ? "var(--sb-accent)"
+        : Clamped >= WarningThreshold ? "var(--sb-warning)"
+        : "var(--sb-primary)";
+}

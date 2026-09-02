@@ -23,7 +23,10 @@ public static class MauiProgram
         builder.Services.AddScoped<AuthStore>();
         builder.Services.AddScoped<ThemeService>();
         builder.Services.AddScoped<LocalizationService>();
+        builder.Services.AddScoped<ToastService>();
         builder.Services.AddScoped<IApiClient, ApiClient>();
+        builder.Services.AddScoped<AskSessionStore>();
+        builder.Services.AddScoped<FileDownloadService>();
         builder.Services.AddHttpClient("SuperBuilderApi", client =>
             client.BaseAddress = new Uri("https://localhost:5032"));
 

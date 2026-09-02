@@ -1,0 +1,41 @@
+@* 数据源选择器：下拉切换数据源，变更通过 DataSourceIdChanged 回调 *@
+<div class="sb-ds-picker">
+    @if (!string.IsNullOrWhiteSpace(Label))
+    {
+        <span class="sb-field-label">@Label</span>
+    }
+    <select class="form-control" value="@DataSourceId" @onchange="OnChange" style="max-width:240px">
+        @foreach (var ds in Items)
+        {
+            <option value="@ds.Id" selected="@(ds.Id == DataSourceId)">@ds.Name</option>
+        }
+    </select>
+    @if (!string.IsNullOrWhiteSpace(SubText))
+    {
+        <span class="muted tiny">@SubText</span>
+    }
+</div>
+
+@code {
+    /// <summary>候选项（id + 名称）。</summary>
+    public sealed class Option
+    {
+        public long Id { get; init; }
+        public string Name { get; init; } = "";
+    }
+
+    [Parameter] public IReadOnlyList<Option> Items { get; set; } = Array.Empty<Option>();
+    [Parameter] public long DataSourceId { get; set; }
+    [Parameter] public EventCallback<long> DataSourceIdChanged { get; set; }
+    [Parameter] public string? Label { get; set; } = "数据源";
+    [Parameter] public string? SubText { get; set; }
+
+    private async Task OnChange(ChangeEventArgs e)
+    {
+        if (long.TryParse(e.Value?.ToString(), out var id))
+        {
+            DataSourceId = id;
+            if (DataSourceIdChanged.HasDelegate) await DataSourceIdChanged.InvokeAsync(id);
+        }
+    }
+}

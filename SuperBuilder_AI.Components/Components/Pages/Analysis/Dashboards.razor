@@ -1,103 +1,79 @@
 @page "/dashboards"
 @inject IApiClient Api
-@inject Services.AppState AppState
+@inject AppState State
+@inject NavigationManager Nav
+@inject ToastService Toast
 @using System.Text.Json
 @using SuperBuilder_AI.Components.Shared
 
-<PageHead Icon="sb-ico-dash" Title="仪表盘" Desc="将 Ask 分析结果固化为可复用的可视化看板，支持团队共享与定时刷新。">
-    <button class="btn btn-primary btn-sm" @onclick='() => Toast("新建仪表盘（编辑器蓝图已就绪，P11.3 接入）")'>
-        <svg class="btn-ico"><use href="#sb-ico-dash" /></svg> 新建仪表盘
-    </button>
-</PageHead>
+<AuthGuard>
+    <SbListPage TItem="JsonElement" Icon="sb-ico-dash" Title="仪表盘"
+                Desc="将 Ask 分析结果固化为可复用的可视化看板，支持团队共享与定时刷新。"
+                Items="@_rows" Columns="@Columns" Loading="@_loading" Error="@_error"
+                OnReload="Reload" SearchPlaceholder="搜索名称 / 编码…"
+                EmptyTitle="暂无仪表盘"
+                EmptyText="将一次问数结果保存为仪表盘，即可在团队内复用这套分析视角与图表。"
+                LoadingText="正在加载仪表盘…" PageSize="20">
 
-@if (!string.IsNullOrEmpty(_msg))
-{
-    <div class="alert alert-info">@_msg</div>
-}
+        <Actions>
+            <button class="btn btn-primary btn-sm" @onclick="Create">
+                <svg class="btn-ico"><use href="#sb-ico-plus" /></svg> 新建仪表盘
+            </button>
+        </Actions>
 
-@if (_loading)
-{
-    <div class="empty-state"><div class="es-title">加载中…</div></div>
-}
-else if (_error is not null)
-{
-    <div class="alert alert-danger">@_error</div>
-}
-else if (_rows.Count == 0)
-{
-    <div class="panel">
-        <div class="panel-body">
-            <div class="empty-state">
-                <svg class="es-ico"><use href="#sb-ico-dash" /></svg>
-                <div class="es-title">暂无仪表盘</div>
-                <div class="es-text">将一次问数结果保存为仪表盘，即可在团队内复用这套分析视角与图表。</div>
-                <div class="es-actions">
-                    <button class="btn btn-primary btn-sm" @onclick='() => Toast("从 Ask 会话发布为仪表盘")'>从 Ask 发布</button>
-                    <button class="btn btn-outline-secondary btn-sm" @onclick="Reload">刷新</button>
-                </div>
+        <Stats>
+            <SbStatTile Label="仪表盘总数" Value="@_rows.Count" Sub="含全局模板" />
+            <SbStatTile Label="已发布" Value="@_rows.Count(IsPublished)" Sub="可对外共享" Accent="success" />
+            <SbStatTile Label="草稿" Value="@_rows.Count(r => !IsPublished(r))" Sub="编辑中" Accent="warning" />
+        </Stats>
+
+        <EmptyActions>
+            <button class="btn btn-primary btn-sm" @onclick='() => Nav.NavigateTo("ask")'>从 Ask 发布</button>
+        </EmptyActions>
+
+        <RowActions>
+            <button class="btn btn-sm btn-outline-secondary" @onclick="() => Open(context)">详情</button>
+            <button class="btn btn-sm btn-outline-danger" @onclick="() => AskDelete(context)">删除</button>
+        </RowActions>
+    </SbListPage>
+
+    <SbConfirm Visible="@_confirm" VisibleChanged="v => _confirm = v" Title="删除仪表盘"
+               Message="删除后不可恢复，确认要删除该仪表盘吗？" ConfirmText="删除"
+               Tone="danger" OnConfirm="DoDelete" />
+
+    <SbModal Visible="@_createModal" VisibleChanged="v => _createModal = v" Title="新建仪表盘" Size="lg">
+        <Body>
+            <div class="form-stack">
+                <SbField Label="状态">
+                    <select class="form-select" @bind="_newStatus">
+                        <option value="draft">草稿</option>
+                        <option value="published">已发布</option>
+                    </select>
+                </SbField>
+                <SbField Label="DslJson" Required="true" Error="@_createErr" Hint="声明式仪表盘定义（DashboardDsl JSON）。保存将校验后创建。">
+                    <textarea class="form-control sb-pre" rows="16" @bind="_newDsl"></textarea>
+                </SbField>
             </div>
-        </div>
-    </div>
-}
-else
-{
-    <div class="stat-grid">
-        <div class="stat-tile"><div class="st-label">仪表盘总数</div><div class="st-value">@_rows.Count</div><div class="st-sub">含全局模板</div></div>
-        <div class="stat-tile accent-success"><div class="st-label">已发布</div><div class="st-value">@_rows.Count(r => IsPublished(r))</div><div class="st-sub">可对外共享</div></div>
-        <div class="stat-tile accent-warning"><div class="st-label">草稿</div><div class="st-value">@_rows.Count(r => !IsPublished(r))</div><div class="st-sub">编辑中</div></div>
-    </div>
-
-    <div class="toolbar">
-        <div class="search">
-            <svg><use href="#sb-ico-search" /></svg>
-            <input @bind="Q" @bind:event="oninput" placeholder="搜索名称 / 编码…" />
-        </div>
-        <div class="spacer"></div>
-        <button class="btn btn-outline-secondary btn-sm" @onclick="Reload">刷新</button>
-    </div>
-
-    <div class="panel">
-        <div class="panel-head"><div class="panel-title"><svg class="pt-ico"><use href="#sb-ico-dash" /></svg> 全部仪表盘</div></div>
-        <div class="panel-body flush">
-            <div class="table-wrap">
-                <table class="data-table">
-                    <thead><tr>@foreach (var c in _cols) { <th>@TablePresenter.Friendly(c)</th> }</tr></thead>
-                    <tbody>
-                    @foreach (var row in Filtered)
-                    {
-                        <tr>
-                            @foreach (var c in _cols)
-                            {
-                                @if (TablePresenter.IsStatusColumn(c))
-                                {
-                                    <td><span class="badge @TablePresenter.StatusBadge(TablePresenter.Cell(row, c))">@TablePresenter.Cell(row, c)</span></td>
-                                }
-                                else
-                                {
-                                    <td>@TablePresenter.Cell(row, c)</td>
-                                }
-                            }
-                        </tr>
-                    }
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-}
+        </Body>
+        <Footer>
+            <button class="btn btn-outline-secondary btn-sm" @onclick="() => _createModal = false">取消</button>
+            <button class="btn btn-primary btn-sm" @onclick="CreateDashboard">创建</button>
+        </Footer>
+    </SbModal>
+</AuthGuard>
 
 @code {
-    private JsonElement? _data;
     private List<JsonElement> _rows = new();
     private List<string> _cols = new();
     private string _error = "";
     private bool _loading = true;
-    private string Q = "";
-    private string _msg = "";
 
-    private List<JsonElement> Filtered => string.IsNullOrWhiteSpace(Q)
-        ? _rows
-        : _rows.Where(r => _cols.Any(c => TablePresenter.Cell(r, c).Contains(Q, StringComparison.OrdinalIgnoreCase))).ToList();
+    /// <summary>列定义由后端返回结构推断（表头友好化与状态徽章复用 TablePresenter）。</summary>
+    private List<SbColumn<JsonElement>> Columns =>
+        _cols.Select(c => SbCol.Of<JsonElement>(
+            TablePresenter.Friendly(c),
+            r => TablePresenter.Cell(r, c),
+            isStatus: TablePresenter.IsStatusColumn(c))).ToList();
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -107,13 +83,90 @@ else
     private async Task Reload()
     {
         _loading = true;
-        var (data, _, err) = await Api.GetJsonAsync($"api/dashboards?tenantId={AppState.TenantId}");
+        var (data, _, err) = await Api.GetJsonAsync($"api/dashboards?tenantId={State.TenantId}");
         _error = err ?? "";
-        _data = data;
         _rows = data is { ValueKind: JsonValueKind.Array } ? data.Value.EnumerateArray().ToList() : new();
-        _cols = TablePresenter.InferColumns(_data);
+        _cols = TablePresenter.InferColumns(data);
         _loading = false;
         StateHasChanged();
+    }
+
+    private void Open(JsonElement row)
+    {
+        var id = TablePresenter.Cell(row, "id");
+        if (string.IsNullOrWhiteSpace(id))
+        {
+            Toast.Warning("该记录缺少 id，无法打开详情。");
+            return;
+        }
+        Nav.NavigateTo($"dashboards/{id}");
+    }
+
+    private bool _confirm = false;
+    private string? _confirmId;
+
+    private void AskDelete(JsonElement row)
+    {
+        var id = TablePresenter.Cell(row, "id");
+        if (string.IsNullOrWhiteSpace(id)) { Toast.Warning("该记录缺少 id，无法删除。"); return; }
+        _confirmId = id;
+        _confirm = true;
+    }
+
+    private async Task DoDelete()
+    {
+        _confirm = false;
+        if (string.IsNullOrWhiteSpace(_confirmId)) return;
+        var (ok, status, err) = await Api.DeleteAsync($"api/dashboards/{_confirmId}?tenantId={State.TenantId}");
+        if (!ok) { Toast.Error(err ?? "删除失败。"); return; }
+        Toast.Success("仪表盘已删除。");
+        await Reload();
+    }
+
+    private void Create() => OpenCreate();
+
+    // ---- 新建仪表盘 ----
+    private bool _createModal;
+    private string _newDsl = "";
+    private string _newStatus = "draft";
+    private string _createErr = "";
+
+    private async Task OpenCreate()
+    {
+        _createErr = "";
+        _newStatus = "draft";
+        var (data, _, err) = await Api.GetJsonAsync("api/dashboards/editor/blueprint");
+        if (data is { ValueKind: JsonValueKind.Object } && data.Value.TryGetProperty("skeleton", out var sk) && sk.ValueKind == JsonValueKind.String)
+        {
+            _newDsl = sk.GetString()!;
+        }
+        else
+        {
+            _newDsl = err ?? "{}";
+            if (string.IsNullOrWhiteSpace(err)) _createErr = "未能获取蓝图骨架，请手动填写 DslJson。";
+        }
+        _createModal = true;
+    }
+
+    private async Task CreateDashboard()
+    {
+        if (string.IsNullOrWhiteSpace(_newDsl)) { _createErr = "DslJson 不能为空。"; return; }
+        var (_, status, err) = await Api.PostAsync("api/dashboards", new
+        {
+            tenantId = State.TenantId,
+            dslJson = _newDsl,
+            status = _newStatus
+        });
+        if (status is >= 200 and < 300)
+        {
+            Toast.Success("仪表盘已创建。");
+            _createModal = false;
+            await Reload();
+        }
+        else
+        {
+            _createErr = err ?? $"创建失败（HTTP {status}）。";
+        }
     }
 
     private static bool IsPublished(JsonElement row)
@@ -121,6 +174,4 @@ else
         var s = TablePresenter.Cell(row, "status");
         return s.Equals("published", StringComparison.OrdinalIgnoreCase) || s.Equals("ready", StringComparison.OrdinalIgnoreCase);
     }
-
-    private void Toast(string m) => _msg = m; // 占位：真实 toast 待 P11.3 交互层
 }

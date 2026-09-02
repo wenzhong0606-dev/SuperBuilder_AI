@@ -1,9 +1,13 @@
 @page "/ask"
 @using System.Collections.Generic
 @using System.Linq
+@using System.Text.Json
+@using SuperBuilder_AI.Components.Models
 @inject IApiClient Api
 @inject AppState State
 @inject NavigationManager Nav
+@inject AskSessionStore Session
+@inject FileDownloadService Download
 
 <h2>Ask BI 智能问数（旗舰）</h2>
 
@@ -14,11 +18,28 @@
 else
 {
     <div class="card ask-bar">
-        <label>数据源 ID<input class="form-control" @bind="DataSourceId" type="number" min="0" /></label>
-        <label>自然语言问题<textarea class="form-control" @bind="Question" placeholder="例如：上个月各区域销售额对比"></textarea></label>
+        <div class="ask-bar-row">
+            <label class="ask-ds">
+                数据源
+                @if (_dsBusy)
+                {
+                    <span class="muted tiny">加载中…</span>
+                }
+                else if (_dsError is not null)
+                {
+                    <span class="error tiny">@_dsError</span>
+                }
+                else
+                {
+                    <DataSourcePicker Items="_dsOptions" DataSourceId="DataSourceId" DataSourceIdChanged="OnDsChanged" Label="" />
+                }
+            </label>
+            <label class="ask-q">自然语言问题<textarea class="form-control" @bind="Question" placeholder="例如：上个月各区域销售额对比"></textarea></label>
+        </div>
         <div class="ask-actions">
             <button class="btn btn-primary" @onclick="DoAsk" disabled="@Busy">提问</button>
             <button class="btn btn-outline-secondary" @onclick="ClearChat" disabled="@Busy">清空对话</button>
+            @if (_sessionLoaded && Turns.Count > 0) { <span class="muted tiny">已恢复 @Turns.Count 轮历史</span> }
             @if (!string.IsNullOrEmpty(GlobalError)) { <span class="error">@GlobalError</span> }
         </div>
     </div>
@@ -28,140 +49,9 @@ else
         <p class="muted">还没有对话。试着问一个业务问题，例如「本月各品类销售额 Top 10」。</p>
     }
 
-    @for (var ti = 0; ti < Turns.Count; ti++)
+    @foreach (var tp in WithParents())
     {
-        var turn = Turns[ti];
-        var tIndex = ti;
-        <div class="turn @(turn.IsRefine ? "refine" : "")">
-            <div class="bubble user"><span class="who">我</span>@turn.Question</div>
-
-            @if (!string.IsNullOrEmpty(turn.Error))
-            {
-                <div class="alert alert-warning ask-error" role="alert">
-                    <div class="ask-error-msg">@turn.Error</div>
-                    @if (!string.IsNullOrEmpty(turn.Code))
-                    {
-                        <div class="ask-error-meta">错误码：<code>@turn.Code</code>@if (!string.IsNullOrEmpty(turn.TraceId)) { <text> · 追踪 ID：<code>@turn.TraceId</code></text> }</div>
-                    }
-                </div>
-            }
-            else if (turn.Response is not null)
-            {
-                var resp = turn.Response;
-
-                @* AI 自然语言解读 *@
-                @if (resp.Answer is not null && !string.IsNullOrWhiteSpace(resp.Answer.Answer))
-                {
-                    <div class="answer-block">
-                        <div class="answer-title">AI 解读</div>
-                        <div class="answer-text">@resp.Answer.Answer</div>
-                        <div class="muted tiny">耗时 @resp.Answer.ElapsedMilliseconds ms · 建议图表 @resp.Answer.Visualizations.Count 个</div>
-                    </div>
-                }
-
-                @* KPI 卡片（来自 summary） *@
-                @if (resp.Answer is not null && resp.Answer.Summary.Count > 0)
-                {
-                    <div class="kpi-row">
-                        @foreach (var kv in resp.Answer.Summary)
-                        {
-                            <div class="kpi-card">
-                                <div class="kpi-label">@kv.Key</div>
-                                <div class="kpi-value">@JsonValue.AsString(kv.Value)</div>
-                            </div>
-                        }
-                    </div>
-                }
-
-                @* 图表（来自 visualizations，支持视图层多轮调整） *@
-                @if (resp.Data is not null && resp.Data.Rows.Count > 0)
-                {
-                    @for (var vi = 0; vi < (resp.Answer?.Visualizations.Count ?? 0); vi++)
-                    {
-                        var viz = resp.Answer!.Visualizations[vi];
-                        var vIndex = vi;
-                        var ov = turn.GetOverride(vi);
-                        var effType = EffType(viz, ov);
-                        <div class="viz-card">
-                            <div class="viz-head">
-                                <strong>@(string.IsNullOrWhiteSpace(viz.Title) ? $"图表 {vi + 1}" : viz.Title)</strong>
-                                @if (!string.IsNullOrWhiteSpace(viz.Reason)) { <span class="muted tiny">@viz.Reason</span> }
-                            </div>
-                            @if (effType != "table")
-                            {
-                                var (labels, datasets) = BuildChart(viz, resp.Data.Rows, ov);
-                                <ChartView Type="@effType" Labels="@labels" Datasets="@datasets"
-                                           Title="@viz.Title" ShowLegend="@EffLegend(ov)" Palette="@EffPalette(ov)"
-                                           @key="@($"turn{tIndex}-viz{vIndex}")" />
-                            }
-                            <div class="viz-toolbar">
-                                <span class="tiny">视图调整：</span>
-                                <button class="btn btn-sm btn-outline-secondary" @onclick='() => SetType(turn, vIndex, "bar")'>柱状</button>
-                                <button class="btn btn-sm btn-outline-secondary" @onclick='() => SetType(turn, vIndex, "line")'>折线</button>
-                                <button class="btn btn-sm btn-outline-secondary" @onclick='() => SetType(turn, vIndex, "pie")'>饼图</button>
-                                <button class="btn btn-sm btn-outline-secondary" @onclick="() => ToggleLegend(turn, vIndex)">@(EffLegend(ov) ? "隐藏图例" : "显示图例")</button>
-                                <button class="btn btn-sm btn-outline-secondary" @onclick="() => CyclePalette(turn, vIndex)">换配色</button>
-                            </div>
-                        </div>
-                    }
-                }
-
-                @* 数据表 *@
-                @if (resp.Data is not null && resp.Data.Rows.Count > 0)
-                {
-                    <div class="table-wrap">
-                        <table class="data-table">
-                            <thead>
-                                <tr>@foreach (var col in Columns(resp.Data.Rows)) { <th>@col</th> }</tr>
-                            </thead>
-                            <tbody>
-                                @foreach (var row in resp.Data.Rows)
-                                {
-                                    <tr>@foreach (var col in Columns(resp.Data.Rows)) { <td>@JsonValue.AsString(row.GetValueOrDefault(col))</td> }</tr>
-                                }
-                            </tbody>
-                        </table>
-                    </div>
-                }
-                else if (resp.Data is not null && !resp.Data.Success)
-                {
-                    <p class="error">查询失败：@resp.Data.ErrorMessage</p>
-                }
-
-                @* SQL（可折叠） *@
-                @if (!string.IsNullOrWhiteSpace(resp.Sql))
-                {
-                    <details class="sql-block">
-                        <summary>查看生成的 SQL</summary>
-                        <pre>@resp.Sql</pre>
-                    </details>
-                }
-
-                @* 视图层多轮调整指令（纯前端 DSL 变更，零后端调用） *@
-                <div class="refine-box">
-                    <input class="form-control" @bind="turn.RefineCmd" placeholder="例如：改成柱状图 / 隐藏图例 / 配色换成绿色" />
-                    <button class="btn btn-sm btn-outline-secondary" @onclick="() => ApplyViewCommand(turn)">应用调整</button>
-                    @if (!string.IsNullOrEmpty(turn.RefineMsg)) { <span class="muted tiny">@turn.RefineMsg</span> }
-                </div>
-
-                @* 多轮语义细化（后端 LLM 重新查询，补全指代/省略） *@
-                <div class="refine-box semantic">
-                    <input class="form-control" @bind="turn.RefineInstruction" placeholder="基于本轮结果继续追问，如：只看华东地区 / 改成按月统计" />
-                    <button class="btn btn-sm btn-primary" @onclick="() => DoRefine(turn)" disabled="@turn.RefineBusy">语义细化</button>
-                    @if (turn.RefineBusy) { <span class="muted tiny">查询中…</span> }
-                    @if (!string.IsNullOrEmpty(turn.RefineInfo)) { <span class="ok tiny">@turn.RefineInfo</span> }
-                    @if (!string.IsNullOrEmpty(turn.RefineError)) { <span class="error tiny">@turn.RefineError</span> }
-                </div>
-
-                @* 发布为应用（P11.2 基础骨架：序列化 → P8 BuildFromDslAsync） *@
-                <div class="publish-box">
-                    <button class="btn btn-outline-secondary" @onclick="() => Publish(turn)" disabled="@turn.PublishBusy">发布为应用</button>
-                    @if (turn.PublishBusy) { <span class="muted tiny">发布中…</span> }
-                    @if (!string.IsNullOrEmpty(turn.PublishInfo)) { <span class="ok tiny">@turn.PublishInfo</span> }
-                    @if (!string.IsNullOrEmpty(turn.PublishError)) { <span class="error tiny">@turn.PublishError</span> }
-                </div>
-            }
-        </div>
+        <AskTurnCard Turn="tp.Turn" Index="tp.Index" CompareWith="tp.Parent" OnRefine="DoRefine" OnPublish="Publish" OnExport="Export" />
     }
 }
 
@@ -172,48 +62,94 @@ else
     private string? GlobalError = "";
     private readonly List<AskTurn> Turns = new();
 
-    private sealed class AskTurn
-    {
-        public string Question = "";
-        public BIResponse? Response;
-        public string? Error;
-        public string? Code;
-        public string? TraceId;
-        public Dictionary<int, VizOverride> Overrides { get; } = new();
-        public string RefineCmd { get; set; } = "";
-        public string? RefineMsg { get; set; }
-        public string RefineInstruction { get; set; } = "";
-        public bool RefineBusy { get; set; }
-        public string? RefineInfo { get; set; }
-        public string? RefineError { get; set; }
-        public bool IsRefine { get; set; }
-        public bool PublishBusy { get; set; }
-        public string? PublishInfo { get; set; }
-        public string? PublishError { get; set; }
+    private List<DataSourcePicker.Option> _dsOptions = new();
+    private bool _dsBusy = false;
+    private string? _dsError;
 
-        public VizOverride GetOverride(int vi)
+    private bool _sessionLoaded = false;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (State.SessionRestored && State.IsAuthenticated)
         {
-            if (!Overrides.TryGetValue(vi, out var o)) { o = new VizOverride(); Overrides[vi] = o; }
-            return o;
+            if (!_dsBusy && _dsOptions.Count == 0 && _dsError is null)
+                await LoadDataSourcesAsync();
+            if (!_sessionLoaded)
+            {
+                _sessionLoaded = true;
+                var saved = await Session.LoadAsync(State.TenantId, State.UserId);
+                if (saved.Count > 0)
+                {
+                    Turns.Clear();
+                    Turns.AddRange(saved);
+                    if (DataSourceId == 1 && saved.Count > 0 && saved[0].DataSourceIdHint is { } hint && hint > 0)
+                        DataSourceId = hint;
+                    StateHasChanged();
+                }
+            }
         }
     }
 
-    private sealed class VizOverride
+    private async Task LoadDataSourcesAsync()
     {
-        public string? Type;
-        public bool? ShowLegend;
-        public string? Palette;
+        _dsBusy = true;
+        try
+        {
+            var (data, _, err) = await Api.GetJsonAsync("api/data-sources");
+            if (data is null) { _dsError = err ?? "数据源列表为空"; return; }
+            var opts = JsonSerializer.Deserialize<List<DsOption>>(data.Value.GetRawText(), new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            if (opts is { Count: > 0 })
+            {
+                _dsOptions = opts.Select(o => new DataSourcePicker.Option { Id = o.Id, Name = o.Name + (string.IsNullOrWhiteSpace(o.DbType) ? "" : $" · {o.DbType}") }).ToList();
+                if (DataSourceId == 1) DataSourceId = _dsOptions[0].Id;
+            }
+            else
+            {
+                _dsError = "当前账号暂无可用数据源";
+            }
+        }
+        catch (Exception ex)
+        {
+            _dsError = "数据源加载失败：" + ex.Message;
+        }
+        finally
+        {
+            _dsBusy = false;
+        }
+    }
+
+    private void OnDsChanged(long id)
+    {
+        DataSourceId = id;
+        if (Turns.LastOrDefault() is { } last) last.DataSourceIdHint = id;
+    }
+
+    private sealed record TurnWithParent(AskTurn Turn, int Index, AskTurn? Parent);
+
+    /// <summary>为每轮计算其父轮（用于 S3-5 语义细化对比）。细化子轮绑定最近的普通轮。</summary>
+    private List<TurnWithParent> WithParents()
+    {
+        var list = new List<TurnWithParent>();
+        AskTurn? lastParent = null;
+        for (var i = 0; i < Turns.Count; i++)
+        {
+            if (Turns[i].IsRefine) list.Add(new TurnWithParent(Turns[i], i, lastParent));
+            else { list.Add(new TurnWithParent(Turns[i], i, null)); lastParent = Turns[i]; }
+        }
+        return list;
     }
 
     private async Task DoAsk()
     {
         if (string.IsNullOrWhiteSpace(Question)) { GlobalError = "请输入问题。"; return; }
+        if (_dsOptions.Count == 0 && DataSourceId == 1) { GlobalError = "请先选择数据源。"; return; }
         Busy = true; GlobalError = "";
-        var turn = new AskTurn { Question = Question };
+        var turn = new AskTurn { Question = Question, DataSourceIdHint = DataSourceId };
         Turns.Add(turn);
         var q = Question; Question = "";
         var outcome = await Api.AskAsync(q, DataSourceId);
         ApplyOutcome(turn, outcome);
+        await PersistAsync();
         Busy = false;
     }
 
@@ -231,10 +167,11 @@ else
                 .Select(t => RefineTurn.User(t.Question))
                 .ToList();
             var outcome = await Api.RefineAsync(turn.Question, instr, history, DataSourceId);
-            var child = new AskTurn { Question = $"{turn.Question} → {instr}", IsRefine = true };
+            var child = new AskTurn { Question = $"{turn.Question} → {instr}", IsRefine = true, DataSourceIdHint = DataSourceId };
             ApplyOutcome(child, outcome);
             Turns.Add(child);
             turn.RefineInfo = "已基于本轮结果重新查询（多轮语义调整）。";
+            await PersistAsync();
         }
         catch (Exception ex)
         {
@@ -262,116 +199,92 @@ else
             turn.Error = outcome.Response.ErrorMessage;
     }
 
-    private void ClearChat()
+    private async Task ClearChat()
     {
         Turns.Clear();
         GlobalError = "";
+        await PersistAsync();
     }
 
-    // ===== 视图层多轮调整（纯前端，零后端调用）=====
-
-    private static string EffType(VisualizationSuggestion v, VizOverride o)
+    private async Task PersistAsync()
     {
-        var t = o.Type ?? v.Type;
-        return string.IsNullOrWhiteSpace(t) ? "bar" : t;
-    }
-    private static bool EffLegend(VizOverride o) => o.ShowLegend ?? true;
-    private static string EffPalette(VizOverride o) => o.Palette ?? "primary";
-
-    private static void SetType(AskTurn t, int vi, string type) => t.GetOverride(vi).Type = type;
-    private static void ToggleLegend(AskTurn t, int vi)
-    {
-        var o = t.GetOverride(vi);
-        o.ShowLegend = !(o.ShowLegend ?? true);
-    }
-    private static readonly string[] Palettes = { "primary", "success", "warning", "danger", "neutral" };
-    private static void CyclePalette(AskTurn t, int vi)
-    {
-        var o = t.GetOverride(vi);
-        var cur = o.Palette ?? "primary";
-        var idx = Array.IndexOf(Palettes, cur);
-        o.Palette = Palettes[(idx + 1) % Palettes.Length];
+        if (_sessionLoaded) await Session.SaveAsync(State.TenantId, State.UserId, Turns);
     }
 
-    private void ApplyViewCommand(AskTurn turn)
-    {
-        var cmd = turn.RefineCmd?.Trim() ?? "";
-        if (string.IsNullOrEmpty(cmd)) { turn.RefineMsg = "请输入调整指令。"; return; }
-        if (turn.Response?.Answer is null) { turn.RefineMsg = "当前轮无可视化结果。"; return; }
-
-        var n = turn.Response.Answer.Visualizations.Count;
-        string? type = cmd.Contains("柱状") ? "bar" : cmd.Contains("折线") ? "line" : cmd.Contains("饼") ? "pie" : null;
-        bool? legend = cmd.Contains("隐藏图例") || cmd.Contains("关图例") || cmd.Contains("不显示图例") ? false
-                     : cmd.Contains("显示图例") || cmd.Contains("加图例") || cmd.Contains("开图例") ? true : null;
-        string? palette = cmd.Contains("绿") || cmd.Contains("成功") ? "success"
-                        : cmd.Contains("橙") || cmd.Contains("警告") || cmd.Contains("黄") ? "warning"
-                        : cmd.Contains("红") || cmd.Contains("危险") ? "danger"
-                        : cmd.Contains("灰") || cmd.Contains("中性") ? "neutral"
-                        : cmd.Contains("蓝") || cmd.Contains("主") || cmd.Contains("默认") ? "primary" : null;
-
-        if (type is null && legend is null && palette is null)
+    // ===== 导出（S3-3，经 AskTurnCard 回调）=====
+    private Task Export(AskTurnCard.AskTurnExport e)
+        => e.Turn switch
         {
-            turn.RefineMsg = "未能识别指令（支持：改成柱状/折线/饼图、显示/隐藏图例、配色换绿/橙/红/灰/蓝）。";
-            return;
-        }
-        for (var i = 0; i < n; i++)
-        {
-            var o = turn.GetOverride(i);
-            if (type is not null) o.Type = type;
-            if (legend is not null) o.ShowLegend = legend;
-            if (palette is not null) o.Palette = palette;
-        }
-        turn.RefineMsg = "已应用视图调整（纯前端，未发起后端请求）。";
-    }
+            { Response.Data.Rows.Count: > 0 } => ExportRows(e.Turn.Response!.Data.Rows, e.Format, e.Turn.Question),
+            _ => Task.CompletedTask
+        };
 
-    // ===== 图表数据映射 =====
-
-    private static (List<string> Labels, List<ChartView.ChartDataset> Datasets) BuildChart(
-        VisualizationSuggestion viz, List<Dictionary<string, object?>> rows, VizOverride ov)
+    private static List<string> CollectColumns(List<Dictionary<string, object?>> rows)
     {
-        string? catCol = null;
-        if (!string.IsNullOrWhiteSpace(viz.XAxis) && rows.Count > 0 && rows[0].ContainsKey(viz.XAxis))
-            catCol = viz.XAxis;
-        else if (rows.Count > 0)
-        {
-            foreach (var k in rows[0].Keys)
-            {
-                var allNonNum = rows.All(r => !JsonValue.IsNumber(r.GetValueOrDefault(k)));
-                if (allNonNum) { catCol = k; break; }
-            }
-        }
-        var labels = catCol is null
-            ? rows.Select((_, i) => $"#{i + 1}").ToList()
-            : rows.Select(r => JsonValue.AsString(r.GetValueOrDefault(catCol))).ToList();
-
-        List<string> measures;
-        if (viz.YAxis is { Count: > 0 })
-            measures = viz.YAxis.Where(k => rows.Count == 0 || rows[0].ContainsKey(k)).ToList();
-        else if (rows.Count > 0)
-            measures = rows[0].Keys.Where(k => rows.All(r => JsonValue.IsNumber(r.GetValueOrDefault(k)))).ToList();
-        else
-            measures = new List<string>();
-        if (measures.Count == 0 && rows.Count > 0) measures = rows[0].Keys.ToList();
-
-        var datasets = measures.Select(m => new ChartView.ChartDataset
-        {
-            Label = m,
-            Data = rows.Select(r => JsonValue.AsNumber(r.GetValueOrDefault(m))).ToList()
-        }).ToList();
-
-        return (labels, datasets);
-    }
-
-    private static List<string> Columns(List<Dictionary<string, object?>> rows)
-    {
-        if (rows.Count == 0) return new List<string>();
-        // 保留首次出现的列顺序（跨行并集）
         var cols = new List<string>();
         foreach (var r in rows)
             foreach (var k in r.Keys)
                 if (!cols.Contains(k)) cols.Add(k);
         return cols;
     }
+
+    private async Task ExportRows(List<Dictionary<string, object?>> rows, string format, string title)
+    {
+        var cols = CollectColumns(rows);
+        if (format == "excel")
+        {
+            var html = BuildExcel(rows, cols, title);
+            await Download.DownloadTextAsync(SafeName(title) + ".xls", "application/vnd.ms-excel", html);
+        }
+        else
+        {
+            var csv = BuildCsv(rows, cols);
+            await Download.DownloadTextAsync(SafeName(title) + ".csv", "text/csv", csv);
+        }
+    }
+
+    private static string SafeName(string s)
+    {
+        var n = new string((s ?? "ask").Where(c => char.IsLetterOrDigit(c) || c == '-' || c == '_').ToArray());
+        return string.IsNullOrEmpty(n) ? "ask-export" : n[..Math.Min(n.Length, 40)];
+    }
+
+    private static string CsvCell(object? v)
+    {
+        var s = JsonValue.AsString(v);
+        if (s.Contains(',') || s.Contains('"') || s.Contains('\n'))
+            return "\"" + s.Replace("\"", "\"\"") + "\"";
+        return s;
+    }
+
+    private static string BuildCsv(List<Dictionary<string, object?>> rows, List<string> cols)
+    {
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine(string.Join(",", cols.Select(CsvCell)));
+        foreach (var r in rows)
+            sb.AppendLine(string.Join(",", cols.Select(c => CsvCell(r.GetValueOrDefault(c)))));
+        // 加 BOM 确保 Excel 中文不乱码
+        return "\uFEFF" + sb.ToString();
+    }
+
+    private static string BuildExcel(List<Dictionary<string, object?>> rows, List<string> cols, string title)
+    {
+        var sb = new System.Text.StringBuilder();
+        sb.Append("<html xmlns:x=\"urn:schemas-microsoft-com:office:excel\"><head><meta charset=\"utf-8\"></head><body>");
+        sb.Append("<table border=\"1\"><thead><tr>");
+        foreach (var c in cols) sb.Append("<th>").Append(EscapeHtml(c)).Append("</th>");
+        sb.Append("</tr></thead><tbody>");
+        foreach (var r in rows)
+        {
+            sb.Append("<tr>");
+            foreach (var c in cols) sb.Append("<td>").Append(EscapeHtml(JsonValue.AsString(r.GetValueOrDefault(c)))).Append("</td>");
+            sb.Append("</tr>");
+        }
+        sb.Append("</tbody></table></body></html>");
+        return sb.ToString();
+    }
+
+    private static string EscapeHtml(string s) => s.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;");
 
     // ===== 发布为应用（序列化 → P8 BuildFromDslAsync）=====
 
@@ -442,5 +355,12 @@ else
         {
             turn.PublishBusy = false;
         }
+    }
+
+    private sealed class DsOption
+    {
+        public long Id { get; set; }
+        public string Name { get; set; } = "";
+        public string DbType { get; set; } = "";
     }
 }

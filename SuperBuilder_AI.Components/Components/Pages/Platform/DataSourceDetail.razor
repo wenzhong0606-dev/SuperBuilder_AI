@@ -1,0 +1,160 @@
+@page "/data-sources/{Id:long}"
+@inject IApiClient Api
+@inject NavigationManager Nav
+@inject ToastService Toast
+@using System.Text.Json
+@using SuperBuilder_AI.Components.Shared
+
+<AuthGuard>
+    <PageHead Icon="sb-ico-db" Title="@($"数据源 #{Id}")" Desc="数据源的授权清单与行级安全策略（RLS）。">
+        <button class="btn btn-outline-secondary btn-sm" @onclick='() => Nav.NavigateTo("data-sources")'>返回列表</button>
+        <button class="btn btn-outline-secondary btn-sm" @onclick="() => Load()">刷新</button>
+    </PageHead>
+
+    <SbTabs>
+        <SbTab Title="访问授权" Badge="@_grants.Count.ToString()">
+            <SbToolbar>
+                <Right>
+                    <button class="btn btn-outline-secondary btn-sm" @onclick="() => Load()">刷新授权</button>
+                </Right>
+            </SbToolbar>
+            @if (_loadingGrants)
+            {
+                <LoadingState Text="正在加载授权…" />
+            }
+            else if (_grantsError is not null)
+            {
+                <ErrorState Message="@_grantsError" OnRetry="LoadGrants" />
+            }
+            else
+            {
+                <SbPanel Icon="sb-ico-key" Title="授权清单" Flush="true">
+                    <Body>
+                        <ResultTable Rows="@_grants" EmptyText="该数据源尚未授予任何主体访问权限。" />
+                    </Body>
+                </SbPanel>
+            }
+        </SbTab>
+
+        <SbTab Title="行级安全" Badge="@_policies.Count.ToString()">
+            @if (_loadingPolicies)
+            {
+                <LoadingState Text="正在加载策略…" />
+            }
+            else if (_policiesError is not null)
+            {
+                <ErrorState Message="@_policiesError" OnRetry="LoadPolicies" />
+            }
+            else if (_policies.Count == 0)
+            {
+                <SbPanel Icon="sb-ico-shield" Title="行级安全策略">
+                    <Body>
+                        <SbEmptyState Icon="sb-ico-shield" Title="未配置行级安全策略"
+                                      Text="配置后可按用户/角色限制可见数据行，控制越权取数风险。" />
+                    </Body>
+                </SbPanel>
+            }
+            else
+            {
+                <SbPanel Icon="sb-ico-shield" Title="策略清单" Flush="true">
+                    <Body>
+                        <div class="table-wrap">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        @foreach (var c in _policyCols) { <th>@TablePresenter.Friendly(c)</th> }
+                                        <th class="ta-right">操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var row in _policies)
+                                    {
+                                        <tr>
+                                            @foreach (var c in _policyCols)
+                                            {
+                                                <td>@JsonValue.AsString(row.GetValueOrDefault(c))</td>
+                                            }
+                                            <td class="ta-right">
+                                                <button class="btn btn-sm btn-outline-secondary"
+                                                        @onclick="() => RemovePolicy(row)">删除</button>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </Body>
+                </SbPanel>
+            }
+        </SbTab>
+    </SbTabs>
+</AuthGuard>
+
+@code {
+    [Parameter] public long Id { get; set; }
+
+    private List<Dictionary<string, object?>> _grants = new();
+    private List<Dictionary<string, object?>> _policies = new();
+    private List<string> _policyCols = new();
+    private string? _grantsError;
+    private string? _policiesError;
+    private bool _loadingGrants = true;
+    private bool _loadingPolicies = true;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        await Load();
+    }
+
+    private async Task Load()
+    {
+        await LoadGrants();
+        await LoadPolicies();
+        StateHasChanged();
+    }
+
+    private async Task LoadGrants()
+    {
+        _loadingGrants = true;
+        var (data, status, err) = await Api.GetJsonAsync($"api/data-source-access?dataSourceId={Id}");
+        _grantsError = data is null ? (err ?? $"加载授权失败（{status}）。") : null;
+        _grants = JsonRows.Extract(data);
+        _loadingGrants = false;
+    }
+
+    private async Task LoadPolicies()
+    {
+        _loadingPolicies = true;
+        var (data, status, err) = await Api.GetJsonAsync($"api/data-policies/row?dataSourceId={Id}");
+        _policiesError = data is null ? (err ?? $"加载策略失败（{status}）。") : null;
+        _policies = JsonRows.Extract(data);
+        _policyCols = Columns(_policies);
+        _loadingPolicies = false;
+    }
+
+    private async Task RemovePolicy(Dictionary<string, object?> row)
+    {
+        var id = JsonValue.AsString(row.GetValueOrDefault("id"));
+        if (string.IsNullOrWhiteSpace(id)) return;
+        var (ok, status, err) = await Api.DeleteAsync($"api/data-policies/row/{id}");
+        if (ok)
+        {
+            Toast.Success("策略已删除。");
+            await LoadPolicies();
+        }
+        else
+        {
+            Toast.Error(err ?? $"删除失败（{status}）。");
+        }
+    }
+
+    private static List<string> Columns(List<Dictionary<string, object?>> rows)
+    {
+        var cols = new List<string>();
+        foreach (var r in rows)
+            foreach (var k in r.Keys)
+                if (!cols.Contains(k)) cols.Add(k);
+        return cols;
+    }
+}

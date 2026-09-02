@@ -41,3 +41,33 @@ window.SuperBuilder.renderChart = function (canvas, spec) {
 window.SuperBuilder.destroyChart = function (canvas) {
     if (canvas && canvas._sbChart) { canvas._sbChart.destroy(); canvas._sbChart = null; }
 };
+
+// ===== Ask 会话持久化（S3-2）：localStorage 封装 =====
+window.SuperBuilder.setLocalJson = function (key, json) {
+    try { localStorage.setItem(key, json); } catch (e) {}
+};
+
+window.SuperBuilder.getLocalJson = function (key) {
+    try { return localStorage.getItem(key) || null; } catch (e) { return null; }
+};
+
+window.SuperBuilder.removeLocal = function (key) {
+    try { localStorage.removeItem(key); } catch (e) {}
+};
+
+// ===== 文件下载（S3-3 导出 CSV / Excel）=====
+window.SuperBuilder.downloadTextFile = function (name, mime, text) {
+    try {
+        var blob = new Blob([text], { type: mime + ';charset=utf-8' });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = name;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+    } catch (e) {
+        console.error('downloadTextFile failed', e);
+    }
+};

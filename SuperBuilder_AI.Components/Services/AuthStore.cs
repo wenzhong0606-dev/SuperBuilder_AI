@@ -68,6 +68,11 @@ public sealed class AuthStore
         {
             // 解析/读取失败时保持未登录
         }
+        finally
+        {
+            // 无论还原成功与否都置位，避免守卫长时间停留在加载态
+            _state.MarkSessionRestored();
+        }
     }
 
     /// <summary>清除会话：先清 AppState，再移除 localStorage 记录。</summary>

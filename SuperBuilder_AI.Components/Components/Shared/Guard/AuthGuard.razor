@@ -1,0 +1,49 @@
+@implements IDisposable
+@inject AppState State
+@inject NavigationManager Nav
+@* 页面级登录守卫。
+   必须等待 AppState.SessionRestored（localStorage 自举完成）后再判定，
+   否则预渲染/首帧会把已登录用户误判为未登录。 *@
+@if (!State.SessionRestored)
+{
+    <LoadingState Text="正在校验会话…" />
+}
+else if (State.IsAuthenticated)
+{
+    @ChildContent
+}
+else
+{
+    <SbEmptyState Icon="sb-ico-shield" Title="需要登录" Text="该页面需要登录后访问，请先登录你的账号。">
+        <Actions>
+            <button class="btn btn-primary btn-sm" @onclick="GoLogin">前往登录</button>
+        </Actions>
+    </SbEmptyState>
+}
+
+@code {
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    /// <summary>未登录时是否自动跳转登录页（默认展示内联提示）。</summary>
+    [Parameter] public bool AutoRedirect { get; set; }
+
+    protected override void OnInitialized() => State.SessionRestoredChanged += OnSessionState;
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (!firstRender) return;
+        if (State.SessionRestored && !State.IsAuthenticated && AutoRedirect) Nav.NavigateTo("/login");
+    }
+
+    private void OnSessionState()
+    {
+        InvokeAsync(() =>
+        {
+            if (!State.IsAuthenticated && AutoRedirect) Nav.NavigateTo("/login");
+            StateHasChanged();
+        });
+    }
+
+    private void GoLogin() => Nav.NavigateTo("/login");
+
+    public void Dispose() => State.SessionRestoredChanged -= OnSessionState;
+}

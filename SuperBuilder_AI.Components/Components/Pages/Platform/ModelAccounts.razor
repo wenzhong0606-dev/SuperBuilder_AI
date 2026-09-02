@@ -1,41 +1,44 @@
 @page "/model-accounts"
-<PageHead Icon="sb-ico-key" Title="模型与账号（BYO）" Desc="选择当前 AI 模型，或绑定你自有的模型 API Key（BYO），按租户隔离、密钥掩码存储。" />
+@inject ToastService Toast
+@using SuperBuilder_AI.Components.Shared
 
-<div class="card-grid">
-    @foreach (var m in _models)
-    {
-        <div class="feature-card">
-            <div class="fc-ico"><svg><use href="#sb-ico-key" /></svg></div>
-            <div class="fc-title">@m.Name</div>
-            <div class="fc-desc">@m.Desc</div>
-            <div style="display:flex;gap:6px;align-items:center">
-                <span class="badge @(m.Bound ? "badge-success" : "badge-muted")">@(m.Bound ? "已绑定" : "未绑定")</span>
-                @if (m.Default) { <span class="badge badge-primary">默认</span> }
-                <div class="spacer" style="flex:1"></div>
-                <button class="btn btn-outline-secondary btn-sm" @onclick="() => SetDefault(m.Name)">设为默认</button>
+<AuthGuard>
+    <PageHead Icon="sb-ico-key" Title="模型与账号（BYO）" Desc="选择当前 AI 模型，或绑定你自有的模型 API Key（BYO），按租户隔离、密钥掩码存储。" />
+
+    <div class="card-grid">
+        @foreach (var m in _models)
+        {
+            <div class="feature-card">
+                <div class="fc-ico"><svg><use href="#sb-ico-key" /></svg></div>
+                <div class="fc-title">@m.Name</div>
+                <div class="fc-desc">@m.Desc</div>
+                <div style="display:flex;gap:6px;align-items:center">
+                    <span class="badge @(m.Bound ? "badge-success" : "badge-muted")">@(m.Bound ? "已绑定" : "未绑定")</span>
+                    @if (m.Default) { <span class="badge badge-primary">默认</span> }
+                    <div class="spacer" style="flex:1"></div>
+                    <button class="btn btn-outline-secondary btn-sm" @onclick="() => SetDefault(m.Name)">设为默认</button>
+                </div>
             </div>
-        </div>
-    }
-</div>
-
-<div class="panel">
-    <div class="panel-head"><div class="panel-title"><svg class="pt-ico"><use href="#sb-ico-key" /></svg> 绑定自有 API Key</div></div>
-    <div class="panel-body">
-        <div class="field-grid">
-            <label>模型
-                <select @bind="SelModel">
-                    @foreach (var m in _models) { <option value="@m.Name">@m.Name</option> }
-                </select>
-            </label>
-            <label>API Key<input type="password" @bind="Key" placeholder="sk-••••••" /></label>
-            <label class="full">备注<input @bind="Note" placeholder="如：生产环境专用" /></label>
-        </div>
-        <div class="toolbar" style="margin-top:16px;margin-bottom:0">
-            <button class="btn btn-primary btn-sm" @onclick="Bind">保存绑定</button>
-            <span class="muted tiny">@_msg</span>
-        </div>
+        }
     </div>
-</div>
+
+    <SbPanel Icon="sb-ico-key" Title="绑定自有 API Key">
+        <Body>
+            <div class="field-grid">
+                <SbField Label="模型">
+                    <select @bind="SelModel">
+                        @foreach (var m in _models) { <option value="@m.Name">@m.Name</option> }
+                    </select>
+                </SbField>
+                <SbField Label="API Key"><input type="password" @bind="Key" placeholder="sk-••••••" /></SbField>
+                <SbField Label="备注" Full="true"><input @bind="Note" placeholder="如：生产环境专用" /></SbField>
+            </div>
+            <div class="toolbar" style="margin-top:16px;margin-bottom:0">
+                <button class="btn btn-primary btn-sm" @onclick="Bind">保存绑定</button>
+            </div>
+        </Body>
+    </SbPanel>
+</AuthGuard>
 
 @code {
     private class Model
@@ -53,12 +56,12 @@
         new() { Name = "Azure OpenAI", Desc = "企业合规部署", Bound = false },
         new() { Name = "DeepSeek", Desc = "高性价比推理", Bound = false },
     };
-    private string SelModel = "Qwen-Plus", Key = "", Note = "", _msg = "";
+    private string SelModel = "Qwen-Plus", Key = "", Note = "";
 
     private void SetDefault(string n)
     {
         foreach (var m in _models) m.Default = m.Name == n;
-        _msg = $"已将 {n} 设为默认模型";
+        Toast.Success($"已将 {n} 设为默认模型");
     }
-    private void Bind() => _msg = "绑定已提交（ILLMProvider + UserModelBinding 计划于 P13 实现，密钥将以掩码存储）。";
+    private void Bind() => Toast.Info("绑定已提交（ILLMProvider + UserModelBinding 计划于 P13 实现，密钥将以掩码存储）。");
 }

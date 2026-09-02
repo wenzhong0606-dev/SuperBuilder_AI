@@ -5,6 +5,8 @@
 @inject AuthStore Session
 @inject IJSRuntime JS
 
+<IconSprite />
+
 <div class="app-shell @(NavOpen ? "nav-open" : "")">
     <header class="app-header">
         <button class="icon-btn menu-btn" @onclick="ToggleNav" aria-label="菜单" title="菜单">
@@ -26,9 +28,22 @@
 
         @if (State.IsAuthenticated)
         {
-            <div class="user-chip" title="当前用户">
-                <span class="avatar">@(string.IsNullOrEmpty(State.Username) ? "?" : State.Username.Substring(0, 1).ToUpper())</span>
-                <span class="uname">@State.Username</span>
+            <div class="user-menu">
+                <button class="user-chip" @onclick="ToggleUserMenu" aria-haspopup="true" aria-expanded="@UserMenuOpen" title="账号菜单">
+                    <span class="avatar">@(string.IsNullOrEmpty(State.Username) ? "?" : State.Username.Substring(0, 1).ToUpper())</span>
+                    <span class="uname">@State.Username</span>
+                </button>
+                @if (UserMenuOpen)
+                {
+                    <div class="sb-menu" role="menu">
+                        <a class="sb-menu-item" href="settings" @onclick="CloseUserMenu">
+                            <svg class="btn-ico"><use href="#sb-ico-settings" /></svg> 个人设置
+                        </a>
+                        <button class="sb-menu-item" @onclick="Logout">
+                            <svg class="btn-ico"><use href="#sb-ico-shield" /></svg> 退出登录
+                        </button>
+                    </div>
+                }
             </div>
         }
     </header>
@@ -37,14 +52,18 @@
         <NavMenu />
         <div class="nav-scrim" @onclick="CloseNav"></div>
         <main class="content">
+            <AppBreadcrumb />
             @Body
         </main>
     </div>
 </div>
 
+<SbToastHost />
+
 @code {
     private bool NavOpen = false;
     private bool IsDark = false;
+    private bool UserMenuOpen = false;
 
     protected override void OnInitialized()
     {
@@ -62,7 +81,6 @@
         await Theme.ApplyAsync(theme);
 
         // 会话自举：从 localStorage 还原令牌，并校验是否仍有效（过期则清除）。
-        // 必须在浏览器阶段执行（JS 运行时可用）。
         await Session.RestoreAsync();
         if (State.IsAuthenticated)
         {
@@ -80,6 +98,7 @@
 
     private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
     {
+        UserMenuOpen = false;
         if (NavOpen)
         {
             NavOpen = false;
@@ -89,6 +108,16 @@
 
     private void ToggleNav() => NavOpen = !NavOpen;
     private void CloseNav() => NavOpen = false;
+    private void ToggleUserMenu() => UserMenuOpen = !UserMenuOpen;
+    private void CloseUserMenu() => UserMenuOpen = false;
+
+    private async Task Logout()
+    {
+        UserMenuOpen = false;
+        await Session.ClearAsync();
+        State.ClearSession();
+        Nav.NavigateTo("/login", forceLoad: true);
+    }
 
     private async Task ToggleTheme()
     {

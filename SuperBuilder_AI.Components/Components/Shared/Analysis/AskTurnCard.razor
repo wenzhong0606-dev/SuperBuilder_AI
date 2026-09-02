@@ -1,0 +1,359 @@
+@using System.Collections.Generic
+@using System.Linq
+@using SuperBuilder_AI.Components.Models
+
+<div class="turn @(Turn.IsRefine ? "refine" : "")">
+    <div class="bubble user"><span class="who">我</span>@Turn.Question</div>
+
+    @if (!string.IsNullOrEmpty(Turn.Error))
+    {
+        <div class="alert alert-warning ask-error" role="alert">
+            <div class="ask-error-msg">@Turn.Error</div>
+            @if (!string.IsNullOrEmpty(Turn.Code))
+            {
+                <div class="ask-error-meta">错误码：<code>@Turn.Code</code>@if (!string.IsNullOrEmpty(Turn.TraceId)) { <text> · 追踪 ID：<code>@Turn.TraceId</code></text> }</div>
+            }
+        </div>
+    }
+    else if (Turn.Response is not null)
+    {
+        var resp = Turn.Response;
+
+        @if (resp.Answer is not null && !string.IsNullOrWhiteSpace(resp.Answer.Answer))
+        {
+            <div class="answer-block">
+                <div class="answer-title">AI 解读</div>
+                <div class="answer-text">@resp.Answer.Answer</div>
+                <div class="muted tiny">耗时 @resp.Answer.ElapsedMilliseconds ms · 建议图表 @resp.Answer.Visualizations.Count 个</div>
+            </div>
+        }
+
+        @if (resp.Answer is not null && resp.Answer.Summary.Count > 0)
+        {
+            <div class="kpi-row">
+                @foreach (var kv in resp.Answer.Summary)
+                {
+                    <div class="kpi-card">
+                        <div class="kpi-label">@kv.Key</div>
+                        <div class="kpi-value">@JsonValue.AsString(kv.Value)</div>
+                    </div>
+                }
+            </div>
+        }
+
+        @if (resp.Data is not null && resp.Data.Rows.Count > 0)
+        {
+            var catCol = CategoryColumn(resp);
+            var drillRows = string.IsNullOrEmpty(_drillCat) || catCol is null
+                ? resp.Data.Rows
+                : resp.Data.Rows.Where(r => JsonValue.AsString(r.GetValueOrDefault(catCol)) == _drillCat).ToList();
+
+            @for (var vi = 0; vi < (resp.Answer?.Visualizations.Count ?? 0); vi++)
+            {
+                var viz = resp.Answer!.Visualizations[vi];
+                var vIndex = vi;
+                var ov = Turn.GetOverride(vi);
+                var effType = EffType(viz, ov);
+                <div class="viz-card">
+                    <div class="viz-head">
+                        <strong>@(string.IsNullOrWhiteSpace(viz.Title) ? $"图表 {vi + 1}" : viz.Title)</strong>
+                        @if (!string.IsNullOrWhiteSpace(viz.Reason)) { <span class="muted tiny">@viz.Reason</span> }
+                    </div>
+                    @if (effType != "table")
+                    {
+                        var (labels, datasets) = BuildChart(viz, resp.Data.Rows, ov);
+                        <ChartView Type="@effType" Labels="@labels" Datasets="@datasets"
+                                   Title="@viz.Title" ShowLegend="@EffLegend(ov)" Palette="@EffPalette(ov)"
+                                   Stacked="@EffStacked(ov)" Area="@EffArea(ov)" MultiAxis="@EffMultiAxis(ov)"
+                                   @key="@($"turn{Index}-viz{vIndex}")" />
+                    }
+                    <div class="viz-toolbar">
+                        <span class="tiny">视图：</span>
+                        <button class="btn btn-sm btn-outline-secondary" @onclick='() => SetType(Turn, vIndex, "bar")'>柱状</button>
+                        <button class="btn btn-sm btn-outline-secondary" @onclick='() => SetType(Turn, vIndex, "line")'>折线</button>
+                        <button class="btn btn-sm btn-outline-secondary" @onclick='() => SetType(Turn, vIndex, "pie")'>饼图</button>
+                        <button class="btn btn-sm btn-outline-secondary" @onclick="() => ToggleLegend(Turn, vIndex)">@(EffLegend(ov) ? "隐藏图例" : "显示图例")</button>
+                        <button class="btn btn-sm btn-outline-secondary" @onclick="() => CyclePalette(Turn, vIndex)">换配色</button>
+                        @if (effType != "pie")
+                        {
+                            <span class="tiny sep">|</span>
+                            <button class="btn btn-sm btn-outline-secondary" @onclick="() => ToggleStacked(Turn, vIndex)">@(EffStacked(ov) ? "取消堆叠" : "堆叠")</button>
+                            <button class="btn btn-sm btn-outline-secondary" @onclick="() => ToggleArea(Turn, vIndex)">@(EffArea(ov) ? "取消面积" : "面积")</button>
+                            <button class="btn btn-sm btn-outline-secondary" @onclick="() => ToggleMultiAxis(Turn, vIndex)">@(EffMultiAxis(ov) ? "取消多轴" : "多轴")</button>
+                        }
+                    </div>
+                </div>
+            }
+
+            <div class="table-wrap">
+                <div class="table-toolbar">
+                    <span class="muted tiny">共 @resp.Data.Rows.Count 行</span>
+                    @if (catCol is not null && resp.Data.Rows.Count > 0)
+                    {
+                        <span class="drill-hint tiny">下钻：</span>
+                        @foreach (var c in resp.Data.Rows.Select(r => JsonValue.AsString(r.GetValueOrDefault(catCol))).Where(c => !string.IsNullOrEmpty(c)).Distinct().Take(12))
+                        {
+                            <button class="chip @(_drillCat == c ? "active" : "")" @onclick="() => SetDrill(c)">@c</button>
+                        }
+                        @if (!string.IsNullOrEmpty(_drillCat))
+                        {
+                            <button class="chip clear" @onclick='() => SetDrill("")'>清除下钻</button>
+                        }
+                    }
+                    <span class="export-group">
+                        <button class="btn btn-sm btn-outline-secondary" @onclick='() => OnExport.InvokeAsync(new AskTurnExport(Turn, "csv"))'>导出 CSV</button>
+                        <button class="btn btn-sm btn-outline-secondary" @onclick='() => OnExport.InvokeAsync(new AskTurnExport(Turn, "excel"))'>导出 Excel</button>
+                    </span>
+                </div>
+                <table class="data-table">
+                    <thead>
+                        <tr>@foreach (var col in Columns(drillRows)) { <th>@col</th> }</tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var row in drillRows)
+                        {
+                            <tr>@foreach (var col in Columns(drillRows)) { <td>@JsonValue.AsString(row.GetValueOrDefault(col))</td> }</tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+        else if (resp.Data is not null && !resp.Data.Success)
+        {
+            <p class="error">查询失败：@resp.Data.ErrorMessage</p>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(resp.Sql))
+        {
+            <details class="sql-block">
+                <summary>查看生成的 SQL</summary>
+                <pre>@resp.Sql</pre>
+            </details>
+        }
+
+        @if (CompareWith is not null)
+        {
+            <div class="compare-box">
+                <button class="btn btn-sm btn-outline-primary" @onclick="() => _compare = !_compare">@(_compare ? "隐藏对比" : "对比原结果")</button>
+                @if (_compare)
+                {
+                    <div class="compare-grid">
+                        <div class="compare-col">
+                            <div class="compare-head">原结果 · @CompareWith.Question</div>
+                            @RenderCompact(CompareWith)
+                        </div>
+                        <div class="compare-col">
+                            <div class="compare-head">细化结果 · @Turn.Question</div>
+                            @RenderCompact(Turn)
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+
+        <div class="refine-box">
+            <input class="form-control" @bind="Turn.RefineCmd" placeholder="例如：改成柱状图 / 隐藏图例 / 配色换成绿色" />
+            <button class="btn btn-sm btn-outline-secondary" @onclick="() => ApplyViewCommand()">应用调整</button>
+            @if (!string.IsNullOrEmpty(Turn.RefineMsg)) { <span class="muted tiny">@Turn.RefineMsg</span> }
+        </div>
+
+        <div class="refine-box semantic">
+            <input class="form-control" @bind="Turn.RefineInstruction" placeholder="基于本轮结果继续追问，如：只看华东地区 / 改成按月统计" />
+            <button class="btn btn-sm btn-primary" @onclick="() => OnRefine.InvokeAsync(Turn)" disabled="@Turn.RefineBusy">语义细化</button>
+            @if (Turn.RefineBusy) { <span class="muted tiny">查询中…</span> }
+            @if (!string.IsNullOrEmpty(Turn.RefineInfo)) { <span class="ok tiny">@Turn.RefineInfo</span> }
+            @if (!string.IsNullOrEmpty(Turn.RefineError)) { <span class="error tiny">@Turn.RefineError</span> }
+        </div>
+
+        <div class="publish-box">
+            <button class="btn btn-outline-secondary" @onclick="() => OnPublish.InvokeAsync(Turn)" disabled="@Turn.PublishBusy">发布为应用</button>
+            @if (Turn.PublishBusy) { <span class="muted tiny">发布中…</span> }
+            @if (!string.IsNullOrEmpty(Turn.PublishInfo)) { <span class="ok tiny">@Turn.PublishInfo</span> }
+            @if (!string.IsNullOrEmpty(Turn.PublishError)) { <span class="error tiny">@Turn.PublishError</span> }
+        </div>
+    }
+</div>
+
+@code {
+    /// <summary>导出请求（轮次 + 格式），由父页 Ask.razor 处理实际下载。</summary>
+    public sealed record AskTurnExport(AskTurn Turn, string Format);
+
+    [Parameter] public AskTurn Turn { get; set; } = new();
+    [Parameter] public int Index { get; set; }
+    [Parameter] public AskTurn? CompareWith { get; set; }
+    [Parameter] public EventCallback<AskTurn> OnRefine { get; set; }
+    [Parameter] public EventCallback<AskTurn> OnPublish { get; set; }
+    [Parameter] public EventCallback<AskTurnExport> OnExport { get; set; }
+
+    private string _drillCat = "";
+    private bool _compare = false;
+
+    private static string EffType(VisualizationSuggestion v, VizOverride o)
+    {
+        var t = o.Type ?? v.Type;
+        return string.IsNullOrWhiteSpace(t) ? "bar" : t;
+    }
+    private static bool EffLegend(VizOverride o) => o.ShowLegend ?? true;
+    private static string EffPalette(VizOverride o) => o.Palette ?? "primary";
+    private static bool EffStacked(VizOverride o) => o.Stacked ?? false;
+    private static bool EffArea(VizOverride o) => o.Area ?? false;
+    private static bool EffMultiAxis(VizOverride o) => o.MultiAxis ?? false;
+
+    private static void SetType(AskTurn t, int vi, string type) => t.GetOverride(vi).Type = type;
+    private static void ToggleLegend(AskTurn t, int vi)
+    {
+        var o = t.GetOverride(vi);
+        o.ShowLegend = !(o.ShowLegend ?? true);
+    }
+    private static readonly string[] Palettes = { "primary", "success", "warning", "danger", "neutral" };
+    private static void CyclePalette(AskTurn t, int vi)
+    {
+        var o = t.GetOverride(vi);
+        var cur = o.Palette ?? "primary";
+        var idx = Array.IndexOf(Palettes, cur);
+        o.Palette = Palettes[(idx + 1) % Palettes.Length];
+    }
+    private static void ToggleStacked(AskTurn t, int vi) { var o = t.GetOverride(vi); o.Stacked = !(o.Stacked ?? false); }
+    private static void ToggleArea(AskTurn t, int vi) { var o = t.GetOverride(vi); o.Area = !(o.Area ?? false); }
+    private static void ToggleMultiAxis(AskTurn t, int vi) { var o = t.GetOverride(vi); o.MultiAxis = !(o.MultiAxis ?? false); }
+
+    private void SetDrill(string c) => _drillCat = c;
+
+    private void ApplyViewCommand()
+    {
+        var turn = Turn;
+        var cmd = turn.RefineCmd?.Trim() ?? "";
+        if (string.IsNullOrEmpty(cmd)) { turn.RefineMsg = "请输入调整指令。"; return; }
+        if (turn.Response?.Answer is null) { turn.RefineMsg = "当前轮无可视化结果。"; return; }
+
+        var n = turn.Response.Answer.Visualizations.Count;
+        string? type = cmd.Contains("柱状") ? "bar" : cmd.Contains("折线") ? "line" : cmd.Contains("饼") ? "pie" : null;
+        bool? legend = cmd.Contains("隐藏图例") || cmd.Contains("关图例") || cmd.Contains("不显示图例") ? false
+                     : cmd.Contains("显示图例") || cmd.Contains("加图例") || cmd.Contains("开图例") ? true : null;
+        string? palette = cmd.Contains("绿") || cmd.Contains("成功") ? "success"
+                        : cmd.Contains("橙") || cmd.Contains("警告") || cmd.Contains("黄") ? "warning"
+                        : cmd.Contains("红") || cmd.Contains("危险") ? "danger"
+                        : cmd.Contains("灰") || cmd.Contains("中性") ? "neutral"
+                        : cmd.Contains("蓝") || cmd.Contains("主") || cmd.Contains("默认") ? "primary" : null;
+
+        if (type is null && legend is null && palette is null)
+        {
+            turn.RefineMsg = "未能识别指令（支持：改成柱状/折线/饼图、显示/隐藏图例、配色换绿/橙/红/灰/蓝）。";
+            return;
+        }
+        for (var i = 0; i < n; i++)
+        {
+            var o = turn.GetOverride(i);
+            if (type is not null) o.Type = type;
+            if (legend is not null) o.ShowLegend = legend;
+            if (palette is not null) o.Palette = palette;
+        }
+        turn.RefineMsg = "已应用视图调整（纯前端，未发起后端请求）。";
+    }
+
+    /// <summary>推断分类列（用于图表 X 轴与下钻切片）。</summary>
+    private static string? CategoryColumn(BIResponse resp)
+    {
+        var viz = resp.Answer?.Visualizations.FirstOrDefault();
+        var rows = resp.Data?.Rows;
+        if (rows is null || rows.Count == 0) return null;
+        if (viz is not null && !string.IsNullOrWhiteSpace(viz.XAxis) && rows[0].ContainsKey(viz.XAxis))
+            return viz.XAxis;
+        foreach (var k in rows[0].Keys)
+        {
+            var allNonNum = rows.All(r => !JsonValue.IsNumber(r.GetValueOrDefault(k)));
+            if (allNonNum) return k;
+        }
+        return null;
+    }
+
+    private static (List<string> Labels, List<ChartView.ChartDataset> Datasets) BuildChart(
+        VisualizationSuggestion viz, List<Dictionary<string, object?>> rows, VizOverride ov)
+    {
+        string? catCol = null;
+        if (!string.IsNullOrWhiteSpace(viz.XAxis) && rows.Count > 0 && rows[0].ContainsKey(viz.XAxis))
+            catCol = viz.XAxis;
+        else if (rows.Count > 0)
+        {
+            foreach (var k in rows[0].Keys)
+            {
+                var allNonNum = rows.All(r => !JsonValue.IsNumber(r.GetValueOrDefault(k)));
+                if (allNonNum) { catCol = k; break; }
+            }
+        }
+        var labels = catCol is null
+            ? rows.Select((_, i) => $"#{i + 1}").ToList()
+            : rows.Select(r => JsonValue.AsString(r.GetValueOrDefault(catCol))).ToList();
+
+        List<string> measures;
+        if (viz.YAxis is { Count: > 0 })
+            measures = viz.YAxis.Where(k => rows.Count == 0 || rows[0].ContainsKey(k)).ToList();
+        else if (rows.Count > 0)
+            measures = rows[0].Keys.Where(k => rows.All(r => JsonValue.IsNumber(r.GetValueOrDefault(k)))).ToList();
+        else
+            measures = new List<string>();
+        if (measures.Count == 0 && rows.Count > 0) measures = rows[0].Keys.ToList();
+
+        var datasets = measures.Select(m => new ChartView.ChartDataset
+        {
+            Label = m,
+            Data = rows.Select(r => JsonValue.AsNumber(r.GetValueOrDefault(m))).ToList()
+        }).ToList();
+
+        return (labels, datasets);
+    }
+
+    private static List<string> Columns(List<Dictionary<string, object?>> rows)
+    {
+        if (rows.Count == 0) return new List<string>();
+        var cols = new List<string>();
+        foreach (var r in rows)
+            foreach (var k in r.Keys)
+                if (!cols.Contains(k)) cols.Add(k);
+        return cols;
+    }
+
+    /// <summary>紧凑结果渲染（S3-5 对比用）：答案文本 + 数据表 + SQL。</summary>
+    private static RenderFragment RenderCompact(AskTurn t) => builder =>
+    {
+        if (t.Response is null) return;
+        var resp = t.Response;
+        if (resp.Answer is { Answer: { Length: > 0 } a })
+        {
+            builder.OpenElement(0, "div");
+            builder.AddAttribute(1, "class", "answer-text");
+            builder.AddContent(2, a);
+            builder.CloseElement();
+        }
+        if (resp.Data is { Rows.Count: > 0 })
+        {
+            var cols = new List<string>();
+            foreach (var r in resp.Data.Rows)
+                foreach (var k in r.Keys)
+                    if (!cols.Contains(k)) cols.Add(k);
+            builder.OpenElement(3, "table");
+            builder.AddAttribute(4, "class", "data-table compact");
+            builder.OpenElement(5, "thead");
+            builder.OpenElement(6, "tr");
+            foreach (var c in cols) { builder.OpenElement(7, "th"); builder.AddContent(8, c); builder.CloseElement(); }
+            builder.CloseElement();
+            builder.CloseElement();
+            builder.OpenElement(9, "tbody");
+            foreach (var row in resp.Data.Rows.Take(100))
+            {
+                builder.OpenElement(10, "tr");
+                foreach (var c in cols) { builder.OpenElement(11, "td"); builder.AddContent(12, JsonValue.AsString(row.GetValueOrDefault(c))); builder.CloseElement(); }
+                builder.CloseElement();
+            }
+            builder.CloseElement();
+            builder.CloseElement();
+        }
+        if (!string.IsNullOrWhiteSpace(resp.Sql))
+        {
+            builder.OpenElement(13, "pre");
+            builder.AddAttribute(14, "class", "sql-compact");
+            builder.AddContent(15, resp.Sql);
+            builder.CloseElement();
+        }
+    };
+}

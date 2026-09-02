@@ -1,23 +1,219 @@
 @page "/admin/tenants"
-<PageHead Icon="sb-ico-tenant" Title="租户管理" Desc="管理多租户：创建租户、配置隔离作用域与默认配额，平台运营入口。" />
+@inject IApiClient Api
+@inject ToastService Toast
+@using System.Text.Json
+@using SuperBuilder_AI.Components.Shared
 
-<div class="stat-grid">
-    <div class="stat-tile"><div class="st-label">租户总数</div><div class="st-value">—</div></div>
-    <div class="stat-tile accent-success"><div class="st-label">活跃</div><div class="st-value">—</div></div>
-    <div class="stat-tile accent-warning"><div class="st-label">待激活</div><div class="st-value">—</div></div>
-</div>
+<AuthGuard>
+    <PageHead Icon="sb-ico-tenant" Title="租户管理" Desc="管理多租户：创建租户、配置隔离作用域与默认配额，平台运营入口。" />
 
-<div class="panel"><div class="panel-body">
-    <div class="empty-state">
-        <svg class="es-ico"><use href="#sb-ico-tenant" /></svg>
-        <div class="es-title">租户管理后端待接入</div>
-        <div class="es-text">租户 CRUD 与隔离作用域由平台层提供，前端结构已就绪，待对应管理端点上线后自动填充。</div>
-        <div class="es-actions">
-            <button class="btn btn-primary btn-sm" @onclick='() => Toast("新建租户")'><svg class="btn-ico"><use href="#sb-ico-plus" /></svg> 新建租户</button>
-        </div>
-    </div>
-</div></div>
+    <SbListPage TItem="JsonElement" Icon="sb-ico-tenant" Title="租户列表"
+                Items="@_rows" Columns="@Columns" Loading="@_loading" Error="@_error"
+                OnReload="Reload" SearchPlaceholder="搜索租户编码 / 名称…"
+                EmptyTitle="暂无租户"
+                EmptyText="创建租户以隔离数据与配额作用域。"
+                LoadingText="正在加载租户…">
+
+        <Actions>
+            <button class="btn btn-primary btn-sm" @onclick="() => _creating = true">
+                <svg class="btn-ico"><use href="#sb-ico-plus" /></svg> 新建租户
+            </button>
+        </Actions>
+
+        <Stats>
+            <SbStatTile Label="租户总数" Value="@_rows.Count" Sub="平台级" />
+            <SbStatTile Label="已启用" Value="@_rows.Count(IsEnabled)" Sub="使用中" Accent="success" />
+            <SbStatTile Label="已停用" Value="@_rows.Count(r => !IsEnabled(r))" Sub="未启用" Accent="warning" />
+        </Stats>
+
+        <RowActions>
+            @if (IsEnabled(context))
+            {
+                <button class="btn btn-sm btn-outline-secondary" @onclick="() => SetEnabled(context, false)">停用</button>
+            }
+            else
+            {
+                <button class="btn btn-sm btn-outline-secondary" @onclick="() => SetEnabled(context, true)">启用</button>
+            }
+            <button class="btn btn-sm btn-outline-secondary" @onclick="() => OpenSettings(context)">设置</button>
+        </RowActions>
+    </SbListPage>
+
+    <SbModal Visible="@_creating" VisibleChanged="v => _creating = v" Title="新建租户">
+        <Body>
+            <SbField Label="租户编码" Full="true" Required="true" Error="@_codeErr"><input @bind="_code" placeholder="如：t-acme" /></SbField>
+            <SbField Label="租户名称" Full="true"><input @bind="_name" placeholder="如：Acme 零售" /></SbField>
+            @if (!string.IsNullOrWhiteSpace(_createErr)) { <div class="alert alert-danger tiny" style="padding:8px 12px">@_createErr</div> }
+        </Body>
+        <Footer>
+            <button class="btn btn-outline-secondary btn-sm" @onclick="() => _creating = false">取消</button>
+            <button class="btn btn-primary btn-sm" @onclick="SaveCreate" disabled="@_saving">保存</button>
+        </Footer>
+    </SbModal>
+
+    <SbModal Visible="@_setting" VisibleChanged="v => _setting = v" Title="@($"租户设置 · {_settingName}")">
+        <Body>
+            @if (_settingsLoading)
+            {
+                <SbSpinner />
+            }
+            else
+            {
+                @if (_settings.Count == 0)
+                {
+                    <SbEmptyState Icon="sb-ico-cog" Title="暂无设置" Text="为该租户新增一条配置项（Key/Value/DataType）。" />
+                }
+                else
+                {
+                    <div class="row-list">
+                        @foreach (var s in _settings)
+                        {
+                            <div class="row-item">
+                                <div><span class="badge badge-muted">@Cell(s, "key")</span> <span class="muted">@Cell(s, "dataType")</span></div>
+                                <div><code>@Cell(s, "value")</code></div>
+                            </div>
+                        }
+                    </div>
+                }
+                <hr />
+                <SbField Label="配置 Key" Full="true" Required="true" Error="@_skErr"><input @bind="_sKey" placeholder="如：DefaultQuota" /></SbField>
+                <SbField Label="配置 Value" Full="true"><input @bind="_sValue" placeholder="如：1000" /></SbField>
+                <SbField Label="数据类型" Full="true">
+                    <select @bind="_sType">
+                        <option value="string">string</option>
+                        <option value="int">int</option>
+                        <option value="bool">bool</option>
+                        <option value="json">json</option>
+                    </select>
+                </SbField>
+                @if (!string.IsNullOrWhiteSpace(_settingErr)) { <div class="alert alert-danger tiny" style="padding:8px 12px">@_settingErr</div> }
+            }
+        </Body>
+        <Footer>
+            <button class="btn btn-outline-secondary btn-sm" @onclick="() => _setting = false">关闭</button>
+            <button class="btn btn-primary btn-sm" @onclick="SaveSetting" disabled="@_savingSetting">保存配置</button>
+        </Footer>
+    </SbModal>
+</AuthGuard>
 
 @code {
-    private void Toast(string m) { }
+    private List<JsonElement> _rows = new();
+    private List<string> _cols = new();
+    private string _error = "";
+    private bool _loading = true;
+
+    private bool _creating = false;
+    private bool _saving = false;
+    private string _createErr = "";
+    private string _codeErr = "";
+    private string _code = "";
+    private string _name = "";
+
+    private List<SbColumn<JsonElement>> Columns =>
+        _cols.Select(c => SbCol.Of<JsonElement>(
+            TablePresenter.Friendly(c),
+            r => TablePresenter.Cell(r, c),
+            isStatus: TablePresenter.IsStatusColumn(c))).ToList();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender) await Reload();
+    }
+
+    private async Task Reload()
+    {
+        _loading = true;
+        var (data, _, err) = await Api.GetJsonAsync("api/tenant-management");
+        _error = err ?? "";
+        _rows = data is { ValueKind: JsonValueKind.Array } ? data.Value.EnumerateArray().ToList() : new();
+        _cols = TablePresenter.InferColumns(data);
+        _loading = false;
+        StateHasChanged();
+    }
+
+    private async Task SaveCreate()
+    {
+        _codeErr = ""; _createErr = "";
+        if (string.IsNullOrWhiteSpace(_code)) { _codeErr = "租户编码必填。"; return; }
+        _saving = true;
+        var (ok, status, err) = await Api.PostAsync("api/tenant-management", new { tenantCode = _code, tenantName = _name });
+        _saving = false;
+        if (!ok) { _createErr = status == 409 ? "租户编码已存在。" : (err ?? "保存失败。"); return; }
+        _creating = false; _codeErr = "";
+        _code = ""; _name = "";
+        Toast.Success("租户已创建。");
+        await Reload();
+    }
+
+    private async Task SetEnabled(JsonElement row, bool enabled)
+    {
+        var id = TablePresenter.Cell(row, "id");
+        if (string.IsNullOrWhiteSpace(id)) { Toast.Warning("该记录缺少 id。"); return; }
+        var (ok, _, err) = await Api.PatchAsync($"api/tenant-management/{id}/{(enabled ? "enable" : "disable")}");
+        if (!ok) { Toast.Error(err ?? "操作失败。"); return; }
+        Toast.Success(enabled ? "租户已启用。" : "租户已停用。");
+        await Reload();
+    }
+
+    private static bool IsEnabled(JsonElement row)
+    {
+        var v = TablePresenter.Cell(row, "enabled");
+        return v == "True" || v == "true" || v == "1";
+    }
+
+    private static string Cell(JsonElement row, string col) => TablePresenter.Cell(row, col);
+
+    // ---- 租户设置 Upsert（S2-4）----
+    private bool _setting = false;
+    private long _settingId;
+    private string _settingName = "";
+    private List<JsonElement> _settings = new();
+    private bool _settingsLoading = false;
+    private bool _savingSetting = false;
+    private string _sKey = "";
+    private string _sValue = "";
+    private string _sType = "string";
+    private string _skErr = "";
+    private string _settingErr = "";
+
+    private void OpenSettings(JsonElement row)
+    {
+        var id = TablePresenter.Cell(row, "id");
+        if (string.IsNullOrWhiteSpace(id) || !long.TryParse(id, out _settingId))
+        {
+            Toast.Warning("该记录缺少 id，无法打开设置。");
+            return;
+        }
+        var nm = TablePresenter.Cell(row, "tenantName");
+        if (string.IsNullOrWhiteSpace(nm)) nm = TablePresenter.Cell(row, "name");
+        _settingName = string.IsNullOrWhiteSpace(nm) ? _settingId.ToString() : nm;
+        _setting = true;
+        _ = LoadSettings();
+    }
+
+    private async Task LoadSettings()
+    {
+        _settingsLoading = true;
+        StateHasChanged();
+        var (data, _, err) = await Api.GetJsonAsync($"api/tenant-management/{_settingId}/settings");
+        _settingErr = err ?? "";
+        _settings = data is { ValueKind: JsonValueKind.Array } ? data.Value.EnumerateArray().ToList() : new();
+        _settingsLoading = false;
+        StateHasChanged();
+    }
+
+    private async Task SaveSetting()
+    {
+        _skErr = ""; _settingErr = "";
+        if (string.IsNullOrWhiteSpace(_sKey)) { _skErr = "配置 Key 必填。"; return; }
+        _savingSetting = true;
+        var (ok, status, err) = await Api.PostAsync(
+            $"api/tenant-management/{_settingId}/settings",
+            new { key = _sKey, value = _sValue, dataType = _sType });
+        _savingSetting = false;
+        if (!ok) { _settingErr = status == 409 ? "配置 Key 已存在。" : (err ?? "保存失败。"); return; }
+        _sKey = ""; _sValue = ""; _sType = "string";
+        Toast.Success("租户配置已保存。");
+        await LoadSettings();
+    }
 }

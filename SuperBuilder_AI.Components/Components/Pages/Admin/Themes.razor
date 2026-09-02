@@ -1,15 +1,17 @@
 @page "/admin/themes"
-@inject Services.AppState AppState
+@using SuperBuilder_AI.Components.Shared
 
-<PageHead Icon="sb-ico-theme" Title="主题（租户级）" Desc="为租户指派或创建主题蓝图，统一视觉风格；个人偏好请在「主题编辑器」中调整。" />
+<AuthGuard>
+    <PageHead Icon="sb-ico-theme" Title="主题（租户级）" Desc="为租户指派或创建主题蓝图，统一视觉风格；个人偏好请在「主题编辑器」中调整。" />
 
-<div class="panel"><div class="panel-body">
-    <div class="empty-state">
-        <svg class="es-ico"><use href="#sb-ico-theme" /></svg>
-        <div class="es-title">主题后端待接入</div>
-        <div class="es-text">租户级主题由 P7.4 的 <code>api/themes</code> 提供，前端编辑器已就绪（见「主题编辑器」）。待管理端点上线后此处列出租户主题。</div>
-        <div class="es-actions">
-            <a class="btn btn-primary btn-sm" href="themes"><svg class="btn-ico"><use href="#sb-ico-theme" /></svg> 打开主题编辑器</a>
-        </div>
-    </div>
-</div></div>
+    <SbPanel Icon="sb-ico-theme" Title="租户主题">
+        <Body>
+            <SbEmptyState Icon="sb-ico-theme" Title="主题后端待接入"
+                          Text="租户级主题由 P7.4 的 api/themes 提供，前端编辑器已就绪（见「主题编辑器」）。待管理端点上线后此处列出租户主题。">
+                <Actions>
+                    <a class="btn btn-primary btn-sm" href="themes"><svg class="btn-ico"><use href="#sb-ico-theme" /></svg> 打开主题编辑器</a>
+                </Actions>
+            </SbEmptyState>
+        </Body>
+    </SbPanel>
+</AuthGuard>

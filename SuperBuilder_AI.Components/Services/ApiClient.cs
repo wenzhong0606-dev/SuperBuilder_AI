@@ -182,8 +182,22 @@ public sealed class ApiClient : IApiClient
                 return (e.Code, e.Message, e.TraceId);
             // 兼容旧 { error: "..." }
             var raw = JsonSerializer.Deserialize<JsonElement>(body, opt);
-            if (raw.ValueKind == JsonValueKind.Object && raw.TryGetProperty("error", out var ev) && ev.ValueKind == JsonValueKind.String)
-                return (null, ev.GetString(), null);
+            if (raw.ValueKind == JsonValueKind.Object)
+            {
+                if (raw.TryGetProperty("error", out var ev) && ev.ValueKind == JsonValueKind.String)
+                    return (null, ev.GetString(), null);
+                // 后端写操作普遍以 { errors: ["..."] } 扁平数组返回，逐条合并为可读文本，
+                // 替代此前回退的原始 JSON 截断文本（如 AppBuilder/Agent/Tenant 等校验失败）。
+                if (raw.TryGetProperty("errors", out var errs) && errs.ValueKind == JsonValueKind.Array)
+                {
+                    var msgs = new List<string>();
+                    foreach (var item in errs.EnumerateArray())
+                        if (item.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(item.GetString()))
+                            msgs.Add(item.GetString()!);
+                    if (msgs.Count > 0)
+                        return (null, string.Join("；", msgs), null);
+                }
+            }
         }
         catch
         {
@@ -237,6 +251,48 @@ public sealed class ApiClient : IApiClient
     }
 
     /// <summary>
+    /// 通用写操作：统一处理 401 回收与错误体解析，避免每个页面重复实现。
+    /// DELETE 与 GET 不发送请求体。
+    /// </summary>
+    public async Task<(bool Ok, int Status, string? Error)> SendAsync(
+        HttpMethod method, string relativeUrl, object? body = null, CancellationToken ct = default)
+    {
+        var client = CreateClient();
+        try
+        {
+            using var req = new HttpRequestMessage(method, relativeUrl);
+            if (body is not null && method != HttpMethod.Get && method != HttpMethod.Delete)
+                req.Content = JsonContent.Create(body);
+
+            var resp = await client.SendAsync(req, ct);
+            if (resp.StatusCode == HttpStatusCode.Unauthorized) OnUnauthorized();
+            if (!resp.IsSuccessStatusCode)
+            {
+                var raw = await resp.Content.ReadAsStringAsync(ct);
+                var (_, msg, _) = ParseApiError(raw);
+                return (false, (int)resp.StatusCode, msg ?? $"请求失败（{(int)resp.StatusCode}）。");
+            }
+            return (true, (int)resp.StatusCode, null);
+        }
+        catch (Exception ex)
+        {
+            return (false, 0, "网络错误：" + ex.Message);
+        }
+    }
+
+    public Task<(bool Ok, int Status, string? Error)> PostAsync(string relativeUrl, object? body = null, CancellationToken ct = default)
+        => SendAsync(HttpMethod.Post, relativeUrl, body, ct);
+
+    public Task<(bool Ok, int Status, string? Error)> PutAsync(string relativeUrl, object? body, CancellationToken ct = default)
+        => SendAsync(HttpMethod.Put, relativeUrl, body, ct);
+
+    public Task<(bool Ok, int Status, string? Error)> PatchAsync(string relativeUrl, object? body = null, CancellationToken ct = default)
+        => SendAsync(HttpMethod.Patch, relativeUrl, body, ct);
+
+    public Task<(bool Ok, int Status, string? Error)> DeleteAsync(string relativeUrl, CancellationToken ct = default)
+        => SendAsync(HttpMethod.Delete, relativeUrl, null, ct);
+
+    /// <summary>
     /// 读取任意 JSON 端点为 <see cref="JsonElement"/>，失败时返回错误信息且不抛异常。
     /// 用于在不确定后端 DTO 精确结构时安全渲染列表/详情。
     /// </summary>
@@ -262,6 +318,27 @@ public sealed class ApiClient : IApiClient
         catch (Exception ex)
         {
             return (null, 0, "网络或解析错误：" + ex.Message);
+        }
+    }
+
+    /// <summary>纯文本读取：不解析 JSON，供 /health、/metrics 等非 JSON 端点使用。</summary>
+    public async Task<(string? Text, int Status, string? Error)> GetTextAsync(string relativeUrl, CancellationToken ct = default)
+    {
+        var client = CreateClient();
+        try
+        {
+            var resp = await client.GetAsync(relativeUrl, ct);
+            var body = await resp.Content.ReadAsStringAsync(ct);
+            if (!resp.IsSuccessStatusCode)
+            {
+                if (resp.StatusCode == HttpStatusCode.Unauthorized) OnUnauthorized();
+                return (null, (int)resp.StatusCode, $"请求失败（{(int)resp.StatusCode}）。");
+            }
+            return (body, (int)resp.StatusCode, null);
+        }
+        catch (Exception ex)
+        {
+            return (null, 0, "网络错误：" + ex.Message);
         }
     }
 }

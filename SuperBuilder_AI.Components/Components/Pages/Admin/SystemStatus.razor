@@ -1,0 +1,74 @@
+@page "/admin/system"
+@inject IApiClient Api
+@inject ToastService Toast
+
+<AuthGuard>
+    <PermissionGuard Require="@(new[] { "system.read" })">
+        <PageHead Icon="sb-ico-activity" Title="系统状态" Desc="后端健康检查与运行时指标（只读）。">
+            <button class="btn btn-outline-secondary btn-sm" @onclick="() => Load()" disabled="@_loading">
+                @(_loading ? "刷新中…" : "刷新")
+            </button>
+        </PageHead>
+
+        <div class="stat-grid">
+            <SbStatTile Label="健康状态" Value="@(string.IsNullOrWhiteSpace(_status) ? "—" : _status)"
+                        Sub="@($"HTTP {_healthStatus}")"
+                        Accent="@(_healthy ? "success" : "warning")" />
+            <SbStatTile Label="响应耗时" Value="@($"{_elapsed} ms")" Sub="本页刷新耗时" />
+            <SbStatTile Label="指标行数" Value="@_metricLines" Sub="/metrics 文本行数" />
+        </div>
+
+        <SbTabs>
+            <SbTab Title="健康检查">
+                <SbPanel Icon="sb-ico-activity" Title="/health">
+                    <Body><pre class="sb-pre">@_healthText</pre></Body>
+                </SbPanel>
+            </SbTab>
+            <SbTab Title="运行时指标">
+                <SbPanel Icon="sb-ico-quota" Title="/metrics">
+                    <Body><pre class="sb-pre">@_metricsText</pre></Body>
+                </SbPanel>
+            </SbTab>
+        </SbTabs>
+    </PermissionGuard>
+</AuthGuard>
+
+@code {
+    private string _healthText = "";
+    private string _metricsText = "";
+    private string _status = "";
+    private int _healthStatus;
+    private long _elapsed;
+    private int _metricLines;
+    private bool _loading = true;
+    private bool _healthy;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        await Load();
+    }
+
+    private async Task Load()
+    {
+        _loading = true;
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+
+        var (health, hStatus, hErr) = await Api.GetJsonAsync("health");
+        _healthStatus = hStatus;
+        _healthText = health is not null ? health.Value.ToString() : (hErr ?? "无响应");
+        _status = health is not null && health.Value.TryGetProperty("status", out var s) ? (s.GetString() ?? "") : (hStatus == 200 ? "UP" : "DOWN");
+        _healthy = hStatus == 200;
+
+        var (metrics, _, mErr) = await Api.GetTextAsync("metrics");
+        _metricsText = metrics ?? (mErr ?? "无响应");
+        _metricLines = string.IsNullOrEmpty(_metricsText)
+            ? 0
+            : _metricsText.Split('\n', StringSplitOptions.RemoveEmptyEntries).Length;
+
+        sw.Stop();
+        _elapsed = sw.ElapsedMilliseconds;
+        _loading = false;
+        StateHasChanged();
+    }
+}

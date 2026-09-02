@@ -1,0 +1,43 @@
+@implements IDisposable
+@inject ToastService Toasts
+@* 全局轻提示宿主：挂载在 MainLayout 中，页面通过注入 ToastService 调用 *@
+<div class="sb-toast-host" aria-live="polite">
+    @foreach (var t in Toasts.Items)
+    {
+        <div class="sb-toast sb-toast-@t.Tone" @key="t.Id">
+            <span class="sb-toast-text">@t.Text</span>
+            <button type="button" class="sb-toast-close" @onclick="() => Toasts.Dismiss(t.Id)" aria-label="关闭">×</button>
+        </div>
+    }
+</div>
+
+@code {
+    private readonly HashSet<string> _scheduled = new();
+
+    protected override void OnInitialized() => Toasts.OnChanged += OnChanged;
+
+    private void OnChanged() => InvokeAsync(StateHasChanged);
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        foreach (var t in Toasts.Items)
+        {
+            if (_scheduled.Add(t.Id)) _ = DismissLater(t);
+        }
+    }
+
+    private async Task DismissLater(ToastMessage t)
+    {
+        try
+        {
+            await Task.Delay(t.TimeoutMs);
+            Toasts.Dismiss(t.Id);
+        }
+        catch
+        {
+            // 组件已销毁时忽略（延迟任务无法取消）
+        }
+    }
+
+    public void Dispose() => Toasts.OnChanged -= OnChanged;
+}

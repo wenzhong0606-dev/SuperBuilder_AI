@@ -1,0 +1,113 @@
+namespace SuperBuilder_AI.Components.Components.Layout;
+
+/// <summary>导航项元数据。</summary>
+public sealed class NavItem
+{
+    /// <summary>路由地址（相对，不带前导 /）。</summary>
+    public string Href { get; init; } = "";
+    public string Title { get; init; } = "";
+    /// <summary>图标 symbol id（见 IconSprite）。</summary>
+    public string Icon { get; init; } = "";
+    /// <summary>所需权限码；为空表示仅要求登录。</summary>
+    public string? Permission { get; init; }
+    /// <summary>是否仅在侧栏显示（不出现在面包屑父级链中）。</summary>
+    public bool HideInBreadcrumb { get; init; }
+}
+
+/// <summary>导航分组。</summary>
+public sealed class NavGroup
+{
+    public string Title { get; init; } = "";
+    public IReadOnlyList<NavItem> Items { get; init; } = Array.Empty<NavItem>();
+}
+
+/// <summary>
+/// 导航单一事实来源：侧栏、面包屑、权限过滤均读此表。
+/// 新增页面时只需在此登记，无需改动 NavMenu。
+/// </summary>
+public static class NavMenuItems
+{
+    /// <summary>
+    /// 是否启用基于权限码的菜单/页面过滤。
+    /// 默认 false —— 后端权限码体系（IdentityController）尚未与前端完全对齐，
+    /// 若强行过滤会在权限数据为空时把管理入口全部隐藏。对齐后置为 true。
+    /// </summary>
+    public static bool EnforcePermissions { get; set; }
+
+    public static IReadOnlyList<NavGroup> Groups { get; } = new[]
+    {
+        new NavGroup
+        {
+            Title = "旗舰",
+            Items = new[]
+            {
+                new NavItem { Href = "", Title = "首页", Icon = "sb-ico-home" },
+                new NavItem { Href = "ask", Title = "Ask BI 智能问数", Icon = "sb-ico-ask" }
+            }
+        },
+        new NavGroup
+        {
+            Title = "分析",
+            Items = new[]
+            {
+                new NavItem { Href = "dashboards", Title = "仪表盘", Icon = "sb-ico-dash" },
+                new NavItem { Href = "apps", Title = "应用工厂", Icon = "sb-ico-app" },
+                new NavItem { Href = "agent", Title = "智能体 / Copilot", Icon = "sb-ico-agent" },
+                new NavItem { Href = "semantic-labels", Title = "语义标签", Icon = "sb-ico-tag" },
+                new NavItem { Href = "business-model", Title = "语义模型", Icon = "sb-ico-model" }
+            }
+        },
+        new NavGroup
+        {
+            Title = "自定义",
+            Items = new[]
+            {
+                new NavItem { Href = "components", Title = "组件库", Icon = "sb-ico-comp" },
+                new NavItem { Href = "themes", Title = "主题编辑器", Icon = "sb-ico-theme" }
+            }
+        },
+        new NavGroup
+        {
+            Title = "平台扩展",
+            Items = new[]
+            {
+                new NavItem { Href = "data-sources", Title = "数据源管理", Icon = "sb-ico-db" },
+                new NavItem { Href = "model-accounts", Title = "模型与账号", Icon = "sb-ico-key" }
+            }
+        },
+        new NavGroup
+        {
+            Title = "管理后台",
+            Items = new[]
+            {
+                new NavItem { Href = "admin/tenants", Title = "租户", Icon = "sb-ico-tenant", Permission = "tenant.read" },
+                new NavItem { Href = "admin/identity", Title = "身份权限", Icon = "sb-ico-shield", Permission = "identity.read" },
+                new NavItem { Href = "admin/audit", Title = "审计", Icon = "sb-ico-audit", Permission = "audit.read" },
+                new NavItem { Href = "admin/quota", Title = "配额", Icon = "sb-ico-quota", Permission = "quota.read" },
+                new NavItem { Href = "admin/localization", Title = "多语言", Icon = "sb-ico-lang", Permission = "localization.read" },
+                new NavItem { Href = "admin/themes", Title = "主题", Icon = "sb-ico-theme", Permission = "theme.read" },
+                new NavItem { Href = "admin/system", Title = "系统状态", Icon = "sb-ico-activity", Permission = "system.read" }
+            }
+        }
+    };
+
+    /// <summary>按路由地址查找导航项（用于面包屑标题）。</summary>
+    public static NavItem? FindByHref(string href)
+    {
+        var target = (href ?? "").Trim('/');
+        foreach (var g in Groups)
+            foreach (var it in g.Items)
+                if (string.Equals(it.Href.Trim('/'), target, StringComparison.OrdinalIgnoreCase))
+                    return it;
+        return null;
+    }
+
+    /// <summary>查找导航项所属分组。</summary>
+    public static NavGroup? FindGroup(NavItem item)
+    {
+        foreach (var g in Groups)
+            if (g.Items.Any(x => ReferenceEquals(x, item)))
+                return g;
+        return null;
+    }
+}

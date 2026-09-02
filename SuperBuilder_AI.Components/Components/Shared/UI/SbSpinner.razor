@@ -1,0 +1,11 @@
+@* 加载指示：Size = sm|md；可带文案 *@
+<span class="sb-spinner @(Size == "sm" ? "sm" : "")" role="status" aria-live="polite"></span>
+@if (!string.IsNullOrWhiteSpace(Text))
+{
+    <span class="muted tiny">@Text</span>
+}
+
+@code {
+    [Parameter] public string Size { get; set; } = "md";
+    [Parameter] public string? Text { get; set; }
+}

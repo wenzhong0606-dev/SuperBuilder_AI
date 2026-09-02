@@ -1,0 +1,12 @@
+@* 键值列表：详情页属性区 *@
+<dl class="kv">
+    @foreach (var kv in Items)
+    {
+        <dt>@kv.Key</dt>
+        <dd>@kv.Value</dd>
+    }
+</dl>
+
+@code {
+    [Parameter] public IReadOnlyList<KeyValuePair<string, string>> Items { get; set; } = Array.Empty<KeyValuePair<string, string>>();
+}

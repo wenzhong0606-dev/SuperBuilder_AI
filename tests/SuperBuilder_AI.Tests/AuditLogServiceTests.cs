@@ -46,7 +46,7 @@ public class AuditLogServiceTests
     }
 
     [Fact]
-    public async Task Query_TenantScoped_OnlyOwn_And_Global()
+    public async Task Query_TenantScoped_OnlyOwn_NotPlatformGlobal()
     {
         using var ctx = CreateContext(out var conn);
         var svc = CreateService(ctx);
@@ -55,9 +55,9 @@ public class AuditLogServiceTests
         await svc.LogAsync(new AuditLogEntry(0, "system.boot", "System")); // 全局
 
         var items = await svc.QueryAsync(new AuditLogQuery(TenantId: Tenant100));
-        Assert.Equal(2, items.Count); // 本租户 + 全局
-        Assert.Contains(items, a => a.TenantId == Tenant100);
-        Assert.Contains(items, a => a.TenantId == 0);
+		Assert.Single(items);
+		Assert.Equal(Tenant100, items[0].TenantId);
+		Assert.DoesNotContain(items, a => a.TenantId == 0);
         Assert.DoesNotContain(items, a => a.TenantId == Tenant200);
     }
 
