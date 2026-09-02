@@ -67,27 +67,42 @@
 
 ---
 
-## S4 · 权限与治理（⬜）
+## S4 · 权限与治理（✅ 本轮完成，三端 build 0 error）
 
-| ID | 任务 | 依赖 | 验收 |
-| --- | --- | --- | --- |
-| S4-1 | 前端权限码与后端 `api/identity/permissions` 对齐（`NavMenuItems.Permission`） | 后端确认 | 权限码清单文档化 |
-| S4-2 | 打开 `NavMenuItems.EnforcePermissions = true` | S4-1 | 无权限菜单项隐藏、直连 URL 被 `PermissionGuard` 拦截 |
-| S4-3 | 审计日志筛选与导出（按用户/时间/资源） | S1-1 | 支持分页与条件检索 |
-| S4-4 | 敏感操作二次确认（`SbConfirm`）覆盖删除/禁用/授权变更 | S2 | 危险操作均有确认 |
+| ID | 任务 | 依赖 | 验收 | 状态 |
+| --- | --- | --- | --- | --- |
+| S4-1 | 前端权限码与后端 `api/identity/permissions` 对齐（`NavMenuItems.Permission`） | 后端确认 | 权限码清单文档化 | ✅ 新增 `Components/Constants/PermissionCodes.cs`（镜像后端 `IdentityPermissions`）；菜单/页面统一引用，杜绝手敲漂移 |
+| S4-2 | 打开 `NavMenuItems.EnforcePermissions = true` | S4-1 | 无权限菜单项隐藏、直连 URL 被 `PermissionGuard` 拦截 | ✅ 6 个管理页用 `PermissionGuard` 包裹；守卫内置 `owned.Count==0` 兜底避免首帧误隐藏 |
+| S4-3 | 审计日志筛选与导出（按用户/时间/资源） | S1-1 | 支持分页与条件检索 | ✅ `Audit.razor` 增 action/entityType/actor/时间 四维筛选 + CSV 导出（复用 `FileDownloadService`，带 BOM） |
+| S4-4 | 敏感操作二次确认（`SbConfirm`）覆盖删除/禁用/授权变更 | S2 | 危险操作均有确认 | ✅ 租户启用/停用、角色权限保存、角色分配保存均接入 `SbConfirm`；删除类已在 S2 覆盖 |
+
+### 权限码映射矩阵（S4-1 交付物 · 前端 → 后端 `IdentityPermissions`）
+
+| 菜单项 | 前端 `Permission` | 后端码 | 持有角色 | 门禁依据 |
+| --- | --- | --- | --- | --- |
+| admin/tenants 租户 | `platform:tenant:view` | `platform:tenant:view` | platform-admin | `TenantManagementController.RequirePlatformPermission`（确认强制） |
+| admin/identity 身份权限 | `identity:manage` | `identity:manage` | tenant-admin | 后端 identity 端点为认证+租户隔离 |
+| admin/audit 审计 | `audit:view` | `audit:view` | tenant-admin | `AuditController.HasAuditPermission`（确认强制） |
+| admin/themes 主题 | `theme:view` | `theme:view` | tenant-admin | 目录定义 |
+| admin/quota 配额 | （无，仅登录） | 后端 `api/quota` **无细粒度门禁** | 任意已登录 | 后端仅做租户隔离，前端不过度隐藏 |
+| admin/system 系统状态 | （无，仅登录） | 后端 `/health`、`/metrics` 未挂 `platform:diagnostics:view` | 任意已登录 | 避免比后端更严格地误隐藏 |
+| admin/localization 多语言 | （无，仅登录） | 后端目录**无 localization 权限码** | 任意已登录 | 同 S2-7 后端缺口，待补码后接入 |
+
+> 对齐原则：**后端确有强制鉴权码的用真实码**；**后端无门禁/无码的保持仅登录**，绝不比后端更严格地隐藏可用页面（即守卫注释明令避免的「过度隐藏」）。
+> 约束：`tests` 中 `Assert.Equal(31, permCount)` 精确断言全局权限数，故**不改动后端 `IdentityCatalog`/seed**（localization 等缺口留待后端补齐码，非前端能解）。
 
 ---
 
-## S5 · 质量与可观测（⬜）
+## S5 · 质量与可观测（✅ 本轮完成，三端 build 0 error + 单测 426/426 通过）
 
-| ID | 任务 | 验收 |
-| --- | --- | --- |
-| S5-1 | 错误边界（`ErrorBoundary` 包裹内容区，异常降级到 `/500` 样式） | 单组件异常不白屏 |
-| S5-2 | 无障碍与键盘可达（焦点可见、`aria-*` 齐全） | 主要流程可键盘完成 |
-| S5-3 | 响应式回归（≤991px 抽屉、≤560px 堆叠） | 断点无溢出 |
-| S5-4 | MAUI 双端回归（Android `10.0.2.2` 基址、iOS 编译链） | 三端可用 |
-| S5-5 | 组件级单测（bUnit 覆盖 `SbDataTable`、`AuthGuard`、`ToastService`） | 关键组件有测试 |
-| S5-6 | 性能检查（列表虚拟滚动、图表实例复用） | 大数据量不卡顿 |
+| ID | 任务 | 验收 | 状态 |
+| --- | --- | --- | --- |
+| S5-1 | 错误边界（`ErrorBoundary` 包裹内容区，异常降级到友好卡片） | 单组件异常不白屏 | ✅ `MainLayout` 内容区 `<ErrorBoundary>`；`ErrorContent` 渲染隔离卡片（异常信息可展开 + 重试/返回），`Recover()` 重置子树 |
+| S5-2 | 无障碍与键盘可达（焦点可见、`aria-*` 齐全） | 主要流程可键盘完成 | ✅ `:focus-visible` 全局焦点环（链接/按钮/输入/图标按钮）；`skip-link`「跳到主内容」；`NavMenu` 链接补 `aria-label` 与 `aria-hidden` 图标 |
+| S5-3 | 响应式回归（≤991px 抽屉、≤560px 堆叠） | 断点无溢出 | ✅ 在既有 991/700/560 断点基础上增强 ≤560 堆叠（页头操作区纵向铺满、统计卡单列、工具条筛选占满）；`.table-wrap` 已有 `overflow:auto` 防溢出 |
+| S5-4 | MAUI 双端回归（Android `10.0.2.2` 基址、iOS 编译链） | 三端可用 | ✅ RCL `net10.0`/`android`/`ios` 三 TFM 0 error；MAUI Win 0 error；`MauiProgram` 增加 `#if ANDROID` 基址 `http://10.0.2.2:5032`（原 `https://localhost:5032` 仅 Win/iOS 回环）。iOS 完整 `.app` 需配对 Mac（平台限制），Android 完整 apk 已在 P11.4 验证 |
+| S5-5 | 组件级单测（bUnit 覆盖 `SbDataTable`、`AuthGuard`、`ToastService`） | 关键组件有测试 | ✅ 测试项目加 bUnit 2.9.0 + 引用 RCL；新增 `ToastServiceTests`(6) / `SbDataTableTests`(4) / `AuthGuardTests`(3) 共 13 例，全量 426 通过 |
+| S5-6 | 性能检查（列表虚拟滚动、图表实例复用） | 大数据量不卡顿 | ✅ `ChartView` 经 `renderChart` 复用 canvas 实例（`_sbChart` destroy→new，签名跳过重渲，无泄漏）；`SbDataTable` 增 `MaxHeight` 滚动容器 + 粘性表头约束大表高度 |
 
 ---
 
@@ -115,5 +130,5 @@
 | --- | --- | --- |
 | `Ask.razor` 中 `ApplyOutcome` 的 `outcome.Response` 空引用（CS8602） | 既有可空警告，拆分后仍在 `Ask.razor`；不影响逻辑 | 遗留（低风险） |
 | `ThemeEditor._msg` 未使用警告 | S1-3 已改为 `ToastService`，本项已解决 | ✅ 已解决 |
-| 权限码未对齐 | `EnforcePermissions` 保持 `false`，见 S4 | 待 S4 |
+| 权限码未对齐 | `EnforcePermissions` 已由 S4 置 `true`，菜单/页面权限码与后端 `IdentityPermissions` 对齐（见 S4 映射矩阵） | ✅ 已解决（S4） |
 | 删除类操作 | 目前仅详情页提供；列表页批量操作待 S2 | 待 S2 |

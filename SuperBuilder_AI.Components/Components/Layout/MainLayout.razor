@@ -7,6 +7,8 @@
 
 <IconSprite />
 
+<a class="skip-link" href="#main-content" @onclick:preventDefault="false">跳到主内容</a>
+
 <div class="app-shell @(NavOpen ? "nav-open" : "")">
     <header class="app-header">
         <button class="icon-btn menu-btn" @onclick="ToggleNav" aria-label="菜单" title="菜单">
@@ -51,9 +53,28 @@
     <div class="app-body">
         <NavMenu />
         <div class="nav-scrim" @onclick="CloseNav"></div>
-        <main class="content">
+        <main class="content" id="main-content" tabindex="-1">
             <AppBreadcrumb />
-            @Body
+            <ErrorBoundary @ref="_errBoundary">
+                <ChildContent>
+                    @Body
+                </ChildContent>
+                <ErrorContent Context="ex">
+                    <div class="error-boundary-card" role="alert">
+                        <div class="eb-code">!</div>
+                        <h3>页面渲染出错</h3>
+                        <p class="muted">该页面在渲染时发生异常，已被安全隔离，未影响其它功能。可重试当前页面或返回工作台。</p>
+                        <details class="eb-detail">
+                            <summary>技术详情</summary>
+                            <pre>@ex.Message</pre>
+                        </details>
+                        <div class="eb-actions">
+                            <button class="btn btn-primary btn-sm" @onclick="Recover">重试</button>
+                            <button class="btn btn-outline-secondary btn-sm" @onclick='() => Nav.NavigateTo("")'>返回工作台</button>
+                        </div>
+                    </div>
+                </ErrorContent>
+            </ErrorBoundary>
         </main>
     </div>
 </div>
@@ -61,6 +82,7 @@
 <SbToastHost />
 
 @code {
+    private ErrorBoundary? _errBoundary;
     private bool NavOpen = false;
     private bool IsDark = false;
     private bool UserMenuOpen = false;
@@ -105,6 +127,9 @@
             _ = InvokeAsync(StateHasChanged);
         }
     }
+
+    /// <summary>错误边界恢复：清除异常状态并重新渲染子树。</summary>
+    private void Recover() => _errBoundary?.Recover();
 
     private void ToggleNav() => NavOpen = !NavOpen;
     private void CloseNav() => NavOpen = false;

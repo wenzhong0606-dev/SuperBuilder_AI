@@ -1,3 +1,5 @@
+using SuperBuilder_AI.Components.Components.Constants;
+
 namespace SuperBuilder_AI.Components.Components.Layout;
 
 /// <summary>导航项元数据。</summary>
@@ -29,10 +31,11 @@ public static class NavMenuItems
 {
     /// <summary>
     /// 是否启用基于权限码的菜单/页面过滤。
-    /// 默认 false —— 后端权限码体系（IdentityController）尚未与前端完全对齐，
-    /// 若强行过滤会在权限数据为空时把管理入口全部隐藏。对齐后置为 true。
+    /// 前端权限码已与后端 <c>IdentityPermissions</c> 对齐（见 <c>PermissionCodes</c>），
+    /// <c>/api/auth/me</c> 返回用户实际持有的码集合，故可安全开启。
+    /// 守卫内置兜底：当权限数据尚未加载（owned.Count==0）时一律放行，避免首帧误隐藏。
     /// </summary>
-    public static bool EnforcePermissions { get; set; }
+    public static bool EnforcePermissions { get; set; } = true;
 
     public static IReadOnlyList<NavGroup> Groups { get; } = new[]
     {
@@ -80,13 +83,13 @@ public static class NavMenuItems
             Title = "管理后台",
             Items = new[]
             {
-                new NavItem { Href = "admin/tenants", Title = "租户", Icon = "sb-ico-tenant", Permission = "tenant.read" },
-                new NavItem { Href = "admin/identity", Title = "身份权限", Icon = "sb-ico-shield", Permission = "identity.read" },
-                new NavItem { Href = "admin/audit", Title = "审计", Icon = "sb-ico-audit", Permission = "audit.read" },
-                new NavItem { Href = "admin/quota", Title = "配额", Icon = "sb-ico-quota", Permission = "quota.read" },
-                new NavItem { Href = "admin/localization", Title = "多语言", Icon = "sb-ico-lang", Permission = "localization.read" },
-                new NavItem { Href = "admin/themes", Title = "主题", Icon = "sb-ico-theme", Permission = "theme.read" },
-                new NavItem { Href = "admin/system", Title = "系统状态", Icon = "sb-ico-activity", Permission = "system.read" }
+                new NavItem { Href = "admin/tenants", Title = "租户", Icon = "sb-ico-tenant", Permission = PermissionCodes.PlatformTenantView },
+                new NavItem { Href = "admin/identity", Title = "身份权限", Icon = "sb-ico-shield", Permission = PermissionCodes.IdentityManage },
+                new NavItem { Href = "admin/audit", Title = "审计", Icon = "sb-ico-audit", Permission = PermissionCodes.AuditView },
+                new NavItem { Href = "admin/quota", Title = "配额", Icon = "sb-ico-quota" },
+                new NavItem { Href = "admin/localization", Title = "多语言", Icon = "sb-ico-lang" },
+                new NavItem { Href = "admin/themes", Title = "主题", Icon = "sb-ico-theme", Permission = PermissionCodes.ThemeView },
+                new NavItem { Href = "admin/system", Title = "系统状态", Icon = "sb-ico-activity" }
             }
         }
     };

@@ -2,30 +2,57 @@
 @inject IApiClient Api
 @inject AppState State
 @inject ToastService Toast
+@inject FileDownloadService File
 @using System.Text.Json
 @using SuperBuilder_AI.Components.Shared
 
 <AuthGuard>
-    <SbListPage TItem="JsonElement" Icon="sb-ico-audit" Title="审计日志"
-                Desc="记录关键操作与访问轨迹，支持按租户、时间检索，满足合规要求。"
-                Items="@_rows" Columns="@Columns" Loading="@_loading" Error="@_error"
-                OnReload="Reload" SearchPlaceholder="搜索操作 / 用户…"
-                EmptyTitle="暂无审计记录"
-                EmptyText="关键写操作与登录事件会被记录到这里，便于追溯与合规审查。"
-                LoadingText="正在加载审计日志…">
+    <PermissionGuard Require="@(new[]{ PermissionCodes.AuditView })">
+        <SbListPage TItem="JsonElement" Icon="sb-ico-audit" Title="审计日志"
+                    Desc="记录关键操作与访问轨迹，支持按操作 / 资源 / 操作人 / 时间检索，满足合规要求。"
+                    Items="@_rows" Columns="@Columns" Loading="@_loading" Error="@_error"
+                    OnReload="Reload" SearchPlaceholder="搜索操作 / 用户 / 资源…"
+                    EmptyTitle="暂无审计记录"
+                    EmptyText="关键写操作与登录事件会被记录到这里，便于追溯与合规审查。"
+                    LoadingText="正在加载审计日志…">
 
-        <Stats>
-            <SbStatTile Label="日志总数" Value="@_rows.Count" Sub="当前租户" />
-            <SbStatTile Label="今日" Value="@_rows.Count(IsToday)" Sub="当天事件" Accent="info" />
-        </Stats>
-    </SbListPage>
+            <Actions>
+                <button class="btn btn-outline-secondary btn-sm" @onclick="ExportCsv" disabled="@(_rows.Count == 0)">
+                    <svg class="btn-ico"><use href="#sb-ico-export" /></svg> 导出 CSV
+                </button>
+            </Actions>
+
+            <ToolbarRight>
+                <input class="form-control form-control-sm sb-filter" placeholder="操作 action" @bind-value="_fAction" @bind-value:after="ApplyFilters" />
+                <input class="form-control form-control-sm sb-filter" placeholder="资源 entityType" @bind-value="_fEntity" @bind-value:after="ApplyFilters" />
+                <input class="form-control form-control-sm sb-filter" placeholder="操作人 actor" @bind-value="_fActor" @bind-value:after="ApplyFilters" />
+                <input type="date" class="form-control form-control-sm sb-filter" @bind-value="_fFrom" @bind-value:after="ApplyFilters" />
+                <input type="date" class="form-control form-control-sm sb-filter" @bind-value="_fTo" @bind-value:after="ApplyFilters" />
+                <button class="btn btn-outline-secondary btn-sm" @onclick="ClearFilters">重置</button>
+            </ToolbarRight>
+
+            <Stats>
+                <SbStatTile Label="日志总数" Value="@_all.Count" Sub="本租户" />
+                <SbStatTile Label="筛选命中" Value="@_rows.Count" Sub="当前条件" Accent="info" />
+                <SbStatTile Label="今日" Value="@_all.Count(IsToday)" Sub="当天事件" Accent="success" />
+            </Stats>
+        </SbListPage>
+    </PermissionGuard>
 </AuthGuard>
 
 @code {
+    private List<JsonElement> _all = new();
     private List<JsonElement> _rows = new();
     private List<string> _cols = new();
     private string _error = "";
     private bool _loading = true;
+
+    // 筛选条件
+    private string _fAction = "";
+    private string _fEntity = "";
+    private string _fActor = "";
+    private DateTime? _fFrom;
+    private DateTime? _fTo;
 
     private List<SbColumn<JsonElement>> Columns =>
         _cols.Select(c => SbCol.Of<JsonElement>(
@@ -41,18 +68,68 @@
     private async Task Reload()
     {
         _loading = true;
-        var (data, _, err) = await Api.GetJsonAsync($"api/audit/logs?tenantId={State.TenantId}");
+        var (data, _, err) = await Api.GetJsonAsync($"api/audit/logs?tenantId={State.TenantId}&limit=500");
         _error = err ?? "";
-        _rows = data is { ValueKind: JsonValueKind.Array } ? data.Value.EnumerateArray().ToList() : new();
+        _all = data is { ValueKind: JsonValueKind.Array } ? data.Value.EnumerateArray().ToList() : new();
         _cols = TablePresenter.InferColumns(data);
+        ApplyFilters();
         _loading = false;
         StateHasChanged();
     }
 
-    private bool IsToday(JsonElement row)
+    private void ApplyFilters()
+    {
+        var a = _fAction.Trim();
+        var e = _fEntity.Trim();
+        var actor = _fActor.Trim();
+        _rows = _all.Where(r =>
+        {
+            if (a.Length > 0 && !ContainsIC(TablePresenter.Cell(r, "action"), a)) return false;
+            if (e.Length > 0 && !ContainsIC(TablePresenter.Cell(r, "entityType"), e)) return false;
+            if (actor.Length > 0 && !ContainsIC(TablePresenter.Cell(r, "actor"), actor)) return false;
+            var ts = ParseTs(r);
+            if (_fFrom is { } from && ts is { } t && t < from) return false;
+            if (_fTo is { } to && ts is { } t2 && t2 > to.AddDays(1)) return false;
+            return true;
+        }).ToList();
+    }
+
+    private void ClearFilters()
+    {
+        _fAction = ""; _fEntity = ""; _fActor = ""; _fFrom = null; _fTo = null;
+        ApplyFilters();
+    }
+
+    private static bool ContainsIC(string hay, string needle) =>
+        hay.Contains(needle, StringComparison.OrdinalIgnoreCase);
+
+    private DateTime? ParseTs(JsonElement row)
     {
         var v = TablePresenter.Cell(row, "time");
-        if (string.IsNullOrWhiteSpace(v)) { v = TablePresenter.Cell(row, "timestamp"); }
-        return !string.IsNullOrWhiteSpace(v) && v.Contains(DateTime.Now.ToString("yyyy-MM-dd"), StringComparison.Ordinal);
+        if (string.IsNullOrWhiteSpace(v)) v = TablePresenter.Cell(row, "timestamp");
+        if (DateTime.TryParse(v, out var dt)) return dt;
+        return null;
+    }
+
+    private bool IsToday(JsonElement row)
+    {
+        var ts = ParseTs(row);
+        return ts is { } t && t.ToString("yyyy-MM-dd") == DateTime.Now.ToString("yyyy-MM-dd");
+    }
+
+    private async Task ExportCsv()
+    {
+        if (_rows.Count == 0) { Toast.Warning("没有可导出的记录。"); return; }
+        var sb = new System.Text.StringBuilder();
+        sb.Append('\uFEFF'); // BOM，防中文乱码
+        sb.AppendLine(string.Join(",", _cols.Select(TablePresenter.Friendly)));
+        foreach (var r in _rows)
+            sb.AppendLine(string.Join(",", _cols.Select(c =>
+            {
+                var v = TablePresenter.Cell(r, c).Replace("\"", "\"\"");
+                return v.Contains(',') || v.Contains('"') || v.Contains('\n') ? $"\"{v}\"" : v;
+            })));
+        await File.DownloadTextAsync($"audit_{DateTime.Now:yyyyMMdd}.csv", "text/csv;charset=utf-8", sb.ToString());
+        Toast.Success($"已导出 {_rows.Count} 条审计记录。");
     }
 }

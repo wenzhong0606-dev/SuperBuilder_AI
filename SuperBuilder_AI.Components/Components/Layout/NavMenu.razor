@@ -6,8 +6,8 @@
         <div class="nav-group">@group.Title</div>
         @foreach (var item in group.Items.Where(Allowed))
         {
-            <NavLink href="@item.Href" Match="@(string.IsNullOrEmpty(item.Href) ? NavLinkMatch.All : NavLinkMatch.Prefix)">
-                <svg class="nav-ico"><use href="#@item.Icon" /></svg>@item.Title
+            <NavLink href="@item.Href" Match="@(string.IsNullOrEmpty(item.Href) ? NavLinkMatch.All : NavLinkMatch.Prefix)" aria-label="@item.Title">
+                <svg class="nav-ico" aria-hidden="true"><use href="#@item.Icon" /></svg>@item.Title
             </NavLink>
         }
     }

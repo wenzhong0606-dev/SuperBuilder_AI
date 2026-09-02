@@ -2,6 +2,7 @@
 @using SuperBuilder_AI.Components.Shared
 
 <AuthGuard>
+    <PermissionGuard Require="@(new[]{ PermissionCodes.ThemeView })">
     <PageHead Icon="sb-ico-theme" Title="主题（租户级）" Desc="为租户指派或创建主题蓝图，统一视觉风格；个人偏好请在「主题编辑器」中调整。" />
 
     <SbPanel Icon="sb-ico-theme" Title="租户主题">
@@ -14,4 +15,5 @@
             </SbEmptyState>
         </Body>
     </SbPanel>
+    </PermissionGuard>
 </AuthGuard>

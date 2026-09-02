@@ -16,10 +16,10 @@ else if (View.Count == 0)
         </SbEmptyState>
     </div>
 }
-else
-{
-    <div class="table-wrap">
-        <table class="data-table">
+    else
+    {
+        <div class="table-wrap @(string.IsNullOrWhiteSpace(MaxHeight) ? "" : "table-scroll")" style="@(string.IsNullOrWhiteSpace(MaxHeight) ? "" : "max-height:" + MaxHeight + ";")">
+            <table class="data-table">
             <thead>
                 <tr>
                     @foreach (var col in Columns)
@@ -92,6 +92,8 @@ else
     [Parameter] public string? LoadingText { get; set; }
     [Parameter] public string? Icon { get; set; }
     [Parameter] public RenderFragment? EmptyActions { get; set; }
+    /// <summary>大表高度上限（如 "420px"）。设置后表格区变为可滚动容器，表头吸顶。</summary>
+    [Parameter] public string? MaxHeight { get; set; }
 
     private SbColumn<TItem>? _sortCol;
     private bool _sortAsc = true;

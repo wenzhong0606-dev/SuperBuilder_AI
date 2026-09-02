@@ -6,6 +6,7 @@
 @using SuperBuilder_AI.Components.Shared
 
 <AuthGuard>
+    <PermissionGuard>
     <PageHead Icon="sb-ico-quota" Title="配额管理" Desc="查看与配置租户资源配额：问数次数、Token、存储与并发等，超阈预警。" />
 
     @if (_loading)
@@ -47,6 +48,7 @@
             </Body>
         </SbPanel>
     }
+    </PermissionGuard>
 </AuthGuard>
 
 @code {

@@ -5,6 +5,7 @@
 @using SuperBuilder_AI.Components.Shared
 
 <AuthGuard>
+    <PermissionGuard Require="@(new[]{ PermissionCodes.PlatformTenantView })">
     <PageHead Icon="sb-ico-tenant" Title="租户管理" Desc="管理多租户：创建租户、配置隔离作用域与默认配额，平台运营入口。" />
 
     <SbListPage TItem="JsonElement" Icon="sb-ico-tenant" Title="租户列表"
@@ -29,11 +30,11 @@
         <RowActions>
             @if (IsEnabled(context))
             {
-                <button class="btn btn-sm btn-outline-secondary" @onclick="() => SetEnabled(context, false)">停用</button>
+                <button class="btn btn-sm btn-outline-secondary" @onclick="() => AskEnable(context, false)">停用</button>
             }
             else
             {
-                <button class="btn btn-sm btn-outline-secondary" @onclick="() => SetEnabled(context, true)">启用</button>
+                <button class="btn btn-sm btn-outline-secondary" @onclick="() => AskEnable(context, true)">启用</button>
             }
             <button class="btn btn-sm btn-outline-secondary" @onclick="() => OpenSettings(context)">设置</button>
         </RowActions>
@@ -94,6 +95,13 @@
             <button class="btn btn-primary btn-sm" @onclick="SaveSetting" disabled="@_savingSetting">保存配置</button>
         </Footer>
     </SbModal>
+
+    <SbConfirm Visible="@_confirmEnabled" VisibleChanged="v => _confirmEnabled = v"
+               Title='@(_pendingEnabled ? "启用租户" : "停用租户")'
+               Message='@($"确认{(_pendingEnabled ? "启用" : "停用")}租户「{_pendingName}」？该操作会影响其数据访问与隔离作用域。")'
+               ConfirmText='@(_pendingEnabled ? "启用" : "停用")' Tone="danger"
+               OnConfirm="() => SetEnabled(_pendingRow, _pendingEnabled)" />
+    </PermissionGuard>
 </AuthGuard>
 
 @code {
@@ -162,6 +170,20 @@
     }
 
     private static string Cell(JsonElement row, string col) => TablePresenter.Cell(row, col);
+
+    // ---- 启用/停用二次确认（S4-4）----
+    private bool _confirmEnabled;
+    private JsonElement _pendingRow;
+    private bool _pendingEnabled;
+    private string _pendingName = "";
+
+    private void AskEnable(JsonElement row, bool enabled)
+    {
+        _pendingRow = row;
+        _pendingEnabled = enabled;
+        _pendingName = TablePresenter.Cell(row, "name");
+        _confirmEnabled = true;
+    }
 
     // ---- 租户设置 Upsert（S2-4）----
     private bool _setting = false;

@@ -57,6 +57,70 @@
     --bs-font-sans-serif: "Noto Sans SC", "Microsoft YaHei", system-ui, "Segoe UI", sans-serif;
 }
 
+/* —— 无障碍：键盘焦点可见（S5-2）—— */
+:focus { outline: none; }
+a:focus-visible,
+button:focus-visible,
+.btn:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+.nav a:focus-visible,
+.sb-menu-item:focus-visible,
+.user-chip:focus-visible,
+.icon-btn:focus-visible {
+    outline: 2px solid var(--sb-primary);
+    outline-offset: 2px;
+    border-radius: var(--sb-radius-sm);
+}
+/* 跳到主内容（默认隐藏，键盘聚焦时显现） */
+.skip-link {
+    position: absolute;
+    left: -9999px;
+    top: 8px;
+    z-index: 100;
+    padding: 8px 14px;
+    background: var(--sb-primary);
+    color: #fff;
+    border-radius: var(--sb-radius-sm);
+    text-decoration: none;
+}
+.skip-link:focus {
+    left: 12px;
+    color: #fff;
+}
+
+/* —— 错误边界降级卡片（S5-1）—— */
+.error-boundary-card {
+    margin: 28px auto;
+    max-width: 560px;
+    padding: 24px 28px;
+    background: var(--sb-surface);
+    border: 1px solid var(--sb-border);
+    border-radius: var(--sb-radius-lg);
+    box-shadow: var(--sb-shadow);
+    text-align: center;
+}
+.error-boundary-card .eb-code {
+    width: 44px; height: 44px; margin: 0 auto 12px;
+    display: grid; place-items: center;
+    border-radius: 50%;
+    background: var(--sb-accent); color: #fff;
+    font-size: 22px; font-weight: 700;
+}
+.error-boundary-card h3 { margin: 0 0 6px; color: var(--sb-text); }
+.error-boundary-card .eb-detail {
+    margin: 14px 0; text-align: left;
+    font-size: 13px; color: var(--sb-muted);
+}
+.error-boundary-card .eb-detail pre {
+    margin: 6px 0 0; padding: 10px;
+    background: var(--sb-surface-2);
+    border: 1px solid var(--sb-border); border-radius: var(--sb-radius-sm);
+    white-space: pre-wrap; word-break: break-word; max-height: 180px; overflow: auto;
+}
+.error-boundary-card .eb-actions { display: flex; gap: 10px; justify-content: center; }
+
 [data-theme="dark"] {
     --sb-bg: #1B1813;
     --sb-surface: #25211A;
@@ -434,6 +498,12 @@ button.mini { padding: 4px 10px; font-size: 12px; border-radius: var(--sb-radius
 .viz-toolbar { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--sb-border); }
 
 .table-wrap { overflow: auto; border: 1px solid var(--sb-border); border-radius: var(--sb-radius); max-width: 920px; background: var(--sb-surface); box-shadow: var(--sb-shadow-sm); }
+/* S5-6 大表滚动容器：表头吸顶 */
+.table-wrap.table-scroll { overflow: auto; }
+.table-wrap.table-scroll thead th {
+    position: sticky; top: 0; z-index: 1;
+    background: var(--sb-surface-2);
+}
 .data-table { border-collapse: collapse; width: 100%; font-size: 13px; }
 .data-table th, .data-table td { border-bottom: 1px solid var(--sb-border); padding: 8px 13px; text-align: left; white-space: nowrap; }
 .data-table th { background: var(--sb-surface-2); color: var(--sb-muted); position: sticky; top: 0; font-weight: 600; z-index: 1; }
@@ -579,6 +649,7 @@ button.mini { padding: 4px 10px; font-size: 12px; border-radius: var(--sb-radius
 .toolbar .search:focus-within { box-shadow: var(--sb-ring); border-color: var(--sb-primary); }
 .toolbar .search svg { width: 16px; height: 16px; color: var(--sb-muted); flex: 0 0 16px; }
 .toolbar .search input { border: none; background: transparent; padding: 0; box-shadow: none !important; flex: 1; }
+.toolbar .sb-filter { width: 11rem; max-width: 100%; }
 
 /* —— 徽标 / 标签 —— */
 .badge {
@@ -720,6 +791,15 @@ button.mini { padding: 4px 10px; font-size: 12px; border-radius: var(--sb-radius
     .kpi-row { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
     .content { padding: 14px 12px; }
     .app-header-brand small { display: none; }
+    /* S5-3 小屏堆叠：页头操作区纵向铺满、统计卡单列、工具条控件占满 */
+    .page-head { flex-direction: column; align-items: stretch; }
+    .page-head .ph-actions { margin-top: 10px; }
+    .page-head .ph-actions .btn,
+    .page-head .ph-actions .sb-filter { width: 100%; }
+    .stat-grid { grid-template-columns: 1fr; }
+    .toolbar { gap: 8px; }
+    .toolbar .sb-filter { width: 100%; }
+    .toolbar .search { flex: 1 1 100%; }
 }
 
 /* ============================================================

@@ -28,7 +28,14 @@ public static class MauiProgram
         builder.Services.AddScoped<AskSessionStore>();
         builder.Services.AddScoped<FileDownloadService>();
         builder.Services.AddHttpClient("SuperBuilderApi", client =>
-            client.BaseAddress = new Uri("https://localhost:5032"));
+        {
+            // Windows / iOS  simulator 直连本机回环；Android 模拟器回环为 10.0.2.2（S5-4 双端回归）。
+#if ANDROID
+            client.BaseAddress = new Uri("http://10.0.2.2:5032");
+#else
+            client.BaseAddress = new Uri("https://localhost:5032");
+#endif
+        });
 
         return builder.Build();
     }
