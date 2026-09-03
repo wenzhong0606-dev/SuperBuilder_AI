@@ -122,6 +122,41 @@ public class QueryPlanBuilderDetailListTests
 		Assert.DoesNotContain(plan.Fields, f => string.Equals(f.ColumnName, "del_flag", StringComparison.OrdinalIgnoreCase));
 	}
 
+	/// <summary>
+	/// 复现用户实战 bug：AI（Qwen）对“最近的十个入库单”直接返回 OrderBy=come_time，
+	/// 导致 Step5.5 外层分支被跳过、补列不执行，最终 SELECT 只剩 come_time 一列。
+	/// 修复后，纯明细补列（Step5.6）不再依赖 OrderBy 是否为空，必须仍补出多列业务字段。
+	/// </summary>
+	[Fact]
+	public async Task Recent_detail_query_fills_columns_when_llm_returns_orderby()
+	{
+		var table = MakeReceiptTable();
+		var ctx = CreateContext(out var connection);
+		await using var _ = connection;
+		await using var __ = ctx;
+		await SeedAsync(ctx, table);
+
+		var search = new FakeSearch { Results = { TableVector(table) } };
+		var builder = BuildBuilder(search, ctx);
+
+		// 模拟 LLM 已返回 OrderBy=come_time（真实 Qwen 行为），其余字段为空。
+		var plan = await builder.BuildAsync(new QueryIntent
+		{
+			OriginalQuestion = "最近的十个入库单",
+			IntentType = "Detail",
+			Limit = 10,
+			OrderBy = "come_time",
+			OrderDirection = "DESC",
+		});
+
+		Assert.True(plan.Fields.Count >= 6, $"LLM 已返回 OrderBy 时仍应补出多列，实际 {plan.Fields.Count}");
+		Assert.Contains(plan.Fields, f => string.Equals(f.ColumnName, "come_time", StringComparison.OrdinalIgnoreCase));
+		Assert.Contains(plan.Fields, f => string.Equals(f.ColumnName, "receipt_no", StringComparison.OrdinalIgnoreCase));
+		Assert.Contains(plan.Fields, f => string.Equals(f.ColumnName, "material_code", StringComparison.OrdinalIgnoreCase));
+		Assert.Contains(plan.Fields, f => string.Equals(f.ColumnName, "quantity", StringComparison.OrdinalIgnoreCase));
+		Assert.DoesNotContain(plan.Fields, f => string.Equals(f.ColumnName, "del_flag", StringComparison.OrdinalIgnoreCase));
+	}
+
 	[Fact]
 	public async Task Field_expansion_instruction_extends_to_preferred_columns()
 	{

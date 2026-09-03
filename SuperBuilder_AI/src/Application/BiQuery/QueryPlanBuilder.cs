@@ -781,6 +781,96 @@ public partial class QueryPlanBuilder : IQueryPlanBuilder
 			}
 		}
 
+		/*
+		 * ============================================================
+		 * Step 5.6（M0-09 明细列表兜底补列）
+		 *
+		 * 关键修复：
+		 *
+		 * 上面的默认时间排序只在“用户说了最近/最新 且 AI 未返回 OrderBy”
+		 * 时设置。但实战中 AI（Qwen）对“最近的十个入库单”通常会直接返回
+		 * OrderBy=come_time，导致 Step5.5 的整个外层分支被跳过，
+		 * 补列逻辑从不执行，最终 SELECT 只剩 come_time 一列。
+		 *
+		 * 这里把“纯明细补列”从“OrderBy 是否为空”的错误前置条件中解耦：
+		 * 只要当前意图没有 指标/维度/过滤（即纯明细列表），
+		 * 且 SELECT 字段不足目标数量，就按首选展示列 + 业务相关性兜底
+		 * 补足到 FallbackTargetColumnCount 列。
+		 *
+		 * 该逻辑对“首轮提问”与“refine 显示更多字段”均生效，
+		 * 且不会影响聚合 / 带指标维度的查询。
+		 * ============================================================
+		 */
+
+		var isPureDetailList =
+			intent.Metrics.Count == 0
+			&& intent.Dimensions.Count == 0
+			&& intent.Filters.Count == 0;
+
+		if (isPureDetailList
+			&& table.Columns != null
+			&& plan.Fields.Count < FallbackTargetColumnCount)
+		{
+			try
+			{
+				var preferred =
+					GetPreferredDisplayColumns(table)
+						.Take(FallbackTargetColumnCount)
+						.ToList();
+
+				foreach (var pc in preferred)
+				{
+					AddOrUpdateQueryField(
+						plan,
+						pc,
+						"NONE");
+				}
+
+				// 兜底：首选列不足目标数量时（metadata 标记稀疏），
+				// 按业务相关性补足该表的非内部字段。
+				if (plan.Fields.Count < FallbackTargetColumnCount
+					&& table.Columns != null)
+				{
+					var need =
+						FallbackTargetColumnCount - plan.Fields.Count;
+
+					var more =
+						GetFallbackDisplayColumns(
+							table,
+							plan.Fields.Select(f => f.ColumnName))
+							.Take(need)
+							.ToList();
+
+					foreach (var fc in more)
+					{
+						AddOrUpdateQueryField(
+							plan,
+							fc,
+							"NONE");
+					}
+				}
+
+				// 极端兜底：如果首选列全空，至少保证有一个字段。
+				if (plan.Fields.Count == 0)
+				{
+					var lastResort =
+						table.Columns.FirstOrDefault();
+
+					if (lastResort != null)
+					{
+						AddOrUpdateQueryField(
+							plan,
+							lastResort,
+							"NONE");
+					}
+				}
+			}
+			catch
+			{
+				// 辅助逻辑异常不影响主流程
+			}
+		}
+
 		// 将 QueryPlan.DataSourceId 设置为选中的主表的数据源，避免后续使用 DataSourceId 时为默认 0 导致错误
 		plan.DataSourceId = table.DataSourceId;
 
