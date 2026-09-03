@@ -701,110 +701,73 @@ public partial class QueryPlanBuilder : IQueryPlanBuilder
 
 				if (plan.Fields.Count == 0)
 				{
-					MetadataColumn? defaultCol = null;
+					/*
+					 * 对未指定具体字段的“最近N条”类纯明细查询，
+					 * 不再只补单个默认列（之前只返回 come_time 等时间字段，
+					 * 导致用户无法看到业务信息）。改为按首选展示列补 6 个字段。
+					 *
+					 * 注意：必须确认当前意图没有指标/维度/过滤条件，
+					 * 否则聚合/筛选查询应由后续 Step 6-9 处理，不能在此兜底。
+					 */
+					var isPureDetail =
+						intent.Metrics.Count == 0
+						&& intent.Dimensions.Count == 0
+						&& intent.Filters.Count == 0;
 
-					if (table.Columns != null)
+					if (isPureDetail && table.Columns != null)
 					{
-						/*
-						 * 1. 主键
-						 */
+						var preferred =
+							GetPreferredDisplayColumns(table)
+								.Take(6)
+								.ToList();
 
-						defaultCol =
-							table.Columns.FirstOrDefault(
-								c =>
-									c.IsPrimaryKey == true);
-
-						/*
-						 * 2. id
-						 */
-
-						if (defaultCol == null)
+						foreach (var pc in preferred)
 						{
-							defaultCol =
-								table.Columns.FirstOrDefault(
-									c =>
-										string.Equals(
-											c.ColumnName,
-											"id",
-											StringComparison.OrdinalIgnoreCase));
+							AddOrUpdateQueryField(
+								plan,
+								pc,
+								"NONE");
 						}
 
-						/*
-						 * 3. code / no
-						 */
-
-						if (defaultCol == null)
+						// 兜底：首选列不足目标数量时（metadata 标记稀疏），
+						// 按业务相关性补足该表的非内部字段，
+						// 确保“最近的十个入库单”等首轮问题能直接返回多列业务字段。
+						if (plan.Fields.Count < FallbackTargetColumnCount
+							&& table.Columns != null)
 						{
-							defaultCol =
-								table.Columns.FirstOrDefault(
-									c =>
-										c.ColumnName != null
-										&&
-										(
-											string.Equals(
-												c.ColumnName,
-												"code",
-												StringComparison.OrdinalIgnoreCase)
-											||
-											c.ColumnName.EndsWith(
-												"_code",
-												StringComparison.OrdinalIgnoreCase)
-											||
-											c.ColumnName.EndsWith(
-												"_no",
-												StringComparison.OrdinalIgnoreCase)
-											||
-											c.ColumnName.IndexOf(
-												"code",
-												StringComparison.OrdinalIgnoreCase) >= 0
-										));
+							var need =
+								FallbackTargetColumnCount - plan.Fields.Count;
+
+							var more =
+								GetFallbackDisplayColumns(
+									table,
+									plan.Fields.Select(f => f.ColumnName))
+									.Take(need)
+									.ToList();
+
+							foreach (var fc in more)
+							{
+								AddOrUpdateQueryField(
+									plan,
+									fc,
+									"NONE");
+							}
 						}
 
-						/*
-						 * 4. 避免 create_by / update_by 等内部字段。
-						 */
-
-						if (defaultCol == null)
+						// 极端兜底：如果首选列全空，至少保证有一个字段。
+						if (plan.Fields.Count == 0)
 						{
-							defaultCol =
-								table.Columns.FirstOrDefault(
-									c =>
-										c.ColumnName != null
-										&&
-										!(
-											c.ColumnName.EndsWith(
-												"_by",
-												StringComparison.OrdinalIgnoreCase)
-											||
-											string.Equals(
-												c.ColumnName,
-												"create_by",
-												StringComparison.OrdinalIgnoreCase)
-											||
-											string.Equals(
-												c.ColumnName,
-												"update_by",
-												StringComparison.OrdinalIgnoreCase)
-										));
-						}
-
-						/*
-						 * 5. 最终兜底。
-						 */
-
-						if (defaultCol == null)
-						{
-							defaultCol =
+							var lastResort =
 								table.Columns.FirstOrDefault();
-						}
-					}
 
-					if (defaultCol != null)
-					{
-						AddOrUpdateQueryField(
-							plan,
-							defaultCol,
-							"NONE");
+							if (lastResort != null)
+							{
+								AddOrUpdateQueryField(
+									plan,
+									lastResort,
+									"NONE");
+							}
+						}
 					}
 				}
 			}
@@ -1330,23 +1293,38 @@ public partial class QueryPlanBuilder : IQueryPlanBuilder
 
 
 
-		if (plan.Fields.Count == 0)
+		var isDetailList =
+			plan.Tables.Any(
+				t => t.MetadataTableId > 0)
+			&& !plan.IsAggregate
+			&& plan.Metrics.Count == 0
+			&& plan.Dimensions.Count == 0
+			&& (plan.Limit.HasValue
+				|| plan.Orders.Count > 0);
+
+		var userRequestedMoreFields =
+			isDetailList
+			&& IsFieldExpansionRequested(intent.OriginalQuestion)
+			&& plan.Fields.Count > 0
+			&& plan.Fields.Count < 8;
+
+		if (plan.Fields.Count == 0 || userRequestedMoreFields)
 		{
 			/*
 			 * 合法明细列表（目标表已解析 + 含 Limit/Order + 非聚合 + 无指标/维度）
 			 * 允许无显式字段：按首选展示列补全后进入 SQL Builder。
 			 * 这类请求不需要指标/维度，误报 SB_BI_002 会阻断
 			 * 「列出最近十张入库单」等明细场景。
+			 *
+			 * 另外，当用户明确说“显示更多字段”等 refine 指令时，
+			 * 即使 LLM 只返回了少量字段，也强制扩展到首选展示列。
+			 *
+			 * 两层兜底：
+			 *  1) GetPreferredDisplayColumns —— 业务语义推荐的列
+			 *  2) 兜底：表的前 N 个非 _by/_flag/del_flag 列
+			 * 第二层确保即便 metadata 列标记（如 IsPreferredDisplay）稀疏，
+			 * refine「显示更多字段」仍能稳定输出该表的多个核心列。
 			 */
-			var isDetailList =
-				plan.Tables.Any(
-					t => t.MetadataTableId > 0)
-				&& !plan.IsAggregate
-				&& plan.Metrics.Count == 0
-				&& plan.Dimensions.Count == 0
-				&& (plan.Limit.HasValue
-					|| plan.Orders.Count > 0);
-
 			if (isDetailList
 				&& table != null
 				&& table.Columns != null)
@@ -1363,13 +1341,37 @@ public partial class QueryPlanBuilder : IQueryPlanBuilder
 						pc,
 						"NONE");
 				}
-			}
 
-			// 明细列表已按首选列补全；若仍无字段（异常情况下），按原规则报错。
-			if (plan.Fields.Count == 0)
-			{
-				throw new InvalidOperationException(
-					$"QueryPlan没有任何可查询字段：{intent.OriginalQuestion}");
+				// 兜底：首选列不足 3 个时（即 metadata 标记稀疏，
+				// 例如入库单只标了时间列），补足该表前若干非内部字段。
+				if (plan.Fields.Count < FallbackTargetColumnCount
+					&& table.Columns != null)
+				{
+					var need =
+						FallbackTargetColumnCount - plan.Fields.Count;
+
+					var more =
+						GetFallbackDisplayColumns(
+							table,
+							plan.Fields.Select(f => f.ColumnName))
+							.Take(need)
+							.ToList();
+
+					foreach (var fc in more)
+					{
+						AddOrUpdateQueryField(
+							plan,
+							fc,
+							"NONE");
+					}
+				}
+
+				// 明细列表已按首选列补全；若仍无字段（异常情况下），按原规则报错。
+				if (plan.Fields.Count == 0)
+				{
+					throw new InvalidOperationException(
+						$"QueryPlan没有任何可查询字段：{intent.OriginalQuestion}");
+				}
 			}
 		}
 
@@ -1433,6 +1435,108 @@ public partial class QueryPlanBuilder : IQueryPlanBuilder
 
 
 
+
+	/// <summary>
+	/// 检测用户问题中是否包含“显示更多字段/列”类明确扩展字段的意图。
+	/// 用于 refine 轮次在 LLM 仍只返回少量字段时强制补全首选展示列。
+	/// </summary>
+	private bool IsFieldExpansionRequested(string? question)
+	{
+		if (string.IsNullOrWhiteSpace(question))
+			return false;
+
+		var q = question;
+		return
+			q.Contains("显示更多字段", StringComparison.OrdinalIgnoreCase)
+			|| q.Contains("显示所有字段", StringComparison.OrdinalIgnoreCase)
+			|| q.Contains("显示更多列", StringComparison.OrdinalIgnoreCase)
+			|| q.Contains("更多列", StringComparison.OrdinalIgnoreCase)
+			|| q.Contains("展开列", StringComparison.OrdinalIgnoreCase)
+			|| q.Contains("显示全部字段", StringComparison.OrdinalIgnoreCase)
+			|| q.Contains("全部字段", StringComparison.OrdinalIgnoreCase)
+			|| q.Contains("详细字段", StringComparison.OrdinalIgnoreCase)
+			|| q.Contains("更多字段", StringComparison.OrdinalIgnoreCase)
+			|| q.Contains("多显示", StringComparison.OrdinalIgnoreCase)
+			|| q.Contains("显示详细信息", StringComparison.OrdinalIgnoreCase);
+	}
+
+	/// <summary>
+	/// 明细列表兜底补列的目标列数。
+	/// 当首选展示列不足该数量（metadata 标记稀疏）或用户明确要求“显示更多字段”时，
+	/// 按业务相关性补足到该数量，确保“最近的十个入库单”等场景能直接看到多列业务信息。
+	/// </summary>
+	private const int FallbackTargetColumnCount = 8;
+
+	/// <summary>
+	/// 当 <see cref="GetPreferredDisplayColumns"/> 给出的首选展示列不足时使用的兜底列集合。
+	/// 返回该表中“非内部字段”（排除 _by / _flag / del_flag / create_by / update_by / is_deleted
+	/// 以及 blob / text / clob 大字段），并排除 alreadySelected 中已选列，避免重复。
+	/// 结果按业务相关性排序：编号/代码 &gt; 名称 &gt; 数量/金额 &gt; 时间 &gt; id/主键 &gt; 其它，
+	/// 以保证最关键的列（如数量、编码、名称）优先出现在明细列表中。
+	/// </summary>
+	private static IEnumerable<MetadataColumn> GetFallbackDisplayColumns(
+		MetadataTable table,
+		IEnumerable<string>? alreadySelected)
+	{
+		if (table.Columns == null)
+			yield break;
+
+		var selected =
+			new HashSet<string>(
+				alreadySelected ?? Enumerable.Empty<string>(),
+				StringComparer.OrdinalIgnoreCase);
+
+		var candidates =
+			table.Columns
+				.Where(c =>
+					c != null
+					&& !string.IsNullOrWhiteSpace(c.ColumnName)
+					&& !c.ColumnName.EndsWith("_by", StringComparison.OrdinalIgnoreCase)
+					&& !c.ColumnName.EndsWith("_flag", StringComparison.OrdinalIgnoreCase)
+					&& !string.Equals(c.ColumnName, "del_flag", StringComparison.OrdinalIgnoreCase)
+					&& !string.Equals(c.ColumnName, "create_by", StringComparison.OrdinalIgnoreCase)
+					&& !string.Equals(c.ColumnName, "update_by", StringComparison.OrdinalIgnoreCase)
+					&& !string.Equals(c.ColumnName, "is_deleted", StringComparison.OrdinalIgnoreCase)
+					&& (c.DataType == null
+						|| !(c.DataType.IndexOf("blob", StringComparison.OrdinalIgnoreCase) >= 0
+							|| c.DataType.IndexOf("text", StringComparison.OrdinalIgnoreCase) >= 0
+							|| c.DataType.IndexOf("clob", StringComparison.OrdinalIgnoreCase) >= 0))
+					&& !selected.Contains(c.ColumnName))
+				.ToList();
+
+		static int Rank(MetadataColumn c)
+		{
+			var n = c.ColumnName!;
+
+			// 数量/金额是明细记录最核心的业务值，始终最高优先级。
+			if (n.IndexOf("quantity", StringComparison.OrdinalIgnoreCase) >= 0
+				|| n.IndexOf("qty", StringComparison.OrdinalIgnoreCase) >= 0
+				|| n.IndexOf("amount", StringComparison.OrdinalIgnoreCase) >= 0
+				|| n.IndexOf("price", StringComparison.OrdinalIgnoreCase) >= 0
+				|| n.IndexOf("num", StringComparison.OrdinalIgnoreCase) >= 0
+				|| n.IndexOf("count", StringComparison.OrdinalIgnoreCase) >= 0)
+				return -1;
+
+			if (n.IndexOf("code", StringComparison.OrdinalIgnoreCase) >= 0
+				|| n.IndexOf("_no", StringComparison.OrdinalIgnoreCase) >= 0
+				|| n.EndsWith("no", StringComparison.OrdinalIgnoreCase)
+				|| n.IndexOf("name", StringComparison.OrdinalIgnoreCase) >= 0)
+				return 0;
+
+			if (n.IndexOf("time", StringComparison.OrdinalIgnoreCase) >= 0
+				|| n.IndexOf("date", StringComparison.OrdinalIgnoreCase) >= 0)
+				return 1;
+
+			if (c.IsPrimaryKey == true
+				|| n.IndexOf("id", StringComparison.OrdinalIgnoreCase) >= 0)
+				return 2;
+
+			return 3;
+		}
+
+		foreach (var c in candidates.OrderBy(Rank))
+			yield return c;
+	}
 
 	/// <summary>
 	/// 收集QueryIntent中的业务字段。

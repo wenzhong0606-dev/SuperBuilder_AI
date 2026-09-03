@@ -214,6 +214,18 @@ public sealed class AskController : ControllerBase
 	/// 将「原始问题 + 历史用户轮次 + 本轮细化指令」合成为一条独立可理解的自然语言问题。
 	/// 以中文分号连接以保留语义并列关系；去重避免历史轮次重复拼接导致的意图漂移。
 	/// </summary>
+	private static readonly string[] FieldExpansionMarkers = new[]
+	{
+		"显示更多字段", "显示所有字段", "显示更多列", "更多列", "展开列",
+		"显示全部字段", "全部字段", "详细字段", "更多字段", "多显示", "显示详细信息"
+	};
+
+	private static bool IsFieldExpansionInstruction(string? instruction)
+	{
+		if (string.IsNullOrWhiteSpace(instruction)) return false;
+		return FieldExpansionMarkers.Any(m => instruction.Contains(m, StringComparison.OrdinalIgnoreCase));
+	}
+
 	private static string ComposeRefinedQuestion(AskRefineRequest request)
 	{
 		var parts = new List<string>();
@@ -238,6 +250,12 @@ public sealed class AskController : ControllerBase
 		}
 
 		Add(request.Instruction);
+
+		// 当用户明确要求“显示更多字段”时，强化合成问题，避免 LLM 仍然只选时间字段。
+		if (IsFieldExpansionInstruction(request.Instruction))
+		{
+			Add("请返回该表的主要业务字段，不要只返回时间字段");
+		}
 
 		return string.Join("；", parts);
 	}
