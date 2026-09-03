@@ -1,12 +1,13 @@
+@inject LocalizationService L10n
 @* 页面统一页头：图标 + 标题 + 描述 + 右侧操作区 *@
 <div class="page-head">
     <div class="ph-title">
         <span class="ph-ico"><svg><use href="@Icon" /></svg></span>
         <div>
-            <h2>@Title</h2>
+            <h2>@L10n.T($"Page.Title.{Title}", Title)</h2>
             @if (!string.IsNullOrWhiteSpace(Desc))
             {
-                <p class="ph-desc">@Desc</p>
+                <p class="ph-desc">@L10n.T($"Page.Desc.{Title}", Desc)</p>
             }
         </div>
     </div>

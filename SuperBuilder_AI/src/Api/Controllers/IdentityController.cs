@@ -121,11 +121,10 @@ public sealed class IdentityController : ControllerBase
 		[FromQuery] long tenantId = 0,
 		CancellationToken cancellationToken = default)
 	{
-		if (tenantId <= 0) return BadRequest("需要 tenantId > 0。");
 		if (request is null) return BadRequest("请求体不能为空。");
 		if (string.IsNullOrWhiteSpace(request.RoleCode)) return BadRequest("roleCode 必填。");
 
-		ScopeTo(tenantId);
+		tenantId = ScopeTo(tenantId);
 		var result = await _identity.AssignRoleAsync(tenantId, id, request.RoleCode, cancellationToken);
 		if (!result.Success) return BadRequest(new { errors = result.Errors });
 		return Ok(new { userId = id, roleCode = request.RoleCode, assigned = true });
@@ -139,10 +138,9 @@ public sealed class IdentityController : ControllerBase
 		[FromQuery] long tenantId = 0,
 		CancellationToken cancellationToken = default)
 	{
-		if (tenantId <= 0) return BadRequest("需要 tenantId > 0。");
 		if (string.IsNullOrWhiteSpace(roleCode)) return BadRequest("roleCode 必填。");
 
-		ScopeTo(tenantId);
+		tenantId = ScopeTo(tenantId);
 		var result = await _identity.RevokeRoleAsync(tenantId, id, roleCode, cancellationToken);
 		if (!result.Success) return BadRequest(new { errors = result.Errors });
 		return NoContent();
@@ -155,8 +153,7 @@ public sealed class IdentityController : ControllerBase
 		[FromQuery] long tenantId = 0,
 		CancellationToken cancellationToken = default)
 	{
-		if (tenantId <= 0) return BadRequest("需要 tenantId > 0。");
-		ScopeTo(tenantId);
+		tenantId = ScopeTo(tenantId);
 
 		var user = await _db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == id, cancellationToken);
 		if (user is null) return NotFound();
@@ -242,7 +239,6 @@ public sealed class IdentityController : ControllerBase
 		[FromQuery] long tenantId = 0,
 		CancellationToken cancellationToken = default)
 	{
-		if (tenantId <= 0) return BadRequest("需要 tenantId > 0。");
 		if (request is null) return BadRequest("请求体不能为空。");
 		if (string.IsNullOrWhiteSpace(code)) return BadRequest("角色编码不能为空。");
 

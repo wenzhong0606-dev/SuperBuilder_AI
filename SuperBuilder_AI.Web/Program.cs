@@ -18,10 +18,11 @@ builder.Services.AddScoped<IApiClient, ApiClient>();
 builder.Services.AddScoped<AskSessionStore>();
 builder.Services.AddScoped<FileDownloadService>();
 
-// API 基地址：默认本机 5032（P11.0 起的 API），可用 appsettings:ApiBaseUrl 覆盖
+// 直接使用 API 的 HTTPS 端口，避免 HTTP -> HTTPS 自动重定向时 Authorization 头被移除。
+// 可用 appsettings:ApiBaseUrl 覆盖（例如仅启用 HTTP 的本地环境）。
 builder.Services.AddHttpClient("SuperBuilderApi", client =>
 {
-    client.BaseAddress = new Uri(builder.Configuration["ApiBaseUrl"] ?? "https://localhost:5032");
+    client.BaseAddress = new Uri(builder.Configuration["ApiBaseUrl"] ?? "https://localhost:7086");
 });
 
 var app = builder.Build();

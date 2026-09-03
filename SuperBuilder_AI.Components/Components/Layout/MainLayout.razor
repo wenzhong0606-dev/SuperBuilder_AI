@@ -1,23 +1,35 @@
 @inherits LayoutComponentBase
+@implements IDisposable
 @inject ThemeService Theme
 @inject NavigationManager Nav
 @inject AppState State
 @inject AuthStore Session
 @inject IJSRuntime JS
+@inject LocalizationService L10n
 
 <IconSprite />
 
-<a class="skip-link" href="#main-content" @onclick:preventDefault="false">跳到主内容</a>
+<a class="skip-link" href="#main-content" @onclick:preventDefault="false">@L10n.T("Accessibility.SkipToContent", "跳到主内容")</a>
 
 <div class="app-shell @(NavOpen ? "nav-open" : "")">
     <header class="app-header">
-        <button class="icon-btn menu-btn" @onclick="ToggleNav" aria-label="菜单" title="菜单">
+        <button class="icon-btn menu-btn" @onclick="ToggleNav" aria-label="@L10n.T("Common.Menu", "菜单")" title="@L10n.T("Common.Menu", "菜单")">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
         </button>
-        <div class="app-header-brand">SuperBuilder <span>AI</span><small>智能问数平台</small></div>
+        <div class="app-header-brand">SuperBuilder <span>AI</span><small>@L10n.T("app.subtitle")</small></div>
         <div class="app-header-spacer"></div>
 
-        <button class="icon-btn theme-btn" @onclick="ToggleTheme" aria-label="切换主题" title="@(IsDark ? "切换到浅色" : "切换到深色")">
+        @if (State.IsAuthenticated && L10n.AvailableCultures.Count > 1)
+        {
+            <select class="culture-switcher" value="@L10n.CurrentCulture" @onchange="ChangeCulture" aria-label="Language">
+                @foreach (var culture in L10n.AvailableCultures)
+                {
+                    <option value="@culture">@culture</option>
+                }
+            </select>
+        }
+
+        <button class="icon-btn theme-btn" @onclick="ToggleTheme" aria-label="@L10n.T("Theme.Switch", "切换主题")" title="@(IsDark ? L10n.T("theme.light") : L10n.T("theme.dark"))">
             @if (IsDark)
             {
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 2v2.5M12 19.5V22M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2 12h2.5M19.5 12H22M4.2 19.8l1.8-1.8M18 6l1.8-1.8"/></svg>
@@ -39,10 +51,10 @@
                 {
                     <div class="sb-menu" role="menu">
                         <a class="sb-menu-item" href="settings" @onclick="CloseUserMenu">
-                            <svg class="btn-ico"><use href="#sb-ico-settings" /></svg> 个人设置
+                            <svg class="btn-ico"><use href="#sb-ico-settings" /></svg> @L10n.T("common.settings")
                         </a>
                         <button class="sb-menu-item" @onclick="Logout">
-                            <svg class="btn-ico"><use href="#sb-ico-shield" /></svg> 退出登录
+                            <svg class="btn-ico"><use href="#sb-ico-shield" /></svg> @L10n.T("common.logout")
                         </button>
                     </div>
                 }
@@ -91,6 +103,7 @@
     {
         Nav.LocationChanged += OnLocationChanged;
         State.SessionExpired += OnSessionExpired;
+        L10n.Changed += OnCultureChanged;
     }
 
     // 主题读取/应用需在浏览器中执行（预渲染阶段无 JS 运行时）。
@@ -107,6 +120,7 @@
         if (State.IsAuthenticated)
         {
             await Session.ValidateAsync();
+            await L10n.InitializeAsync(State.TenantId, State.UserId, State.AvailableCultures, State.DefaultCulture);
         }
         StateHasChanged();
     }
@@ -116,6 +130,14 @@
     {
         await Session.ClearAsync();
         Nav.NavigateTo("/login");
+    }
+
+    /// <summary>电路销毁/重建时退订，避免重连后事件重复订阅。</summary>
+    public void Dispose()
+    {
+        Nav.LocationChanged -= OnLocationChanged;
+        State.SessionExpired -= OnSessionExpired;
+        L10n.Changed -= OnCultureChanged;
     }
 
     private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
@@ -135,6 +157,8 @@
     private void CloseNav() => NavOpen = false;
     private void ToggleUserMenu() => UserMenuOpen = !UserMenuOpen;
     private void CloseUserMenu() => UserMenuOpen = false;
+    private void OnCultureChanged() => _ = InvokeAsync(StateHasChanged);
+    private async Task ChangeCulture(ChangeEventArgs e) => await L10n.SetCultureAsync(State.TenantId, State.UserId, e.Value?.ToString() ?? "zh-CN");
 
     private async Task Logout()
     {

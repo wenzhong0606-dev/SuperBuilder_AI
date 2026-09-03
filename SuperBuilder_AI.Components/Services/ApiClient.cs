@@ -54,14 +54,22 @@ public sealed class ApiClient : IApiClient
     public async Task<(AuthResult? Result, string? Error)> LoginAsync(string username, long tenantId, string? password = null, CancellationToken ct = default)
     {
         var client = _factory.CreateClient("SuperBuilderApi");
-        var resp = await client.PostAsJsonAsync("api/auth/login", new { username, tenantId, password }, ct);
-        if (!resp.IsSuccessStatusCode)
+        try
         {
-            var (code, msg, _) = ParseApiError(await resp.Content.ReadAsStringAsync(ct));
-            return (null, msg ?? $"登录失败（{(int)resp.StatusCode}）。");
+            var resp = await client.PostAsJsonAsync("api/auth/login", new { username, tenantId, password }, ct);
+            if (!resp.IsSuccessStatusCode)
+            {
+                var (code, msg, _) = ParseApiError(await resp.Content.ReadAsStringAsync(ct));
+                return (null, msg ?? $"登录失败（{(int)resp.StatusCode}）。");
+            }
+            var r = await resp.Content.ReadFromJsonAsync<AuthResult>(ct);
+            return (r, null);
         }
-        var r = await resp.Content.ReadFromJsonAsync<AuthResult>(ct);
-        return (r, null);
+        catch (HttpRequestException ex)
+        {
+            return (null, "无法连接登录服务，请确认 API 服务已启动且地址配置正确。" +
+                (string.IsNullOrWhiteSpace(ex.Message) ? "" : $"（{ex.Message}）"));
+        }
     }
 
     public async Task<string?> AskRawAsync(string question, long? dataSourceId, CancellationToken ct = default)
@@ -79,10 +87,10 @@ public sealed class ApiClient : IApiClient
     }
 
     /// <summary>类型化问数：反序列化为 <see cref="BIResponse"/>，并对非成功状态解析统一错误码。</summary>
-    public async Task<AskOutcome> AskAsync(string question, long? dataSourceId, CancellationToken ct = default)
+    public async Task<AskOutcome> AskAsync(string question, long? dataSourceId, string? conversationId = null, CancellationToken ct = default)
     {
         var client = CreateClient();
-        var resp = await client.PostAsJsonAsync("api/ask", new { question, dataSourceId = dataSourceId ?? 0L }, ct);
+        var resp = await client.PostAsJsonAsync("api/ask", new { question, dataSourceId = dataSourceId ?? 0L, conversationId }, ct);
         if (!resp.IsSuccessStatusCode)
         {
             var (code, msg, trace) = ParseApiError(await resp.Content.ReadAsStringAsync(ct));
@@ -365,4 +373,6 @@ public sealed class AuthResult
     public long UserId { get; set; }
     public string Username { get; set; } = "";
     public System.Collections.Generic.List<string>? Permissions { get; set; }
+    public System.Collections.Generic.List<string>? AvailableCultures { get; set; }
+    public string? DefaultCulture { get; set; }
 }

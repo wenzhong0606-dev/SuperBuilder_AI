@@ -9,6 +9,9 @@ namespace SuperBuilder_AI.Components.Models;
 /// </summary>
 public sealed class BIResponse
 {
+	public string? ConversationId { get; set; }
+	public string ConversationStatus { get; set; } = "Completed";
+	public string? RewrittenQuestion { get; set; }
 	public bool Success { get; set; }
 	public string? Question { get; set; }
 	public string? Sql { get; set; }

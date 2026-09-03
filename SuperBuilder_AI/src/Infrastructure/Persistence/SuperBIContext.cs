@@ -72,6 +72,8 @@ public class SuperBIContext : DbContext
 
     #region P5 Localization
     public DbSet<SemanticLabel> SemanticLabels { get; set; }
+    public DbSet<UiLanguage> UiLanguages { get; set; }
+    public DbSet<UiTextResource> UiTextResources { get; set; }
     #endregion
 
     #region P6 Low-code BI
@@ -209,6 +211,20 @@ public class SuperBIContext : DbContext
         builder.Entity<SemanticLabel>().Property(x => x.Value).IsRequired().HasMaxLength(512).HasComment("标签文本");
         builder.Entity<SemanticLabel>().Property(x => x.Source).HasMaxLength(32).HasComment("来源");
         builder.Entity<SemanticLabel>().Property(x => x.SortOrder).HasComment("排序");
+        #endregion
+
+        #region UI Localization
+        builder.Entity<UiLanguage>().ToTable(tb => tb.HasComment("平台界面语言目录"));
+        builder.Entity<UiLanguage>().HasIndex(x => x.Culture).IsUnique();
+        builder.Entity<UiLanguage>().Property(x => x.Culture).IsRequired().HasMaxLength(16);
+        builder.Entity<UiLanguage>().Property(x => x.DisplayName).IsRequired().HasMaxLength(64);
+        builder.Entity<UiLanguage>().Property(x => x.NativeName).IsRequired().HasMaxLength(64);
+        builder.Entity<UiTextResource>().ToTable(tb => tb.HasComment("平台及租户界面文本"));
+        builder.Entity<UiTextResource>().HasIndex(x => new { x.TenantId, x.Culture, x.ResourceKey }).IsUnique();
+        builder.Entity<UiTextResource>().Property(x => x.Culture).IsRequired().HasMaxLength(16);
+        builder.Entity<UiTextResource>().Property(x => x.ResourceKey).IsRequired().HasMaxLength(160);
+        builder.Entity<UiTextResource>().Property(x => x.Value).IsRequired().HasMaxLength(2048);
+        builder.Entity<UiTextResource>().Property(x => x.Description).HasMaxLength(256);
         #endregion
 
         #region P6.1 Dashboard

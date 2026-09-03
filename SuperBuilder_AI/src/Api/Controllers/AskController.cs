@@ -11,6 +11,7 @@ using SuperBuilder_AI.Api.Errors;
 using SuperBuilder_AI.Interfaces.BI;
 using SuperBuilder_AI.Interfaces.Identity;
 using SuperBuilder_AI.Models.Identity;
+using SuperBuilder_AI.Services.BI;
 
 namespace SuperBuilder_AI.Controllers;
 
@@ -39,19 +40,22 @@ public sealed class AskController : ControllerBase
 	private readonly IAskResponseCache? _cache;
 	private readonly IDataSourceAuthorizationService? _dataSourceAuthorization;
 	private readonly IRowLevelSecurityService? _rowSecurity;
+	private readonly IAskConversationService _conversations;
 
 	public AskController(
 		IBIConversationService bi,
 		IIdentityService identity,
 		IAskResponseCache? cache = null,
 		IDataSourceAuthorizationService? dataSourceAuthorization = null,
-		IRowLevelSecurityService? rowSecurity = null)
+		IRowLevelSecurityService? rowSecurity = null,
+		IAskConversationService? conversations = null)
 	{
 		_bi = bi;
 		_identity = identity;
 		_cache = cache;
 		_dataSourceAuthorization = dataSourceAuthorization;
 		_rowSecurity = rowSecurity;
+		_conversations = conversations ?? new AskConversationService();
 	}
 
 	/// <summary>提交一个自然语言问题并执行 BI 查询。</summary>
@@ -77,6 +81,7 @@ public sealed class AskController : ControllerBase
 
 		var access = await ResolveDataSourceAccessAsync(tenantId, userId, request.DataSourceId, cancellationToken);
 		if (access.ForbiddenResult is not null) return access.ForbiddenResult;
+		var turn = _conversations.Resolve(tenantId, userId, request.ConversationId, request.Question!);
 
 		// P11.5.1 语义缓存：命中则直接返回，跳过整条 BI 链路（仅作用于 api/ask；Golden 走独立端点不受影响）。
 		// ?noCache=1 旁路，便于联调/强制刷新。
@@ -84,7 +89,7 @@ public sealed class AskController : ControllerBase
 		var policyFingerprint = _rowSecurity is null
 			? "legacy"
 			: await _rowSecurity.GetPolicyFingerprintAsync(tenantId, userId, cancellationToken);
-		var cacheQuestion = string.Concat(request.Question!, "\u001fperm:", access.PermissionFingerprint ?? "legacy", "\u001fpolicy:", policyFingerprint);
+		var cacheQuestion = string.Concat(turn.StandaloneQuestion, "\u001fperm:", access.PermissionFingerprint ?? "legacy", "\u001fpolicy:", policyFingerprint);
 		if (_cache is not null && !bypass)
 		{
 			var cached = _cache.Get(tenantId, cacheQuestion, access.EffectiveDataSourceId ?? 0);
@@ -97,11 +102,16 @@ public sealed class AskController : ControllerBase
 		}
 
 		var response = await _bi.AskAsync(
-			request.Question,
+			turn.StandaloneQuestion,
 			tenantId,
 			access.EffectiveDataSourceId,
 			access.AuthorizedDataSourceIds);
 
+		var awaiting = response.Explanation?.Summary.RequiresConfirmation == true;
+		_conversations.Record(turn.ConversationId, tenantId, userId, turn.StandaloneQuestion, awaiting);
+		response.ConversationId = turn.ConversationId;
+		response.ConversationStatus = awaiting ? "AwaitingClarification" : "Completed";
+		response.RewrittenQuestion = turn.AppliedClarification ? turn.StandaloneQuestion : null;
 		if (_cache is not null && !bypass) _cache.Set(tenantId, cacheQuestion, access.EffectiveDataSourceId ?? 0, response);
 		return Ok(response);
 	}
@@ -270,6 +280,7 @@ public sealed class AskController : ControllerBase
 public sealed class AskRequest
 {
 	public string? Question { get; set; }
+	public string? ConversationId { get; set; }
 	public long DataSourceId { get; set; }
 }
 

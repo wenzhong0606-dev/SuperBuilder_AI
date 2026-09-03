@@ -39,6 +39,8 @@ public sealed class AuthStore
                 Username = _state.Username,
                 Permissions = _state.Permissions as System.Collections.Generic.List<string>
                     ?? new System.Collections.Generic.List<string>(_state.Permissions),
+                AvailableCultures = new System.Collections.Generic.List<string>(_state.AvailableCultures),
+                DefaultCulture = _state.DefaultCulture,
             };
             await _js.InvokeVoidAsync("localStorage.setItem", StorageKey, JsonSerializer.Serialize(snap));
         }
@@ -63,6 +65,8 @@ public sealed class AuthStore
             _state.UserId = snap.UserId;
             _state.Username = snap.Username ?? "";
             _state.Permissions = snap.Permissions ?? new System.Collections.Generic.List<string>();
+            _state.AvailableCultures = snap.AvailableCultures ?? new System.Collections.Generic.List<string> { "zh-CN" };
+            _state.DefaultCulture = snap.DefaultCulture ?? "zh-CN";
         }
         catch
         {
@@ -113,6 +117,8 @@ public sealed class AuthStore
         _state.UserId = r.UserId;
         _state.Username = r.Username;
         _state.Permissions = r.Permissions ?? new System.Collections.Generic.List<string>();
+        _state.AvailableCultures = r.AvailableCultures ?? new System.Collections.Generic.List<string> { "zh-CN" };
+        _state.DefaultCulture = r.DefaultCulture ?? "zh-CN";
         await SaveAsync();
     }
 
@@ -123,5 +129,7 @@ public sealed class AuthStore
         public long UserId { get; set; }
         public string? Username { get; set; }
         public System.Collections.Generic.List<string>? Permissions { get; set; }
+        public System.Collections.Generic.List<string>? AvailableCultures { get; set; }
+        public string? DefaultCulture { get; set; }
     }
 }

@@ -12,6 +12,7 @@ public static class GovernanceDataPlanePolicy
 	{
 		if (!path.StartsWithSegments("/api")) return false;
 		return !path.StartsWithSegments("/api/tenant-management") &&
+			!path.StartsWithSegments("/api/localization") &&
 			!path.StartsWithSegments("/api/quota") &&
 			!path.StartsWithSegments("/api/audit") &&
 			!path.StartsWithSegments("/api/metadata-vector") &&

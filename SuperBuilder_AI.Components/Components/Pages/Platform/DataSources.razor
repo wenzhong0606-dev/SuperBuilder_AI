@@ -1,45 +1,91 @@
 @page "/data-sources"
 @inject ToastService Toast
+@inject IApiClient Api
+@inject NavigationManager Nav
+@using System.Text.Json
 @using SuperBuilder_AI.Components.Shared
 
 <AuthGuard>
-    <PageHead Icon="sb-ico-db" Title="数据源管理" Desc="接入多种数据库：选择连接器、填写连接信息、测试连通性并触发元数据扫描。" />
+    <PageHead Icon="sb-ico-db" Title="数据源管理" Desc="统一管理租户数据连接、元数据覆盖与访问状态。">
+        <button class="btn btn-primary" @onclick="() => CreateVisible = true">
+            <svg class="btn-ico"><use href="#sb-ico-plus" /></svg> 新增数据源
+        </button>
+    </PageHead>
 
-    <div class="card-grid">
-        @foreach (var c in _connectors)
-        {
-            <div class="feature-card @(c.Ready ? "" : "is-disabled")" @onclick="() => Select(c.Name)">
-                <div class="fc-ico"><svg><use href="#sb-ico-db" /></svg></div>
-                <div class="fc-title">@c.Name</div>
-                <div class="fc-desc">@c.Desc</div>
-                <span class="badge @(c.Ready ? "badge-success" : "badge-muted")">@(c.Ready ? "可用" : "规划中")</span>
-            </div>
-        }
+    <div class="ds-overview">
+        <div class="ds-metric"><span class="ds-metric-icon"><svg><use href="#sb-ico-db" /></svg></span><div><strong>@Sources.Count</strong><span>数据源总数</span></div></div>
+        <div class="ds-metric"><span class="ds-metric-icon is-online"><span class="status-pulse"></span></span><div><strong>@Sources.Count(s => Bool(s, "enabled"))</strong><span>在线连接</span></div></div>
+        <div class="ds-metric"><span class="ds-metric-icon"><svg><use href="#sb-ico-model" /></svg></span><div><strong>@Sources.Sum(s => Number(s, "tableCount"))</strong><span>元数据表</span></div></div>
+        <div class="ds-metric"><span class="ds-metric-icon"><svg><use href="#sb-ico-tag" /></svg></span><div><strong>@Sources.Sum(s => Number(s, "columnCount"))</strong><span>已识别字段</span></div></div>
     </div>
 
-    <SbPanel Icon="sb-ico-plus" Title="新建数据源">
+    <SbPanel Icon="sb-ico-db" Title="连接资产" Flush="true">
         <Body>
-            <SbField Label="数据源名称" Hint="如：WMS 生产库">
-                <input @bind="Name" placeholder="如：WMS 生产库" />
-            </SbField>
-            <SbField Label="连接器类型">
-                <select @bind="Type">
-                    @foreach (var c in _connectors) { <option value="@c.Name">@c.Name</option> }
-                </select>
-            </SbField>
+            <div class="ds-list-toolbar">
+                <div class="ds-search"><svg><use href="#sb-ico-ask" /></svg><input @bind="Search" @bind:event="oninput" placeholder="搜索名称或数据库类型…" /></div>
+                <button class="btn btn-outline-secondary btn-sm" @onclick="LoadSources">刷新</button>
+            </div>
+            @if (Loading)
+            {
+                <LoadingState Text="正在加载数据源…" />
+            }
+            else if (!string.IsNullOrWhiteSpace(ListError))
+            {
+                <ErrorState Message="@ListError" OnRetry="LoadSources" />
+            }
+            else if (Sources.Count == 0)
+            {
+                <SbEmptyState Icon="sb-ico-db" Title="暂无数据源" Text="请在下方创建第一个数据源。" />
+            }
+            else
+            {
+                <div class="table-wrap">
+                    <table class="data-table">
+                        <thead><tr><th>ID</th><th>名称</th><th>类型</th><th>状态</th><th>元数据表</th><th>字段</th><th></th></tr></thead>
+                        <tbody>
+                        @foreach (var source in FilteredSources)
+                        {
+                            <tr>
+                                <td><span class="ds-id">DS-@Cell(source, "id")</span></td>
+                                <td><div class="ds-name-cell"><span class="ds-type-mark">@Initial(source)</span><div><strong>@Cell(source, "name")</strong><small>租户专属连接</small></div></div></td>
+                                <td><span class="ds-engine">@Cell(source, "dbType")</span></td>
+                                <td><span class="ds-status @(Bool(source, "enabled") ? "is-active" : "")"><i></i>@(Bool(source, "enabled") ? "运行中" : "已停用")</span></td>
+                                <td>@Cell(source, "tableCount")</td><td>@Cell(source, "columnCount")</td>
+                                <td class="ta-right"><button class="btn btn-outline-secondary btn-sm" @onclick="() => Open(source)">管理连接 →</button></td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </Body>
+    </SbPanel>
+
+    <SbModal Visible="@CreateVisible" VisibleChanged="v => CreateVisible = v" Title="接入新的数据源" Size="lg">
+        <Body>
+            <div class="connector-picker">
+                @foreach (var c in _connectors)
+                {
+                    <button type="button" class="connector-option @(Type == c.Name ? "is-selected" : "") @(c.Ready ? "" : "is-disabled")" disabled="@(!c.Ready)" @onclick="() => Select(c.Name)">
+                        <span class="connector-logo">@c.Name.Substring(0, 1)</span><strong>@c.Name</strong><small>@c.Desc</small>
+                    </button>
+                }
+            </div>
+            <div class="field-grid ds-create-fields">
+                <SbField Label="数据源名称" Hint="给团队一个易识别的名称"><input @bind="Name" placeholder="如：WMS 生产库" /></SbField>
+                <SbField Label="连接器类型"><input value="@Type" disabled /></SbField>
+            </div>
             <SbField Label="连接串" Full="true">
                 <input @bind="ConnStr" placeholder="Server=host;Database=db;User=...;" />
             </SbField>
-            <div class="field-grid">
-                <SbField Label="用户名"><input @bind="User" /></SbField>
-                <SbField Label="密码"><input type="password" @bind="Pass" placeholder="••••••" /></SbField>
-            </div>
-            <div class="toolbar" style="margin-top:16px;margin-bottom:0">
-                <button class="btn btn-outline-secondary btn-sm" @onclick="TestConn">测试连接</button>
-                <button class="btn btn-primary btn-sm" @onclick="Save">保存并扫描</button>
-            </div>
+            @if (!string.IsNullOrWhiteSpace(Error)) { <div class="alert alert-danger tiny" style="margin-top:12px">@Error</div> }
         </Body>
-    </SbPanel>
+        <Footer>
+            <button class="btn btn-outline-secondary" @onclick="() => CreateVisible = false">取消</button>
+            <button class="btn btn-outline-secondary" @onclick="TestConn">测试连接</button>
+            <button class="btn btn-primary" @onclick="Save" disabled="@Saving">@(Saving ? "正在保存…" : "保存并接入")</button>
+        </Footer>
+    </SbModal>
 </AuthGuard>
 
 @code {
@@ -53,9 +99,62 @@
         new("ClickHouse", "列式分析型数据库", false),
         new("MongoDB", "文档型 NoSQL", false),
     };
-    private string Name = "", Type = "MySQL", ConnStr = "", User = "", Pass = "";
+    private string Name = "", Type = "MySQL", ConnStr = "";
+    private bool Saving;
+    private bool CreateVisible;
+    private string Error = "";
+    private string Search = "";
+    private bool Loading = true;
+    private string ListError = "";
+    private List<JsonElement> Sources = new();
+    private IEnumerable<JsonElement> FilteredSources => string.IsNullOrWhiteSpace(Search)
+        ? Sources
+        : Sources.Where(s => Cell(s, "name").Contains(Search, StringComparison.OrdinalIgnoreCase) || Cell(s, "dbType").Contains(Search, StringComparison.OrdinalIgnoreCase));
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        await LoadSources();
+        StateHasChanged();
+    }
+
+    private async Task LoadSources()
+    {
+        Loading = true; ListError = "";
+        var (data, _, err) = await Api.GetJsonAsync("api/data-sources/manage");
+        Sources = data is { ValueKind: JsonValueKind.Array } ? data.Value.EnumerateArray().ToList() : new();
+        ListError = data is null ? (err ?? "加载数据源失败。") : "";
+        Loading = false;
+    }
+
+    private static string Cell(JsonElement row, string name) => TablePresenter.Cell(row, name);
+    private static bool Bool(JsonElement row, string name) => row.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.True;
+    private static int Number(JsonElement row, string name) => row.TryGetProperty(name, out var v) && v.TryGetInt32(out var n) ? n : 0;
+    private static string Initial(JsonElement row) { var value = Cell(row, "dbType"); return string.IsNullOrWhiteSpace(value) ? "DB" : value[..1].ToUpperInvariant(); }
+    private void Open(JsonElement row) { if (long.TryParse(Cell(row, "id"), out var id)) Nav.NavigateTo($"data-sources/{id}"); }
 
     private void Select(string n) { Type = n; Toast.Info($"已选择连接器：{n}"); }
     private void TestConn() => Toast.Info("连通性测试已提交（Multi-DB Connector 后端计划于 P12 实现）。");
-    private void Save() => Toast.Info("保存并触发扫描（后端 IDataSourceConnector 计划于 P12 实现）。");
+    private async Task Save()
+    {
+        Error = "";
+        if (string.IsNullOrWhiteSpace(Name) || string.IsNullOrWhiteSpace(ConnStr))
+        {
+            Error = "数据源名称和连接串必填。";
+            return;
+        }
+        Saving = true;
+        var (ok, _, err) = await Api.PostAsync("api/data-sources", new
+        {
+            name = Name,
+            dbType = Type,
+            connectionString = ConnStr,
+        });
+        Saving = false;
+        if (!ok) { Error = err ?? "保存数据源失败。"; return; }
+        Name = ""; ConnStr = "";
+        CreateVisible = false;
+        Toast.Success("数据源已保存，并已授权给当前管理员。Ask 页面现在可以选择它。");
+        await LoadSources();
+    }
 }

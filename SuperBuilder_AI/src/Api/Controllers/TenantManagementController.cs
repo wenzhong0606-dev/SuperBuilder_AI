@@ -20,10 +20,12 @@ namespace SuperBuilder_AI.Controllers;
 public sealed class TenantManagementController : ControllerBase
 {
 	private readonly SuperBIContext _db;
+	private readonly SuperBuilder_AI.Interfaces.Identity.IIdentityService _identity;
 
-	public TenantManagementController(SuperBIContext db)
+	public TenantManagementController(SuperBIContext db, SuperBuilder_AI.Interfaces.Identity.IIdentityService identity)
 	{
 		_db = db;
+		_identity = identity;
 	}
 
 	/// <summary>
@@ -46,7 +48,9 @@ public sealed class TenantManagementController : ControllerBase
 		var tenants = await _db.Tenants
 			.AsNoTracking()
 			.OrderBy(t => t.Id)
-			.Select(t => new TenantSummary(t.Id, t.TenantCode, t.TenantName, t.Enabled))
+			.Select(t => new TenantSummary(t.Id, t.TenantCode, t.TenantName, t.Enabled,
+				_db.TenantSettings.Where(s => s.TenantId == t.Id && s.Key == "localization:availableCultures").Select(s => s.Value).FirstOrDefault(),
+				_db.TenantSettings.Where(s => s.TenantId == t.Id && s.Key == "localization:defaultCulture").Select(s => s.Value).FirstOrDefault()))
 			.ToListAsync(cancellationToken);
 		return Ok(tenants);
 	}
@@ -73,6 +77,9 @@ public sealed class TenantManagementController : ControllerBase
 		var code = (request.TenantCode ?? string.Empty).Trim();
 		if (code.Length == 0)
 			return BadRequest("TenantCode 不能为空。");
+		var adminUsername = (request.AdminUsername ?? string.Empty).Trim();
+		if (adminUsername.Length == 0 || string.IsNullOrWhiteSpace(request.AdminPassword) || request.AdminPassword.Length < 8)
+			return BadRequest("首位租户管理员用户名必填，初始口令至少 8 位。");
 
 		if (await _db.Tenants.AnyAsync(t => t.TenantCode == code, cancellationToken))
 			return Conflict($"租户编码 {code} 已存在。");
@@ -83,9 +90,38 @@ public sealed class TenantManagementController : ControllerBase
 			TenantName = (request.TenantName ?? string.Empty).Trim(),
 			Enabled = true
 		};
+		await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
 		_db.Tenants.Add(tenant);
 		await _db.SaveChangesAsync(cancellationToken);
-		return Ok(new TenantSummary(tenant.Id, tenant.TenantCode, tenant.TenantName, tenant.Enabled));
+		var cultures = (request.AvailableCultures ?? new[] { "zh-CN" })
+			.Where(x => !string.IsNullOrWhiteSpace(x)).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+		var supportedCultures = await _db.UiLanguages.AsNoTracking().Where(x => x.Enabled).Select(x => x.Culture).ToListAsync(cancellationToken);
+		if (supportedCultures.Count > 0)
+			cultures = cultures.Where(x => supportedCultures.Contains(x, StringComparer.OrdinalIgnoreCase)).ToArray();
+		if (cultures.Length == 0) cultures = new[] { "zh-CN" };
+		var defaultCulture = cultures.Contains(request.DefaultCulture ?? "") ? request.DefaultCulture! : cultures[0];
+		_db.TenantSettings.AddRange(
+			new TenantSetting { TenantId = tenant.Id, Key = "localization:availableCultures", Value = System.Text.Json.JsonSerializer.Serialize(cultures), DataType = "json" },
+			new TenantSetting { TenantId = tenant.Id, Key = "localization:defaultCulture", Value = defaultCulture, DataType = "string" });
+		await _db.SaveChangesAsync(cancellationToken);
+		var created = await _identity.CreateUserAsync(
+			tenant.Id, adminUsername, request.AdminDisplayName ?? adminUsername,
+			request.AdminEmail ?? string.Empty, new[] { IdentityRoles.TenantAdmin }, cancellationToken);
+		if (!created.Success || created.Id is null)
+		{
+			await transaction.RollbackAsync(cancellationToken);
+			return Conflict(created.Errors.FirstOrDefault() ?? "租户管理员创建失败。");
+		}
+		var passwordSet = await _identity.SetPasswordAsync(tenant.Id, created.Id.Value, request.AdminPassword, cancellationToken);
+		if (!passwordSet.Success)
+		{
+			await transaction.RollbackAsync(cancellationToken);
+			return BadRequest(passwordSet.Errors.FirstOrDefault() ?? "租户管理员口令设置失败。");
+		}
+		await transaction.CommitAsync(cancellationToken);
+		return Ok(new CreateTenantResult(
+			new TenantSummary(tenant.Id, tenant.TenantCode, tenant.TenantName, tenant.Enabled),
+			created.Id.Value, adminUsername));
 	}
 
 	[HttpPatch("{id:long}/enable")]
@@ -95,6 +131,32 @@ public sealed class TenantManagementController : ControllerBase
 	[HttpPatch("{id:long}/disable")]
 	public async Task<IActionResult> Disable(long id, CancellationToken cancellationToken = default)
 		=> await SetEnabledAsync(id, false, cancellationToken);
+
+	[HttpPut("{id:long}")]
+	public async Task<IActionResult> Update(long id, [FromBody] UpdateTenantRequest request, CancellationToken cancellationToken = default)
+	{
+		if (RequirePlatformPermission(IdentityPermissions.PlatformTenantManage) is { } denied) return denied;
+		TenantDataPlanePolicy.StoreManagementTarget(HttpContext, id, "tenant.update", true);
+		var tenant = await _db.Tenants.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+		if (tenant is null) return NotFound();
+		var cultures = (request.AvailableCultures ?? Array.Empty<string>()).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+		var supported = await _db.UiLanguages.AsNoTracking().Where(x => x.Enabled).Select(x => x.Culture).ToListAsync(cancellationToken);
+		cultures = cultures.Where(x => supported.Contains(x, StringComparer.OrdinalIgnoreCase)).ToArray();
+		if (cultures.Length == 0) return BadRequest("至少选择一种平台已启用的语言。");
+		var defaultCulture = cultures.Contains(request.DefaultCulture ?? "", StringComparer.OrdinalIgnoreCase) ? request.DefaultCulture! : cultures[0];
+		tenant.TenantName = (request.TenantName ?? tenant.TenantName ?? string.Empty).Trim();
+		await UpsertInternalSetting(id, "localization:availableCultures", System.Text.Json.JsonSerializer.Serialize(cultures), "json", cancellationToken);
+		await UpsertInternalSetting(id, "localization:defaultCulture", defaultCulture, "string", cancellationToken);
+		await _db.SaveChangesAsync(cancellationToken);
+		return Ok(new TenantSummary(tenant.Id, tenant.TenantCode, tenant.TenantName, tenant.Enabled, System.Text.Json.JsonSerializer.Serialize(cultures), defaultCulture));
+	}
+
+	private async Task UpsertInternalSetting(long tenantId, string key, string value, string dataType, CancellationToken ct)
+	{
+		var row = await _db.TenantSettings.FirstOrDefaultAsync(x => x.TenantId == tenantId && x.Key == key, ct);
+		if (row is null) { row = new TenantSetting { TenantId = tenantId, Key = key }; _db.TenantSettings.Add(row); }
+		row.Value = value; row.DataType = dataType;
+	}
 
 	private async Task<IActionResult> SetEnabledAsync(long id, bool enabled, CancellationToken cancellationToken)
 	{
@@ -158,10 +220,21 @@ public sealed class TenantManagementController : ControllerBase
 }
 
 /// <summary>租户摘要 DTO。</summary>
-public sealed record TenantSummary(long Id, string? TenantCode, string? TenantName, bool Enabled);
+public sealed record TenantSummary(long Id, string? TenantCode, string? TenantName, bool Enabled, string? AvailableCultures = null, string? DefaultCulture = null);
 
 /// <summary>创建租户请求。</summary>
-public sealed record CreateTenantRequest(string? TenantCode, string? TenantName);
+public sealed record CreateTenantRequest(
+	string? TenantCode,
+	string? TenantName,
+	string? AdminUsername,
+	string? AdminPassword,
+	string? AdminDisplayName = null,
+	string? AdminEmail = null,
+	string[]? AvailableCultures = null,
+	string? DefaultCulture = null);
+
+public sealed record CreateTenantResult(TenantSummary Tenant, long AdminUserId, string AdminUsername);
+public sealed record UpdateTenantRequest(string? TenantName, string[]? AvailableCultures, string? DefaultCulture);
 
 /// <summary>租户配置项 DTO。</summary>
 public sealed record TenantSettingSummary(long Id, string Key, string? Value, string? DataType);

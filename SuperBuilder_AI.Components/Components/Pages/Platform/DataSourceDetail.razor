@@ -12,8 +12,72 @@
     </PageHead>
 
     <SbTabs>
+        <SbTab Title="元数据" Badge="@_metadata.Count.ToString()">
+            <SbToolbar>
+                <Right>
+                    <button class="btn btn-primary btn-sm" @onclick="ScanMetadata" disabled="@_scanning">@(_scanning ? "扫描中…" : "重新扫描")</button>
+                    <button class="btn btn-outline-secondary btn-sm" @onclick="LoadMetadata">刷新</button>
+                </Right>
+            </SbToolbar>
+            @if (_loadingMetadata) { <LoadingState Text="正在加载元数据…" /> }
+            else if (_metadataError is not null) { <ErrorState Message="@_metadataError" OnRetry="LoadMetadata" /> }
+            else if (_metadata.Count == 0)
+            {
+                <SbEmptyState Icon="sb-ico-db" Title="尚未扫描到元数据" Text="点击重新扫描，从业务数据库读取表和字段结构。" />
+            }
+            else
+            {
+                @foreach (var table in _metadata)
+                {
+                    <section class="meta-table-card" id="@($"table-{Text(table, "id")}")">
+                        <header class="meta-table-head">
+                            <div class="meta-table-title"><svg><use href="#sb-ico-db" /></svg><div><strong>@Text(table, "tableName")</strong><div class="muted tiny">MetadataTable #@Text(table, "id") · @Text(table, "tableComment")</div></div></div>
+                            <span class="badge badge-primary">@ColumnsOf(table).Count 字段</span>
+                        </header>
+                        <div class="table-wrap">
+                            <table class="data-table meta-table">
+                                <thead><tr><th>字段 / 关系</th><th>类型</th><th>可空</th><th>Semantic</th><th>Vector</th><th>业务键</th></tr></thead>
+                                <tbody>
+                                @foreach (var column in ColumnsOf(table))
+                                {
+                                    var semantic = SemanticOf(column);
+                                    <tr id="@($"column-{Text(column, "id")}")">
+                                        <td><div class="meta-column-name"><span>@Text(column, "columnName")</span>@if (Flag(column, "isPrimaryKey")) { <span class="meta-pk">PK</span> }</div><small class="muted">MetadataColumn #@Text(column, "id") → Table #@Text(table, "id")</small></td>
+                                        <td><span class="meta-type">@Text(column, "dataType")@(string.IsNullOrWhiteSpace(Text(column, "length")) ? "" : $"({Text(column, "length")})")</span></td>
+                                        <td><span class="meta-switch @(Flag(column, "isNullable") ? "is-on" : "")" title="@(Flag(column, "isNullable") ? "true" : "false")"></span></td>
+                                        <td>
+                                            @if (semantic is not null)
+                                            {
+                                                <a class="meta-key-link" href="@($"/platform/metadata/semantic/{Text(semantic, "id")}")">Semantic #@Text(semantic, "id") →</a>
+                                                <div id="@($"semantic-{Text(semantic, "id")}")" class="muted tiny">@Text(semantic, "businessMeaning")</div>
+                                            }
+                                            else { <span class="muted">—</span> }
+                                        </td>
+                                        <td>
+                                            @if (semantic is not null && !string.IsNullOrWhiteSpace(Text(semantic, "vectorId")))
+                                            { <a class="meta-key-link" href="@($"/platform/metadata/vector/{Uri.EscapeDataString(Text(semantic, "vectorId"))}")">Qdrant · @Short(Text(semantic, "vectorId")) →</a><div class="muted tiny">@Text(semantic, "embeddingModel") · @Text(semantic, "vectorDimension")D</div> }
+                                            else if (!string.IsNullOrWhiteSpace(Text(column, "vectorId")))
+                                            { <a class="meta-key-link" href="@($"/platform/metadata/vector/{Uri.EscapeDataString(Text(column, "vectorId"))}")">Column Vector · @Short(Text(column, "vectorId")) →</a> }
+                                            else { <span class="muted">未向量化</span> }
+                                        </td>
+                                        <td>@if (!string.IsNullOrWhiteSpace(Text(column, "businessKey"))) { <a class="meta-key-link" href="@($"/platform/metadata/column/{Text(column, "id")}")">@Text(column, "businessKey") →</a> } else { <span class="muted">—</span> }</td>
+                                    </tr>
+                                }
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
+                }
+            }
+        </SbTab>
+
         <SbTab Title="访问授权" Badge="@_grants.Count.ToString()">
             <SbToolbar>
+                <Left>
+                    <select class="form-select" @bind="_grantType"><option value="1">用户</option><option value="2">角色</option></select>
+                    <select class="form-select" @bind="_grantSubjectId"><option value="0">选择授权主体…</option>@foreach(var subject in GrantSubjects){<option value="@Text(subject,"id")">@GrantSubjectName(subject)</option>}</select>
+                    <button class="btn btn-primary btn-sm" @onclick="GrantAccess">授予访问</button>
+                </Left>
                 <Right>
                     <button class="btn btn-outline-secondary btn-sm" @onclick="() => Load()">刷新授权</button>
                 </Right>
@@ -30,7 +94,8 @@
             {
                 <SbPanel Icon="sb-ico-key" Title="授权清单" Flush="true">
                     <Body>
-                        <ResultTable Rows="@_grants" EmptyText="该数据源尚未授予任何主体访问权限。" />
+                        @if (_grants.Count == 0) { <SbEmptyState Icon="sb-ico-key" Title="暂无显式授权" Text="选择用户或角色并授予该数据源访问权限。" /> }
+                        else { <div class="table-wrap"><table class="data-table"><thead><tr><th>主体类型</th><th>主体</th><th>授权时间</th><th></th></tr></thead><tbody>@foreach(var grant in _grants){<tr><td>@Text(grant,"subjectType")</td><td>@GrantName(grant)</td><td>@Text(grant,"createdTime")</td><td class="ta-right"><button class="btn btn-sm btn-outline-secondary" @onclick="() => RevokeAccess(grant)">撤销</button></td></tr>}</tbody></table></div> }
                     </Body>
                 </SbPanel>
             }
@@ -94,12 +159,20 @@
     [Parameter] public long Id { get; set; }
 
     private List<Dictionary<string, object?>> _grants = new();
+    private List<Dictionary<string, object?>> _grantUsers = new();
+    private List<Dictionary<string, object?>> _grantRoles = new();
+    private int _grantType = 1; private long _grantSubjectId;
+    private IEnumerable<Dictionary<string, object?>> GrantSubjects => _grantType == 1 ? _grantUsers : _grantRoles;
     private List<Dictionary<string, object?>> _policies = new();
     private List<string> _policyCols = new();
     private string? _grantsError;
     private string? _policiesError;
     private bool _loadingGrants = true;
     private bool _loadingPolicies = true;
+    private List<Dictionary<string, object?>> _metadata = new();
+    private string? _metadataError;
+    private bool _loadingMetadata = true;
+    private bool _scanning;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -109,9 +182,45 @@
 
     private async Task Load()
     {
+        await LoadMetadata();
         await LoadGrants();
         await LoadPolicies();
         StateHasChanged();
+    }
+
+    private async Task LoadMetadata()
+    {
+        _loadingMetadata = true;
+        var (data, status, err) = await Api.GetJsonAsync($"api/data-sources/{Id}/metadata");
+        _metadataError = data is null ? (err ?? $"加载元数据失败（{status}）。") : null;
+        _metadata = JsonRows.Extract(data);
+        _loadingMetadata = false;
+        StateHasChanged();
+    }
+
+    private async Task ScanMetadata()
+    {
+        _scanning = true;
+        var (ok, _, err) = await Api.PostAsync($"api/data-sources/{Id}/metadata/scan");
+        _scanning = false;
+        if (!ok) { Toast.Error(err ?? "元数据扫描失败。"); return; }
+        Toast.Success("元数据扫描完成。");
+        await LoadMetadata();
+    }
+
+    private static string Text(Dictionary<string, object?> row, string key) => JsonValue.AsString(row.GetValueOrDefault(key));
+    private static bool Flag(Dictionary<string, object?> row, string key) => row.TryGetValue(key, out var value) && value is JsonElement el && el.ValueKind == JsonValueKind.True;
+    private static Dictionary<string, object?>? SemanticOf(Dictionary<string, object?> row)
+    {
+        if (!row.TryGetValue("semantic", out var value) || value is not JsonElement el || el.ValueKind != JsonValueKind.Object) return null;
+        return el.EnumerateObject().ToDictionary(p => p.Name, p => (object?)p.Value.Clone());
+    }
+    private static string Short(string value) => value.Length > 16 ? value[..13] + "…" : value;
+    private static List<Dictionary<string, object?>> ColumnsOf(Dictionary<string, object?> row)
+    {
+        if (!row.TryGetValue("columns", out var value) || value is not JsonElement el || el.ValueKind != JsonValueKind.Array)
+            return new();
+        return JsonRows.Extract(el);
     }
 
     private async Task LoadGrants()
@@ -120,7 +229,26 @@
         var (data, status, err) = await Api.GetJsonAsync($"api/data-source-access?dataSourceId={Id}");
         _grantsError = data is null ? (err ?? $"加载授权失败（{status}）。") : null;
         _grants = JsonRows.Extract(data);
+        var (users, _, _) = await Api.GetJsonAsync("api/identity/users"); _grantUsers = JsonRows.Extract(users);
+        var (roles, _, _) = await Api.GetJsonAsync("api/identity/roles"); _grantRoles = JsonRows.Extract(roles);
         _loadingGrants = false;
+    }
+
+    private string GrantSubjectName(Dictionary<string, object?> row) => _grantType == 1 ? $"{Text(row,"displayName")}（{Text(row,"username")}）" : $"{Text(row,"name")}（{Text(row,"code")}）";
+    private string GrantName(Dictionary<string, object?> grant)
+    {
+        var id=Text(grant,"subjectId"); var isUser=Text(grant,"subjectType").Contains("User",StringComparison.OrdinalIgnoreCase)||Text(grant,"subjectType")=="1";
+        var row=(isUser?_grantUsers:_grantRoles).FirstOrDefault(x=>Text(x,"id")==id); return row is null ? $"#{id}" : (isUser ? GrantUserName(row) : $"{Text(row,"name")}（{Text(row,"code")}）");
+    }
+    private static string GrantUserName(Dictionary<string, object?> row) => $"{Text(row,"displayName")}（{Text(row,"username")}）";
+    private async Task GrantAccess()
+    {
+        if(_grantSubjectId<=0){Toast.Warning("请选择用户或角色。");return;}
+        var(ok,_,err)=await Api.PostAsync("api/data-source-access",new{dataSourceId=Id,subjectType=_grantType,subjectId=_grantSubjectId}); if(!ok){Toast.Error(err??"授权失败。");return;} Toast.Success("数据源访问权限已授予。"); _grantSubjectId=0; await LoadGrants();
+    }
+    private async Task RevokeAccess(Dictionary<string,object?> grant)
+    {
+        var type=Text(grant,"subjectType"); var id=Text(grant,"subjectId"); var(ok,_,err)=await Api.DeleteAsync($"api/data-source-access?dataSourceId={Id}&subjectType={Uri.EscapeDataString(type)}&subjectId={id}"); if(!ok)Toast.Error(err??"撤销失败。");else{Toast.Success("授权已撤销。");await LoadGrants();}
     }
 
     private async Task LoadPolicies()

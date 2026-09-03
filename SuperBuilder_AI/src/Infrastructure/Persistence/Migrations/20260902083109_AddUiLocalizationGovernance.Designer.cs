@@ -3,17 +3,20 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using SuperBuilder_AI.Data;
 
 #nullable disable
 
-namespace SuperBuilder_AI.Migrations
+namespace SuperBuilder_AI.src.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(SuperBIContext))]
-    partial class SuperBIContextModelSnapshot : ModelSnapshot
+    [Migration("20260902083109_AddUiLocalizationGovernance")]
+    partial class AddUiLocalizationGovernance
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1089,97 +1092,6 @@ namespace SuperBuilder_AI.Migrations
                     b.ToTable("SemanticLabels", t =>
                         {
                             t.HasComment("语义多语言标签");
-                        });
-                });
-
-            modelBuilder.Entity("SuperBuilder_AI.Models.Localization.UiLanguage", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint")
-                        .HasComment("主键");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
-
-                    b.Property<DateTime>("CreatedTime")
-                        .HasColumnType("datetime2")
-                        .HasComment("创建时间");
-
-                    b.Property<string>("Culture")
-                        .IsRequired()
-                        .HasMaxLength(16)
-                        .HasColumnType("nvarchar(16)");
-
-                    b.Property<string>("DisplayName")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("nvarchar(64)");
-
-                    b.Property<bool>("Enabled")
-                        .HasColumnType("bit");
-
-                    b.Property<string>("NativeName")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("nvarchar(64)");
-
-                    b.Property<int>("SortOrder")
-                        .HasColumnType("int");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Culture")
-                        .IsUnique();
-
-                    b.ToTable("UiLanguages", t =>
-                        {
-                            t.HasComment("平台界面语言目录");
-                        });
-                });
-
-            modelBuilder.Entity("SuperBuilder_AI.Models.Localization.UiTextResource", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint")
-                        .HasComment("主键");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
-
-                    b.Property<DateTime>("CreatedTime")
-                        .HasColumnType("datetime2")
-                        .HasComment("创建时间");
-
-                    b.Property<string>("Culture")
-                        .IsRequired()
-                        .HasMaxLength(16)
-                        .HasColumnType("nvarchar(16)");
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(256)
-                        .HasColumnType("nvarchar(256)");
-
-                    b.Property<string>("ResourceKey")
-                        .IsRequired()
-                        .HasMaxLength(160)
-                        .HasColumnType("nvarchar(160)");
-
-                    b.Property<long>("TenantId")
-                        .HasColumnType("bigint");
-
-                    b.Property<string>("Value")
-                        .IsRequired()
-                        .HasMaxLength(2048)
-                        .HasColumnType("nvarchar(2048)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("TenantId", "Culture", "ResourceKey")
-                        .IsUnique();
-
-                    b.ToTable("UiTextResources", t =>
-                        {
-                            t.HasComment("平台及租户界面文本");
                         });
                 });
 

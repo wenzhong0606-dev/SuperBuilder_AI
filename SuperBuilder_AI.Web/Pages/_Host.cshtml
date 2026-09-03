@@ -16,7 +16,11 @@
     <script src="_content/SuperBuilder_AI.Components/js/chart.js"></script>
 </head>
 <body>
-    <component type="typeof(App)" render-mode="ServerPrerendered" />
+    @* 经典 Blazor Server：不使用 ServerPrerendered。预渲染阶段没有 SignalR 电路（IClientProxy 为 null），
+       组件在「预渲染→电路接管」交接窗口内触发 JS 互操作/StateHasChanged 时，框架会把 JS.BeginInvokeJS 推送给
+       尚为 null 的客户端代理，抛出 NullReferenceException（Microsoft.AspNetCore.SignalR.ClientProxyExtensions.SendAsync）。
+       改用 Server 后组件只在已建立电路后渲染，IClientProxy 始终有效，且首屏主题由下方内联脚本设置 data-theme 防闪烁。 *@
+    <component type="typeof(App)" render-mode="Server" />
     <script src="_content/SuperBuilder_AI.Components/lib/bootstrap/js/bootstrap.bundle.min.js"></script>
     <script src="_framework/blazor.server.js"></script>
 </body>

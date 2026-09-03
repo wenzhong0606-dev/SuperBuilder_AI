@@ -1,5 +1,6 @@
 @implements IDisposable
 @inject NavigationManager Nav
+@inject LocalizationService L10n
 @* 面包屑：分组 / 当前页；详情页（带 id、code 参数）显示为「列表 / 详情」 *@
 @{
     var current = NavMenuItems.FindByHref(CurrentPath);
@@ -10,15 +11,15 @@
     <nav class="sb-crumb" aria-label="面包屑">
         @if (group is not null)
         {
-            <span class="sb-crumb-seg">@group.Title</span>
+            <span class="sb-crumb-seg">@L10n.T($"Nav.Group.{group.Title}", group.Title)</span>
             <span class="sb-crumb-sep">/</span>
         }
         @if (Parent is not null)
         {
-            <a href="@Parent.Href" class="sb-crumb-link">@Parent.Title</a>
+            <a href="@Parent.Href" class="sb-crumb-link">@L10n.T($"Nav.{Parent.Href}", Parent.Title)</a>
             <span class="sb-crumb-sep">/</span>
         }
-        <span class="sb-crumb-cur">@current.Title</span>
+        <span class="sb-crumb-cur">@L10n.T($"Nav.{current.Href}", current.Title)</span>
     </nav>
 }
 

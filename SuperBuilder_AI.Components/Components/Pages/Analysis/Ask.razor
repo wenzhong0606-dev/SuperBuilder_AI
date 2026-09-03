@@ -19,8 +19,8 @@ else
 {
     <div class="card ask-bar">
         <div class="ask-bar-row">
-            <label class="ask-ds">
-                数据源
+            <div class="ask-ds">
+                可访问数据范围
                 @if (_dsBusy)
                 {
                     <span class="muted tiny">加载中…</span>
@@ -31,9 +31,9 @@ else
                 }
                 else
                 {
-                    <DataSourcePicker Items="_dsOptions" DataSourceId="DataSourceId" DataSourceIdChanged="OnDsChanged" Label="" />
+                    <div class="ask-source-scope">@foreach (var source in _dsOptions) { <span class="badge badge-primary">@source.Name</span> }</div>
                 }
-            </label>
+            </div>
             <label class="ask-q">自然语言问题<textarea class="form-control" @bind="Question" placeholder="例如：上个月各区域销售额对比"></textarea></label>
         </div>
         <div class="ask-actions">
@@ -57,7 +57,7 @@ else
 
 @code {
     private string Question = "";
-    private long DataSourceId = 1;
+    private long DataSourceId = 0;
     private bool Busy = false;
     private string? GlobalError = "";
     private readonly List<AskTurn> Turns = new();
@@ -67,6 +67,7 @@ else
     private string? _dsError;
 
     private bool _sessionLoaded = false;
+    private string? _conversationId;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -82,8 +83,6 @@ else
                 {
                     Turns.Clear();
                     Turns.AddRange(saved);
-                    if (DataSourceId == 1 && saved.Count > 0 && saved[0].DataSourceIdHint is { } hint && hint > 0)
-                        DataSourceId = hint;
                     StateHasChanged();
                 }
             }
@@ -101,7 +100,6 @@ else
             if (opts is { Count: > 0 })
             {
                 _dsOptions = opts.Select(o => new DataSourcePicker.Option { Id = o.Id, Name = o.Name + (string.IsNullOrWhiteSpace(o.DbType) ? "" : $" · {o.DbType}") }).ToList();
-                if (DataSourceId == 1) DataSourceId = _dsOptions[0].Id;
             }
             else
             {
@@ -116,12 +114,6 @@ else
         {
             _dsBusy = false;
         }
-    }
-
-    private void OnDsChanged(long id)
-    {
-        DataSourceId = id;
-        if (Turns.LastOrDefault() is { } last) last.DataSourceIdHint = id;
     }
 
     private sealed record TurnWithParent(AskTurn Turn, int Index, AskTurn? Parent);
@@ -142,13 +134,14 @@ else
     private async Task DoAsk()
     {
         if (string.IsNullOrWhiteSpace(Question)) { GlobalError = "请输入问题。"; return; }
-        if (_dsOptions.Count == 0 && DataSourceId == 1) { GlobalError = "请先选择数据源。"; return; }
+        if (_dsOptions.Count == 0) { GlobalError = "当前账号尚未获授权任何数据源，请联系租户管理员。"; return; }
         Busy = true; GlobalError = "";
-        var turn = new AskTurn { Question = Question, DataSourceIdHint = DataSourceId };
+        var turn = new AskTurn { Question = Question, DataSourceIdHint = 0 };
         Turns.Add(turn);
         var q = Question; Question = "";
-        var outcome = await Api.AskAsync(q, DataSourceId);
+        var outcome = await Api.AskAsync(q, DataSourceId, _conversationId);
         ApplyOutcome(turn, outcome);
+        _conversationId = outcome.Response?.ConversationStatus == "AwaitingClarification" ? outcome.Response.ConversationId : null;
         await PersistAsync();
         Busy = false;
     }
@@ -202,6 +195,7 @@ else
     private async Task ClearChat()
     {
         Turns.Clear();
+        _conversationId = null;
         GlobalError = "";
         await PersistAsync();
     }

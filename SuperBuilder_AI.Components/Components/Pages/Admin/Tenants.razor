@@ -28,6 +28,7 @@
         </Stats>
 
         <RowActions>
+            <button class="btn btn-sm btn-primary" @onclick="() => OpenEdit(context)">编辑</button>
             @if (IsEnabled(context))
             {
                 <button class="btn btn-sm btn-outline-secondary" @onclick="() => AskEnable(context, false)">停用</button>
@@ -44,12 +45,56 @@
         <Body>
             <SbField Label="租户编码" Full="true" Required="true" Error="@_codeErr"><input @bind="_code" placeholder="如：t-acme" /></SbField>
             <SbField Label="租户名称" Full="true"><input @bind="_name" placeholder="如：Acme 零售" /></SbField>
+            <SbField Label="首位租户管理员用户名" Full="true" Required="true" Error="@_adminErr"><input @bind="_adminUsername" placeholder="如：acme-admin" /></SbField>
+            <SbField Label="管理员显示名" Full="true"><input @bind="_adminDisplayName" placeholder="如：Acme 管理员" /></SbField>
+            <SbField Label="管理员邮箱" Full="true"><input @bind="_adminEmail" type="email" /></SbField>
+            <SbField Label="管理员初始口令" Full="true" Required="true" Hint="至少 8 位，建议首次登录后立即修改。"><input @bind="_adminPassword" type="password" /></SbField>
+            <SbField Label="租户可用语言" Full="true" Hint="用户只能在启用的语言之间切换。">
+                <div class="language-choice-grid">
+                    @foreach (var language in _languages)
+                    {
+                        var culture = Cell(language, "culture");
+                        <label class="language-choice @(_selectedCultures.Contains(culture) ? "selected" : "")">
+                            <input type="checkbox" checked="@_selectedCultures.Contains(culture)" @onchange="e => ToggleCulture(culture, e.Value is true)" />
+                            <span class="locale-orb">@culture.Split('-')[0].ToUpperInvariant()</span>
+                            <span><b>@Cell(language, "nativeName")</b><small>@culture</small></span>
+                        </label>
+                    }
+                </div>
+            </SbField>
+            <SbField Label="默认显示语言" Full="true">
+                <select @bind="_defaultCulture">
+                    @foreach (var culture in _selectedCultures) { <option value="@culture">@LanguageName(culture)</option> }
+                </select>
+            </SbField>
             @if (!string.IsNullOrWhiteSpace(_createErr)) { <div class="alert alert-danger tiny" style="padding:8px 12px">@_createErr</div> }
         </Body>
         <Footer>
             <button class="btn btn-outline-secondary btn-sm" @onclick="() => _creating = false">取消</button>
             <button class="btn btn-primary btn-sm" @onclick="SaveCreate" disabled="@_saving">保存</button>
         </Footer>
+    </SbModal>
+
+    <SbModal Visible="@_editing" VisibleChanged="v => _editing = v" Title="@($"编辑租户 · {_editCode}")">
+        <Body>
+            <SbField Label="租户名称" Full="true"><input @bind="_editName" /></SbField>
+            <SbField Label="租户支持语言" Full="true" Hint="语言范围来自平台多语言中心。">
+                <div class="language-choice-grid">
+                    @foreach (var language in _languages)
+                    {
+                        var culture = Cell(language, "culture");
+                        <label class="language-choice @(_editCultures.Contains(culture) ? "selected" : "")">
+                            <input type="checkbox" checked="@_editCultures.Contains(culture)" @onchange="e => ToggleEditCulture(culture, e.Value is true)" />
+                            <span class="locale-orb">@culture.Split('-')[0].ToUpperInvariant()</span>
+                            <span><b>@Cell(language, "nativeName")</b><small>@culture</small></span>
+                        </label>
+                    }
+                </div>
+            </SbField>
+            <SbField Label="默认语言" Full="true"><select @bind="_editDefaultCulture">@foreach (var culture in _editCultures) { <option value="@culture">@LanguageName(culture)</option> }</select></SbField>
+            @if (!string.IsNullOrWhiteSpace(_editError)) { <div class="alert alert-danger tiny">@_editError</div> }
+        </Body>
+        <Footer><button class="btn btn-outline-secondary btn-sm" @onclick="() => _editing=false">取消</button><button class="btn btn-primary btn-sm" @onclick="SaveEdit" disabled="@_savingEdit">保存修改</button></Footer>
     </SbModal>
 
     <SbModal Visible="@_setting" VisibleChanged="v => _setting = v" Title="@($"租户设置 · {_settingName}")">
@@ -116,6 +161,16 @@
     private string _codeErr = "";
     private string _code = "";
     private string _name = "";
+    private string _adminUsername = "";
+    private string _adminPassword = "";
+    private string _adminDisplayName = "";
+    private string _adminEmail = "";
+    private string _adminErr = "";
+    private List<JsonElement> _languages = new();
+    private HashSet<string> _selectedCultures = new(StringComparer.OrdinalIgnoreCase);
+    private string _defaultCulture = "en-US";
+    private bool _editing, _savingEdit; private long _editId; private string _editCode="", _editName="", _editDefaultCulture="", _editError="";
+    private HashSet<string> _editCultures = new(StringComparer.OrdinalIgnoreCase);
 
     private List<SbColumn<JsonElement>> Columns =>
         _cols.Select(c => SbCol.Of<JsonElement>(
@@ -131,6 +186,14 @@
     private async Task Reload()
     {
         _loading = true;
+        var (languageData, _, _) = await Api.GetJsonAsync("api/localization/languages");
+        _languages = languageData is { ValueKind: JsonValueKind.Array } ? languageData.Value.EnumerateArray().ToList() : new();
+        if (_selectedCultures.Count == 0)
+        {
+            foreach (var language in _languages.Take(2)) _selectedCultures.Add(Cell(language, "culture"));
+            if (_selectedCultures.Contains("en-US")) _defaultCulture = "en-US";
+            else if (_selectedCultures.Count > 0) _defaultCulture = _selectedCultures.First();
+        }
         var (data, _, err) = await Api.GetJsonAsync("api/tenant-management");
         _error = err ?? "";
         _rows = data is { ValueKind: JsonValueKind.Array } ? data.Value.EnumerateArray().ToList() : new();
@@ -141,16 +204,76 @@
 
     private async Task SaveCreate()
     {
-        _codeErr = ""; _createErr = "";
+        _codeErr = ""; _adminErr = ""; _createErr = "";
         if (string.IsNullOrWhiteSpace(_code)) { _codeErr = "租户编码必填。"; return; }
+        if (string.IsNullOrWhiteSpace(_adminUsername)) { _adminErr = "首位租户管理员用户名必填。"; return; }
+        if (_adminPassword.Length < 8) { _adminErr = "管理员初始口令至少 8 位。"; return; }
+        var cultures = _selectedCultures.ToList();
+        if (cultures.Count == 0) { _createErr = "至少选择一种租户语言。"; return; }
+        if (!cultures.Contains(_defaultCulture)) _defaultCulture = cultures[0];
         _saving = true;
-        var (ok, status, err) = await Api.PostAsync("api/tenant-management", new { tenantCode = _code, tenantName = _name });
+        var (ok, status, err) = await Api.PostAsync("api/tenant-management", new
+        {
+            tenantCode = _code,
+            tenantName = _name,
+            adminUsername = _adminUsername,
+            adminPassword = _adminPassword,
+            adminDisplayName = _adminDisplayName,
+            adminEmail = _adminEmail,
+            availableCultures = cultures,
+            defaultCulture = _defaultCulture,
+        });
         _saving = false;
         if (!ok) { _createErr = status == 409 ? "租户编码已存在。" : (err ?? "保存失败。"); return; }
         _creating = false; _codeErr = "";
-        _code = ""; _name = "";
-        Toast.Success("租户已创建。");
+        _code = ""; _name = ""; _adminUsername = ""; _adminPassword = ""; _adminDisplayName = ""; _adminEmail = "";
+        Toast.Success("租户及首位租户管理员已创建。");
         await Reload();
+    }
+
+    private void ToggleCulture(string culture, bool enabled)
+    {
+        if (enabled) _selectedCultures.Add(culture); else _selectedCultures.Remove(culture);
+        if (!_selectedCultures.Contains(_defaultCulture) && _selectedCultures.Count > 0) _defaultCulture = _selectedCultures.First();
+    }
+
+    private string LanguageName(string culture)
+    {
+        var row = _languages.FirstOrDefault(x => Cell(x, "culture") == culture);
+        var name = row.ValueKind == JsonValueKind.Undefined ? culture : Cell(row, "nativeName");
+        return $"{name}（{culture}）";
+    }
+
+    private void OpenEdit(JsonElement row)
+    {
+        if (!long.TryParse(Cell(row, "id"), out _editId)) return;
+        _editCode = Cell(row, "tenantCode"); _editName = Cell(row, "tenantName"); _editError = "";
+        _editCultures = ParseCultures(Cell(row, "availableCultures"));
+        if (_editCultures.Count == 0) foreach (var language in _languages.Take(1)) _editCultures.Add(Cell(language, "culture"));
+        _editDefaultCulture = Cell(row, "defaultCulture");
+        if (!_editCultures.Contains(_editDefaultCulture)) _editDefaultCulture = _editCultures.FirstOrDefault() ?? "";
+        _editing = true;
+    }
+
+    private static HashSet<string> ParseCultures(string json)
+    {
+        try { return new HashSet<string>(JsonSerializer.Deserialize<string[]>(json) ?? Array.Empty<string>(), StringComparer.OrdinalIgnoreCase); }
+        catch { return new HashSet<string>(StringComparer.OrdinalIgnoreCase); }
+    }
+
+    private void ToggleEditCulture(string culture, bool enabled)
+    {
+        if (enabled) _editCultures.Add(culture); else _editCultures.Remove(culture);
+        if (!_editCultures.Contains(_editDefaultCulture) && _editCultures.Count > 0) _editDefaultCulture = _editCultures.First();
+    }
+
+    private async Task SaveEdit()
+    {
+        _editError = ""; if (_editCultures.Count == 0) { _editError = "至少选择一种语言。"; return; }
+        _savingEdit = true;
+        var (ok, _, err) = await Api.PutAsync($"api/tenant-management/{_editId}", new { tenantName=_editName, availableCultures=_editCultures.ToArray(), defaultCulture=_editDefaultCulture });
+        _savingEdit = false; if (!ok) { _editError = err ?? "保存失败。"; return; }
+        _editing = false; Toast.Success("租户基本信息与语言配置已更新。"); await Reload();
     }
 
     private async Task SetEnabled(JsonElement row, bool enabled)

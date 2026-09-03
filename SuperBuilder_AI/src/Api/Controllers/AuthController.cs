@@ -83,6 +83,7 @@ public sealed class AuthController : ControllerBase
 
 		var perms = await _identity.GetPermissionsAsync(request.TenantId, user.Id, cancellationToken);
 		var token = _token.Issue(request.TenantId, user.Id, user.Username, perms, user.SecurityStamp);
+		var locale = await ResolveTenantLocaleAsync(request.TenantId, cancellationToken);
 
 		return Ok(new AuthResult
 		{
@@ -92,12 +93,14 @@ public sealed class AuthController : ControllerBase
 			UserId = user.Id,
 			Username = user.Username,
 			Permissions = perms,
+			AvailableCultures = locale.Available,
+			DefaultCulture = locale.Default,
 		});
 	}
 
 	/// <summary>返回当前已认证主体。</summary>
 	[HttpGet("me")]
-	public IActionResult Me()
+	public async Task<IActionResult> Me(CancellationToken cancellationToken)
 	{
 		if (User?.Identity is not { IsAuthenticated: true })
 			return Unauthorized(new { error = "未认证。" });
@@ -110,15 +113,57 @@ public sealed class AuthController : ControllerBase
 			.Select(c => c.Value)
 			.ToList();
 
+		var resolvedTenantId = long.TryParse(tenantId, out var t) ? t : 0;
+		var locale = await ResolveTenantLocaleAsync(resolvedTenantId, cancellationToken);
 		return Ok(new AuthResult
 		{
 			Token = null,
 			ExpiresInSeconds = 0,
-			TenantId = long.TryParse(tenantId, out var t) ? t : 0,
+			TenantId = resolvedTenantId,
 			UserId = long.TryParse(userId, out var u) ? u : 0,
 			Username = username,
 			Permissions = perms,
+			AvailableCultures = locale.Available,
+			DefaultCulture = locale.Default,
 		});
+	}
+
+	private async Task<(List<string> Available, string Default)> ResolveTenantLocaleAsync(long tenantId, CancellationToken ct)
+	{
+		var settings = await _db.TenantSettings.AsNoTracking()
+			.Where(s => s.TenantId == tenantId && (s.Key == "localization:availableCultures" || s.Key == "localization:defaultCulture"))
+			.ToDictionaryAsync(s => s.Key, s => s.Value, ct);
+		List<string> available;
+		try { available = System.Text.Json.JsonSerializer.Deserialize<List<string>>(settings.GetValueOrDefault("localization:availableCultures") ?? "[]") ?? new(); }
+		catch { available = new(); }
+		available = available.Where(x => x is "zh-CN" or "en-US").Distinct().ToList();
+		if (available.Count == 0) available.Add("zh-CN");
+		var defaultCulture = settings.GetValueOrDefault("localization:defaultCulture") ?? available[0];
+		if (!available.Contains(defaultCulture)) defaultCulture = available[0];
+		return (available, defaultCulture);
+	}
+
+	[HttpGet("login-options")]
+	[AllowAnonymous]
+	public async Task<IActionResult> LoginOptions(CancellationToken cancellationToken)
+	{
+		var tenants = await _db.Tenants.IgnoreQueryFilters().AsNoTracking().Where(x => x.Enabled).OrderBy(x => x.TenantName)
+			.Select(x => new { x.Id, x.TenantCode, x.TenantName }).ToListAsync(cancellationToken);
+		var ids = tenants.Select(x => x.Id).ToArray();
+		var settings = await _db.TenantSettings.IgnoreQueryFilters().AsNoTracking()
+			.Where(x => ids.Contains(x.TenantId) && (x.Key == "localization:availableCultures" || x.Key == "localization:defaultCulture"))
+			.ToListAsync(cancellationToken);
+		var platformCultures = await _db.UiLanguages.AsNoTracking().Where(x => x.Enabled).OrderBy(x => x.SortOrder).Select(x => x.Culture).ToListAsync(cancellationToken);
+		return Ok(tenants.Select(x =>
+		{
+			var own = settings.Where(s => s.TenantId == x.Id).ToDictionary(s => s.Key, s => s.Value);
+			List<string> cultures;
+			try { cultures = System.Text.Json.JsonSerializer.Deserialize<List<string>>(own.GetValueOrDefault("localization:availableCultures") ?? "[]") ?? new(); } catch { cultures = new(); }
+			if (x.TenantCode == "platform" && platformCultures.Count > 0) cultures = platformCultures;
+			if (cultures.Count == 0) cultures.Add("zh-CN");
+			var defaultCulture = own.GetValueOrDefault("localization:defaultCulture") ?? cultures[0];
+			return new { x.Id, x.TenantCode, Name = x.TenantCode == "platform" ? "平台管理" : x.TenantName, AvailableCultures = cultures, DefaultCulture = defaultCulture };
+		}));
 	}
 }
 
@@ -141,4 +186,6 @@ public sealed class AuthResult
 	public string Username { get; set; } = string.Empty;
 	public System.Collections.Generic.IReadOnlyList<string> Permissions { get; set; }
 		= System.Array.Empty<string>();
+	public System.Collections.Generic.IReadOnlyList<string> AvailableCultures { get; set; } = new[] { "zh-CN" };
+	public string DefaultCulture { get; set; } = "zh-CN";
 }

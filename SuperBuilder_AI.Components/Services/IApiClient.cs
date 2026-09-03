@@ -15,7 +15,7 @@ public interface IApiClient
     Task<(AuthResult? Result, string? Error)> LoginAsync(string username, long tenantId, string? password = null, CancellationToken ct = default);
     Task<string?> AskRawAsync(string question, long? dataSourceId, CancellationToken ct = default);
     /// <summary>类型化问数：返回 <see cref="BIResponse"/> 并区分传输错误。</summary>
-    Task<AskOutcome> AskAsync(string question, long? dataSourceId, CancellationToken ct = default);
+    Task<AskOutcome> AskAsync(string question, long? dataSourceId, string? conversationId = null, CancellationToken ct = default);
     /// <summary>
     /// 多轮语义调整：在已有问题（+ 历史上下文）上追加细化指令，重新走完整 BI 链路。
     /// 仅在用户显式发起「细化」时调用（<c>POST api/ask/refine</c>）；默认问数路径 <c>api/ask</c> 不变。

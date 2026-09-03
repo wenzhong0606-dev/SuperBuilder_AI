@@ -4,11 +4,13 @@
 @inject AppState State
 @inject AuthStore Session
 @inject NavigationManager Nav
+@inject LocalizationService L10n
+@inject IJSRuntime JS
 
 <div class="login-wrap">
     <section class="login-hero">
         <h1>SuperBuilder AI</h1>
-        <p class="sub">自然语言驱动的智能问数平台 —— 对话即分析，所见即洞察。</p>
+        <p class="sub">@L10n.T("Login.Tagline")</p>
         <div class="tags">
             <span>AI Native BI</span>
             <span>多租户</span>
@@ -19,7 +21,25 @@
     </section>
 
     <section class="login-form">
-        @if (State.IsAuthenticated)
+        <div class="login-language"><select value="@L10n.CurrentCulture" @onchange="ChangeLoginCulture">@foreach (var culture in _loginCultures) { <option value="@culture">@culture</option> }</select></div>
+        @if (BootstrapChecking)
+        {
+            <div class="card"><LoadingState Text="正在检查平台初始化状态…" /></div>
+        }
+        else if (BootstrapRequired)
+        {
+            <div class="card">
+                <h2 style="margin:0 0 4px;">初始化平台系统管理员</h2>
+                <p class="muted tiny">这是一次性初始化入口。创建完成后将永久关闭，请妥善保管管理员口令。</p>
+                <label>管理员用户名<input class="form-control" @bind="BootstrapUsername" placeholder="例如 platform-admin" /></label>
+                <label>显示名<input class="form-control" @bind="BootstrapDisplayName" /></label>
+                <label>管理员口令<input class="form-control" @bind="BootstrapPassword" type="password" placeholder="至少 8 位" /></label>
+                <label>确认口令<input class="form-control" @bind="BootstrapPasswordConfirm" type="password" /></label>
+                <button class="btn btn-primary" @onclick="InitializePlatform" disabled="@Busy">创建平台管理员</button>
+                @if (!string.IsNullOrEmpty(Error)) { <div class="alert alert-danger">@Error</div> }
+            </div>
+        }
+        else if (State.IsAuthenticated)
         {
             <div class="card">
                 <p class="ok">当前用户：@State.Username（租户 @State.TenantId，用户 @State.UserId）</p>
@@ -29,11 +49,16 @@
         else
         {
             <div class="card">
-                <h2 style="margin:0 0 4px;">登录 / 租户选择</h2>
-                <label>用户名<input class="form-control" @bind="Username" placeholder="例如 admin" /></label>
-                <label>口令<input class="form-control" @bind="Password" type="password" placeholder="账户口令" /></label>
-                <label>租户 ID<input class="form-control" @bind="TenantId" type="number" min="1" /></label>
-                <button class="btn btn-primary" @onclick="DoLogin" disabled="@Busy">登录</button>
+                <h2 style="margin:0 0 4px;">@L10n.T("Login.Title")</h2>
+                <label>@L10n.T("Login.Username")<input class="form-control" @bind="Username" placeholder="例如 admin" /></label>
+                <label>@L10n.T("Login.Password")<input class="form-control" @bind="Password" type="password" placeholder="账户口令" /></label>
+                <label>@L10n.T("Login.TenantId")
+                    <select class="form-control" value="@TenantId" @onchange="ChangeTenant">
+                        <option value="0">-- 请选择租户 --</option>
+                        @foreach (var tenant in _tenantOptions) { <option value="@TenantValue(tenant)">@TenantLabel(tenant)</option> }
+                    </select>
+                </label>
+                <button class="btn btn-primary" @onclick="DoLogin" disabled="@Busy">@L10n.T("Common.Login")</button>
                 @if (!string.IsNullOrEmpty(Error)) { <div class="alert alert-danger">@Error</div> }
                 <p class="muted tiny">P0-04A 起登录校验口令：未设置口令的账户需先由管理员初始化。令牌携带安全戳，口令/角色变更后旧令牌立即失效。</p>
             </div>
@@ -44,12 +69,102 @@
 @code {
     private string Username = "";
     private string Password = "";
-    private long TenantId = 1;
+    private long TenantId;
     private bool Busy = false;
     private string Error = "";
+    private bool BootstrapChecking = true;
+    private bool BootstrapRequired;
+    private string BootstrapUsername = "platform-admin";
+    private string BootstrapDisplayName = "平台系统管理员";
+    private string BootstrapPassword = "";
+    private string BootstrapPasswordConfirm = "";
+    private List<string> _loginCultures = new() { "zh-CN", "en-US" };
+    private List<System.Text.Json.JsonElement> _tenantOptions = new();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        var (languages, _, _) = await Api.GetJsonAsync("api/localization/public/languages");
+        if (languages is { ValueKind: System.Text.Json.JsonValueKind.Array }) _loginCultures = languages.Value.EnumerateArray().Select(x => x.GetProperty("culture").GetString() ?? "").Where(x => x.Length > 0).ToList();
+        await L10n.InitializeAsync(0, 0, _loginCultures, L10n.CurrentCulture);
+        var (tenants, _, _) = await Api.GetJsonAsync("api/auth/login-options");
+        if (tenants is { ValueKind: System.Text.Json.JsonValueKind.Array }) _tenantOptions = tenants.Value.EnumerateArray().ToList();
+        if (_tenantOptions.Count > 0)
+        {
+            long savedTenant = 0;
+            try { long.TryParse(await JS.InvokeAsync<string?>("localStorage.getItem", "sb_last_login_tenant"), out savedTenant); } catch { }
+            TenantId = _tenantOptions.Any(x => TenantValue(x) == savedTenant) ? savedTenant : TenantValue(_tenantOptions[0]);
+            await ApplyTenantLanguage();
+        }
+        await RefreshBootstrapStatus();
+        BootstrapChecking = false;
+        StateHasChanged();
+    }
+
+    private async Task ChangeTenant(ChangeEventArgs e)
+    {
+        long.TryParse(e.Value?.ToString(), out TenantId);
+        try { await JS.InvokeVoidAsync("localStorage.setItem", "sb_last_login_tenant", TenantId.ToString()); } catch { }
+        await ApplyTenantLanguage();
+    }
+
+    private async Task ApplyTenantLanguage()
+    {
+        var tenant = _tenantOptions.FirstOrDefault(x => TenantValue(x) == TenantId);
+        if (tenant.ValueKind == System.Text.Json.JsonValueKind.Undefined) return;
+        var cultures = tenant.TryGetProperty("availableCultures", out var values) && values.ValueKind == System.Text.Json.JsonValueKind.Array ? values.EnumerateArray().Select(x => x.GetString() ?? "").Where(x => x.Length > 0).ToList() : new List<string> { "zh-CN" };
+        var defaultCulture = tenant.TryGetProperty("defaultCulture", out var value) ? value.GetString() : cultures[0];
+        _loginCultures = cultures;
+        await L10n.InitializeAsync(TenantId, 0, cultures, defaultCulture);
+        StateHasChanged();
+    }
+
+    private static long TenantValue(System.Text.Json.JsonElement tenant) => tenant.TryGetProperty("id", out var id) ? id.GetInt64() : 0;
+    private static string TenantLabel(System.Text.Json.JsonElement tenant) { var name=tenant.TryGetProperty("name",out var n)?n.GetString():""; var code=tenant.TryGetProperty("tenantCode",out var c)?c.GetString():""; return $"{name}（{code}）"; }
+
+    private async Task ChangeLoginCulture(ChangeEventArgs e)
+    {
+        await L10n.SetCultureAsync(0, 0, e.Value?.ToString() ?? "zh-CN");
+        StateHasChanged();
+    }
+
+    private async Task RefreshBootstrapStatus()
+    {
+        var (data, _, err) = await Api.GetJsonAsync("api/platform-bootstrap/status");
+        if (data is not { ValueKind: System.Text.Json.JsonValueKind.Object })
+        {
+            Error = err ?? "无法读取平台初始化状态。";
+            return;
+        }
+        BootstrapRequired = data.Value.TryGetProperty("required", out var required) && required.GetBoolean();
+        if (BootstrapRequired && data.Value.TryGetProperty("platformTenantId", out var tenant) && tenant.TryGetInt64(out var id))
+            TenantId = id;
+    }
+
+    private async Task InitializePlatform()
+    {
+        Error = "";
+        if (string.IsNullOrWhiteSpace(BootstrapUsername)) { Error = "管理员用户名必填。"; return; }
+        if (BootstrapPassword.Length < 8) { Error = "管理员口令至少 8 位。"; return; }
+        if (BootstrapPassword != BootstrapPasswordConfirm) { Error = "两次输入的口令不一致。"; return; }
+        Busy = true;
+        var (ok, _, err) = await Api.PostAsync("api/platform-bootstrap", new
+        {
+            username = BootstrapUsername,
+            password = BootstrapPassword,
+            displayName = BootstrapDisplayName,
+        });
+        Busy = false;
+        if (!ok) { Error = err ?? "平台管理员初始化失败。"; return; }
+        Username = BootstrapUsername;
+        Password = BootstrapPassword;
+        await RefreshBootstrapStatus();
+        Error = "";
+    }
 
     private async Task DoLogin()
     {
+        if (TenantId <= 0) { Error = "请先选择租户。"; return; }
         Busy = true; Error = "";
         var (r, loginErr) = await Api.LoginAsync(Username, TenantId, Password);
         Busy = false;
@@ -60,6 +175,7 @@
         }
         // 写入 AppState 并持久化到 localStorage（刷新不掉登录）
         await Session.SetFromLoginAsync(r);
+        await L10n.InitializeAsync(r.TenantId, r.UserId, r.AvailableCultures, r.DefaultCulture);
         Nav.NavigateTo("/ask");
     }
 

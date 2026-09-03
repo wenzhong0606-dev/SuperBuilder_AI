@@ -1,69 +1,84 @@
 @page "/admin/localization"
 @inject IApiClient Api
 @inject ToastService Toast
+@inject AppState State
 @using System.Text.Json
 @using SuperBuilder_AI.Components.Shared
 
 <AuthGuard>
-    <PageHead Icon="sb-ico-lang" Title="多语言" Desc="管理界面与导出的区域（Culture）、回退链与文案覆盖，支撑多语言租户。" />
-
-    @if (_loading)
-    {
-        <LoadingState Text="正在加载区域配置…" />
-    }
-    else if (!string.IsNullOrWhiteSpace(_error))
-    {
-        <ErrorState Message="@_error" OnRetry="Reload" />
-    }
-    else if (_rows.Count == 0)
-    {
-        <SbPanel Icon="sb-ico-lang" Title="可用区域">
-            <Body>
-                <SbEmptyState Icon="sb-ico-lang" Title="暂无区域配置"
-                              Text="配置支持的语言区域与回退顺序，问数结果与导出文案将按区域呈现。" />
-            </Body>
-        </SbPanel>
-    }
-    else
-    {
-        <SbPanel Icon="sb-ico-lang" Title="可用区域" Flush="true">
-            <Body>
-                <div class="row-list">
-                    @foreach (var r in _rows)
-                    {
-                        <div class="row-item">
-                            <div class="ri-ico"><svg><use href="#sb-ico-lang" /></svg></div>
-                            <div class="ri-main">
-                                <div class="ri-title">@TablePresenter.Cell(r, "culture")</div>
-                                <div class="ri-sub">@TablePresenter.Cell(r, "displayName") @TablePresenter.Cell(r, "name")</div>
-                            </div>
-                            @if (TablePresenter.Cell(r, "isDefault") == "True" || TablePresenter.Cell(r, "default") == "True")
-                            { <span class="badge badge-primary">默认</span> }
+    <PageHead Icon="sb-ico-lang" Title="多语言中心" Desc="平台维护语言与标准文本；租户自动继承，并只覆盖自己的差异文案。" />
+    <div class="locale-console">
+        <aside class="locale-rail">
+            <div class="locale-rail-title">语言目录 <span>@_languages.Count</span></div>
+            @foreach (var language in _languages)
+            {
+                var culture = Cell(language, "culture");
+                <button class="locale-item @(culture == _culture ? "active" : "")" @onclick="() => SelectCulture(culture)">
+                    <span class="locale-orb">@culture.Split('-')[0].ToUpperInvariant()</span>
+                    <span><b>@Cell(language, "nativeName")</b><small>@culture · @Cell(language, "displayName")</small></span><i></i>
+                </button>
+            }
+            @if (_isPlatform)
+            {
+                <button class="btn btn-primary btn-sm" style="width:100%;margin-top:10px" @onclick="() => _addingLanguage = true">＋ 添加语言</button>
+            }
+        </aside>
+        <section class="locale-workspace">
+            <header class="locale-workspace-head">
+                <div><span class="eyebrow">TEXT RESOURCE MATRIX</span><h3>@_culture 系统文本</h3><p>@(_isPlatform ? "正在维护平台基线，修改会自动影响未覆盖该文本的租户。" : "默认继承平台文本；标记为“租户专属”的项目仅对当前租户生效。")</p></div>
+                <div>@if (_isPlatform) { <button class="btn btn-primary btn-sm" @onclick="() => _addingText=true">＋ 新增文本键</button> } <span class="inherit-badge">@(_isPlatform ? "平台基线" : "继承 + 差异覆盖")</span></div>
+            </header>
+            @if (_loading) { <LoadingState Text="正在加载语言资源…" /> }
+            else if (!string.IsNullOrWhiteSpace(_error)) { <ErrorState Message="@_error" OnRetry="LoadTexts" /> }
+            else
+            {
+                <div class="text-resource-list">
+                @foreach (var row in _texts)
+                {
+                    var key = Cell(row, "resourceKey"); var overridden = Flag(row, "isOverridden");
+                    <div class="text-resource-row @(_isPlatform ? "platform" : "")">
+                        <div class="text-resource-key"><code>@key</code><small>@Cell(row, "description")</small></div>
+                        @if (!_isPlatform) { <div class="text-resource-base"><label>平台默认</label><div>@Cell(row, "platformValue")</div></div> }
+                        <div class="text-resource-edit"><label>@(_isPlatform ? "平台文本" : "租户显示文本")</label><input value="@Cell(row, "value")" @onchange="e => Save(key, e.Value?.ToString() ?? string.Empty)" /></div>
+                        <div class="text-resource-state">
+                            @if (!_isPlatform && overridden) { <span class="override-chip">租户专属</span><button class="btn btn-sm btn-outline-secondary" @onclick="() => Reset(key)">恢复继承</button> }
+                            else { <span class="inherit-chip">@(_isPlatform ? "基线" : "已继承")</span> }
                         </div>
-                    }
+                    </div>
+                }
                 </div>
-            </Body>
-        </SbPanel>
-    }
+            }
+        </section>
+    </div>
+    <SbModal Visible="@_addingLanguage" VisibleChanged="v => _addingLanguage = v" Title="添加平台语言">
+        <Body>
+            <SbField Label="Culture 代码" Full="true" Required="true"><input @bind="_newCulture" placeholder="如：fr-FR" /></SbField>
+            <SbField Label="显示名称" Full="true"><input @bind="_newDisplayName" placeholder="如：法语（法国）" /></SbField>
+            <SbField Label="本地名称" Full="true"><input @bind="_newNativeName" placeholder="如：Français" /></SbField>
+            <SbField Label="初始文本复制自" Full="true"><select @bind="_copyFrom">@foreach(var language in _languages){<option value="@Cell(language,"culture")">@Cell(language,"nativeName")</option>}</select></SbField>
+        </Body>
+        <Footer><button class="btn btn-outline-secondary btn-sm" @onclick="() => _addingLanguage=false">取消</button><button class="btn btn-primary btn-sm" @onclick="AddLanguage">创建语言</button></Footer>
+    </SbModal>
+    <SbModal Visible="@_addingText" VisibleChanged="v => _addingText=v" Title="新增系统文本键">
+        <Body><SbField Label="资源键" Full="true" Required="true"><input @bind="_newTextKey" placeholder="如：Page.Title.订单" /></SbField><SbField Label="当前语言文本" Full="true" Required="true"><input @bind="_newTextValue" /></SbField></Body>
+        <Footer><button class="btn btn-outline-secondary btn-sm" @onclick="() => _addingText=false">取消</button><button class="btn btn-primary btn-sm" @onclick="AddText">保存</button></Footer>
+    </SbModal>
 </AuthGuard>
 
 @code {
-    private List<JsonElement> _rows = new();
-    private string _error = "";
-    private bool _loading = true;
-
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (firstRender) await Reload();
-    }
-
-    private async Task Reload()
-    {
-        _loading = true;
-        var (data, _, err) = await Api.GetJsonAsync("api/localization/locales");
-        _error = err ?? "";
-        _rows = data is { ValueKind: JsonValueKind.Array } ? data.Value.EnumerateArray().ToList() : new();
-        _loading = false;
-        StateHasChanged();
-    }
+    private List<JsonElement> _languages = new(); private List<JsonElement> _texts = new();
+    private string _culture = "zh-CN", _error = ""; private bool _loading = true;
+    private bool _addingLanguage; private string _newCulture="", _newDisplayName="", _newNativeName="", _copyFrom="en-US";
+    private bool _addingText; private string _newTextKey="", _newTextValue="";
+    private bool _isPlatform => State.Permissions?.Contains(PermissionCodes.PlatformTenantView) == true;
+    protected override async Task OnAfterRenderAsync(bool firstRender) { if (firstRender) await Load(); }
+    private async Task Load() { var (data, _, err) = await Api.GetJsonAsync("api/localization/languages"); _languages = data is { ValueKind: JsonValueKind.Array } ? data.Value.EnumerateArray().ToList() : new(); _error = err ?? ""; if (_languages.Count > 0 && !_languages.Any(x => Cell(x, "culture") == _culture)) _culture = Cell(_languages[0], "culture"); await LoadTexts(); }
+    private async Task SelectCulture(string culture) { _culture = culture; await LoadTexts(); }
+    private async Task LoadTexts() { _loading = true; StateHasChanged(); var (data, _, err) = await Api.GetJsonAsync($"api/localization/texts?culture={Uri.EscapeDataString(_culture)}"); _texts = data is { ValueKind: JsonValueKind.Array } ? data.Value.EnumerateArray().ToList() : new(); _error = err ?? ""; _loading = false; StateHasChanged(); }
+    private async Task Save(string key, string value) { var (ok, _, err) = await Api.PutAsync($"api/localization/texts/{Uri.EscapeDataString(_culture)}/{Uri.EscapeDataString(key)}", new { value }); if (!ok) Toast.Error(err ?? "保存失败。"); else { Toast.Success(_isPlatform ? "平台文本已更新。" : "租户专属文本已保存。"); await LoadTexts(); } }
+    private async Task Reset(string key) { var (ok, _, err) = await Api.DeleteAsync($"api/localization/texts/{Uri.EscapeDataString(_culture)}/{Uri.EscapeDataString(key)}/override"); if (!ok) Toast.Error(err ?? "恢复失败。"); else { Toast.Success("已恢复继承平台文本。"); await LoadTexts(); } }
+    private async Task AddLanguage() { var (ok, _, err)=await Api.PostAsync("api/localization/languages",new { culture=_newCulture,displayName=_newDisplayName,nativeName=_newNativeName,copyFromCulture=_copyFrom }); if(!ok){Toast.Error(err??"创建失败。");return;} _addingLanguage=false; _culture=_newCulture; _newCulture=_newDisplayName=_newNativeName=""; Toast.Success("语言已创建，可开始维护对应文本。"); await Load(); }
+    private async Task AddText() { if(string.IsNullOrWhiteSpace(_newTextKey)||string.IsNullOrWhiteSpace(_newTextValue))return; await Save(_newTextKey.Trim(),_newTextValue); _addingText=false; _newTextKey=_newTextValue=""; }
+    private static string Cell(JsonElement row, string key) => TablePresenter.Cell(row, key);
+    private static bool Flag(JsonElement row, string key) => Cell(row, key).Equals("True", StringComparison.OrdinalIgnoreCase);
 }

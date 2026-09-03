@@ -1,13 +1,14 @@
 @inject AppState State
+@inject LocalizationService L10n
 @* 侧栏导航：由 NavMenuItems 元数据驱动，按权限过滤（无权限项隐藏） *@
 <nav class="nav">
     @foreach (var group in VisibleGroups)
     {
-        <div class="nav-group">@group.Title</div>
+        <div class="nav-group">@L10n.T($"Nav.Group.{group.Title}", group.Title)</div>
         @foreach (var item in group.Items.Where(Allowed))
         {
-            <NavLink href="@item.Href" Match="@(string.IsNullOrEmpty(item.Href) ? NavLinkMatch.All : NavLinkMatch.Prefix)" aria-label="@item.Title">
-                <svg class="nav-ico" aria-hidden="true"><use href="#@item.Icon" /></svg>@item.Title
+            <NavLink href="@item.Href" Match="@(string.IsNullOrEmpty(item.Href) ? NavLinkMatch.All : NavLinkMatch.Prefix)" aria-label="@L10n.T($"Nav.{item.Href}", item.Title)">
+                <svg class="nav-ico" aria-hidden="true"><use href="#@item.Icon" /></svg>@L10n.T($"Nav.{item.Href}", item.Title)
             </NavLink>
         }
     }

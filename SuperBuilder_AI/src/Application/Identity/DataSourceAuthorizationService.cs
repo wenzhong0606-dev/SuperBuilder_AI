@@ -22,6 +22,14 @@ public sealed class DataSourceAuthorizationService : IDataSourceAuthorizationSer
 		var roleIds = await _db.UserRoles.AsNoTracking()
 			.Where(x => x.TenantId == tenantId && x.UserId == userId)
 			.Select(x => x.RoleId).ToListAsync(ct);
+		var managesMetadata = await (
+			from rp in _db.RolePermissions.AsNoTracking()
+			join permission in _db.Permissions.AsNoTracking() on rp.PermissionId equals permission.Id
+			where roleIds.Contains(rp.RoleId) && permission.Code == IdentityPermissions.MetadataEdit
+			select rp.Id).AnyAsync(ct);
+		if (managesMetadata)
+			return await _db.DataSources.AsNoTracking().Where(x => x.TenantId == tenantId && x.Enabled == true)
+				.OrderBy(x => x.Id).Select(x => x.Id).ToListAsync(ct);
 
 		return await (
 			from grant in _db.DataSourceAccessGrants.AsNoTracking()

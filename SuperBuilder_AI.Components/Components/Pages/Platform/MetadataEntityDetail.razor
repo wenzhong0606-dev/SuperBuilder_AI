@@ -1,0 +1,37 @@
+@page "/platform/metadata/{Type}/{EntityId}"
+@inject IApiClient Api
+@using System.Text.Json
+@using SuperBuilder_AI.Components.Shared
+
+<AuthGuard>
+    <PageHead Icon="sb-ico-database" Title="元数据关系详情" Desc="查看元数据实体的实际数据、所属对象及向量索引关系。" />
+    @if (_loading) { <LoadingState Text="正在读取元数据实体…" /> }
+    else if (!string.IsNullOrWhiteSpace(_error)) { <ErrorState Message="@_error" OnRetry="Load" /> }
+    else if (_data.HasValue)
+    {
+        <section class="metadata-entity-hero">
+            <div class="entity-node"><span>@Type.ToUpperInvariant()</span><b>#@EntityId</b></div>
+            <div><span class="eyebrow">RELATION INSPECTOR</span><h2>@Value("entityType")</h2><p>以下内容来自当前租户的实际元数据记录。</p></div>
+        </section>
+        <div class="metadata-property-grid">
+            @foreach (var p in _data.Value.EnumerateObject())
+            {
+                <article class="metadata-property-card @(p.Value.ValueKind is JsonValueKind.Object or JsonValueKind.Array ? "wide" : "")">
+                    <label>@p.Name</label>
+                    @if (p.Value.ValueKind is JsonValueKind.True or JsonValueKind.False) { <span class="meta-switch @(p.Value.GetBoolean() ? "is-on" : "")"></span> }
+                    else if (p.Value.ValueKind == JsonValueKind.Object) { <pre>@JsonSerializer.Serialize(p.Value, new JsonSerializerOptions { WriteIndented = true })</pre> }
+                    else { <div>@(p.Value.ValueKind == JsonValueKind.Null ? "—" : p.Value.ToString())</div> }
+                </article>
+            }
+        </div>
+    }
+</AuthGuard>
+
+@code {
+    [Parameter] public string Type { get; set; } = "";
+    [Parameter] public string EntityId { get; set; } = "";
+    private JsonElement? _data; private bool _loading = true; private string _error = "";
+    protected override async Task OnParametersSetAsync() => await Load();
+    private async Task Load() { _loading = true; var (data, status, err) = await Api.GetJsonAsync($"api/data-sources/metadata/entities/{Uri.EscapeDataString(Type)}/{Uri.EscapeDataString(EntityId)}"); _data = data; _error = data is null ? (err ?? $"未找到对应数据（{status}）。") : ""; _loading = false; }
+    private string Value(string key) => _data.HasValue && _data.Value.TryGetProperty(key, out var p) ? p.ToString() : Type;
+}

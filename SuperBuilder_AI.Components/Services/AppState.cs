@@ -9,6 +9,8 @@ public sealed class AppState
     public string Username { get; set; } = "";
     public System.Collections.Generic.IReadOnlyList<string> Permissions { get; set; }
         = System.Array.Empty<string>();
+    public System.Collections.Generic.IReadOnlyList<string> AvailableCultures { get; set; } = new[] { "zh-CN" };
+    public string DefaultCulture { get; set; } = "zh-CN";
 
     public bool IsAuthenticated => !string.IsNullOrEmpty(Token);
 
@@ -39,6 +41,8 @@ public sealed class AppState
         UserId = 0;
         Username = "";
         Permissions = System.Array.Empty<string>();
+        AvailableCultures = new[] { "zh-CN" };
+        DefaultCulture = "zh-CN";
         SessionRestored = false;
     }
 

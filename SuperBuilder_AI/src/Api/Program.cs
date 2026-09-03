@@ -50,6 +50,7 @@ builder.Services.AddDbContext<SuperBIContext>(options =>
 builder.Services.Configure<QdrantOptions>(builder.Configuration.GetSection("Qdrant"));
 builder.Services.Configure<EmbeddingOptions>(builder.Configuration.GetSection("Embedding"));
 builder.Services.AddScoped<IDataSourceMetadataReader, MySqlMetadataReader>();
+builder.Services.AddScoped<PlatformAdminBootstrapper>();
 builder.Services.AddScoped<MetadataScannerService>();
 builder.Services.AddScoped<MetadataSearchTextBuilder>();
 builder.Services.AddScoped<IMetadataSearchTextBuilder>(sp => sp.GetRequiredService<MetadataSearchTextBuilder>());
@@ -114,6 +115,7 @@ builder.Services.AddScoped<IMetadataSemanticSearchService>(sp => sp.GetRequiredS
 builder.Services.AddScoped<SuperBuilder_AI.Interfaces.BI.IDimensionResolutionEvidenceService, DimensionResolutionEvidenceService>();
 builder.Services.AddScoped<QueryIntentNormalizer>();
 builder.Services.AddScoped<QueryUnderstandingService>();
+builder.Services.AddSingleton<SuperBuilder_AI.Services.BI.IAskConversationService, SuperBuilder_AI.Services.BI.AskConversationService>();
 builder.Services.AddScoped<IQueryUnderstandingService>(sp => sp.GetRequiredService<QueryUnderstandingService>());
 builder.Services.AddScoped<QueryJoinInferenceService>();
 builder.Services.AddScoped<IQueryJoinInferenceService>(sp => sp.GetRequiredService<QueryJoinInferenceService>());
@@ -251,7 +253,7 @@ builder.Services.AddSingleton<SuperBuilder_AI.Middleware.RequestMetricsCollector
 
 var app = builder.Build();
 
-// P10.1 Identity 全局目录种子（幂等；失败不阻断平台启动）
+// P10.1 Identity 全局目录种子（幂等）。
 using (var seedScope = app.Services.CreateScope())
 {
     try
@@ -263,6 +265,14 @@ using (var seedScope = app.Services.CreateScope())
     {
         Console.Error.WriteLine($"[IdentitySeed] skipped: {seedEx.Message}");
     }
+}
+
+// 若提供安全配置则自动创建首个平台管理员；未提供时由登录页的一次性本机初始化向导完成。
+using (var bootstrapScope = app.Services.CreateScope())
+{
+    var bootstrapper = bootstrapScope.ServiceProvider.GetRequiredService<PlatformAdminBootstrapper>();
+    if (await bootstrapper.EnsureAsync())
+        Console.WriteLine("[PlatformBootstrap] first platform administrator created.");
 }
 
 // P10.4 Quota 平台默认配额种子（幂等；失败不阻断平台启动）

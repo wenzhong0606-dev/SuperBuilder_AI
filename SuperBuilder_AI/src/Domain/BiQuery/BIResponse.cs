@@ -5,6 +5,9 @@
 /// </summary>
 public sealed class BIResponse
 {
+	public string? ConversationId { get; set; }
+	public string ConversationStatus { get; set; } = "Completed";
+	public string? RewrittenQuestion { get; set; }
 	/// <summary>
 	/// 是否成功。
 	/// </summary>

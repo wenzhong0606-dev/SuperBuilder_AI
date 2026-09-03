@@ -33,7 +33,8 @@ public static class MauiProgram
 #if ANDROID
             client.BaseAddress = new Uri("http://10.0.2.2:5032");
 #else
-            client.BaseAddress = new Uri("https://localhost:5032");
+            // 直接访问 HTTPS 端口，避免重定向过程中 Authorization 头被移除。
+            client.BaseAddress = new Uri("https://localhost:7086");
 #endif
         });
 

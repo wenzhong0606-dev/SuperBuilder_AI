@@ -1,6 +1,11 @@
 using Microsoft.AspNetCore.Mvc;
 using SuperBuilder_AI.Interfaces.Platform;
 using SuperBuilder_AI.Models.Organization;
+using SuperBuilder_AI.Data;
+using SuperBuilder_AI.Models.Localization;
+using SuperBuilder_AI.Models.Identity;
+using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 
 namespace SuperBuilder_AI.Controllers;
 
@@ -16,10 +21,12 @@ namespace SuperBuilder_AI.Controllers;
 public sealed class LocalizationController : ControllerBase
 {
 	private readonly ILocalizationService _localization;
+	private readonly SuperBIContext _db;
 
-	public LocalizationController(ILocalizationService localization)
+	public LocalizationController(ILocalizationService localization, SuperBIContext db)
 	{
 		_localization = localization;
+		_db = db;
 	}
 
 	/// <summary>列举平台支持的语言区域。</summary>
@@ -56,7 +63,136 @@ public sealed class LocalizationController : ControllerBase
 		var locale = _localization.Resolve(culture);
 		return Ok(new FallbackChainResult(locale.Culture, _localization.BuildFallbackChain(locale)));
 	}
+
+	/// <summary>数据库维护的可用语言目录；首次使用时从平台内置区域初始化。</summary>
+	[HttpGet("languages")]
+	public async Task<IActionResult> Languages(CancellationToken ct)
+	{
+		await EnsureSeedAsync(ct);
+		var cultures = await AllowedCulturesAsync(ct);
+		return Ok(await _db.UiLanguages.AsNoTracking().Where(x => x.Enabled && cultures.Contains(x.Culture)).OrderBy(x => x.SortOrder)
+			.Select(x => new { x.Id, x.Culture, x.DisplayName, x.NativeName, x.Enabled, x.SortOrder }).ToListAsync(ct));
+	}
+
+	[HttpGet("public/languages")]
+	public async Task<IActionResult> PublicLanguages(CancellationToken ct)
+	{
+		await EnsureSeedAsync(ct);
+		return Ok(await _db.UiLanguages.AsNoTracking().Where(x => x.Enabled).OrderBy(x => x.SortOrder)
+			.Select(x => new { x.Culture, x.DisplayName, x.NativeName }).ToListAsync(ct));
+	}
+
+	[HttpGet("public/texts")]
+	public async Task<IActionResult> PublicTexts([FromQuery] string culture, [FromQuery] long tenantId = 0, CancellationToken ct = default)
+	{
+		await EnsureSeedAsync(ct);
+		var validTenant = tenantId > 0 && await _db.Tenants.IgnoreQueryFilters().AnyAsync(x => x.Id == tenantId && x.Enabled, ct) ? tenantId : 0;
+		var rows = await _db.UiTextResources.AsNoTracking().Where(x => x.Culture == culture && (x.TenantId == 0 || x.TenantId == validTenant)).ToListAsync(ct);
+		var overrides = rows.Where(x => x.TenantId == validTenant && validTenant > 0).ToDictionary(x => x.ResourceKey, StringComparer.OrdinalIgnoreCase);
+		return Ok(rows.Where(x => x.TenantId == 0).OrderBy(x => x.ResourceKey).Select(x => new { x.ResourceKey, PlatformValue=x.Value, Value=overrides.TryGetValue(x.ResourceKey, out var own) ? own.Value : x.Value, IsOverridden=overrides.ContainsKey(x.ResourceKey), x.Description }));
+	}
+
+	[HttpPost("languages")]
+	public async Task<IActionResult> CreateLanguage([FromBody] SaveUiLanguageRequest request, CancellationToken ct)
+	{
+		if (!User.HasClaim("perm", IdentityPermissions.PlatformTenantManage)) return Forbid();
+		await EnsureSeedAsync(ct);
+		var culture = (request.Culture ?? string.Empty).Trim();
+		if (culture.Length < 2 || await _db.UiLanguages.AnyAsync(x => x.Culture == culture, ct)) return Conflict("语言代码为空或已存在。");
+		var language = new UiLanguage { Culture = culture, DisplayName = request.DisplayName?.Trim() ?? culture, NativeName = request.NativeName?.Trim() ?? culture, Enabled = true, SortOrder = await _db.UiLanguages.CountAsync(ct) };
+		_db.UiLanguages.Add(language);
+		var sourceCulture = string.IsNullOrWhiteSpace(request.CopyFromCulture) ? "en-US" : request.CopyFromCulture;
+		var source = await _db.UiTextResources.AsNoTracking().Where(x => x.TenantId == 0 && x.Culture == sourceCulture).ToListAsync(ct);
+		_db.UiTextResources.AddRange(source.Select(x => new UiTextResource { TenantId=0, Culture=culture, ResourceKey=x.ResourceKey, Value=x.Value, Description=x.Description }));
+		await _db.SaveChangesAsync(ct); return Ok(new { language.Id, language.Culture, language.DisplayName, language.NativeName });
+	}
+
+	/// <summary>读取平台基线以及当前租户覆盖后的文本。</summary>
+	[HttpGet("texts")]
+	public async Task<IActionResult> Texts([FromQuery] string culture, [FromQuery] long? tenantId, CancellationToken ct)
+	{
+		await EnsureSeedAsync(ct);
+		var targetTenant = ResolveTargetTenant(tenantId);
+		if (targetTenant < 0) return Forbid();
+		var rows = await _db.UiTextResources.AsNoTracking()
+			.Where(x => x.Culture == culture && (x.TenantId == 0 || x.TenantId == targetTenant)).ToListAsync(ct);
+		var platform = rows.Where(x => x.TenantId == 0).ToDictionary(x => x.ResourceKey, StringComparer.OrdinalIgnoreCase);
+		var overrides = rows.Where(x => x.TenantId == targetTenant && targetTenant > 0).ToDictionary(x => x.ResourceKey, StringComparer.OrdinalIgnoreCase);
+		return Ok(platform.Values.OrderBy(x => x.ResourceKey).Select(x => new
+		{
+			x.ResourceKey, PlatformValue = x.Value,
+			Value = overrides.TryGetValue(x.ResourceKey, out var own) ? own.Value : x.Value,
+			IsOverridden = overrides.ContainsKey(x.ResourceKey), x.Description
+		}));
+	}
+
+	[HttpPut("texts/{culture}/{key}")]
+	public async Task<IActionResult> SaveText(string culture, string key, [FromQuery] long? tenantId, [FromBody] SaveUiTextRequest request, CancellationToken ct)
+	{
+		var targetTenant = ResolveTargetTenant(tenantId);
+		if (targetTenant < 0 || (targetTenant == 0 && !User.HasClaim("perm", IdentityPermissions.PlatformTenantManage))) return Forbid();
+		if (targetTenant > 0 && !User.HasClaim("perm", IdentityPermissions.IdentityManage)) return Forbid();
+		var value = (request.Value ?? string.Empty).Trim();
+		if (value.Length == 0) return BadRequest("文本不能为空。");
+		var row = await _db.UiTextResources.FirstOrDefaultAsync(x => x.TenantId == targetTenant && x.Culture == culture && x.ResourceKey == key, ct);
+		if (row is null) { row = new UiTextResource { TenantId = targetTenant, Culture = culture, ResourceKey = key }; _db.UiTextResources.Add(row); }
+		row.Value = value;
+		row.Description = request.Description ?? row.Description;
+		await _db.SaveChangesAsync(ct);
+		return Ok();
+	}
+
+	[HttpDelete("texts/{culture}/{key}/override")]
+	public async Task<IActionResult> ResetText(string culture, string key, CancellationToken ct)
+	{
+		var tenantId = CurrentTenantId();
+		if (tenantId <= 0) return BadRequest("平台基线不能使用重置覆盖操作。");
+		if (!User.HasClaim("perm", IdentityPermissions.IdentityManage)) return Forbid();
+		var row = await _db.UiTextResources.FirstOrDefaultAsync(x => x.TenantId == tenantId && x.Culture == culture && x.ResourceKey == key, ct);
+		if (row is not null) { _db.UiTextResources.Remove(row); await _db.SaveChangesAsync(ct); }
+		return NoContent();
+	}
+
+	private long ResolveTargetTenant(long? requested)
+	{
+		if (User.HasClaim("perm", IdentityPermissions.PlatformTenantView)) return requested ?? 0;
+		return CurrentTenantId();
+	}
+
+	private async Task<List<string>> AllowedCulturesAsync(CancellationToken ct)
+	{
+		if (User.HasClaim("perm", IdentityPermissions.PlatformTenantView))
+			return await _db.UiLanguages.AsNoTracking().Where(x => x.Enabled).Select(x => x.Culture).ToListAsync(ct);
+		var tenantId = CurrentTenantId();
+		var json = await _db.TenantSettings.AsNoTracking().Where(x => x.TenantId == tenantId && x.Key == "localization:availableCultures").Select(x => x.Value).FirstOrDefaultAsync(ct);
+		try { return System.Text.Json.JsonSerializer.Deserialize<List<string>>(json ?? "[]") ?? new(); }
+		catch { return new(); }
+	}
+
+	private long CurrentTenantId() => long.TryParse(User.FindFirst("tid")?.Value, out var id) ? id : 0;
+
+	private async Task EnsureSeedAsync(CancellationToken ct)
+	{
+		var locales = _localization.SupportedLocales.ToList();
+		var existingLanguages = await _db.UiLanguages.Select(x => x.Culture).ToListAsync(ct);
+		_db.UiLanguages.AddRange(locales.Where(x => !existingLanguages.Contains(x.Culture, StringComparer.OrdinalIgnoreCase)).Select((x, i) => new UiLanguage { Culture = x.Culture, DisplayName = x.DisplayName, NativeName = x.DisplayName, Enabled = true, SortOrder = existingLanguages.Count + i }));
+		var defaults = new Dictionary<string, Dictionary<string, string>>
+		{
+			["zh-CN"] = new() { ["Common.Login"]="登录", ["Common.Confirm"]="确认", ["Common.Cancel"]="取消", ["Common.Save"]="保存", ["Common.Close"]="关闭", ["Document.OutboundOrder"]="出库单", ["Login.Title"]="登录 / 租户选择", ["Login.Username"]="用户名", ["Login.Password"]="口令", ["Login.TenantId"]="租户 ID", ["Login.Tagline"]="自然语言驱动的智能问数平台 —— 对话即分析，所见即洞察。", ["App.Subtitle"]="智能问数平台", ["Common.Settings"]="个人设置", ["Common.Logout"]="退出登录" },
+			["en-US"] = new() { ["Common.Login"]="Sign in", ["Common.Confirm"]="Confirm", ["Common.Cancel"]="Cancel", ["Common.Save"]="Save", ["Common.Close"]="Close", ["Document.OutboundOrder"]="Outbound order", ["Login.Title"]="Sign in / Select tenant", ["Login.Username"]="Username", ["Login.Password"]="Password", ["Login.TenantId"]="Tenant ID", ["Login.Tagline"]="Natural-language analytics — ask, analyze, and discover.", ["App.Subtitle"]="AI Analytics Platform", ["Common.Settings"]="Settings", ["Common.Logout"]="Sign out" },
+		};
+		foreach (var locale in locales)
+		{
+			var source = defaults.TryGetValue(locale.Culture, out var exact) ? exact : defaults["en-US"];
+			var existingKeys = await _db.UiTextResources.Where(x => x.TenantId == 0 && x.Culture == locale.Culture).Select(x => x.ResourceKey).ToListAsync(ct);
+			_db.UiTextResources.AddRange(source.Where(x => !existingKeys.Contains(x.Key, StringComparer.OrdinalIgnoreCase)).Select(x => new UiTextResource { TenantId = 0, Culture = locale.Culture, ResourceKey = x.Key, Value = x.Value, Description = x.Key.StartsWith("Common.") ? "系统通用文本" : "系统界面文本" }));
+		}
+		await _db.SaveChangesAsync(ct);
+	}
 }
+
+public sealed record SaveUiTextRequest(string? Value, string? Description = null);
+public sealed record SaveUiLanguageRequest(string? Culture, string? DisplayName, string? NativeName, string? CopyFromCulture = null);
 
 /// <summary>语言区域摘要 DTO。</summary>
 public sealed record LocaleSummary(

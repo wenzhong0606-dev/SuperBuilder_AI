@@ -188,6 +188,10 @@ public sealed class AuthMiddleware
 		if (path.StartsWithSegments("/evaluation")) return true;
 		if (path.StartsWithSegments("/health")) return true;
 		if (path.StartsWithSegments("/api/auth/login")) return true;
+		if (path.StartsWithSegments("/api/auth/login-options")) return true;
+		if (path.StartsWithSegments("/api/platform-bootstrap")) return true;
+		// 登录前只开放只读的公共语言入口；管理接口仍需解析认证身份。
+		if (path.StartsWithSegments("/api/localization/public")) return true;
 		if (path.StartsWithSegments("/css")) return true;
 		if (path.StartsWithSegments("/js")) return true;
 		if (path.StartsWithSegments("/lib")) return true;
