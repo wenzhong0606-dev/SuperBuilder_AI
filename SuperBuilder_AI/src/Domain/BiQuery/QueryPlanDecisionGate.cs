@@ -279,6 +279,42 @@ public sealed class QueryPlanDecisionGate
 		}
 
 
+		// ---------------------------------------------------------
+		// 合法明细列表：Medium 亦可进入 SQL Builder
+		// ---------------------------------------------------------
+		//
+		// 明细列表（目标实体已解析、含 Limit/Order、无指标/维度）
+		// 语义明确，不需要指标/维度确认。即使置信度为 Medium，
+		// 也应直接进入 SQL Builder，避免「列出最近十张入库单」这类
+		// 请求被无限期卡在 Confirmation。
+		//
+		// 安全前提：Hard Blocking 已在 Evaluate() 入口统一拦截
+		// （校验错误 / Repair 异常 / BlockingReasons 均会先 Reject）。
+
+		if (confidence.IsExecutableDetailQuery)
+		{
+			return new QueryPlanDecision
+			{
+				Decision =
+					QueryPlanDecisionType.Proceed,
+
+				Confidence =
+					confidence,
+
+				ShouldExecute =
+					true,
+
+				RequiresConfirmation =
+					false,
+
+				Reason =
+					$"QueryPlan 为合法明细列表（目标实体已解析、含 Limit/Order、无指标/维度），" +
+					$"Score = {confidence.Score:F3}，" +
+					"允许直接进入 SQL Builder。"
+			};
+		}
+
+
 		return new QueryPlanDecision
 		{
 			Decision =

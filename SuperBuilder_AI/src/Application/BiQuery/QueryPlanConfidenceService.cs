@@ -352,6 +352,42 @@ public sealed class QueryPlanConfidenceService
 			!maxRepairAttemptsReached;
 
 
+		/*
+		 * 合法明细列表判定：
+		 *
+		 * 目标实体已解析（Tables 含有效 MetadataTableId）
+		 * 且非聚合
+		 * 且无指标/维度（明细列表不需要聚合语义）
+		 * 且含 Limit 或 OrderBy（明确的列表/排序意图）
+		 * 且无校验错误、无 Repair 异常。
+		 *
+		 * 命中后，Decision Gate 在 Medium 置信度下也可直接进入 SQL Builder，
+		 * 避免「列出最近十张入库单」这类明细请求被误判为需补充指标/维度。
+		 */
+		var isExecutableDetailQuery =
+			plan.Tables.Any(
+				t => t.MetadataTableId > 0)
+			&&
+			!plan.IsAggregate
+			&&
+			plan.Metrics.Count == 0
+			&&
+			plan.Dimensions.Count == 0
+			&&
+			(plan.Limit.HasValue
+				|| plan.Orders.Count > 0)
+			&&
+			validationErrorCount == 0
+			&&
+			!repairStalled
+			&&
+			!repairLoopDetected
+			&&
+			!repairFailed
+			&&
+			!maxRepairAttemptsReached;
+
+
 		return new QueryPlanConfidence
 		{
 			Score =
@@ -362,6 +398,9 @@ public sealed class QueryPlanConfidenceService
 
 			CanProceed =
 				canProceed,
+
+			IsExecutableDetailQuery =
+				isExecutableDetailQuery,
 
 			Evidence =
 				evidence,

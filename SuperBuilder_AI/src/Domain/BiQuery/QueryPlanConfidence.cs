@@ -28,6 +28,15 @@ public sealed class QueryPlanConfidence
 	public bool CanProceed { get; set; }
 
 	/// <summary>
+	/// 是否为「合法明细列表」：目标实体已解析、含 Limit/Order、非聚合、无指标/维度、无校验错误。
+	///
+	/// 由 Confidence Service 在评估时计算，供 Decision Gate 在 Medium 置信度下
+	/// 仍允许直接进入 SQL Builder。明细列表语义明确（只是列出某实体的行），
+	/// 不依赖指标/维度，因此不应被当成「需要补充指标或维度」而卡在确认环节。
+	/// </summary>
+	public bool IsExecutableDetailQuery { get; set; }
+
+	/// <summary>
 	/// Confidence 的详细证据。
 	/// </summary>
 	public QueryPlanConfidenceEvidence Evidence { get; set; } = new();

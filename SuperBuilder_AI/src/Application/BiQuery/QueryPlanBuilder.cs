@@ -1332,8 +1332,45 @@ public partial class QueryPlanBuilder : IQueryPlanBuilder
 
 		if (plan.Fields.Count == 0)
 		{
-			throw new InvalidOperationException(
-				$"QueryPlan没有任何可查询字段：{intent.OriginalQuestion}");
+			/*
+			 * 合法明细列表（目标表已解析 + 含 Limit/Order + 非聚合 + 无指标/维度）
+			 * 允许无显式字段：按首选展示列补全后进入 SQL Builder。
+			 * 这类请求不需要指标/维度，误报 SB_BI_002 会阻断
+			 * 「列出最近十张入库单」等明细场景。
+			 */
+			var isDetailList =
+				plan.Tables.Any(
+					t => t.MetadataTableId > 0)
+				&& !plan.IsAggregate
+				&& plan.Metrics.Count == 0
+				&& plan.Dimensions.Count == 0
+				&& (plan.Limit.HasValue
+					|| plan.Orders.Count > 0);
+
+			if (isDetailList
+				&& table != null
+				&& table.Columns != null)
+			{
+				var preferred =
+					GetPreferredDisplayColumns(table)
+						.Take(8)
+						.ToList();
+
+				foreach (var pc in preferred)
+				{
+					AddOrUpdateQueryField(
+						plan,
+						pc,
+						"NONE");
+				}
+			}
+
+			// 明细列表已按首选列补全；若仍无字段（异常情况下），按原规则报错。
+			if (plan.Fields.Count == 0)
+			{
+				throw new InvalidOperationException(
+					$"QueryPlan没有任何可查询字段：{intent.OriginalQuestion}");
+			}
 		}
 
 
