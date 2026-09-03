@@ -1392,13 +1392,24 @@ public partial class QueryPlanBuilder : IQueryPlanBuilder
 			&& (plan.Limit.HasValue
 				|| plan.Orders.Count > 0);
 
-		var userRequestedMoreFields =
-			isDetailList
-			&& IsFieldExpansionRequested(intent.OriginalQuestion)
+		// 字段扩展请求：用户明确说“显示更多字段/列”等。
+		// 实战中 LLM 常把这类 refine 指令误解析为带 dimension/metric 的查询，
+		// 导致 isDetailList 为 false。这里把字段扩展从 isDetailList 解耦：
+		// 只要非聚合、无指标、字段不足，就强制补足到 FallbackTargetColumnCount。
+		var fieldExpansionRequested =
+			IsFieldExpansionRequested(intent.OriginalQuestion)
+			&& !plan.IsAggregate
+			&& plan.Metrics.Count == 0
 			&& plan.Fields.Count > 0
-			&& plan.Fields.Count < 8;
+			&& plan.Fields.Count < FallbackTargetColumnCount;
 
-		if (plan.Fields.Count == 0 || userRequestedMoreFields)
+		var shouldExpandFields =
+			(isDetailList || fieldExpansionRequested)
+			&& table != null
+			&& table.Columns != null
+			&& plan.Fields.Count < FallbackTargetColumnCount;
+
+		if (shouldExpandFields)
 		{
 			/*
 			 * 合法明细列表（目标表已解析 + 含 Limit/Order + 非聚合 + 无指标/维度）
@@ -1407,7 +1418,9 @@ public partial class QueryPlanBuilder : IQueryPlanBuilder
 			 * 「列出最近十张入库单」等明细场景。
 			 *
 			 * 另外，当用户明确说“显示更多字段”等 refine 指令时，
-			 * 即使 LLM 只返回了少量字段，也强制扩展到首选展示列。
+			 * 即使 LLM 把该指令误解析为带 dimension/metric（导致 isDetailList=false），
+			 * 也应在当前已选字段基础上补足到 FallbackTargetColumnCount，
+			 * 避免 refine 后反而只剩一个时间字段。
 			 *
 			 * 两层兜底：
 			 *  1) GetPreferredDisplayColumns —— 业务语义推荐的列
@@ -1415,37 +1428,33 @@ public partial class QueryPlanBuilder : IQueryPlanBuilder
 			 * 第二层确保即便 metadata 列标记（如 IsPreferredDisplay）稀疏，
 			 * refine「显示更多字段」仍能稳定输出该表的多个核心列。
 			 */
-			if (isDetailList
-				&& table != null
+			var preferred =
+				GetPreferredDisplayColumns(table)
+					.Take(FallbackTargetColumnCount)
+					.ToList();
+
+			foreach (var pc in preferred)
+			{
+				AddOrUpdateQueryField(
+					plan,
+					pc,
+					"NONE");
+			}
+
+			// 兜底：首选列不足目标数量时（metadata 标记稀疏），
+			// 按业务相关性补足该表的非内部字段。
+			if (plan.Fields.Count < FallbackTargetColumnCount
 				&& table.Columns != null)
 			{
-				var preferred =
-					GetPreferredDisplayColumns(table)
-						.Take(8)
+				var need =
+					FallbackTargetColumnCount - plan.Fields.Count;
+
+				var more =
+					GetFallbackDisplayColumns(
+						table,
+						plan.Fields.Select(f => f.ColumnName))
+						.Take(need)
 						.ToList();
-
-				foreach (var pc in preferred)
-				{
-					AddOrUpdateQueryField(
-						plan,
-						pc,
-						"NONE");
-				}
-
-				// 兜底：首选列不足 3 个时（即 metadata 标记稀疏，
-				// 例如入库单只标了时间列），补足该表前若干非内部字段。
-				if (plan.Fields.Count < FallbackTargetColumnCount
-					&& table.Columns != null)
-				{
-					var need =
-						FallbackTargetColumnCount - plan.Fields.Count;
-
-					var more =
-						GetFallbackDisplayColumns(
-							table,
-							plan.Fields.Select(f => f.ColumnName))
-							.Take(need)
-							.ToList();
 
 					foreach (var fc in more)
 					{
@@ -1454,15 +1463,14 @@ public partial class QueryPlanBuilder : IQueryPlanBuilder
 							fc,
 							"NONE");
 					}
-				}
-
-				// 明细列表已按首选列补全；若仍无字段（异常情况下），按原规则报错。
-				if (plan.Fields.Count == 0)
-				{
-					throw new InvalidOperationException(
-						$"QueryPlan没有任何可查询字段：{intent.OriginalQuestion}");
-				}
 			}
+		}
+
+		// 明细列表已按首选列补全；若仍无字段（非明细查询且无字段），按原规则报错。
+		if (plan.Fields.Count == 0)
+		{
+			throw new InvalidOperationException(
+				$"QueryPlan没有任何可查询字段：{intent.OriginalQuestion}");
 		}
 
 

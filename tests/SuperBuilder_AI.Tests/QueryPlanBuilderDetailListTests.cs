@@ -275,4 +275,76 @@ public class QueryPlanBuilderDetailListTests
 		Assert.DoesNotContain(plan.Fields, f => f.ColumnName != null && f.ColumnName.EndsWith("_by", StringComparison.OrdinalIgnoreCase));
 		Assert.DoesNotContain(plan.Fields, f => string.Equals(f.ColumnName, "del_flag", StringComparison.OrdinalIgnoreCase));
 	}
+
+	/// <summary>
+	/// 用户实战场景（右侧截图）：refine 说“显示更多字段”后，
+	/// LLM 只返回 create_time 一个字段。修复前 Step11 的 userRequestedMoreFields
+	/// 依赖 isDetailList，而字段扩展请求本身应独立触发补列。
+	/// 修复后应强制补足到 FallbackTargetColumnCount，包含业务字段。
+	/// </summary>
+	[Fact]
+	public async Task Refine_field_expansion_forces_columns_when_only_one_time_field_selected()
+	{
+		var table = MakeReceiptTable();
+		var ctx = CreateContext(out var connection);
+		await using var _ = connection;
+		await using var __ = ctx;
+		await SeedAsync(ctx, table);
+
+		var search = new FakeSearch { Results = { TableVector(table) } };
+		var builder = BuildBuilder(search, ctx);
+
+		var plan = await builder.BuildAsync(new QueryIntent
+		{
+			OriginalQuestion = "查询最近的十条入库记录；显示更多字段",
+			IntentType = "Detail",
+			Limit = 10,
+			OrderBy = "create_time",
+			OrderDirection = "DESC",
+		});
+
+		Assert.True(plan.Fields.Count >= 6, $"refine 后应补到至少 6 列，实际 {plan.Fields.Count}");
+		Assert.Contains(plan.Fields, f => string.Equals(f.ColumnName, "come_time", StringComparison.OrdinalIgnoreCase));
+		Assert.Contains(plan.Fields, f => string.Equals(f.ColumnName, "receipt_no", StringComparison.OrdinalIgnoreCase));
+		Assert.Contains(plan.Fields, f => string.Equals(f.ColumnName, "material_code", StringComparison.OrdinalIgnoreCase));
+		Assert.Contains(plan.Fields, f => string.Equals(f.ColumnName, "quantity", StringComparison.OrdinalIgnoreCase));
+		Assert.DoesNotContain(plan.Fields, f => string.Equals(f.ColumnName, "del_flag", StringComparison.OrdinalIgnoreCase));
+	}
+
+	/// <summary>
+	/// 字段扩展请求应从 isDetailList 解耦：
+	/// LLM 把“显示更多字段”误解析为 dimension（如 material_code），
+	/// 导致 isDetailList=false；但用户语义只是扩展 SELECT 列，
+	/// 仍应补足到目标列数。
+	/// </summary>
+	[Fact]
+	public async Task Refine_field_expansion_works_even_when_llm_adds_dimension()
+	{
+		var table = MakeReceiptTable();
+		var ctx = CreateContext(out var connection);
+		await using var _ = connection;
+		await using var __ = ctx;
+		await SeedAsync(ctx, table);
+
+		var search = new FakeSearch { Results = { TableVector(table) } };
+		var builder = BuildBuilder(search, ctx);
+
+		var plan = await builder.BuildAsync(new QueryIntent
+		{
+			OriginalQuestion = "查询最近的十条入库记录；显示更多字段",
+			IntentType = "Detail",
+			Limit = 10,
+			OrderBy = "come_time",
+			OrderDirection = "DESC",
+			Dimensions = { "material_code" },
+		});
+
+		// 由于 LLM 返回了 dimension，isDetailList 为 false，
+		// 但字段扩展请求仍应触发，强制补列。
+		Assert.True(plan.Fields.Count >= 6, $"误加 dimension 后仍应补到至少 6 列，实际 {plan.Fields.Count}");
+		Assert.Contains(plan.Fields, f => string.Equals(f.ColumnName, "come_time", StringComparison.OrdinalIgnoreCase));
+		Assert.Contains(plan.Fields, f => string.Equals(f.ColumnName, "receipt_no", StringComparison.OrdinalIgnoreCase));
+		Assert.Contains(plan.Fields, f => string.Equals(f.ColumnName, "quantity", StringComparison.OrdinalIgnoreCase));
+		Assert.DoesNotContain(plan.Fields, f => string.Equals(f.ColumnName, "del_flag", StringComparison.OrdinalIgnoreCase));
+	}
 }
