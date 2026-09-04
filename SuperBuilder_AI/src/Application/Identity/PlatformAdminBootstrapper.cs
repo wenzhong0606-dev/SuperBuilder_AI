@@ -5,6 +5,19 @@ using SuperBuilder_AI.Services.Auth;
 
 namespace SuperBuilder_AI.Services.Identity;
 
+/// <summary>平台初始化所需的可诊断状态；避免空库/缺行时以异常终止启动。</summary>
+public enum BootstrapStatus
+{
+    /// <summary>存在平台治理管理员，初始化入口已关闭。</summary>
+    Ready,
+
+    /// <summary>平台租户与角色已就绪，但尚无治理管理员，可交互式初始化。</summary>
+    NeedsInitialization,
+
+    /// <summary>平台租户或角色缺失（Schema 未迁移/平台目录未种子），无法初始化。</summary>
+    NeedsMigration,
+}
+
 /// <summary>从安全配置幂等创建首个平台治理管理员；已有治理管理员时不做任何修改。</summary>
 public sealed class PlatformAdminBootstrapper
 {
@@ -21,7 +34,8 @@ public sealed class PlatformAdminBootstrapper
 
     public async Task<bool> EnsureAsync(CancellationToken ct = default)
     {
-        if (await HasAdministratorAsync(ct)) return false;
+        var status = await GetStatusAsync(ct);
+        if (status != BootstrapStatus.NeedsInitialization) return false;
 
         var username = (_configuration["PlatformBootstrap:Username"] ?? string.Empty).Trim();
         var password = _configuration["PlatformBootstrap:Password"] ?? string.Empty;
@@ -31,22 +45,34 @@ public sealed class PlatformAdminBootstrapper
         return true;
     }
 
-    public async Task<bool> HasAdministratorAsync(CancellationToken ct = default)
+    /// <summary>
+    /// 安全探测当前初始化状态，空库或缺行时返回 <see cref="BootstrapStatus.NeedsMigration"/>，
+    /// 绝不抛出 <see cref="InvalidOperationException"/>（M0-05：禁止无保护的 SingleAsync 终止启动）。
+    /// </summary>
+    public async Task<BootstrapStatus> GetStatusAsync(CancellationToken ct = default)
     {
         var platformTenantId = await _db.Tenants.IgnoreQueryFilters()
             .Where(t => t.TenantCode == IdentityService.PlatformTenantCode)
-            .Select(t => t.Id).SingleAsync(ct);
+            .Select(t => t.Id).FirstOrDefaultAsync(ct);
+        if (platformTenantId == 0) return BootstrapStatus.NeedsMigration;
+
         var platformRoleId = await _db.Roles
             .Where(r => r.TenantId == 0 && r.Code == IdentityRoles.PlatformAdmin)
-            .Select(r => r.Id).SingleAsync(ct);
-        return await _db.UserRoles.AnyAsync(ur =>
-            ur.TenantId == platformTenantId && ur.RoleId == platformRoleId, ct);
+            .Select(r => r.Id).FirstOrDefaultAsync(ct);
+        if (platformRoleId == 0) return BootstrapStatus.NeedsMigration;
+
+        var hasAdmin = await _db.UserRoles.AnyAsync(
+            ur => ur.TenantId == platformTenantId && ur.RoleId == platformRoleId, ct);
+        return hasAdmin ? BootstrapStatus.Ready : BootstrapStatus.NeedsInitialization;
     }
 
-    public Task<long> GetPlatformTenantIdAsync(CancellationToken ct = default) =>
+    public async Task<bool> HasAdministratorAsync(CancellationToken ct = default) =>
+        (await GetStatusAsync(ct)) == BootstrapStatus.Ready;
+
+    public Task<long?> GetPlatformTenantIdAsync(CancellationToken ct = default) =>
         _db.Tenants.IgnoreQueryFilters()
             .Where(t => t.TenantCode == IdentityService.PlatformTenantCode)
-            .Select(t => t.Id).SingleAsync(ct);
+            .Select(t => (long?)t.Id).FirstOrDefaultAsync(ct);
 
     public async Task<(long TenantId, long UserId)> CreateAsync(
         string username, string password, string? displayName, CancellationToken ct = default)
@@ -58,9 +84,15 @@ public sealed class PlatformAdminBootstrapper
             throw new ArgumentException("用户名必填，口令至少 8 位。");
 
         var platformTenant = await _db.Tenants.IgnoreQueryFilters()
-            .SingleAsync(t => t.TenantCode == IdentityService.PlatformTenantCode, ct);
+            .SingleOrDefaultAsync(t => t.TenantCode == IdentityService.PlatformTenantCode, ct);
+        if (platformTenant is null)
+            throw new InvalidOperationException("平台租户尚未创建，请先完成数据库迁移与平台目录种子。");
+
         var platformRole = await _db.Roles
-            .SingleAsync(r => r.TenantId == 0 && r.Code == IdentityRoles.PlatformAdmin, ct);
+            .SingleOrDefaultAsync(r => r.TenantId == 0 && r.Code == IdentityRoles.PlatformAdmin, ct);
+        if (platformRole is null)
+            throw new InvalidOperationException("平台管理员角色尚未创建，请先完成平台目录种子。");
+
         if (await _db.UserRoles.AnyAsync(ur => ur.TenantId == platformTenant.Id && ur.RoleId == platformRole.Id, ct))
             throw new InvalidOperationException("平台管理员已经存在，初始化入口已关闭。");
         if (await _db.Users.IgnoreQueryFilters().AnyAsync(u => u.Username == username, ct))

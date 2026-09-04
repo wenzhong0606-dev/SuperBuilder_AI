@@ -57,4 +57,73 @@ public sealed class PlatformAdminBootstrapperTests
         Assert.False(await bootstrapper.EnsureAsync());
         Assert.False(await bootstrapper.HasAdministratorAsync());
     }
+
+    [Fact]
+    public async Task GetStatusAsync_OnEmptyDatabase_ReturnsNeedsMigration()
+    {
+        using var connection = new SqliteConnection("DataSource=:memory:");
+        connection.Open();
+        var options = new DbContextOptionsBuilder<SuperBIContext>().UseSqlite(connection).Options;
+        await using var db = new SuperBIContext(options);
+        await db.Database.EnsureCreatedAsync();
+        var bootstrapper = new PlatformAdminBootstrapper(db, new PasswordHasher(), new ConfigurationBuilder().Build());
+
+        var status = await bootstrapper.GetStatusAsync();
+        Assert.Equal(BootstrapStatus.NeedsMigration, status);
+    }
+
+    [Fact]
+    public async Task GetStatusAsync_AfterSeedWithoutAdmin_ReturnsNeedsInitialization()
+    {
+        using var connection = new SqliteConnection("DataSource=:memory:");
+        connection.Open();
+        var options = new DbContextOptionsBuilder<SuperBIContext>().UseSqlite(connection).Options;
+        await using var db = new SuperBIContext(options);
+        await db.Database.EnsureCreatedAsync();
+        var hasher = new PasswordHasher();
+        await new IdentityService(db, hasher).SeedAsync();
+        var bootstrapper = new PlatformAdminBootstrapper(db, hasher, new ConfigurationBuilder().Build());
+
+        var status = await bootstrapper.GetStatusAsync();
+        Assert.Equal(BootstrapStatus.NeedsInitialization, status);
+        Assert.False(await bootstrapper.HasAdministratorAsync());
+    }
+
+    [Fact]
+    public async Task GetStatusAsync_WithAdmin_ReturnsReady()
+    {
+        using var connection = new SqliteConnection("DataSource=:memory:");
+        connection.Open();
+        var options = new DbContextOptionsBuilder<SuperBIContext>().UseSqlite(connection).Options;
+        await using var db = new SuperBIContext(options);
+        await db.Database.EnsureCreatedAsync();
+        var hasher = new PasswordHasher();
+        await new IdentityService(db, hasher).SeedAsync();
+        var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["PlatformBootstrap:Username"] = "platform-root",
+            ["PlatformBootstrap:Password"] = "StrongPass123!",
+        }).Build();
+        var bootstrapper = new PlatformAdminBootstrapper(db, hasher, config);
+
+        Assert.True(await bootstrapper.EnsureAsync());
+        Assert.Equal(BootstrapStatus.Ready, await bootstrapper.GetStatusAsync());
+        Assert.True(await bootstrapper.HasAdministratorAsync());
+    }
+
+    [Fact]
+    public async Task EnsureAsync_WhenNeedsMigration_DoesNotThrowAndReturnsFalse()
+    {
+        using var connection = new SqliteConnection("DataSource=:memory:");
+        connection.Open();
+        var options = new DbContextOptionsBuilder<SuperBIContext>().UseSqlite(connection).Options;
+        await using var db = new SuperBIContext(options);
+        await db.Database.EnsureCreatedAsync();
+        var bootstrapper = new PlatformAdminBootstrapper(db, new PasswordHasher(), new ConfigurationBuilder().Build());
+
+        // 空库（平台租户缺失）下 EnsureAsync 必须安全返回 false，而非抛出 InvalidOperationException
+        var ex = await Record.ExceptionAsync(() => bootstrapper.EnsureAsync());
+        Assert.Null(ex);
+        Assert.False(await bootstrapper.EnsureAsync());
+    }
 }

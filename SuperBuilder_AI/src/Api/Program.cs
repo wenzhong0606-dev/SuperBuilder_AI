@@ -33,6 +33,7 @@ using SuperBuilder_AI.Services.Audit;
 using SuperBuilder_AI.Interfaces.Quota;
 using SuperBuilder_AI.Services.Quota;
 using SuperBuilder_AI.Middleware;
+using SuperBuilder_AI.Api.Diagnostics;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -251,41 +252,97 @@ builder.Services.AddSingleton<SuperBuilder_AI.Api.Caching.IAskResponseCache,
 // P11.5.2 安全/运维轨：请求指标采集器（请求数 / 错误数 / P95 延迟，按路由聚合）
 builder.Services.AddSingleton<SuperBuilder_AI.Middleware.RequestMetricsCollector>();
 
+// M0-05：受控启动诊断单例（供 /health 与初始化端点读取，绝不向普通用户输出堆栈）
+builder.Services.AddSingleton<StartupDiagnostics>();
+// M0-05：本地化目录种子服务，使 UiLanguage/Text 在启动序列中固定顺序执行
+builder.Services.AddScoped<ILocalizationSeedService, LocalizationSeedService>();
+
 var app = builder.Build();
 
-// P10.1 Identity 全局目录种子（幂等）。
-using (var seedScope = app.Services.CreateScope())
-{
-    try
-    {
-        var identity = seedScope.ServiceProvider.GetRequiredService<IIdentityService>();
-        await identity.SeedAsync();
-    }
-    catch (Exception seedEx)
-    {
-        Console.Error.WriteLine($"[IdentitySeed] skipped: {seedEx.Message}");
-    }
-}
+// ── M0-05：受控启动序列 ────────────────────────────────────────────────
+// 固定顺序：Schema → Identity/Permission → UiLanguage/Text → 默认策略/主题 → Bootstrap。
+// 每一步独立异常隔离（不抛到宿主进程），并记录结构化日志与可诊断状态；
+// 数据库不可达 / Schema 未创建 / 种子不完整均被区分，Web 仍可启动到受限诊断模式。
+var diagnostics = app.Services.GetRequiredService<StartupDiagnostics>();
+var migrateOnStartup = builder.Configuration.GetValue<bool>("Startup:MigrateOnStartup");
 
-// 若提供安全配置则自动创建首个平台管理员；未提供时由登录页的一次性本机初始化向导完成。
-using (var bootstrapScope = app.Services.CreateScope())
+using (var startupScope = app.Services.CreateScope())
 {
-    var bootstrapper = bootstrapScope.ServiceProvider.GetRequiredService<PlatformAdminBootstrapper>();
-    if (await bootstrapper.EnsureAsync())
-        Console.WriteLine("[PlatformBootstrap] first platform administrator created.");
-}
+    var db = startupScope.ServiceProvider.GetRequiredService<SuperBIContext>();
+    var logger = app.Logger;
 
-// P10.4 Quota 平台默认配额种子（幂等；失败不阻断平台启动）
-using (var quotaScope = app.Services.CreateScope())
-{
-    try
+    // 步骤 1：Schema / 数据库可达性（可区分 DB 不可达与 Schema 未创建）
+    var schema = await SchemaProbe.ProbeAsync(db, migrateOnStartup);
+    if (schema.State != BootstrapState.Ready)
     {
-        var quota = quotaScope.ServiceProvider.GetRequiredService<IQuotaService>();
-        await quota.EnsureSeededAsync();
+        diagnostics.State = schema.State;
+        diagnostics.Reason = schema.Reason;
+        logger.LogError("Startup schema probe failed: {State} - {Reason}", schema.State, schema.Reason);
     }
-    catch (Exception seedEx)
+    else
     {
-        Console.Error.WriteLine($"[QuotaSeed] skipped: {seedEx.Message}");
+        diagnostics.State = BootstrapState.Ready;
+        diagnostics.MarkStep("Schema");
+
+        // 步骤 2：Identity / Permission 全局目录种子（幂等）
+        try
+        {
+            var identity = startupScope.ServiceProvider.GetRequiredService<IIdentityService>();
+            await identity.SeedAsync();
+            diagnostics.MarkStep("Identity");
+            logger.LogInformation("Platform identity catalog seeded.");
+        }
+        catch (Exception seedEx)
+        {
+            diagnostics.State = BootstrapState.SeedIncomplete;
+            diagnostics.Reason = $"平台目录种子失败：{seedEx.Message}";
+            logger.LogError(seedEx, "Platform identity seed failed.");
+        }
+
+        // 步骤 3：UiLanguage / Text 本地化目录种子（幂等）
+        try
+        {
+            var localizationSeed = startupScope.ServiceProvider.GetRequiredService<ILocalizationSeedService>();
+            await localizationSeed.EnsureSeedAsync();
+            diagnostics.MarkStep("Localization");
+            logger.LogInformation("Localization catalog seeded.");
+        }
+        catch (Exception seedEx)
+        {
+            diagnostics.State = BootstrapState.SeedIncomplete;
+            diagnostics.Reason = $"本地化种子失败：{seedEx.Message}";
+            logger.LogError(seedEx, "Localization seed failed.");
+        }
+
+        // 步骤 4：默认策略/主题（Quota 平台默认配额，幂等）
+        try
+        {
+            var quota = startupScope.ServiceProvider.GetRequiredService<IQuotaService>();
+            await quota.EnsureSeededAsync();
+            diagnostics.MarkStep("Quota");
+            logger.LogInformation("Platform default quota seeded.");
+        }
+        catch (Exception seedEx)
+        {
+            diagnostics.State = BootstrapState.SeedIncomplete;
+            diagnostics.Reason = $"默认配额种子失败：{seedEx.Message}";
+            logger.LogError(seedEx, "Quota seed failed.");
+        }
+
+        // 步骤 5：平台管理员引导（幂等；缺 Schema/目录时安全返回，不抛异常）
+        try
+        {
+            var bootstrapper = startupScope.ServiceProvider.GetRequiredService<PlatformAdminBootstrapper>();
+            var created = await bootstrapper.EnsureAsync();
+            diagnostics.MarkStep("Bootstrap");
+            if (created) logger.LogInformation("First platform administrator created.");
+        }
+        catch (Exception seedEx)
+        {
+            diagnostics.State = BootstrapState.SeedIncomplete;
+            diagnostics.Reason = $"平台管理员引导失败：{seedEx.Message}";
+            logger.LogError(seedEx, "Platform bootstrap failed.");
+        }
     }
 }
 
@@ -306,7 +363,15 @@ app.UseMiddleware<ObservabilityMiddleware>();
 app.MapStaticAssets();
 app.MapControllerRoute(name: "default", pattern: "{controller=Home}/{action=Index}/{id?}").WithStaticAssets();
 // P11.0 健康探测（匿名白名单，供运维/可观测面使用）
-app.MapGet("/health", () => new { status = "healthy", ts = System.DateTime.UtcNow });
+// M0-05：在受限诊断模式下仍返回 200，但通过 state/reason 暴露可诊断状态，避免启动崩溃或堆栈泄漏。
+app.MapGet("/health", (StartupDiagnostics d) => new
+{
+    status = d.State is BootstrapState.Ready or BootstrapState.SeedIncomplete ? "healthy" : "degraded",
+    state = d.State.ToString(),
+    reason = d.Reason,
+    steps = d.CompletedSteps,
+    ts = System.DateTime.UtcNow,
+});
 // SB-P0-09 请求指标端点：由 AuthMiddleware 强制 platform:diagnostics:view 权限。
 app.MapGet("/metrics", (SuperBuilder_AI.Middleware.RequestMetricsCollector metrics,
 		SuperBuilder_AI.Api.Caching.IAskResponseCache cache) =>

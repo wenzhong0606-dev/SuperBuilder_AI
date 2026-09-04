@@ -17,12 +17,28 @@ public sealed class PlatformBootstrapController : ControllerBase
     public PlatformBootstrapController(PlatformAdminBootstrapper bootstrapper) => _bootstrapper = bootstrapper;
 
     [HttpGet("status")]
-    public async Task<IActionResult> Status(CancellationToken ct) =>
-        Ok(new
+    public async Task<IActionResult> Status(CancellationToken ct)
+    {
+        try
         {
-            required = !await _bootstrapper.HasAdministratorAsync(ct),
-            platformTenantId = await _bootstrapper.GetPlatformTenantIdAsync(ct),
-        });
+            var status = await _bootstrapper.GetStatusAsync(ct);
+            return Ok(new
+            {
+                status = status.ToString(),
+                required = status == BootstrapStatus.NeedsInitialization,
+                platformTenantId = await _bootstrapper.GetPlatformTenantIdAsync(ct),
+            });
+        }
+        catch (Exception ex)
+        {
+            // 数据库不可达 / Schema 未创建等情况下返回可诊断状态，而非 500 + 堆栈
+            return StatusCode(503, new ApiError
+            {
+                Code = ErrorCodes.ServiceUnavailable,
+                Message = $"平台尚未就绪：{ex.Message}",
+            });
+        }
+    }
 
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] PlatformBootstrapRequest request, CancellationToken ct)
