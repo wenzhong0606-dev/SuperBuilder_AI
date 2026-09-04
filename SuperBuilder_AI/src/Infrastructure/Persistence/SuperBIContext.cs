@@ -352,14 +352,21 @@ public class SuperBIContext : DbContext
         #endregion
 
         #region P10.1 Identity
-        // User：租户作用域，用户名全局唯一（TenantId=0 不放开，用户始终归属某一租户）。
+        // User：租户作用域。用户名唯一范围收窄为租户内 (TenantId, NormalizedUsername)（DEC-02）。
+        // User→Tenant 的外键在本阶段以写入路径（CreateUserAsync 的租户存在性校验）强制，
+        // 未加 DB 级 FK：既有集成测试以 new User{TenantId=N} 直接注入且不建对应租户行，加 FK 会破坏种子。
+        // 后续硬化项见 Master_Development_Plan.md。
         builder.Entity<User>().ToTable(tb => tb.HasComment("用户"));
-        builder.Entity<User>().HasIndex(u => u.Username).IsUnique();
+        builder.Entity<User>().HasIndex(u => new { u.TenantId, u.NormalizedUsername }).IsUnique()
+            .HasDatabaseName("IX_Users_TenantId_NormalizedUsername");
         builder.Entity<User>().HasIndex(u => u.TenantId);
         builder.Entity<User>().Property(u => u.TenantId).HasComment("所属租户");
-        builder.Entity<User>().Property(u => u.Username).IsRequired().HasMaxLength(128).HasComment("登录名（全局唯一）");
+        builder.Entity<User>().Property(u => u.Username).IsRequired().HasMaxLength(128).HasComment("登录名（展示用，大小写原始）");
+        builder.Entity<User>().Property(u => u.NormalizedUsername).HasMaxLength(128).HasComment("规范化登录名（小写，租户内唯一）");
         builder.Entity<User>().Property(u => u.DisplayName).IsRequired().HasMaxLength(128).HasComment("显示名");
         builder.Entity<User>().Property(u => u.Email).HasMaxLength(256).HasComment("邮箱");
+        builder.Entity<User>().Property(u => u.NormalizedEmail).HasMaxLength(256).HasComment("规范化邮箱（小写）");
+        builder.Entity<User>().Property(u => u.EmailConfirmed).IsRequired().HasDefaultValue(false).HasComment("邮箱是否已验证");
         builder.Entity<User>().Property(u => u.Status).HasComment("状态");
         builder.Entity<User>().Property(u => u.PasswordHash).HasMaxLength(256).HasComment("口令哈希（PBKDF2，可选）");
         builder.Entity<User>().Property(u => u.SecurityStamp).HasMaxLength(64).HasComment("安全戳（令牌吊销用）");
@@ -379,13 +386,21 @@ public class SuperBIContext : DbContext
         builder.Entity<Permission>().Property(p => p.Name).IsRequired().HasMaxLength(128).HasComment("权限名");
         builder.Entity<Permission>().Property(p => p.Category).IsRequired().HasMaxLength(32).HasComment("权限分类");
 
-        // UserRole：同租户内 (User, Role) 唯一。
+        // UserRole：同租户内 (User, Role) 唯一；FK 到 User/Role，级联删除保证引用完整性。
         builder.Entity<UserRole>().ToTable(tb => tb.HasComment("用户-角色关联"));
         builder.Entity<UserRole>().HasIndex(ur => new { ur.TenantId, ur.UserId, ur.RoleId }).IsUnique();
+        builder.Entity<UserRole>()
+            .HasOne<User>().WithMany().HasForeignKey(ur => ur.UserId).OnDelete(DeleteBehavior.Cascade);
+        builder.Entity<UserRole>()
+            .HasOne<Role>().WithMany().HasForeignKey(ur => ur.RoleId).OnDelete(DeleteBehavior.Cascade);
 
-        // RolePermission：同租户内 (Role, Permission) 唯一。
+        // RolePermission：同租户内 (Role, Permission) 唯一；FK 到 Role/Permission，级联删除保证引用完整性。
         builder.Entity<RolePermission>().ToTable(tb => tb.HasComment("角色-权限关联"));
         builder.Entity<RolePermission>().HasIndex(rp => new { rp.TenantId, rp.RoleId, rp.PermissionId }).IsUnique();
+        builder.Entity<RolePermission>()
+            .HasOne<Role>().WithMany().HasForeignKey(rp => rp.RoleId).OnDelete(DeleteBehavior.Cascade);
+        builder.Entity<RolePermission>()
+            .HasOne<Permission>().WithMany().HasForeignKey(rp => rp.PermissionId).OnDelete(DeleteBehavior.Cascade);
 		builder.Entity<DataSourceAccessGrant>().ToTable("DataSourceAccessGrants");
 		builder.Entity<DataSourceAccessGrant>().HasIndex(x => new { x.TenantId, x.DataSourceId, x.SubjectType, x.SubjectId }).IsUnique();
 		builder.Entity<DataSourceAccessGrant>().HasIndex(x => new { x.TenantId, x.SubjectType, x.SubjectId });

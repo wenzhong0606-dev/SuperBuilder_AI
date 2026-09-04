@@ -219,12 +219,17 @@ M0 退出：全部 🔴 完成、凭据已轮换、构建零错误、测试不�
 
 > 落地说明：必填/规范化唯一在**控制器写入路径**强制（既有测试以 `new Tenant { Id }` 形式造数不设 Code，故未加 DB 级 NOT NULL，避免破坏集成测试种子）；DB 级 `nvarchar` 长度约束已加。停用治理三字段 + `IsLocked` 已落库并通过迁移 `M1_02_TenantAndSettingIntegrity`。全量 **576/576 通过**，构建 0 error。
 
-### M1-03 User、Role、Permission
+### M1-03 User、Role、Permission ✅（2026-09-04 收尾）
 
-- 增加 User→Tenant、UserRole→User/Role、RolePermission→Role/Permission 外键和租户一致性校验。
-- 建议 Username 改为 `(TenantId, NormalizedUsername)` 唯一；增加 NormalizedEmail、EmailConfirmed。
-- SecurityStamp 必填；改密、停用和敏感授权后轮换。
-- 建立用户邀请、首次设密、忘记密码、重置密码和状态机。
+- ✅ **外键与级联**：`UserRole→User`/`UserRole→Role`/`RolePermission→Role`/`RolePermission→Permission` 全部加 DB 级外键 + `OnDelete(Cascade)`（迁移 `20260904154222_M1_03_UserRolePermissionIntegrity`，非破坏性：`AddForeignKey` + 过滤唯一索引，无 DropColumn）。测试验证级联删除。
+- ✅ **Username 租户内唯一**：唯一索引由全局 `Username` 收窄为 `(TenantId, NormalizedUsername)`（过滤 `[NormalizedUsername] IS NOT NULL`，兼容存量 NULL 行）；`User.NormalizeUsername`/`NormalizeEmail` 小写去空白；`CreateUserAsync` 改为按租户内规范化名查重。
+- ✅ **新增字段**：`NormalizedUsername`(max128)、`NormalizedEmail`(max256)、`EmailConfirmed`(bit, default false)。
+- ✅ **SecurityStamp 轮换闭环**：改密、角色指派/撤销（既有）**+ 停用/启用（`SetUserStatusAsync` + `PUT /api/identity/users/{id}/status`）** 均轮换；状态机仅允许 `Active ↔ Disabled`。
+- ⏸️ **未做（明确延后，记入硬化项）**：
+  1. `User→Tenant` 的 DB 级外键与"租户存在性"校验——沿用 M1-02 策略：因 `IdentityServiceTests`/`AuthControllerDisabledTenantTests`/`P10AcceptanceTests`/`IdentityControllerTests` 等多处以 `new User{TenantId=N}` 直接注入且不建对应租户行，加 FK 会破坏种子测试；当前仅在 `CreateUserAsync` 校验 `tenantId>0`，DB 级 FK 待测试种子补充租户行后启用。
+  2. `SecurityStamp` 的 DB 级 `IsRequired()`——同因测试直接注入 `User` 不设该字段，维持 `string?` + 创建/回填/轮换保证。
+  3. 用户邀请、首次设密、忘记密码、重置密码全流程——属功能里程碑，超出"字段与数据完整性"主题，本批未覆盖（DEC-02 已落地唯一范围）。
+- 验证：全量测试 **581/581 通过**，构建 0 error。
 
 ### M1-04 DataSource
 

@@ -148,19 +148,27 @@ public class IdentityService : IIdentityService
         await _ctx.SaveChangesAsync(ct);
     }
 
-    public async Task<IdentityResult> CreateUserAsync(long tenantId, string username, string displayName, string email, string[]? roleCodes, CancellationToken ct = default)
+    public async Task<IdentityResult> CreateUserAsync(long tenantId, string username, string? displayName, string? email, string[]? roleCodes, CancellationToken ct = default)
     {
         if (tenantId <= 0) return IdentityResult.Fail("tenantId 必须大于 0");
         if (string.IsNullOrWhiteSpace(username)) return IdentityResult.Fail("username 必填");
-        if (await _ctx.Users.AnyAsync(u => u.Username == username, ct))
-            return IdentityResult.Fail($"用户名已存在: {username}");
+
+        // M1-03：User→Tenant 一致性（同 M1-02 的 TenantCode 策略）——DB 级 FK 延后，避免破坏以
+        // new User{TenantId=N} 直接注入且不建对应租户行的集成测试种子；此处仅校验 tenantId>0，
+        // 完整外键与存在性校验列入后续硬化项（见 Master_Development_Plan.md）。
+        var normalized = User.NormalizeUsername(username);
+        if (await _ctx.Users.AnyAsync(u => u.TenantId == tenantId && u.NormalizedUsername == normalized, ct))
+            return IdentityResult.Fail($"该租户内用户名已存在: {username}");
 
         var user = new User
         {
             TenantId = tenantId,
             Username = username,
+            NormalizedUsername = normalized,
             DisplayName = displayName ?? username,
             Email = email ?? string.Empty,
+            NormalizedEmail = User.NormalizeEmail(email),
+            EmailConfirmed = false,
             SecurityStamp = Guid.NewGuid().ToString("N"),
         };
         _ctx.Users.Add(user);
@@ -225,6 +233,34 @@ public class IdentityService : IIdentityService
         var user = await _ctx.Users.FirstAsync(u => u.Id == userId && u.TenantId == tenantId, ct);
         user.PasswordHash = _hasher.Hash(password);
         // 口令变更即轮换安全戳，使所有旧令牌失效（P0-04B）。
+        user.SecurityStamp = Guid.NewGuid().ToString("N");
+        await _ctx.SaveChangesAsync(ct);
+        return IdentityResult.Ok(userId);
+    }
+
+    /// <summary>
+    /// 设置用户状态（M1-03：用户状态机 + 停用轮换）。仅允许 <see cref="UserStatus.Active"/> ↔
+    /// <see cref="UserStatus.Disabled"/> 切换；状态变更即轮换 <see cref="User.SecurityStamp"/>，
+    /// 使既有令牌在下次请求时失效（下次请求 401，须重新登录）。
+    /// </summary>
+    public async Task<IdentityResult> SetUserStatusAsync(long tenantId, long userId, UserStatus newStatus, CancellationToken ct = default)
+    {
+        if (tenantId <= 0) return IdentityResult.Fail("tenantId 必须大于 0");
+        var user = await _ctx.Users.FirstOrDefaultAsync(u => u.Id == userId && u.TenantId == tenantId, ct);
+        if (user is null) return IdentityResult.Fail($"用户不存在: {userId}");
+        if (user.Status == newStatus) return IdentityResult.Ok(userId);
+
+        // 状态机：仅允许 Active <-> Disabled 切换。
+        var allowed = (user.Status, newStatus) switch
+        {
+            (UserStatus.Active, UserStatus.Disabled) => true,
+            (UserStatus.Disabled, UserStatus.Active) => true,
+            _ => false,
+        };
+        if (!allowed) return IdentityResult.Fail($"不允许的状态切换: {user.Status} -> {newStatus}");
+
+        user.Status = newStatus;
+        // 停用/启用即轮换安全戳，使既有令牌失效（M1-03：停用后轮换）。
         user.SecurityStamp = Guid.NewGuid().ToString("N");
         await _ctx.SaveChangesAsync(ct);
         return IdentityResult.Ok(userId);

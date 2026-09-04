@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
@@ -87,7 +88,7 @@ public class IdentityServiceTests
     }
 
     [Fact]
-    public async Task CreateUser_Duplicate_Username_Fails()
+    public async Task CreateUser_Duplicate_Username_SameTenant_Fails_But_CrossTenant_Succeeds()
     {
         using var ctx = CreateContext(out var conn);
         var svc = CreateService(ctx);
@@ -95,8 +96,111 @@ public class IdentityServiceTests
 
         var first = await svc.CreateUserAsync(Tenant100, "bob", "Bob", "b@x.com", null);
         Assert.True(first.Success);
-        var second = await svc.CreateUserAsync(Tenant200, "bob", "Bob2", "b2@x.com", null); // 全局唯一
-        Assert.False(second.Success);
+        // 同租户内重复登录名（规范化后大小写不敏感）应失败。
+        var sameTenantDup = await svc.CreateUserAsync(Tenant100, "BOB", "Bob2", "b2@x.com", null);
+        Assert.False(sameTenantDup.Success);
+        // 跨租户同名允许：唯一范围收窄为 (TenantId, NormalizedUsername)（DEC-02）。
+        var crossTenant = await svc.CreateUserAsync(Tenant200, "bob", "Bob3", "b3@x.com", null);
+        Assert.True(crossTenant.Success);
+    }
+
+    [Fact]
+    public async Task CreateUser_Normalizes_Username_Email_And_Defaults_EmailConfirmed()
+    {
+        using var ctx = CreateContext(out var conn);
+        var svc = CreateService(ctx);
+        await svc.SeedAsync();
+
+        var r = await svc.CreateUserAsync(Tenant100, "  Bob.Smith@Example.COM ", "Bob", "Bob.Smith@Example.COM", null);
+        Assert.True(r.Success);
+        var user = await ctx.Users.SingleAsync(u => u.Id == r.Id!.Value);
+
+        Assert.Equal("  Bob.Smith@Example.COM ", user.Username); // 原始大小写保留
+        Assert.Equal("bob.smith@example.com", user.NormalizedUsername); // 小写、去首尾空白
+        Assert.Equal("bob.smith@example.com", user.NormalizedEmail);
+        Assert.False(user.EmailConfirmed); // 默认未验证
+    }
+
+    [Fact]
+    public async Task SetUserStatus_Disable_RotatesSecurityStamp_And_Reenable_Works()
+    {
+        using var ctx = CreateContext(out var conn);
+        var svc = CreateService(ctx);
+        await svc.SeedAsync();
+
+        var r = await svc.CreateUserAsync(Tenant100, "carol", "Carol", "c@x.com", null);
+        var user = await ctx.Users.SingleAsync(u => u.Id == r.Id!.Value);
+        var originalStamp = user.SecurityStamp;
+        Assert.False(string.IsNullOrEmpty(originalStamp));
+
+        // 禁用即轮换安全戳（M1-03：停用后轮换）。
+        var disable = await svc.SetUserStatusAsync(Tenant100, user.Id, UserStatus.Disabled);
+        Assert.True(disable.Success);
+        user = await ctx.Users.SingleAsync(u => u.Id == user.Id);
+        Assert.Equal(UserStatus.Disabled, user.Status);
+        Assert.NotEqual(originalStamp, user.SecurityStamp);
+
+        // 重新启用同样轮换。
+        var enable = await svc.SetUserStatusAsync(Tenant100, user.Id, UserStatus.Active);
+        Assert.True(enable.Success);
+        user = await ctx.Users.SingleAsync(u => u.Id == user.Id);
+        Assert.Equal(UserStatus.Active, user.Status);
+    }
+
+    [Fact]
+    public async Task SetUserStatus_UnknownUser_Fails()
+    {
+        using var ctx = CreateContext(out var conn);
+        var svc = CreateService(ctx);
+        await svc.SeedAsync();
+
+        var result = await svc.SetUserStatusAsync(Tenant100, 999999, UserStatus.Disabled);
+        Assert.False(result.Success);
+    }
+
+    [Fact]
+    public async Task UserRole_CascadeDeleted_When_User_Removed()
+    {
+        using var ctx = CreateContext(out var conn);
+        var svc = CreateService(ctx);
+        await svc.SeedAsync();
+
+        var user = new User { TenantId = 1, Username = "cascade-u", NormalizedUsername = "cascade-u", SecurityStamp = Guid.NewGuid().ToString("N") };
+        ctx.Users.Add(user);
+        await ctx.SaveChangesAsync();
+        var role = new Role { TenantId = 1, Code = "cascade-r", Name = "Cascade R" };
+        ctx.Roles.Add(role);
+        await ctx.SaveChangesAsync();
+        ctx.UserRoles.Add(new UserRole { TenantId = 1, UserId = user.Id, RoleId = role.Id });
+        await ctx.SaveChangesAsync();
+
+        Assert.True(await ctx.UserRoles.AnyAsync(ur => ur.UserId == user.Id));
+        // M1-03：UserRole→User 外键级联删除。
+        ctx.Users.Remove(user);
+        await ctx.SaveChangesAsync();
+        Assert.False(await ctx.UserRoles.AnyAsync(ur => ur.UserId == user.Id));
+    }
+
+    [Fact]
+    public async Task RolePermission_CascadeDeleted_When_Role_Removed()
+    {
+        using var ctx = CreateContext(out var conn);
+        var svc = CreateService(ctx);
+        await svc.SeedAsync();
+
+        var perm = new Permission { TenantId = 1, Code = "cascade:perm", Name = "C", Category = "c" };
+        var role = new Role { TenantId = 1, Code = "cascade-role", Name = "C" };
+        ctx.Permissions.Add(perm);
+        ctx.Roles.Add(role);
+        await ctx.SaveChangesAsync();
+        ctx.RolePermissions.Add(new RolePermission { TenantId = 1, RoleId = role.Id, PermissionId = perm.Id });
+        await ctx.SaveChangesAsync();
+
+        Assert.True(await ctx.RolePermissions.AnyAsync(rp => rp.RoleId == role.Id));
+        // M1-03：RolePermission→Role 外键级联删除。
+        ctx.Roles.Remove(role);
+        await ctx.SaveChangesAsync();
+        Assert.False(await ctx.RolePermissions.AnyAsync(rp => rp.RoleId == role.Id));
     }
 
     [Fact]

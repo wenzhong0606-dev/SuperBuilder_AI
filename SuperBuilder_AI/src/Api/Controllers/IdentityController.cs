@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -144,6 +145,26 @@ public sealed class IdentityController : ControllerBase
 		var result = await _identity.RevokeRoleAsync(tenantId, id, roleCode, cancellationToken);
 		if (!result.Success) return BadRequest(new { errors = result.Errors });
 		return NoContent();
+	}
+
+	/// <summary>设置用户状态（启用/禁用）。状态变更会轮换安全戳，使该用户既有令牌在下次请求时失效（401）。</summary>
+	[HttpPut("users/{id}/status")]
+	public async Task<IActionResult> SetUserStatus(
+		long id,
+		[FromBody] SetUserStatusRequest request,
+		[FromQuery] long tenantId = 0,
+		CancellationToken cancellationToken = default)
+	{
+		if (request is null) return BadRequest("请求体不能为空。");
+		if (!Enum.IsDefined(typeof(UserStatus), request.Status)) return BadRequest("非法状态值。");
+
+		tenantId = ScopeTo(tenantId);
+		var result = await _identity.SetUserStatusAsync(tenantId, id, request.Status, cancellationToken);
+		if (!result.Success) return BadRequest(new { errors = result.Errors });
+
+		var user = await _db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == id, cancellationToken);
+		if (user is null) return NotFound();
+		return Ok(ToUserSummary(user));
 	}
 
 	/// <summary>解析用户经角色聚合后的全部权限码（去重）。</summary>
@@ -300,6 +321,9 @@ public sealed class IdentityController : ControllerBase
 
 	/// <summary>指派角色请求体。</summary>
 	public sealed record AssignRoleRequest(string RoleCode);
+
+	/// <summary>设置用户状态请求体（M1-03：启用/禁用）。</summary>
+	public sealed record SetUserStatusRequest(UserStatus Status);
 
 	/// <summary>创建角色请求体（仅租户，TenantId&gt;0）。</summary>
 	public sealed record CreateRoleRequest(

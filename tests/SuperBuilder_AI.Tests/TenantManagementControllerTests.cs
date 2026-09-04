@@ -34,6 +34,8 @@ public sealed class TenantManagementControllerTests
 			=> Task.FromResult(IdentityResult.Ok(userId));
 		public Task<IdentityResult> SetPasswordAsync(long tenantId, long userId, string password, CancellationToken ct = default)
 			=> Task.FromResult(IdentityResult.Ok(userId));
+		public Task<IdentityResult> SetUserStatusAsync(long tenantId, long userId, UserStatus newStatus, CancellationToken ct = default)
+			=> Task.FromResult(IdentityResult.Ok(userId));
 		public Task<IReadOnlyList<string>> GetPermissionsAsync(long tenantId, long userId, CancellationToken ct = default)
 			=> Task.FromResult<IReadOnlyList<string>>(Array.Empty<string>());
 		public Task<bool> HasPermissionAsync(long tenantId, long userId, string permissionCode, CancellationToken ct = default)

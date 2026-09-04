@@ -96,6 +96,7 @@ public class PasswordAndTokenRevocationTests
 		public Task<IdentityResult> AssignRoleAsync(long t, long u, string rc, CancellationToken ct = default) => throw new NotImplementedException();
 		public Task<IdentityResult> RevokeRoleAsync(long t, long u, string rc, CancellationToken ct = default) => throw new NotImplementedException();
 		public Task<IdentityResult> SetPasswordAsync(long t, long u, string p, CancellationToken ct = default) => throw new NotImplementedException();
+		public Task<IdentityResult> SetUserStatusAsync(long t, long u, UserStatus newStatus, CancellationToken ct = default) => throw new NotImplementedException();
 		public Task<IReadOnlyList<string>> GetPermissionsAsync(long t, long u, CancellationToken ct = default) => Task.FromResult<IReadOnlyList<string>>(Array.Empty<string>());
 		public Task<bool> HasPermissionAsync(long t, long u, string pc, CancellationToken ct = default) => Task.FromResult(false);
 	}
