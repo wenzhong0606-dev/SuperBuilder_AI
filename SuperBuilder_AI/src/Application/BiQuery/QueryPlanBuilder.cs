@@ -793,19 +793,22 @@ public partial class QueryPlanBuilder : IQueryPlanBuilder
 		 * 补列逻辑从不执行，最终 SELECT 只剩 come_time 一列。
 		 *
 		 * 这里把“纯明细补列”从“OrderBy 是否为空”的错误前置条件中解耦：
-		 * 只要当前意图没有 指标/维度/过滤（即纯明细列表），
+		 * 只要当前意图属于明细列表（非聚合 + 有 Limit/OrderBy），
 		 * 且 SELECT 字段不足目标数量，就按首选展示列 + 业务相关性兜底
 		 * 补足到 FallbackTargetColumnCount 列。
 		 *
+		 * 注意（本次修复）：判定不再要求 Dimensions/Filters 为空。
+		 * 实战中 LLM（Qwen）对「最近的十个入库单」常顺手返回一个 Dimension
+		 * （如 status），旧判定使其被当作分组查询，补列被整体跳过，
+		 * SELECT 最终只剩「时间字段 + status」这类几乎无业务价值的列。
+		 * 聚合查询由 IsDetailListQuery 内部的聚合检测拦截，不受影响。
+		 *
 		 * 该逻辑对“首轮提问”与“refine 显示更多字段”均生效，
-		 * 且不会影响聚合 / 带指标维度的查询。
+		 * 且不会影响聚合 / 带指标的查询。
 		 * ============================================================
 		 */
 
-		var isPureDetailList =
-			intent.Metrics.Count == 0
-			&& intent.Dimensions.Count == 0
-			&& intent.Filters.Count == 0;
+		var isPureDetailList = IsDetailListQuery(intent, plan);
 
 		if (isPureDetailList
 			&& table.Columns != null
@@ -1383,14 +1386,14 @@ public partial class QueryPlanBuilder : IQueryPlanBuilder
 
 
 
+		// 明细列表判定同样不再要求 plan.Dimensions 为空：
+		// LLM 顺手返回的 Dimension（如 status）不应阻止明细补列。
+		// 聚合查询由 IsDetailListQuery 拦截，plan.Metrics.Count == 0 额外保留原语义。
 		var isDetailList =
 			plan.Tables.Any(
 				t => t.MetadataTableId > 0)
-			&& !plan.IsAggregate
 			&& plan.Metrics.Count == 0
-			&& plan.Dimensions.Count == 0
-			&& (plan.Limit.HasValue
-				|| plan.Orders.Count > 0);
+			&& IsDetailListQuery(intent, plan);
 
 		// 字段扩展请求：用户明确说“显示更多字段/列”等。
 		// 实战中 LLM 常把这类 refine 指令误解析为带 dimension/metric 的查询，

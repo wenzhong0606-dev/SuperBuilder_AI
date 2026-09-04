@@ -13,6 +13,7 @@ using SuperBuilder_AI.Models.Metadata;
 using SuperBuilder_AI.Models.Organization;
 using SuperBuilder_AI.Services.BI;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace SuperBuilder_AI.Tests;
 
@@ -24,6 +25,13 @@ namespace SuperBuilder_AI.Tests;
 public class QueryPlanBuilderDetailListTests
 {
 	private const long TenantId = 1;
+
+	private readonly ITestOutputHelper _output;
+
+	public QueryPlanBuilderDetailListTests(ITestOutputHelper output)
+	{
+		_output = output;
+	}
 
 	private sealed class FakeSearch : IMetadataSemanticSearchService
 	{
@@ -346,5 +354,149 @@ public class QueryPlanBuilderDetailListTests
 		Assert.Contains(plan.Fields, f => string.Equals(f.ColumnName, "receipt_no", StringComparison.OrdinalIgnoreCase));
 		Assert.Contains(plan.Fields, f => string.Equals(f.ColumnName, "quantity", StringComparison.OrdinalIgnoreCase));
 		Assert.DoesNotContain(plan.Fields, f => string.Equals(f.ColumnName, "del_flag", StringComparison.OrdinalIgnoreCase));
+	}
+
+	/// <summary>
+	/// 真实线上表结构：wms_storage_receipt（来自 DESCRIBE wms_storage_receipt，共 25 列）。
+	/// 用于复现「最近的十个入库单」只 SELECT 出时间字段 + status 的实战 Bug。
+	/// </summary>
+	private static MetadataTable MakeRealStorageReceiptTable(long id = 458, long dsId = 1)
+		=> new MetadataTable
+		{
+			Id = id,
+			TenantId = TenantId,
+			DataSourceId = dsId,
+			TableName = "wms_storage_receipt",
+			Columns = new List<MetadataColumn>
+			{
+				new() { Id = 1,  ColumnName = "id",                DataType = "bigint",       IsPrimaryKey = true },
+				new() { Id = 2,  ColumnName = "code",              DataType = "varchar(50)" },
+				new() { Id = 3,  ColumnName = "type",              DataType = "bigint" },
+				new() { Id = 4,  ColumnName = "status",            DataType = "tinyint" },
+				new() { Id = 5,  ColumnName = "warehouse_id",      DataType = "bigint" },
+				new() { Id = 6,  ColumnName = "shelf_id",          DataType = "bigint" },
+				new() { Id = 7,  ColumnName = "affirm_time",       DataType = "datetime" },
+				new() { Id = 8,  ColumnName = "affirm_name",       DataType = "varchar(50)" },
+				new() { Id = 9,  ColumnName = "syn_name",          DataType = "varchar(50)" },
+				new() { Id = 10, ColumnName = "charge_time",       DataType = "datetime" },
+				new() { Id = 11, ColumnName = "charge_name",       DataType = "varchar(255)" },
+				new() { Id = 12, ColumnName = "create_by",         DataType = "bigint" },
+				new() { Id = 13, ColumnName = "create_name",       DataType = "varchar(255)" },
+				new() { Id = 14, ColumnName = "create_time",       DataType = "datetime" },
+				new() { Id = 15, ColumnName = "update_by",         DataType = "bigint" },
+				new() { Id = 16, ColumnName = "update_name",       DataType = "varchar(255)" },
+				new() { Id = 17, ColumnName = "update_time",       DataType = "datetime" },
+				new() { Id = 18, ColumnName = "del_flag",          DataType = "tinyint(1)" },
+				new() { Id = 19, ColumnName = "note",              DataType = "varchar(255)" },
+				new() { Id = 20, ColumnName = "source_type",       DataType = "tinyint(1)" },
+				new() { Id = 21, ColumnName = "source_code",       DataType = "varchar(50)" },
+				new() { Id = 22, ColumnName = "erp_receipt_code",  DataType = "varchar(50)" },
+				new() { Id = 23, ColumnName = "erp_receipt_id",    DataType = "varchar(50)" },
+				new() { Id = 24, ColumnName = "come_time",         DataType = "datetime" },
+				new() { Id = 25, ColumnName = "es_supplier_code",  DataType = "varchar(100)" },
+			},
+		};
+
+	/// <summary>
+	/// 场景 A：纯明细（无维度/无指标/无过滤），仅有 Limit=10 + OrderBy=come_time。
+	/// </summary>
+	[Fact]
+	public async Task RealTable_ScenarioA_pure_detail_list()
+	{
+		var table = MakeRealStorageReceiptTable();
+		var ctx = CreateContext(out var connection);
+		await using var _ = connection;
+		await using var __ = ctx;
+		await SeedAsync(ctx, table);
+
+		var search = new FakeSearch { Results = { TableVector(table) } };
+		var builder = BuildBuilder(search, ctx);
+
+		var plan = await builder.BuildAsync(new QueryIntent
+		{
+			OriginalQuestion = "最近的十个入库单",
+			IntentType = "Detail",
+			Limit = 10,
+			OrderBy = "come_time",
+			OrderDirection = "DESC",
+		});
+
+		var cols = string.Join(", ", plan.Fields.Select(f => f.ColumnName));
+		_output.WriteLine($"[场景A] Fields({plan.Fields.Count}) = {cols}");
+
+		Assert.True(plan.Fields.Count >= 6, $"场景A 期望至少 6 个字段，实际 {plan.Fields.Count}：{cols}");
+	}
+
+	/// <summary>
+	/// 场景 B：LLM 顺手返回了一个 Dimension（status），其余同场景 A。
+	/// 期望：仍按明细列表补足业务字段，而不是只剩「时间字段 + status」。
+	/// </summary>
+	[Fact]
+	public async Task RealTable_ScenarioB_llm_adds_status_dimension()
+	{
+		var table = MakeRealStorageReceiptTable();
+		var ctx = CreateContext(out var connection);
+		await using var _ = connection;
+		await using var __ = ctx;
+		await SeedAsync(ctx, table);
+
+		var search = new FakeSearch { Results = { TableVector(table) } };
+		var builder = BuildBuilder(search, ctx);
+
+		var plan = await builder.BuildAsync(new QueryIntent
+		{
+			OriginalQuestion = "最近的十个入库单",
+			IntentType = "Detail",
+			Limit = 10,
+			OrderBy = "come_time",
+			OrderDirection = "DESC",
+			Dimensions = { "status" },
+		});
+
+		var cols = string.Join(", ", plan.Fields.Select(f => f.ColumnName));
+		_output.WriteLine($"[场景B] Fields({plan.Fields.Count}) = {cols}");
+
+		Assert.True(plan.Fields.Count >= 6, $"场景B 期望至少 6 个字段，实际 {plan.Fields.Count}：{cols}");
+		// 核心业务字段必须在列
+		Assert.Contains(plan.Fields, f => string.Equals(f.ColumnName, "code", StringComparison.OrdinalIgnoreCase));
+		Assert.Contains(plan.Fields, f => string.Equals(f.ColumnName, "type", StringComparison.OrdinalIgnoreCase));
+		Assert.Contains(plan.Fields, f => string.Equals(f.ColumnName, "status", StringComparison.OrdinalIgnoreCase));
+		Assert.Contains(plan.Fields, f => string.Equals(f.ColumnName, "warehouse_id", StringComparison.OrdinalIgnoreCase));
+		Assert.Contains(plan.Fields, f => string.Equals(f.ColumnName, "es_supplier_code", StringComparison.OrdinalIgnoreCase));
+		Assert.Contains(plan.Fields, f => string.Equals(f.ColumnName, "come_time", StringComparison.OrdinalIgnoreCase));
+		// 审计/内部字段不得进入首屏
+		Assert.DoesNotContain(plan.Fields, f => string.Equals(f.ColumnName, "del_flag", StringComparison.OrdinalIgnoreCase));
+		Assert.DoesNotContain(plan.Fields, f => f.ColumnName != null && f.ColumnName.EndsWith("_by", StringComparison.OrdinalIgnoreCase));
+	}
+
+	/// <summary>
+	/// 场景 C（必须不回归）：真正的聚合查询「按状态统计入库单数量」带 COUNT 指标，
+	/// 绝不能被明细列表补列逻辑污染。
+	/// </summary>
+	[Fact]
+	public async Task RealTable_ScenarioC_aggregate_query_is_not_expanded()
+	{
+		var table = MakeRealStorageReceiptTable();
+		var ctx = CreateContext(out var connection);
+		await using var _ = connection;
+		await using var __ = ctx;
+		await SeedAsync(ctx, table);
+
+		var search = new FakeSearch { Results = { TableVector(table) } };
+		var builder = BuildBuilder(search, ctx);
+
+		var plan = await builder.BuildAsync(new QueryIntent
+		{
+			OriginalQuestion = "按状态统计入库单数量",
+			IntentType = "Aggregate",
+			Metrics = { new QueryMetric { Name = "入库单数量", Field = "id", Aggregation = "COUNT" } },
+			Dimensions = { "status" },
+		});
+
+		var cols = string.Join(", ", plan.Fields.Select(f => f.ColumnName));
+		_output.WriteLine($"[场景C] Fields({plan.Fields.Count}) = {cols}");
+
+		Assert.True(plan.Fields.Count < 6, $"聚合查询不应被明细补列，实际 {plan.Fields.Count}：{cols}");
+		Assert.Contains(plan.Fields, f => string.Equals(f.ColumnName, "status", StringComparison.OrdinalIgnoreCase));
 	}
 }
