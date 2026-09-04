@@ -95,6 +95,23 @@ public sealed class AuthMiddleware
 					});
 					return;
 				}
+
+				// M1-02：停用治理——租户停用后禁止刷新（每次请求的令牌校验即刷新会话）。
+				var tenantEnabled = await db.Tenants.AsNoTracking()
+					.Where(t => t.Id == principal.TenantId)
+					.Select(t => t.Enabled)
+					.FirstOrDefaultAsync();
+				if (!tenantEnabled)
+				{
+					SecurityAuditContext.Reject(context, ErrorCodes.Unauthorized, "tenant-disabled", principal.TenantId, principal.UserId);
+					context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+					await WriteJsonAsync(context, new ApiError
+					{
+						Code = ErrorCodes.Unauthorized,
+						Message = "未授权：所属租户已停用。"
+					});
+					return;
+				}
 			}
 		}
 

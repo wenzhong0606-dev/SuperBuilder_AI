@@ -60,6 +60,15 @@ public sealed class AuthController : ControllerBase
 		if (request.TenantId <= 0) return BadRequest(new { error = "tenantId 必须大于 0。" });
 		if (string.IsNullOrWhiteSpace(request.Username)) return BadRequest(new { error = "username 必填。" });
 
+		// M1-02：停用治理——停用租户禁止登录。
+		var tenant = await _db.Tenants.AsNoTracking()
+			.FirstOrDefaultAsync(t => t.Id == request.TenantId, cancellationToken);
+		if (tenant is null || !tenant.Enabled)
+		{
+			SecurityAuditContext.Reject(HttpContext, ErrorCodes.AuthInvalidCredential, "tenant-disabled", request.TenantId);
+			return Unauthorized(new { error = "租户已停用或不存在。" });
+		}
+
 		var user = await _db.Users
 			.AsNoTracking()
 			.FirstOrDefaultAsync(

@@ -220,6 +220,10 @@ public sealed class ThemeController : ControllerBase
 		var tenantExists = await _db.Tenants.AnyAsync(t => t.Id == tenantId, cancellationToken);
 		if (!tenantExists) return BadRequest(new { errors = new[] { $"租户不存在：{tenantId}。" } });
 
+		// M1-02：租户侧写入须通过策略校验（Key 允许目录且非锁定安全配置）。
+		if (!TenantSettingPolicy.ValidateTenantWrite(TenantDefaultThemeKey, out var policyError))
+			return BadRequest(new { errors = new[] { policyError } });
+
 		var setting = await _db.TenantSettings
 			.FirstOrDefaultAsync(s => s.TenantId == tenantId && s.Key == TenantDefaultThemeKey, cancellationToken);
 		if (setting is null)

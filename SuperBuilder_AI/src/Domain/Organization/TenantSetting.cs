@@ -19,6 +19,9 @@ public class TenantSetting : BaseEntity
 	/// <summary>值类型提示：string | int | bool | json（便于消费端解析）。</summary>
 	public string? DataType { get; set; }
 
+	/// <summary>该配置是否锁定（平台/安全配置，租户不可覆盖，M1-02）。</summary>
+	public bool IsLocked { get; set; }
+
 	/// <summary>导航属性：所属租户。</summary>
 	public Tenant? Tenant { get; set; }
 }

@@ -194,9 +194,14 @@ public class SuperBIContext : DbContext
         #region Tenant
         builder.Entity<Tenant>().HasIndex(x => x.TenantCode).IsUnique();
         builder.Entity<Tenant>().ToTable(tb => tb.HasComment("租户"));
-        builder.Entity<Tenant>().Property(x => x.TenantCode).HasComment("租户编码");
-        builder.Entity<Tenant>().Property(x => x.TenantName).HasComment("租户名称");
+        // M1-02：编码/名称长度约束（必填校验在写入路径强制，避免破坏既有测试的不完整种子）。
+        builder.Entity<Tenant>().Property(x => x.TenantCode).HasMaxLength(Tenant.MaxCodeLength).HasComment("租户编码（规范化小写存储）");
+        builder.Entity<Tenant>().Property(x => x.TenantName).HasMaxLength(Tenant.MaxNameLength).HasComment("租户名称");
         builder.Entity<Tenant>().Property(x => x.Enabled).HasComment("是否启用");
+        // M1-02：停用治理字段。
+        builder.Entity<Tenant>().Property(x => x.DisabledReason).HasMaxLength(Tenant.MaxDisabledReasonLength).HasComment("停用原因");
+        builder.Entity<Tenant>().Property(x => x.DisabledAt).HasConversion(UtcNullableDateTimeConverter).HasComment("停用时间(UTC)");
+        builder.Entity<Tenant>().Property(x => x.DisabledByUserId).HasComment("停用操作者用户Id");
         #endregion
 
         #region TenantSetting
@@ -205,7 +210,9 @@ public class SuperBIContext : DbContext
         builder.Entity<TenantSetting>().HasIndex(x => new { x.TenantId, x.Key }).IsUnique();
         builder.Entity<TenantSetting>().Property(x => x.Key).IsRequired().HasMaxLength(128).HasComment("配置键");
         builder.Entity<TenantSetting>().Property(x => x.Value).HasComment("配置值");
-        builder.Entity<TenantSetting>().Property(x => x.DataType).HasMaxLength(32).HasComment("值类型");
+        builder.Entity<TenantSetting>().Property(x => x.DataType).HasMaxLength(32).HasComment("值类型(string|int|bool|json)");
+        // M1-02：锁定标记——平台/安全配置租户不可覆盖。
+        builder.Entity<TenantSetting>().Property(x => x.IsLocked).IsRequired().HasDefaultValue(false).HasComment("是否锁定(租户不可覆盖)");
         #endregion
 
         #region DataSource

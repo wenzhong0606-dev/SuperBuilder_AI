@@ -12,6 +12,7 @@ using SuperBuilder_AI.Data;
 using SuperBuilder_AI.Interfaces.Identity;
 using SuperBuilder_AI.Middleware;
 using SuperBuilder_AI.Models.Identity;
+using SuperBuilder_AI.Models.Organization;
 using SuperBuilder_AI.Services.Auth;
 using Xunit;
 
@@ -74,6 +75,8 @@ public class PasswordAndTokenRevocationTests
 		ctx.Database.EnsureCreated();
 		stamp = Guid.NewGuid().ToString("N");
 		var hasher = new PasswordHasher();
+		// M1-02：登录需校验租户存在且启用，因此测试中补建对应启用的租户。
+		ctx.Tenants.Add(new Tenant { Id = 1, TenantCode = "t1", TenantName = "T1", Enabled = true });
 		ctx.Users.Add(new User
 		{
 			TenantId = 1,
@@ -148,6 +151,8 @@ public class PasswordAndTokenRevocationTests
 		conn.Open();
 		var ctx = new SuperBIContext(new DbContextOptionsBuilder<SuperBIContext>().UseSqlite(conn).Options);
 		ctx.Database.EnsureCreated();
+		// M1-02：中间件需校验租户启用，因此补建对应启用的租户。
+		ctx.Tenants.Add(new Tenant { Id = 9, TenantCode = "t9", TenantName = "T9", Enabled = true });
 		ctx.Users.Add(new User
 		{
 			Id = 11,
