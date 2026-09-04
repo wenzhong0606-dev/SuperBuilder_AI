@@ -210,12 +210,14 @@ M0 退出：全部 🔴 完成、凭据已轮换、构建零错误、测试不�
 > - 测试 3+2 例，全量 **535/535 通过**（基线 530+5），构建 0 error。
 > - **未做（留待后续子批）**：M1-01 末条"明确状态/软删除/物理删除/关联表级联策略"的全局策略落地（已通过并发令牌与审计字段奠定基线，软删除过滤器与级联策略将在 M1-02~M1-06 各实体约束中按需落实，避免一次性改动触发 Golden/租户过滤回归）。
 
-### M1-02 Tenant 与 TenantSetting
+### M1-02 Tenant 与 TenantSetting ✅ 已完成（2026-09-04，提交 d70718e）
 
 - TenantCode 必填、最大 64、规范化唯一、创建后默认不可变；TenantName 必填、最大 128。
 - 停用记录原因、时间、操作者；停用后禁止登录和刷新 Token。
 - TenantSetting.DataType 限定 string/int/bool/json 并校验 Value。
 - TenantSetting.Key 进入允许目录，租户不能覆盖安全配置。
+
+> 落地说明：必填/规范化唯一在**控制器写入路径**强制（既有测试以 `new Tenant { Id }` 形式造数不设 Code，故未加 DB 级 NOT NULL，避免破坏集成测试种子）；DB 级 `nvarchar` 长度约束已加。停用治理三字段 + `IsLocked` 已落库并通过迁移 `M1_02_TenantAndSettingIntegrity`。全量 **576/576 通过**，构建 0 error。
 
 ### M1-03 User、Role、Permission
 
