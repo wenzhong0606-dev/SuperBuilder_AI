@@ -33,5 +33,15 @@ public interface IResultUnderstandingService
 			string question,
 			QueryResult result);
 
+	/// <summary>
+	/// 根据已经通过校验的 QueryPlan 分析结果。默认实现保持旧调用方兼容；
+	/// 生产链路应传入 plan，使明细、聚合和趋势使用不同的展示策略。
+	/// </summary>
+	Task<QueryAnswer> AnalyzeAsync(
+		string question,
+		QueryResult result,
+		QueryPlan plan)
+		=> AnalyzeAsync(question, result);
+
 
 }

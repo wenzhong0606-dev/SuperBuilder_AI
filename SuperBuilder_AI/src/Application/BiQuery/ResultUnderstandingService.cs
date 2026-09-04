@@ -47,6 +47,18 @@ public class ResultUnderstandingService
 		AnalyzeAsync(
 			string question,
 			QueryResult result)
+		=> await AnalyzeCoreAsync(question, result, null);
+
+	public async Task<QueryAnswer> AnalyzeAsync(
+		string question,
+		QueryResult result,
+		QueryPlan plan)
+		=> await AnalyzeCoreAsync(question, result, plan);
+
+	private async Task<QueryAnswer> AnalyzeCoreAsync(
+		string question,
+		QueryResult result,
+		QueryPlan? plan)
 	{
 
 
@@ -62,6 +74,34 @@ public class ResultUnderstandingService
 				ErrorMessage =
 					result.ErrorMessage
 
+			};
+		}
+
+		// 明细/TopN 列表是“返回记录”，不是“统计分析”。
+		// 直接给出确定性说明并以表格为唯一默认视图，避免 LLM 把 LIMIT 行数
+		// 误称为总数，或把状态码、日期列随意加工成 KPI/趋势图。
+		if (IsDetailList(plan))
+		{
+			var order = plan!.Orders.FirstOrDefault();
+			var orderText = order is null || string.IsNullOrWhiteSpace(order.Field)
+				? string.Empty
+				: $"，按 {order.Field} {NormalizeDirection(order.Direction)} 排列";
+
+			return new QueryAnswer
+			{
+				Success = true,
+				Question = question,
+				Answer = $"已返回 {result.Count} 条记录{orderText}。",
+				Summary = new Dictionary<string, object?>(),
+				Visualizations = new List<VisualizationSuggestion>
+				{
+					new()
+					{
+						Type = "table",
+						Title = "查询明细",
+						Reason = "明细列表优先展示业务字段，不自动生成统计图表。"
+					}
+				}
 			};
 		}
 
@@ -180,6 +220,7 @@ public class ResultUnderstandingService
 
 
 
+			SanitizeVisualizations(answer, result);
 			return answer;
 
 		}
@@ -203,6 +244,42 @@ public class ResultUnderstandingService
 
 		}
 
+	}
+
+	private static bool IsDetailList(QueryPlan? plan)
+	{
+		if (plan is null || plan.IsAggregate) return false;
+		if (plan.Metrics.Any(x => !string.IsNullOrWhiteSpace(x.Aggregation)
+			&& !string.Equals(x.Aggregation, "NONE", StringComparison.OrdinalIgnoreCase))) return false;
+		return plan.IsDetailRanking
+			|| plan.Intent?.IsDetail == true
+			|| plan.Limit.HasValue
+			|| plan.Orders.Count > 0;
+	}
+
+	private static string NormalizeDirection(string? direction)
+		=> string.Equals(direction, "DESC", StringComparison.OrdinalIgnoreCase) ? "倒序" : "正序";
+
+	private static void SanitizeVisualizations(QueryAnswer answer, QueryResult result)
+	{
+		if (answer.Visualizations.Count == 0 || result.Rows.Count == 0) return;
+		var columns = result.Rows.SelectMany(x => x.Keys).ToHashSet(StringComparer.OrdinalIgnoreCase);
+		answer.Visualizations = answer.Visualizations.Where(v =>
+		{
+			var type = (v.Type ?? string.Empty).Trim().ToLowerInvariant();
+			if (type == "table") return true;
+			if (type is not ("bar" or "line" or "pie")) return false;
+			if (string.IsNullOrWhiteSpace(v.XAxis) || !columns.Contains(v.XAxis)) return false;
+			if (v.YAxis.Count == 0 || v.YAxis.Any(y => !columns.Contains(y))) return false;
+			return v.YAxis.All(y => result.Rows.All(r => IsNumeric(r.GetValueOrDefault(y))));
+		}).ToList();
+	}
+
+	private static bool IsNumeric(object? value)
+	{
+		if (value is null) return false;
+		return value is byte or sbyte or short or ushort or int or uint or long or ulong
+			or float or double or decimal;
 	}
 
 }

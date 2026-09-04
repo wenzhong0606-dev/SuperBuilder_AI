@@ -11,7 +11,11 @@
 
 <h2>Ask BI 智能问数（旗舰）</h2>
 
-@if (!State.IsAuthenticated)
+@if (!State.SessionRestored)
+{
+    <LoadingState Text="正在恢复登录会话…" />
+}
+else if (!State.IsAuthenticated)
 {
     <p class="muted">请先 <a href="" @onclick="@(() => Nav.NavigateTo("/login"))">登录</a> 后再问数。</p>
 }

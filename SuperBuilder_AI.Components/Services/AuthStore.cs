@@ -95,18 +95,21 @@ public sealed class AuthStore
 
     /// <summary>
     /// 校验当前已还原的令牌是否仍有效：调用 <c>GET /api/auth/me</c>，
-    /// 非 200（含 401 过期）则清除会话并返回 false。未登录直接返回 false。
+    /// 只有服务端明确返回 401 时才清除会话。网络中断、TLS 故障或服务端临时异常
+    /// 不能证明令牌失效，因此保留本地会话，避免页面刷新时被错误登出。
     /// </summary>
     public async Task<bool> ValidateAsync()
     {
         if (!_state.IsAuthenticated) return false;
         var (_, status, _) = await _api.GetJsonAsync("api/auth/me");
-        if (status != 200)
+        if (status == 401)
         {
             await ClearAsync();
             return false;
         }
-        return true;
+
+		// 200 表示已验证；其他状态属于暂时无法验证，但不能破坏已有登录态。
+		return _state.IsAuthenticated;
     }
 
     /// <summary>登录成功后写入 AppState 并持久化。</summary>

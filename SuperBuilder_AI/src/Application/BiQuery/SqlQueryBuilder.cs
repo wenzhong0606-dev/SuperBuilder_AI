@@ -231,7 +231,7 @@ public class SqlQueryBuilder : ISqlQueryBuilder
             }
 
             var parameterName = dialect.GetParameterName(i);
-            var dataType = plan.Fields.FirstOrDefault(f =>
+            var dataType = filter.DataType ?? plan.Fields.FirstOrDefault(f =>
                 string.Equals(f.ColumnName, filter.Field,
                     StringComparison.OrdinalIgnoreCase))?.DataType;
 

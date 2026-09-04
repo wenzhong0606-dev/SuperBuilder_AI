@@ -162,6 +162,10 @@ public sealed class QueryPlanPipeline : IQueryPlanPipeline
          *
          * QueryPlan语义验证+自动修复
          */
+		// 最终 Metadata 投影兜底必须位于语义验证之前：确保新增字段和软删除条件
+		// 同样经过验证、Confidence、权限安全闸门，而不是在 SQL Builder 前临时绕过门禁。
+		DetailQueryProjectionPolicy.Apply(plan, validationContext, question);
+
 		var semanticValidation =
 			await _validationPipeline
 				.ValidateAsync(

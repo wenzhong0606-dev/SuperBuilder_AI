@@ -54,19 +54,20 @@
                 var vIndex = vi;
                 var ov = Turn.GetOverride(vi);
                 var effType = EffType(viz, ov);
+                if (effType == "table" || !CanRenderChart(viz, resp.Data.Rows))
+                {
+                    continue;
+                }
                 <div class="viz-card">
                     <div class="viz-head">
                         <strong>@(string.IsNullOrWhiteSpace(viz.Title) ? $"图表 {vi + 1}" : viz.Title)</strong>
                         @if (!string.IsNullOrWhiteSpace(viz.Reason)) { <span class="muted tiny">@viz.Reason</span> }
                     </div>
-                    @if (effType != "table")
-                    {
-                        var (labels, datasets) = BuildChart(viz, resp.Data.Rows, ov);
-                        <ChartView Type="@effType" Labels="@labels" Datasets="@datasets"
-                                   Title="@viz.Title" ShowLegend="@EffLegend(ov)" Palette="@EffPalette(ov)"
-                                   Stacked="@EffStacked(ov)" Area="@EffArea(ov)" MultiAxis="@EffMultiAxis(ov)"
-                                   @key="@($"turn{Index}-viz{vIndex}")" />
-                    }
+                    @{ var (labels, datasets) = BuildChart(viz, resp.Data.Rows, ov); }
+                    <ChartView Type="@effType" Labels="@labels" Datasets="@datasets"
+                               Title="@viz.Title" ShowLegend="@EffLegend(ov)" Palette="@EffPalette(ov)"
+                               Stacked="@EffStacked(ov)" Area="@EffArea(ov)" MultiAxis="@EffMultiAxis(ov)"
+                               @key="@($"turn{Index}-viz{vIndex}")" />
                     <div class="viz-toolbar">
                         <span class="tiny">视图：</span>
                         <button class="btn btn-sm btn-outline-secondary" @onclick='() => SetType(Turn, vIndex, "bar")'>柱状</button>
@@ -261,8 +262,10 @@
             return viz.XAxis;
         foreach (var k in rows[0].Keys)
         {
-            var allNonNum = rows.All(r => !JsonValue.IsNumber(r.GetValueOrDefault(k)));
-            if (allNonNum) return k;
+            var values = rows.Select(r => r.GetValueOrDefault(k)).ToList();
+            var allCategorical = values.All(v => !JsonValue.IsNumber(v) && !IsDateLike(v));
+            var distinct = values.Select(JsonValue.AsString).Distinct(StringComparer.OrdinalIgnoreCase).Count();
+            if (allCategorical && distinct is >= 2 and <= 12) return k;
         }
         return null;
     }
@@ -292,8 +295,6 @@
             measures = rows[0].Keys.Where(k => rows.All(r => JsonValue.IsNumber(r.GetValueOrDefault(k)))).ToList();
         else
             measures = new List<string>();
-        if (measures.Count == 0 && rows.Count > 0) measures = rows[0].Keys.ToList();
-
         var datasets = measures.Select(m => new ChartView.ChartDataset
         {
             Label = m,
@@ -301,6 +302,24 @@
         }).ToList();
 
         return (labels, datasets);
+    }
+
+    private static bool CanRenderChart(VisualizationSuggestion viz, List<Dictionary<string, object?>> rows)
+    {
+        if (rows.Count == 0 || string.IsNullOrWhiteSpace(viz.XAxis) || viz.YAxis.Count == 0)
+            return false;
+        if (!rows[0].ContainsKey(viz.XAxis)) return false;
+        return viz.YAxis.All(y => rows[0].ContainsKey(y)
+            && rows.All(r => JsonValue.IsNumber(r.GetValueOrDefault(y))));
+    }
+
+    private static bool IsDateLike(object? value)
+    {
+        if (value is DateTime or DateTimeOffset or DateOnly) return true;
+        var text = JsonValue.AsString(value);
+        return !string.IsNullOrWhiteSpace(text)
+            && DateTimeOffset.TryParse(text, System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.AllowWhiteSpaces, out _);
     }
 
     private static List<string> Columns(List<Dictionary<string, object?>> rows)

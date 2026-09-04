@@ -322,7 +322,8 @@ public class BIConversationService
 			await _resultUnderstandingService
 				.AnalyzeAsync(
 					question,
-					data);
+					data,
+					plan);
 
 
 		/*

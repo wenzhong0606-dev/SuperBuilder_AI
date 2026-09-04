@@ -1392,7 +1392,6 @@ public partial class QueryPlanBuilder : IQueryPlanBuilder
 		var isDetailList =
 			plan.Tables.Any(
 				t => t.MetadataTableId > 0)
-			&& plan.Metrics.Count == 0
 			&& IsDetailListQuery(intent, plan);
 
 		// 字段扩展请求：用户明确说“显示更多字段/列”等。
@@ -1402,7 +1401,7 @@ public partial class QueryPlanBuilder : IQueryPlanBuilder
 		var fieldExpansionRequested =
 			IsFieldExpansionRequested(intent.OriginalQuestion)
 			&& !plan.IsAggregate
-			&& plan.Metrics.Count == 0
+			&& !plan.Metrics.Any(m => IsAggregation(m.Aggregation))
 			&& plan.Fields.Count > 0
 			&& plan.Fields.Count < FallbackTargetColumnCount;
 
@@ -1467,6 +1466,13 @@ public partial class QueryPlanBuilder : IQueryPlanBuilder
 							"NONE");
 					}
 			}
+		}
+
+		// 对具备标准软删除字段的明细列表默认排除已删除记录。
+		// 规则依据当前已解析 Metadata，而不是硬编码业务表；过滤列不进入 SELECT。
+		if (isDetailList && table?.Columns != null)
+		{
+			ApplyConventionalSoftDeleteFilter(plan, table);
 		}
 
 		// 明细列表已按首选列补全；若仍无字段（非明细查询且无字段），按原规则报错。
@@ -1560,6 +1566,35 @@ public partial class QueryPlanBuilder : IQueryPlanBuilder
 			|| q.Contains("多显示", StringComparison.OrdinalIgnoreCase)
 			|| q.Contains("显示详细信息", StringComparison.OrdinalIgnoreCase);
 	}
+
+	private static void ApplyConventionalSoftDeleteFilter(QueryPlan plan, MetadataTable table)
+	{
+		if (plan.Filters.Any(f =>
+			string.Equals(f.Field, "del_flag", StringComparison.OrdinalIgnoreCase)
+			|| string.Equals(f.Field, "is_deleted", StringComparison.OrdinalIgnoreCase)))
+		{
+			return;
+		}
+
+		var column = table.Columns?.FirstOrDefault(c =>
+			string.Equals(c.ColumnName, "del_flag", StringComparison.OrdinalIgnoreCase)
+			|| string.Equals(c.ColumnName, "is_deleted", StringComparison.OrdinalIgnoreCase));
+		if (column is null || string.IsNullOrWhiteSpace(column.ColumnName)) return;
+
+		plan.Filters.Add(new QueryFilter
+		{
+			SemanticText = "未删除",
+			Field = column.ColumnName,
+			DataType = column.DataType,
+			Operator = "=",
+			Value = IsBooleanDataType(column.DataType) ? "false" : "0"
+		});
+	}
+
+	private static bool IsBooleanDataType(string? dataType)
+		=> !string.IsNullOrWhiteSpace(dataType)
+			&& (dataType.Contains("bool", StringComparison.OrdinalIgnoreCase)
+				|| dataType.Equals("bit", StringComparison.OrdinalIgnoreCase));
 
 	/// <summary>
 	/// 明细列表兜底补列的目标列数。

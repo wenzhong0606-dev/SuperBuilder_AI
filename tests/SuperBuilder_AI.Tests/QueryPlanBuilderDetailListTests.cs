@@ -7,6 +7,7 @@ using Microsoft.EntityFrameworkCore;
 using SuperBuilder_AI.Data;
 using SuperBuilder_AI.Interfaces;
 using SuperBuilder_AI.Interfaces.BI;
+using SuperBuilder_AI.Infrastructure.Database;
 using SuperBuilder_AI.Models.AI;
 using SuperBuilder_AI.Models.BI;
 using SuperBuilder_AI.Models.Metadata;
@@ -467,6 +468,103 @@ public class QueryPlanBuilderDetailListTests
 		// 审计/内部字段不得进入首屏
 		Assert.DoesNotContain(plan.Fields, f => string.Equals(f.ColumnName, "del_flag", StringComparison.OrdinalIgnoreCase));
 		Assert.DoesNotContain(plan.Fields, f => f.ColumnName != null && f.ColumnName.EndsWith("_by", StringComparison.OrdinalIgnoreCase));
+		var softDelete = Assert.Single(plan.Filters, f => string.Equals(f.Field, "del_flag", StringComparison.OrdinalIgnoreCase));
+		Assert.Equal("=", softDelete.Operator);
+		Assert.Equal("0", softDelete.Value);
+
+		var query = await new SqlQueryBuilder().BuildAsync(plan, new MySqlDialect());
+		Assert.Contains("`code`", query.Sql, StringComparison.Ordinal);
+		Assert.Contains("`warehouse_id`", query.Sql, StringComparison.Ordinal);
+		Assert.Contains("`es_supplier_code`", query.Sql, StringComparison.Ordinal);
+		Assert.Contains("WHERE `del_flag` = @p0", query.Sql, StringComparison.Ordinal);
+		Assert.Contains("ORDER BY `come_time` DESC", query.Sql, StringComparison.Ordinal);
+		Assert.EndsWith("LIMIT 10", query.Sql, StringComparison.Ordinal);
+		Assert.Equal(0L, Convert.ToInt64(query.Parameters["@p0"]));
+	}
+
+	/// <summary>
+	/// 场景 B2：真实模型有时会把普通展示字段错误放入 Metrics，
+	/// 但 Aggregation=NONE。它仍是明细列表，不能因为 Metrics 非空而跳过补列和软删除条件。
+	/// </summary>
+	[Fact]
+	public async Task RealTable_ScenarioB2_non_aggregate_metric_is_still_detail_list()
+	{
+		var table = MakeRealStorageReceiptTable();
+		var ctx = CreateContext(out var connection);
+		await using var _ = connection;
+		await using var __ = ctx;
+		await SeedAsync(ctx, table);
+
+		var search = new FakeSearch { Results = { TableVector(table) } };
+		var builder = BuildBuilder(search, ctx);
+
+		var plan = await builder.BuildAsync(new QueryIntent
+		{
+			OriginalQuestion = "查询最近十条入库记录",
+			IntentType = "Detail",
+			Limit = 10,
+			OrderBy = "come_time",
+			OrderDirection = "DESC",
+			Metrics = { new QueryMetric { Name = "确认时间", Field = "affirm_time", Aggregation = "NONE" } },
+		});
+
+		Assert.True(plan.Fields.Count >= 8);
+		Assert.Contains(plan.Fields, f => string.Equals(f.ColumnName, "code", StringComparison.OrdinalIgnoreCase));
+		Assert.Contains(plan.Fields, f => string.Equals(f.ColumnName, "warehouse_id", StringComparison.OrdinalIgnoreCase));
+		Assert.Contains(plan.Fields, f => string.Equals(f.ColumnName, "es_supplier_code", StringComparison.OrdinalIgnoreCase));
+		Assert.Single(plan.Filters, f => string.Equals(f.Field, "del_flag", StringComparison.OrdinalIgnoreCase));
+
+		var query = await new SqlQueryBuilder().BuildAsync(plan, new MySqlDialect());
+		Assert.Contains("WHERE `del_flag` = @p0", query.Sql, StringComparison.Ordinal);
+		Assert.Contains("ORDER BY `come_time` DESC", query.Sql, StringComparison.Ordinal);
+		Assert.EndsWith("LIMIT 10", query.Sql, StringComparison.Ordinal);
+	}
+
+	/// <summary>
+	/// SQL 前最终兜底：即使上游只留下截图中的四个时间字段，
+	/// 也必须基于真实 Metadata 重建具有业务信息的投影，并补软删除过滤。
+	/// </summary>
+	[Fact]
+	public async Task Final_projection_policy_repairs_time_only_runtime_plan()
+	{
+		var table = MakeRealStorageReceiptTable();
+		var plan = new QueryPlan
+		{
+			Limit = 10,
+			Orders = { new QueryOrder { Field = "come_time", Direction = "DESC" } },
+			Tables = { new QueryTable { MetadataTableId = table.Id, DataSourceId = table.DataSourceId, TableName = table.TableName } },
+		};
+		foreach (var name in new[] { "come_time", "affirm_time", "update_time", "create_time" })
+		{
+			var column = Assert.Single(table.Columns, c => c.ColumnName == name);
+			plan.Fields.Add(new QueryField
+			{
+				MetadataColumnId = column.Id,
+				ColumnName = column.ColumnName,
+				DataType = column.DataType,
+				Aggregation = "NONE"
+			});
+		}
+
+		var context = new QueryPlanValidationContext();
+		context.Tables.Add(table.Id, table);
+		context.TableColumns.Add(table.Id, table.Columns.ToList());
+		foreach (var column in table.Columns) context.Columns.Add(column.Id, column);
+
+		DetailQueryProjectionPolicy.Apply(plan, context, "查询最近的10条入库记录");
+
+		Assert.Equal(10, plan.Fields.Count);
+		Assert.DoesNotContain(plan.Fields, f => f.ColumnName is "create_time" or "update_time");
+		Assert.Contains(plan.Fields, f => f.ColumnName == "code");
+		Assert.Contains(plan.Fields, f => f.ColumnName == "status");
+		Assert.Contains(plan.Fields, f => f.ColumnName == "warehouse_id");
+		Assert.Contains(plan.Fields, f => f.ColumnName == "es_supplier_code");
+		Assert.Single(plan.Filters, f => f.Field == "del_flag");
+
+		var query = await new SqlQueryBuilder().BuildAsync(plan, new MySqlDialect());
+		Assert.Contains("`code`", query.Sql, StringComparison.Ordinal);
+		Assert.Contains("`warehouse_id`", query.Sql, StringComparison.Ordinal);
+		Assert.Contains("WHERE `del_flag` = @p0", query.Sql, StringComparison.Ordinal);
 	}
 
 	/// <summary>
