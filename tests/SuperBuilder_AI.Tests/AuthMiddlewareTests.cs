@@ -190,4 +190,78 @@ public class AuthMiddlewareTests
 		Assert.True(nextCalled);
 		Assert.Equal(9L, ctx.Items[TenantDataPlanePolicy.EffectiveTenantItem]);
 	}
+
+	// ── AUTH-1 回归：路径判定必须大小写不敏感 ────────────────────────────
+	// 背景：PathString.StartsWithSegments 默认按 Ordinal 区分大小写，而 ASP.NET 路由匹配大小写不敏感。
+	// 若该判定被回退为大小写敏感，将同时产生两类问题：
+	//   1) /API/** 变体绕过鉴权与租户数据面隔离，却被路由命中控制器 → 匿名越权 / 跨租户越权；
+	//   2) /API/auth/login 进不了匿名白名单 → 客户端无法登录（登录死锁）。
+	// 以下用例守护这两类行为，任何回退都会立即让测试失败。
+
+	[Theory]
+	[InlineData("/API/ask")]
+	[InlineData("/Api/Secret")]
+	[InlineData("/API/DATA-SOURCES")]
+	public async Task Uppercase_Api_Path_Without_Token_Returns_401(string path)
+	{
+		var nextCalled = false;
+		var mw = Build(_ => { nextCalled = true; return Task.CompletedTask; });
+		var ctx = new DefaultHttpContext { Request = { Path = path } };
+
+		await mw.InvokeAsync(ctx);
+
+		Assert.False(nextCalled);
+		Assert.Equal(StatusCodes.Status401Unauthorized, ctx.Response.StatusCode);
+	}
+
+	[Theory]
+	[InlineData("/API/AUTH/LOGIN")]
+	[InlineData("/Api/Auth/Login")]
+	public async Task Uppercase_Login_Endpoint_Remains_Anonymous(string path)
+	{
+		var nextCalled = false;
+		var mw = Build(_ => { nextCalled = true; return Task.CompletedTask; });
+		var ctx = new DefaultHttpContext { Request = { Path = path } };
+
+		await mw.InvokeAsync(ctx);
+
+		// 登录端点必须放行：否则客户端或反向代理改写为大写路径时将无法登录。
+		Assert.True(nextCalled);
+		Assert.Equal(StatusCodes.Status200OK, ctx.Response.StatusCode);
+	}
+
+	[Theory]
+	[InlineData("/METRICS")]
+	[InlineData("/Metrics")]
+	public async Task Uppercase_Diagnostics_Path_Without_Token_Returns_401(string path)
+	{
+		var nextCalled = false;
+		var mw = Build(_ => { nextCalled = true; return Task.CompletedTask; });
+		var ctx = new DefaultHttpContext { Request = { Path = path } };
+
+		await mw.InvokeAsync(ctx);
+
+		Assert.False(nextCalled);
+		Assert.Equal(StatusCodes.Status401Unauthorized, ctx.Response.StatusCode);
+	}
+
+	[Fact]
+	public async Task Uppercase_DataPlane_Path_Enforces_Tenant_Isolation()
+	{
+		var nextCalled = false;
+		var mw = Build(_ => { nextCalled = true; return Task.CompletedTask; });
+		var token = new TokenService(Key).Issue(9, 11, "carol", new[] { "dashboard:view" });
+		var ctx = new DefaultHttpContext
+		{
+			Request = { Path = "/API/ASK", QueryString = new QueryString("?tenantId=10") }
+		};
+		ctx.Request.Headers["Authorization"] = "Bearer " + token;
+
+		await mw.InvokeAsync(ctx);
+
+		// 大写数据面路径同样必须纳入租户隔离，否则可用于跨租户越权。
+		Assert.False(nextCalled);
+		Assert.Equal(StatusCodes.Status403Forbidden, ctx.Response.StatusCode);
+		Assert.Equal(9L, ctx.Items[TenantDataPlanePolicy.EffectiveTenantItem]);
+	}
 }
