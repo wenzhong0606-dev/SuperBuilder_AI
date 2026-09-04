@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using SuperBuilder_AI.Data;
 using SuperBuilder_AI.Interfaces.Identity;
 using SuperBuilder_AI.Models.Identity;
@@ -37,13 +38,15 @@ public sealed class AuthController : ControllerBase
 	private readonly IIdentityService _identity;
 	private readonly ITokenService _token;
 	private readonly IPasswordHasher _hasher;
+	private readonly IConfiguration _config;
 
-	public AuthController(SuperBIContext db, IIdentityService identity, ITokenService token, IPasswordHasher hasher)
+	public AuthController(SuperBIContext db, IIdentityService identity, ITokenService token, IPasswordHasher hasher, IConfiguration configuration)
 	{
 		_db = db;
 		_identity = identity;
 		_token = token;
 		_hasher = hasher;
+		_config = configuration;
 	}
 
 	/// <summary>登录并签发访问令牌。</summary>
@@ -145,10 +148,20 @@ public sealed class AuthController : ControllerBase
 
 	[HttpGet("login-options")]
 	[AllowAnonymous]
-	public async Task<IActionResult> LoginOptions(CancellationToken cancellationToken)
+	public async Task<IActionResult> LoginOptions([FromQuery] string? q = null, CancellationToken cancellationToken = default)
 	{
-		var tenants = await _db.Tenants.IgnoreQueryFilters().AsNoTracking().Where(x => x.Enabled).OrderBy(x => x.TenantName)
+		// M0-08：部署级隐藏策略（默认隐藏），避免未认证用户枚举全部租户代码/名称目录
+		var showDirectory = _config.GetValue<bool>("Auth:ShowTenantDirectory");
+		if (!showDirectory)
+			return Ok(Array.Empty<object>());
+
+		var query = _db.Tenants.IgnoreQueryFilters().AsNoTracking()
+			.Where(x => x.Enabled && x.TenantCode != "platform");
+		if (!string.IsNullOrWhiteSpace(q))
+			query = query.Where(x => x.TenantName.Contains(q) || x.TenantCode.Contains(q));
+		var tenants = await query.OrderBy(x => x.TenantName)
 			.Select(x => new { x.Id, x.TenantCode, x.TenantName }).ToListAsync(cancellationToken);
+
 		var ids = tenants.Select(x => x.Id).ToArray();
 		var settings = await _db.TenantSettings.IgnoreQueryFilters().AsNoTracking()
 			.Where(x => ids.Contains(x.TenantId) && (x.Key == "localization:availableCultures" || x.Key == "localization:defaultCulture"))
@@ -159,10 +172,9 @@ public sealed class AuthController : ControllerBase
 			var own = settings.Where(s => s.TenantId == x.Id).ToDictionary(s => s.Key, s => s.Value);
 			List<string> cultures;
 			try { cultures = System.Text.Json.JsonSerializer.Deserialize<List<string>>(own.GetValueOrDefault("localization:availableCultures") ?? "[]") ?? new(); } catch { cultures = new(); }
-			if (x.TenantCode == "platform" && platformCultures.Count > 0) cultures = platformCultures;
 			if (cultures.Count == 0) cultures.Add("zh-CN");
 			var defaultCulture = own.GetValueOrDefault("localization:defaultCulture") ?? cultures[0];
-			return new { x.Id, x.TenantCode, Name = x.TenantCode == "platform" ? "平台管理" : x.TenantName, AvailableCultures = cultures, DefaultCulture = defaultCulture };
+			return new { x.Id, x.TenantCode, Name = x.TenantName, AvailableCultures = cultures, DefaultCulture = defaultCulture };
 		}));
 	}
 }

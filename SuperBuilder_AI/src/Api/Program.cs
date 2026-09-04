@@ -34,6 +34,8 @@ using SuperBuilder_AI.Interfaces.Quota;
 using SuperBuilder_AI.Services.Quota;
 using SuperBuilder_AI.Middleware;
 using SuperBuilder_AI.Api.Diagnostics;
+using Microsoft.AspNetCore.HttpOverrides;
+using System.Net;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -256,8 +258,22 @@ builder.Services.AddSingleton<SuperBuilder_AI.Middleware.RequestMetricsCollector
 builder.Services.AddSingleton<StartupDiagnostics>();
 // M0-05：本地化目录种子服务，使 UiLanguage/Text 在启动序列中固定顺序执行
 builder.Services.AddScoped<ILocalizationSeedService, LocalizationSeedService>();
+// M0-08：限流阈值（绑定配置节 "RateLimit"，缺省使用安全默认值）
+builder.Services.Configure<RateLimitOptions>(builder.Configuration.GetSection("RateLimit"));
 
 var app = builder.Build();
+
+// M0-08：反向代理可信列表（仅信任明确配置的代理；默认 KnownProxies/KnownNetworks 为空，
+// 即不消费任何 X-Forwarded-*，RemoteIpAddress 直接为连接对端地址，避免伪造客户端 IP）
+var forwardOpts = new ForwardedHeadersOptions
+{
+    ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto | ForwardedHeaders.XForwardedHost,
+};
+foreach (var p in builder.Configuration.GetSection("ReverseProxy:KnownProxies").Get<string[]>() ?? Array.Empty<string>())
+    if (IPAddress.TryParse(p, out var ip)) forwardOpts.KnownProxies.Add(ip);
+foreach (var n in builder.Configuration.GetSection("ReverseProxy:KnownNetworks").Get<string[]>() ?? Array.Empty<string>())
+    if (System.Net.IPNetwork.TryParse(n, out var net)) forwardOpts.KnownIPNetworks.Add(net);
+app.UseForwardedHeaders(forwardOpts);
 
 // ── M0-05：受控启动序列 ────────────────────────────────────────────────
 // 固定顺序：Schema → Identity/Permission → UiLanguage/Text → 默认策略/主题 → Bootstrap。
@@ -353,10 +369,11 @@ app.UseRouting();
 app.UseMiddleware<UnifiedExceptionMiddleware>();
 // P0-10：审计必须包裹鉴权/限流/端点，确保入口拒绝与异常拒绝均入账。
 app.UseMiddleware<AuditMiddleware>();
-// P11.0 安全轨道：CORS → 限流 → 鉴权（顺序：路由之后、授权之前；与 Observability/Audit 互不干扰）
+// P11.0 安全轨道：CORS → 鉴权 → 限流（顺序：路由之后、授权之前；与 Observability/Audit 互不干扰）
 app.UseCors("P11Cors");
-app.UseMiddleware<RateLimitMiddleware>();
+// M0-08：鉴权先于限流，使限流键可基于已认证身份（TenantId+UserId）而非可伪造令牌头
 app.UseMiddleware<AuthMiddleware>();
+app.UseMiddleware<RateLimitMiddleware>();
 app.UseAuthorization();
 // P10.5 可观测性中间件（关联ID透传 + 请求/响应日志 + 耗时，非阻塞、异常静默，不影响 Golden 行为契约）
 app.UseMiddleware<ObservabilityMiddleware>();

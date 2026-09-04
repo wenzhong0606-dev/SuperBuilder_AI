@@ -36,6 +36,7 @@ public sealed class AuthMiddleware
 	private const string BearerPrefix = "Bearer ";
 	private const string ApiTokenHeader = "X-Api-Token";
 	private const string TenantIdItemKey = "TenantId";
+	private const string UserIdItemKey = "UserId";
 
 	public AuthMiddleware(RequestDelegate next, ITokenService tokenService)
 	{
@@ -108,6 +109,7 @@ public sealed class AuthMiddleware
 		var identity = new ClaimsIdentity(claims, "Bearer");
 		context.User = new ClaimsPrincipal(identity);
 		context.Items[TenantIdItemKey] = principal.TenantId;
+		context.Items[UserIdItemKey] = principal.UserId;
 		var executionIdentity = context.RequestServices?.GetService<IDataSourceExecutionIdentityAccessor>();
 		if (executionIdentity is not null)
 			executionIdentity.Current = new DataSourceExecutionIdentity(principal.TenantId, principal.UserId);

@@ -86,13 +86,12 @@ public sealed class LocalizationController : ControllerBase
 	}
 
 	[HttpGet("public/texts")]
-	public async Task<IActionResult> PublicTexts([FromQuery] string culture, [FromQuery] long tenantId = 0, CancellationToken ct = default)
+	public async Task<IActionResult> PublicTexts([FromQuery] string culture, CancellationToken ct = default)
 	{
 		await EnsureSeedAsync(ct);
-		var validTenant = tenantId > 0 && await _db.Tenants.IgnoreQueryFilters().AnyAsync(x => x.Id == tenantId && x.Enabled, ct) ? tenantId : 0;
-		var rows = await _db.UiTextResources.AsNoTracking().Where(x => x.Culture == culture && (x.TenantId == 0 || x.TenantId == validTenant)).ToListAsync(ct);
-		var overrides = rows.Where(x => x.TenantId == validTenant && validTenant > 0).ToDictionary(x => x.ResourceKey, StringComparer.OrdinalIgnoreCase);
-		return Ok(rows.Where(x => x.TenantId == 0).OrderBy(x => x.ResourceKey).Select(x => new { x.ResourceKey, PlatformValue=x.Value, Value=overrides.TryGetValue(x.ResourceKey, out var own) ? own.Value : x.Value, IsOverridden=overrides.ContainsKey(x.ResourceKey), x.Description }));
+		// M0-08：匿名公共端点只返回平台基线（TenantId==0），禁止按任意 tenantId 枚举租户专属文案
+		var rows = await _db.UiTextResources.AsNoTracking().Where(x => x.Culture == culture && x.TenantId == 0).ToListAsync(ct);
+		return Ok(rows.OrderBy(x => x.ResourceKey).Select(x => new { x.ResourceKey, PlatformValue = x.Value, Value = x.Value, IsOverridden = false, x.Description }));
 	}
 
 	[HttpPost("languages")]

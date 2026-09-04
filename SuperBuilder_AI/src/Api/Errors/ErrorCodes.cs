@@ -16,6 +16,7 @@ public static class ErrorCodes
     public const string Unsupported = "SB_UNSUPPORTED";
     public const string Internal = "SB_INTERNAL";
     public const string ServiceUnavailable = "SB_SERVICE_UNAVAILABLE";
+    public const string TooManyRequests = "SB_TOO_MANY_REQUESTS";
 
     // 鉴权
     public const string AuthInvalidCredential = "SB_AUTH_001";
@@ -49,6 +50,7 @@ public static class ErrorCodes
         [Unsupported] = "当前操作不被支持。",
         [Internal] = "服务暂时不可用，请稍后重试；如持续出现，可凭错误码联系管理员。",
         [ServiceUnavailable] = "平台尚未就绪（数据库不可达或尚未完成初始化），请稍后重试或联系管理员。",
+        [TooManyRequests] = "请求过于频繁，请稍后再试。",
         [AuthInvalidCredential] = "用户名或租户不存在，或账号已被禁用。",
         [BiNoQueryTable] = "未能从问题中识别出可查询的数据表，请换一种表述或指定具体业务对象（如「订单」「库存」）。",
         [BiNoQueryableField] = "未能从问题中识别可分析的字段，请补充指标或维度（如「销售额」「按地区」）。",
