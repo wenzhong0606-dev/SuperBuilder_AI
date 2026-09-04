@@ -15,13 +15,14 @@ namespace SuperBuilder_AI.Tests;
 /// M0-08 限流中间件测试：键维度（登录后租户+用户 / 登录前可信IP+设备）、
 /// 登录路径独立严格阈值、伪造令牌头不得成为限流键、结构化 429 契约。
 ///
-/// 注：<see cref="RateLimitMiddleware"/> 的计数器为进程级静态字典，本类各用例通过
-/// 唯一 IP / 租户+用户组合隔离桶，保证确定性、互不污染。
+/// RL-1/RL-2：计数器已由中间件的进程级静态字典改为注入的 <see cref="IRateLimitStore"/>，
+/// 每个用例默认持有独立存储，用例间天然隔离（不再需要靠唯一 IP/组合规避污染），
+/// 且过期窗口会被定期逐出，杜绝随历史客户端数无限增长的内存泄漏。
 /// </summary>
 public sealed class RateLimitMiddlewareTests
 {
-    private static RateLimitMiddleware Build(RateLimitOptions opts, RequestDelegate? next = null)
-        => new RateLimitMiddleware(next ?? (_ => Task.CompletedTask), Options.Create(opts));
+    private static RateLimitMiddleware Build(RateLimitOptions opts, RequestDelegate? next = null, IRateLimitStore? store = null)
+        => new RateLimitMiddleware(next ?? (_ => Task.CompletedTask), Options.Create(opts), store ?? new MemoryRateLimitStore());
 
     private static DefaultHttpContext AnonymousContext(string ip, string ua, string path = "/api/ask")
     {
@@ -133,5 +134,43 @@ public sealed class RateLimitMiddlewareTests
             await mw.InvokeAsync(ctx);
             Assert.Equal(StatusCodes.Status200OK, ctx.Response.StatusCode);
         }
+    }
+
+    // ── RL-1 / RL-2 回归 ────────────────────────────────────────────────
+
+    /// <summary>窗口过期后计数必须重置（RL-2：不可变计数、更新委托无副作用）。</summary>
+    [Fact]
+    public void Increment_Resets_Counter_After_Window_Expires()
+    {
+        using var store = new MemoryRateLimitStore(TimeSpan.FromMinutes(10)); // 拉长清理间隔，仅验证窗口重置
+        var window = TimeSpan.FromSeconds(1);
+        var now = DateTime.UtcNow;
+
+        var first = store.Increment("tenant:1:user:1", window, now);
+        Assert.Equal(1, first.Count);
+
+        var second = store.Increment("tenant:1:user:1", window, now.AddMilliseconds(200));
+        Assert.Equal(2, second.Count); // 窗口内累加
+
+        var afterExpiry = store.Increment("tenant:1:user:1", window, now.AddSeconds(2));
+        Assert.Equal(1, afterExpiry.Count); // 窗口过期 → 重置为新窗口
+    }
+
+    /// <summary>
+    /// RL-1 核心断言：过期条目必须被逐出。
+    /// 若键数随「历史客户端数」而非「活跃客户端数」单调增长，即说明内存泄漏回归。
+    /// </summary>
+    [Fact]
+    public async Task Expired_Windows_Are_Evicted_To_Prevent_Unbounded_Growth()
+    {
+        using var store = new MemoryRateLimitStore(TimeSpan.FromMilliseconds(50));
+
+        store.Increment("ip:198.51.100.9:ua-evict", TimeSpan.FromMilliseconds(30), DateTime.UtcNow);
+        Assert.Equal(1, store.Count);
+
+        // 等待窗口过期并经过至少一轮清理轮询
+        await Task.Delay(250);
+
+        Assert.Equal(0, store.Count);
     }
 }

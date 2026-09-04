@@ -49,6 +49,11 @@ builder.Services.AddControllersWithViews(options =>
 	// SB-P0-09: Golden/evaluation controllers are Development-only infrastructure.
 	if (!builder.Environment.IsDevelopment())
 		options.Conventions.Add(new SuperBuilder_AI.Api.Security.ProductionEvaluationRouteConvention());
+
+	// AUTH-2 Defense-in-Depth：控制器层授权兜底。
+	// 鉴权主力仍是 AuthMiddleware；本过滤器作为第二道防线，
+	// 在中间件被绕过或白名单被误改时，仍然拒绝匿名访问 /api（标注 [AllowAnonymous] 的端点除外）。
+	options.Filters.Add<SuperBuilder_AI.Api.Security.ApiAuthorizationFilter>();
 });
 builder.Services.AddHttpClient();
 
@@ -265,6 +270,11 @@ builder.Services.AddSingleton<StartupDiagnostics>();
 builder.Services.AddScoped<ILocalizationSeedService, LocalizationSeedService>();
 // M0-08：限流阈值（绑定配置节 "RateLimit"，缺省使用安全默认值）
 builder.Services.Configure<RateLimitOptions>(builder.Configuration.GetSection("RateLimit"));
+// RL-1/RL-2：限流存储。默认内存实现会定期逐出过期窗口（杜绝原 static 字典的内存泄漏）。
+// ⚠️ 该实现为进程内存、仅单实例有效；多实例（负载均衡）部署前必须替换为分布式实现
+// （实现 IRateLimitStore 并在此替换注册，例如基于 Redis 的滑动窗口计数）。
+builder.Services.AddSingleton<SuperBuilder_AI.Middleware.IRateLimitStore>(
+	_ => new SuperBuilder_AI.Middleware.MemoryRateLimitStore());
 
 var app = builder.Build();
 

@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -18,44 +17,48 @@ namespace SuperBuilder_AI.Middleware;
 /// 不再依赖可伪造的 <c>X-Api-Token</c> 头，反向代理下也不会退化为单一共享桶。</para>
 ///
 /// <para>登录路径采用更严格阈值（防爆破），其余 /api 走全局阈值。超阈值返回结构化 429（ApiError + Retry-After）。</para>
+///
+/// <para><b>RL-1/RL-2 修复</b>：计数不再存放于中间件的 <c>static</c> 字典（原实现永不清理 → 内存泄漏），
+/// 改由 <see cref="IRateLimitStore"/> 承载；默认 <see cref="MemoryRateLimitStore"/> 会定期逐出过期窗口，
+/// 且计数结构不可变（更新委托无副作用，避免并发计数失真）。
+/// 注意该默认实现为进程内存、<b>仅单实例有效</b>——多实例部署前须替换为分布式存储实现。</para>
 /// </summary>
 public sealed class RateLimitMiddleware
 {
 	private readonly RequestDelegate _next;
 	private readonly RateLimitOptions _options;
-	private static readonly ConcurrentDictionary<string, Window> Counters = new();
+	private readonly IRateLimitStore _store;
 
-	public RateLimitMiddleware(RequestDelegate next, IOptions<RateLimitOptions> options)
+	/// <param name="store">
+	/// 限流存储（RL-1：定期清理过期条目，杜绝内存泄漏；RL-2：可替换为分布式实现以支持多实例）。
+	/// </param>
+	public RateLimitMiddleware(RequestDelegate next, IOptions<RateLimitOptions> options, IRateLimitStore store)
 	{
 		_next = next;
 		_options = options.Value;
+		_store = store;
 	}
 
 	public async Task InvokeAsync(HttpContext context)
 	{
-		if (!context.Request.Path.StartsWithSegments("/api"))
+		// AUTH-1：大小写不敏感，与 ASP.NET 路由语义对齐，避免 /API/** 变体绕过限流。
+		if (!context.Request.Path.StartsWithSegments("/api", StringComparison.OrdinalIgnoreCase))
 		{
 			await _next(context);
 			return;
 		}
 
-		var isLogin = context.Request.Path.StartsWithSegments("/api/auth/login");
+		var isLogin = context.Request.Path.StartsWithSegments("/api/auth/login", StringComparison.OrdinalIgnoreCase);
 		var limit = isLogin ? _options.LoginLimit : _options.GlobalLimit;
 		var window = TimeSpan.FromSeconds(isLogin ? _options.LoginWindowSeconds : _options.GlobalWindowSeconds);
 		var key = ResolveKey(context);
 		var now = DateTime.UtcNow;
 
-		Window? entry;
+		RateLimitCounter entry;
 		try
 		{
-			entry = Counters.AddOrUpdate(key,
-				_ => new Window(now, 1),
-				(_, existing) =>
-				{
-					if (now - existing.Start >= window) return new Window(now, 1);
-					existing.Count++;
-					return existing;
-				});
+			// RL-1/RL-2：经由可清理、可替换的存储实现计数（原子操作且更新委托无副作用）。
+			entry = _store.Increment(key, window, now);
 		}
 		catch
 		{
@@ -113,15 +116,4 @@ public sealed class RateLimitMiddleware
 		return sb.ToString();
 	}
 
-	private sealed class Window
-	{
-		public DateTime Start { get; }
-		public int Count { get; set; }
-
-		public Window(DateTime start, int count)
-		{
-			Start = start;
-			Count = count;
-		}
-	}
 }

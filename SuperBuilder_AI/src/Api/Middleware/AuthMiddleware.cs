@@ -58,7 +58,8 @@ public sealed class AuthMiddleware
 		var diagnosticsPermission = DiagnosticsAccessPolicy.GetRequiredPermission(context.Request.Path);
 		if (principal is null)
 		{
-			if (context.Request.Path.StartsWithSegments("/api") || diagnosticsPermission is not null)
+			// AUTH-1：大小写不敏感，防止 /API/** 变体绕过鉴权（详见 IsPrefix 说明）。
+			if (IsPrefix(context.Request.Path, "/api") || diagnosticsPermission is not null)
 			{
 				SecurityAuditContext.Reject(context, ErrorCodes.Unauthorized, "missing-or-invalid-token");
 				context.Response.StatusCode = StatusCodes.Status401Unauthorized;
@@ -183,20 +184,38 @@ public sealed class AuthMiddleware
 		return null;
 	}
 
+	/// <summary>
+	/// 路径前缀匹配（AUTH-1 修复）：统一为大小写不敏感。
+	///
+	/// <para>
+	/// <c>PathString.StartsWithSegments</c> 默认按 Ordinal 区分大小写，而 ASP.NET 路由匹配是大小写不敏感的。
+	/// 二者不一致会带来两个真实问题：
+	/// <list type="bullet">
+	/// <item><b>鉴权绕过（安全）</b>：<c>/API/ask</c> 这类大写变体不匹配 <c>/api</c> 前缀，
+	/// 因而跳过本中间件的令牌校验与租户数据面隔离，却被路由大小写不敏感地命中控制器 → 匿名越权。</item>
+	/// <item><b>登录死锁（可用性）</b>：<c>/API/auth/login</c> 无法进入匿名白名单，
+	/// 反被要求携带令牌才能登录 → 无法登录。</item>
+	/// </list>
+	/// 故所有路径前缀判断一律按 <see cref="StringComparison.OrdinalIgnoreCase"/> 比较，与路由层语义对齐。
+	/// </para>
+	/// </summary>
+	private static bool IsPrefix(PathString path, string prefix) =>
+		path.StartsWithSegments(prefix, StringComparison.OrdinalIgnoreCase);
+
 	/// <summary>匿名白名单：Golden 运行时、健康探测、登录端点、首页与静态资源。</summary>
 	private static bool IsAnonymousPath(PathString path)
 	{
 		if (path == "/") return true;
-		if (path.StartsWithSegments("/evaluation")) return true;
-		if (path.StartsWithSegments("/health")) return true;
-		if (path.StartsWithSegments("/api/auth/login")) return true;
-		if (path.StartsWithSegments("/api/auth/login-options")) return true;
-		if (path.StartsWithSegments("/api/platform-bootstrap")) return true;
+		if (IsPrefix(path, "/evaluation")) return true;
+		if (IsPrefix(path, "/health")) return true;
+		if (IsPrefix(path, "/api/auth/login")) return true;
+		if (IsPrefix(path, "/api/auth/login-options")) return true;
+		if (IsPrefix(path, "/api/platform-bootstrap")) return true;
 		// 登录前只开放只读的公共语言入口；管理接口仍需解析认证身份。
-		if (path.StartsWithSegments("/api/localization/public")) return true;
-		if (path.StartsWithSegments("/css")) return true;
-		if (path.StartsWithSegments("/js")) return true;
-		if (path.StartsWithSegments("/lib")) return true;
+		if (IsPrefix(path, "/api/localization/public")) return true;
+		if (IsPrefix(path, "/css")) return true;
+		if (IsPrefix(path, "/js")) return true;
+		if (IsPrefix(path, "/lib")) return true;
 
 		var v = path.Value ?? string.Empty;
 		var dot = v.LastIndexOf('.');

@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SuperBuilder_AI.Interfaces.Platform;
 using SuperBuilder_AI.Models.Organization;
@@ -77,7 +78,9 @@ public sealed class LocalizationController : ControllerBase
 			.Select(x => new { x.Id, x.Culture, x.DisplayName, x.NativeName, x.Enabled, x.SortOrder }).ToListAsync(ct));
 	}
 
+	// AUTH-2：登录前只读公共入口，须显式放行（AuthMiddleware 白名单与控制器层兜底过滤器均据此豁免）。
 	[HttpGet("public/languages")]
+	[AllowAnonymous]
 	public async Task<IActionResult> PublicLanguages(CancellationToken ct)
 	{
 		await EnsureSeedAsync(ct);
@@ -85,7 +88,9 @@ public sealed class LocalizationController : ControllerBase
 			.Select(x => new { x.Culture, x.DisplayName, x.NativeName }).ToListAsync(ct));
 	}
 
+	// AUTH-2：同上，登录前只读公共入口。
 	[HttpGet("public/texts")]
+	[AllowAnonymous]
 	public async Task<IActionResult> PublicTexts([FromQuery] string culture, CancellationToken ct = default)
 	{
 		await EnsureSeedAsync(ct);

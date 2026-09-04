@@ -147,11 +147,19 @@ public static class TenantDataPlanePolicy
 		return default;
 	}
 
+	/// <summary>
+	/// 数据面路径判定（AUTH-1 修复）：统一为大小写不敏感。
+	///
+	/// <para>
+	/// 若沿用默认的 Ordinal 区分大小写，<c>/API/ask</c> 等大写变体将不匹配本判定、
+	/// 从而跳过数据面租户隔离，却仍被大小写不敏感的 ASP.NET 路由命中控制器 → 跨租户越权风险。
+	/// </para>
+	/// </summary>
 	public static bool IsDataPlanePath(PathString path) =>
-		path.StartsWithSegments("/api/ask") ||
-		path.StartsWithSegments("/api/business-model") ||
-		path.StartsWithSegments("/api/semantic-labels") ||
-		path.StartsWithSegments("/metadata");
+		path.StartsWithSegments("/api/ask", StringComparison.OrdinalIgnoreCase) ||
+		path.StartsWithSegments("/api/business-model", StringComparison.OrdinalIgnoreCase) ||
+		path.StartsWithSegments("/api/semantic-labels", StringComparison.OrdinalIgnoreCase) ||
+		path.StartsWithSegments("/metadata", StringComparison.OrdinalIgnoreCase);
 
 	public static TenantDataPlaneResolution Resolve(ClaimsPrincipal principal, params long?[] requestedTenantIds)
 	{
