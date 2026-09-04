@@ -202,6 +202,14 @@ M0 退出：全部 🔴 完成、凭据已轮换、构建零错误、测试不�
 - Tenant、UiLanguage、UiTextResource、Role、DataSource、MetadataSemantic 增加 RowVersion/ETag；冲突返回 409。
 - 明确状态、软删除、物理删除和关联表级联策略。
 
+> **状态（2026-09-04）**：地基批次 ✅ 已提交（`e39fd29`）。
+> - `IAuditable` 契约 + `BaseEntity` 审计字段（CreatedTime 改 UTC、增 UpdatedTime/CreatedBy/UpdatedBy/RowVersion）；`Role` 补审计并实现 `IAuditable`。
+> - `SuperBIContext`：全部 `IAuditable` 实体配置 `RowVersion` 为 `IsConcurrencyToken`+默认 1（非数据库 rowversion，兼容 SQL Server 与 SQLite 测试）；UTC 时间转换器（读回强制 Kind=Utc）；`SaveChanges` 统一回填 `UpdatedTime` 与自增 `RowVersion`。
+> - 新增 `ConcurrencyExceptionMiddleware` 将 `DbUpdateConcurrencyException` 映射 HTTP 409（注册于 `UnifiedExceptionMiddleware` 之后）。
+> - 迁移 `M1_01_AuditConcurrency`：为全部 `IAuditable` 实体加审计列与 `RowVersion`（not null, default 1）。
+> - 测试 3+2 例，全量 **535/535 通过**（基线 530+5），构建 0 error。
+> - **未做（留待后续子批）**：M1-01 末条"明确状态/软删除/物理删除/关联表级联策略"的全局策略落地（已通过并发令牌与审计字段奠定基线，软删除过滤器与级联策略将在 M1-02~M1-06 各实体约束中按需落实，避免一次性改动触发 Golden/租户过滤回归）。
+
 ### M1-02 Tenant 与 TenantSetting
 
 - TenantCode 必填、最大 64、规范化唯一、创建后默认不可变；TenantName 必填、最大 128。
