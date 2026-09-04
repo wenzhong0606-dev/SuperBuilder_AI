@@ -1,7 +1,10 @@
 using System.Collections.Generic;
 using System.Net;
+using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using SuperBuilder_AI.Controllers;
@@ -269,5 +272,46 @@ public class ThemeControllerTests
 		var list = Assert.IsType<List<ThemeController.ThemeSummary>>(result!.Value);
 		// 即便未落库内置行，列表在租户作用域下不强制含内置；此处只断言租户自有主题可见。
 		Assert.Contains(list, s => s.Key == "tenant-only" && s.TenantId == Tenant5);
+	}
+
+	[Fact]
+	public async Task Copy_IgnoresBodyTargetTenant_AndUsesAuthenticatedTenant()
+	{
+		var ctx = CreateContext(out var connection);
+		await using var _ = connection;
+		await using var __ = ctx;
+
+		ctx.Tenants.Add(new Tenant { Id = 5 });
+		ctx.Tenants.Add(new Tenant { Id = 7 });
+		await ctx.SaveChangesAsync();
+
+		var controller = new ThemeController(ctx);
+		controller.ControllerContext = new ControllerContext
+		{
+			HttpContext = new DefaultHttpContext
+			{
+				User = new ClaimsPrincipal(new ClaimsIdentity(new[]
+				{
+					new Claim("tid", "5"),
+					new Claim(ClaimTypes.NameIdentifier, "1"),
+				})),
+			},
+		};
+
+		// 认证租户 5 的管理员试图通过请求体把主题复制到租户 7（伪造他租户）。
+		var result = await controller.Copy(
+			"default",
+			new ThemeController.CopyThemeRequest(7, "acme-clone", "Acme 克隆"),
+			5,
+			CancellationToken.None) as Microsoft.AspNetCore.Mvc.CreatedAtActionResult;
+		Assert.NotNull(result);
+
+		// M0-06：目标租户恒为认证租户 5，而非请求体伪造的 7。
+		var cloned = await ctx.Themes
+			.IgnoreQueryFilters()
+			.FirstOrDefaultAsync(t => t.Key == "acme-clone");
+		Assert.NotNull(cloned);
+		Assert.Equal(5, cloned!.TenantId);
+		Assert.False(await ctx.Themes.IgnoreQueryFilters().AnyAsync(t => t.Key == "acme-clone" && t.TenantId == 7));
 	}
 }

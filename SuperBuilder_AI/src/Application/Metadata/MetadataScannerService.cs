@@ -90,6 +90,18 @@ public class MetadataScannerService
 	{
 
 
+		// M0-06：元数据扫描写入强制从 DataSource 继承 TenantId。
+		// 解析归属数据源，以 dataSource.TenantId 为权威写入租户；拒绝非归属租户的扫描请求。
+		var dataSource = await _context.DataSources
+			.AsNoTracking()
+			.FirstOrDefaultAsync(x => x.Id == dataSourceId, CancellationToken.None);
+		if (dataSource is null)
+			throw new KeyNotFoundException($"数据源 {dataSourceId} 不存在，无法扫描元数据。");
+		if (dataSource.TenantId != tenantId)
+			throw new InvalidOperationException(
+				$"数据源 {dataSourceId} 不属于租户 {tenantId}（实际归属租户 {dataSource.TenantId}），拒绝元数据扫描写入。");
+		var effectiveTenantId = dataSource.TenantId ?? 0;
+
 		/*
 		 * =============================
 		 *
@@ -135,7 +147,7 @@ public class MetadataScannerService
 				x.Columns)
 
 			.Where(x =>
-				x.TenantId == tenantId
+				x.TenantId == effectiveTenantId
 				&&
 				x.DataSourceId == dataSourceId)
 
@@ -167,8 +179,8 @@ public class MetadataScannerService
 					new MetadataTable
 					{
 
-						TenantId =
-							tenantId,
+					TenantId =
+						effectiveTenantId,
 
 
 						DataSourceId =
@@ -396,7 +408,7 @@ public class MetadataScannerService
 				x.Semantic)
 
 			.Where(x =>
-				x.MetadataTable!.TenantId == tenantId
+				x.MetadataTable!.TenantId == effectiveTenantId
 				&&
 				x.MetadataTable.DataSourceId == dataSourceId
 				&&
@@ -443,7 +455,7 @@ public class MetadataScannerService
 				x.Semantic)
 
 			.Where(x =>
-				x.TenantId == tenantId
+				x.TenantId == effectiveTenantId
 				&&
 				x.DataSourceId == dataSourceId)
 

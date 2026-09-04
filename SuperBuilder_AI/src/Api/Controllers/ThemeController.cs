@@ -255,11 +255,17 @@ public sealed class ThemeController : ControllerBase
 	{
 		if (request is null) return BadRequest("请求体不能为空。");
 		if (string.IsNullOrWhiteSpace(key)) return BadRequest("源主题 Key 不能为空。");
-		if (request.TargetTenantId <= 0) return BadRequest("目标租户必须 &gt; 0（不能通过复制创建内置主题）。");
 		if (string.IsNullOrWhiteSpace(request.TargetKey)) return BadRequest("目标主题 Key 不能为空。");
 
 		// 解析源 DSL：先查 DB（租户作用域可见；内置无行则合成）。
-		ScopeTo(tenantId);
+		var scopeTenant = ScopeTo(tenantId);
+
+		// M0-06：忽略请求体 TargetTenantId，目标租户恒为认证租户（生产由 AuthMiddleware 从 JWT 注入 tid）；
+		// 测试/遗留显式租户模式（无 tid 声明）回退到请求 tenantId。杜绝租户管理员伪造他租户主题。
+		var authenticatedTenant = User?.FindFirst("tid") is { } tidClaim && long.TryParse(tidClaim.Value, out var at) ? at : 0;
+		var targetTenant = authenticatedTenant > 0 ? authenticatedTenant : scopeTenant;
+		if (targetTenant <= 0) return BadRequest("目标租户必须 &gt; 0（不能通过复制创建内置主题）。");
+
 		var source = await _db.Themes.AsNoTracking()
 			.FirstOrDefaultAsync(t => t.Key == key, cancellationToken);
 		string? sourceDslJson = source?.DslJson;
@@ -273,12 +279,12 @@ public sealed class ThemeController : ControllerBase
 		// 目标键冲突检测（目标租户自身 ∪ 内置）。
 		var conflict = await _db.Themes
 			.IgnoreQueryFilters()
-			.AnyAsync(t => t.Key == request.TargetKey && (t.TenantId == request.TargetTenantId || t.TenantId == 0), cancellationToken);
+			.AnyAsync(t => t.Key == request.TargetKey && (t.TenantId == targetTenant || t.TenantId == 0), cancellationToken);
 		if (conflict) return Conflict(new { errors = new[] { $"目标主题键已存在：{request.TargetKey}。" } });
 
 		var entity = new Theme
 		{
-			TenantId = request.TargetTenantId,
+			TenantId = targetTenant,
 			Key = request.TargetKey,
 			Name = string.IsNullOrWhiteSpace(request.TargetName) ? request.TargetKey : request.TargetName,
 			IsBuiltIn = false,

@@ -35,6 +35,7 @@ public sealed class BusinessEntityService(SuperBIContext db) : IBusinessEntitySe
     {
         ArgumentNullException.ThrowIfNull(entity);
         await EnsureTenantAsync(entity.TenantId, cancellationToken);
+        await ValidateBindingsAsync(entity.TenantId, entity, cancellationToken);
         db.BusinessEntities.Add(entity);
         await db.SaveChangesAsync(cancellationToken);
         return entity;
@@ -44,6 +45,7 @@ public sealed class BusinessEntityService(SuperBIContext db) : IBusinessEntitySe
     {
         ArgumentNullException.ThrowIfNull(entity);
         await EnsureTenantAsync(entity.TenantId, cancellationToken);
+        await ValidateBindingsAsync(entity.TenantId, entity, cancellationToken);
         var exists = await db.BusinessEntities.AnyAsync(x => x.Id == entity.Id && x.TenantId == entity.TenantId, cancellationToken);
         if (!exists) throw new KeyNotFoundException($"BusinessEntity {entity.Id} was not found for tenant {entity.TenantId}.");
         db.BusinessEntities.Update(entity);
@@ -57,6 +59,40 @@ public sealed class BusinessEntityService(SuperBIContext db) : IBusinessEntitySe
         if (entity is null) return;
         db.BusinessEntities.Remove(entity);
         await db.SaveChangesAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// M0-06：校验 BusinessEntity 聚合内所有 PhysicalBinding 的 Tenant → DataSource → Table → Column 完整链，
+    /// 确保每条物理绑定都归属于该实体的租户，杜绝跨租户字段越权。
+    /// </summary>
+    private async Task ValidateBindingsAsync(long tenantId, BusinessEntity entity, CancellationToken cancellationToken)
+    {
+        var bindings = entity.Keys.SelectMany(k => k.PhysicalBindings)
+            .Concat(entity.Attributes.SelectMany(a => a.PhysicalBindings))
+            .Concat(entity.Metrics.SelectMany(m => m.PhysicalBindings))
+            .Concat(entity.SourceRelationships.SelectMany(r => r.PhysicalBindings))
+            .Concat(entity.TargetRelationships.SelectMany(r => r.PhysicalBindings))
+            .ToList();
+        foreach (var binding in bindings)
+        {
+            var column = await db.MetadataColumns.AsNoTracking()
+                .Include(c => c.MetadataTable)
+                .FirstOrDefaultAsync(c => c.Id == binding.MetadataColumnId, cancellationToken);
+            if (column is null || column.MetadataTableId != binding.MetadataTableId)
+                throw new InvalidOperationException(
+                    $"PhysicalBinding 引用的列 {binding.MetadataColumnId} 不存在或不属于声明的表 {binding.MetadataTableId}。");
+
+            var table = column.MetadataTable;
+            if (table is null || table.DataSourceId != binding.DataSourceId)
+                throw new InvalidOperationException(
+                    $"PhysicalBinding 声明的表 {binding.MetadataTableId} 不属于声明的 DataSource {binding.DataSourceId}。");
+
+            var dataSource = await db.DataSources.AsNoTracking()
+                .FirstOrDefaultAsync(d => d.Id == binding.DataSourceId, cancellationToken);
+            if (dataSource is null || dataSource.TenantId != tenantId)
+                throw new InvalidOperationException(
+                    $"PhysicalBinding 声明的 DataSource {binding.DataSourceId} 不存在或不属于租户 {tenantId}。");
+        }
     }
 
     private async Task EnsureTenantAsync(long tenantId, CancellationToken cancellationToken)
