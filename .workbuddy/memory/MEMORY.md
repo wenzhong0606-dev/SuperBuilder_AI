@@ -6,11 +6,13 @@
 - AI Native BI：自然语言 → AI理解 → 语义分析 → 查询计划 → SQL → 数据分析 → 业务答案
 - .NET 10 (net10.0) + EF Core 10 + Dapper；Qdrant 向量库(1024维)；Qwen LLM；多数据库(SQL Server/MySQL/PostgreSQL)
 - 业务库 WMS MySQL `192.168.16.120:3306`（用户确认现已可达）
-- 主交付文档：`docs/DevelopmentPlan.md` + `docs/PhaseChecklist.md` + `docs/ARCHITECTURE.md`
+- 主交付文档（唯一执行计划）：`docs/Master_Development_Plan.md`（v2.0，取代 DevelopmentPlan/PhaseChecklist/DevChecklist_Final 的分散跟踪职责）；源需求保留于 `docs/Audit_Report_and_DevPlan.md`、`docs/DevChecklist_Final.md`、`docs/DevelopmentPlan.md`、`docs/PhaseChecklist.md`
 
 - **P11.6 前端结构与开发清单（2026-09-02，未提交）**：页面六组化 + 通用组件库 + Layout 层 + 9 个新页面（S0 ✅）+ S1 组件化改造全部完成（S1-1~S1-5 ✅）+ S2 写操作闭环全部可补项完成（S2-1/2/3/4/5/6 ✅：删除·新建·启停·DSL 编辑器·角色权限·租户设置 Upsert·字段级 SbField.Error+服务端 errors 友好化；S2-7 后端无写端点⬜）。文档 `docs/Frontend_Structure_Plan.md` + `docs/Frontend_DevChecklist.md`（S0/S1/S2 ✅，S3~S5 ⬜）。三端 build 0 error。
 
-## 阶段状态（截至 2026-08-31）
+## 阶段状态（截至 2026-09-04）
+- **测试基线**：实测 **476/476 全绿、build 0 error**（Master_Development_Plan.md 标注的 431/431 / 468/468 基线均已过时）。Golden 18/18 契约未改。
+- **M0 发布阻塞**：M0-09（Ask 旗舰对话）✅ 已完成（5 提交本地就绪未 push）；M0-03 权限守卫 / M0-04 Ask 可靠性 🟡 进行中（含未提交尾批）；M0-01 凭据轮换 / M0-02 四路由契约 / M0-05 受控 Migration / M0-06 字段越权与关系链 / M0-08 匿名端点与限流 仍为 🔴 未做。
 - **Stage 0 基础/运行时**：✅ 全完成；Golden 18/18 PASS
 - **Stage 1 架构治理**：🟡 A1/A2/A4 ✅；A3/A5 ⬜（用户指令暂缓「先不做」）
 - **Stage 2 产品演进 P3~P10**：✅ 全绿（每阶段退出门槛 = Golden 18/18，硬约束）
