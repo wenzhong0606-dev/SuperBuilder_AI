@@ -270,11 +270,28 @@ builder.Services.AddSingleton<StartupDiagnostics>();
 builder.Services.AddScoped<ILocalizationSeedService, LocalizationSeedService>();
 // M0-08：限流阈值（绑定配置节 "RateLimit"，缺省使用安全默认值）
 builder.Services.Configure<RateLimitOptions>(builder.Configuration.GetSection("RateLimit"));
-// RL-1/RL-2：限流存储。默认内存实现会定期逐出过期窗口（杜绝原 static 字典的内存泄漏）。
-// ⚠️ 该实现为进程内存、仅单实例有效；多实例（负载均衡）部署前必须替换为分布式实现
-// （实现 IRateLimitStore 并在此替换注册，例如基于 Redis 的滑动窗口计数）。
-builder.Services.AddSingleton<SuperBuilder_AI.Middleware.IRateLimitStore>(
-	_ => new SuperBuilder_AI.Middleware.MemoryRateLimitStore());
+// RL-1/RL-2：限流存储。
+// 默认内存实现（MemoryRateLimitStore）会定期逐出过期窗口，杜绝原 static 字典的内存泄漏；
+// 但进程内存仅单实例有效——多实例（负载均衡）部署下各实例独立计数，攻击者可分散绕过。
+// 故提供 Redis 后端（RedisRateLimitStore）：配置 RateLimit:Store:Type=Redis 即切换为全局共享计数，
+// 满足「上线多实例前」的去中心化前置条件。默认仍为 Memory，单实例无需 Redis 依赖。
+var rateLimitStoreType = builder.Configuration["RateLimit:Store:Type"] ?? "Memory";
+if (string.Equals(rateLimitStoreType, "Redis", StringComparison.OrdinalIgnoreCase))
+{
+	var redisConfig = builder.Configuration["RateLimit:Redis:Configuration"]
+		?? throw new InvalidOperationException(
+			"RateLimit:Store:Type 已设为 Redis，但未配置 RateLimit:Redis:Configuration（Redis 连接字符串）。");
+	var redisInstanceName = builder.Configuration["RateLimit:Redis:InstanceName"] ?? "rls:";
+	var multiplexer = StackExchange.Redis.ConnectionMultiplexer.Connect(redisConfig);
+	builder.Services.AddSingleton(multiplexer);
+	builder.Services.AddSingleton<SuperBuilder_AI.Middleware.IRateLimitStore>(
+		_ => new SuperBuilder_AI.Middleware.RedisRateLimitStore(multiplexer, redisInstanceName));
+}
+else
+{
+	builder.Services.AddSingleton<SuperBuilder_AI.Middleware.IRateLimitStore>(
+		_ => new SuperBuilder_AI.Middleware.MemoryRateLimitStore());
+}
 
 var app = builder.Build();
 
