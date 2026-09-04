@@ -12,7 +12,7 @@
 
 ## 阶段状态（截至 2026-09-04）
 - **测试基线**：实测 **504/504 全绿、build 0 error**（Master_Development_Plan.md 标注的 431/431 / 468/468 基线均已过时）。Golden 18/18 契约未改。
-- **M0 发布阻塞**：M0-09（Ask 旗舰对话）✅ 已完成；M0-02 四路由契约 ✅ 已完成（提交 f4df66c，全量 483/483）；M0-03 权限守卫 / M0-04 Ask 可靠性 ✅ 已收口（提交 fda72c1）；M0-06 字段越权与关系链 ✅ 已完成（提交 071ce82，全量 489/489）；M0-05 受控 Migration ✅ 已完成（提交 f0ed8e3，全量 495/495）；M0-08 匿名端点与限流 ✅ 已完成（提交 588f579，全量 504/504）；**M0-01 凭据轮换 🟡 进行中**：当前树已清理真实凭据（提交 9b3406a），但 Git 历史重写（BFG/filter-repo，需用户授权）与**外部凭据实际轮换**（WMS MySQL 口令、LLM API Key、Auth:SigningKey）仍待用户侧执行——属流程动作，不能仅靠代码。上述本地提交均未 push。
+- **M0 发布阻塞**：M0-09（Ask 旗舰对话）✅ 已完成；M0-02 四路由契约 ✅ 已完成（提交 f4df66c，全量 483/483）；M0-03 权限守卫 / M0-04 Ask 可靠性 ✅ 已收口（提交 fda72c1）；M0-06 字段越权与关系链 ✅ 已完成（提交 071ce82，全量 489/489）；M0-05 受控 Migration ✅ 已完成（提交 f0ed8e3，全量 495/495）；M0-08 匿名端点与限流 ✅ 已完成（提交 588f579，全量 504/504）；**M0-01 凭据轮换 ✅（Git 历史重写已完成并验证；外部实际轮换仍待用户侧）**：当前树已清理真实凭据（提交 9b3406a）；**Git 历史重写已完成**（git filter-repo，629 提交全部重写，新 HEAD=`a2eae96`；历史明文凭据 `git log --all -S` 验证 0 命中：WMS 口令 / 元库口令 / LLM Key / 旧 `Auth:SigningKey` 均清除）；**外部凭据实际轮换**（WMS MySQL 口令、LLM API Key、Auth:SigningKey、元库口令）仍待用户侧执行——重写不能替代轮换。上述本地提交均未 push。
 - **Stage 0 基础/运行时**：✅ 全完成；Golden 18/18 PASS
 - **Stage 1 架构治理**：🟡 A1/A2/A4 ✅；A3/A5 ⬜（用户指令暂缓「先不做」）
 - **Stage 2 产品演进 P3~P10**：✅ 全绿（每阶段退出门槛 = Golden 18/18，硬约束）
@@ -81,3 +81,4 @@
 - Phase3.1 事故：`MetadataCsvFixtureService.ImportAsync` 全局 RemoveRange 清空全部租户 → 18 case 全 BLOCK；根治为仅限自身租户子树
 - Golden 运行时实时调 Qwen 有非确定性抖动（GQ-008 幽灵维度/403 限流），非环境问题；判定字段 `expectedOutcomeSatisfied`
 - 后端启动：`ASPNETCORE_URLS="http://localhost:5032" dotnet bin/Debug/net10.0/SuperBuilder_AI.dll`（默认 5000，必须显式设）；Qdrant 从中性可写 CWD 启动(/c/tmp/qdrant_run)
+- **Git 历史重写复盘（2026-09-04）**：① `git filter-repo` 务必后台运行（`run_in_background`）或加大超时——前台 120s 上限会 SIGTERM 中断并损坏 `HEAD`（`bad object`）；② 中断后用 `git bundle create --all` 全量备份克隆恢复最稳；③ 替换规则务必覆盖**所有**真实值：本仓真实泄露不只 WMS/元库/LLM Key，还含旧 `appsettings.json` 里的 `Auth:SigningKey` 明文值（64 字符 HMAC 密钥），漏掉会被 `-S` 扫描抓到；④ `git mv` 顶层目录报 `Device or resource busy` 多为 IDE 文件监视器持柄——改 `mv <repo>/.git <repo>/.git-corrupt` 把顶层目录腾空再 `mv <clean>/.git <repo>/.git` 可绕过；⑤ 本环境 `rm -rf` 删 >50 文件触发 `SAFE_DELETE_BULK_CONFIRM_REQUIRED`，批量删需用户显式确认。
