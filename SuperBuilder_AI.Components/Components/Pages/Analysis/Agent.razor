@@ -88,11 +88,11 @@
     private async Task Reload()
     {
         _loading = true;
-        var (agents, _, aErr) = await Api.GetJsonAsync($"api/agent?tenantId={State.TenantId}");
+        var (agents, _, aErr) = await Api.GetJsonAsync($"api/agent/plans?tenantId={State.TenantId}");
         _error = aErr ?? "";
         _agents = agents is { ValueKind: JsonValueKind.Array } ? agents.Value.EnumerateArray().ToList() : new();
 
-        var (tools, _, tErr) = await Api.GetJsonAsync("api/agent/tools-catalog");
+        var (tools, _, tErr) = await Api.GetJsonAsync("api/agent/tools");
         if (tools is null && string.IsNullOrEmpty(_error)) _error = tErr ?? "";
         _tools = tools is { ValueKind: JsonValueKind.Array } ? tools.Value.EnumerateArray().ToList() : new();
 

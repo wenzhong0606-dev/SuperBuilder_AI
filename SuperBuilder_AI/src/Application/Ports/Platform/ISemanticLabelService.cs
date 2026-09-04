@@ -54,6 +54,14 @@ public interface ISemanticLabelService
 	Task<SemanticLabel> UpsertAsync(
 		UpsertSemanticLabelRequest request,
 		CancellationToken cancellationToken = default);
+
+	/// <summary>
+	/// 按主键获取单条标签（M0-02 详情端点用）。仅返回属于指定租户或全局共享(TenantId=0)的标签。
+	/// </summary>
+	Task<SemanticLabel?> GetByIdAsync(
+		long id,
+		long tenantId,
+		CancellationToken cancellationToken = default);
 }
 
 /// <summary>写入/更新语义标签的请求。</summary>

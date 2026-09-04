@@ -159,6 +159,20 @@ public sealed class SemanticLabelService : ISemanticLabelService
 		return existing;
 	}
 
+	/// <inheritdoc />
+	public async Task<SemanticLabel?> GetByIdAsync(
+		long id,
+		long tenantId,
+		CancellationToken cancellationToken = default)
+	{
+		// 显式租户过滤：仅返回属于指定租户或全局共享(TenantId=0)的标签，避免跨租户读取（M0-06）。
+		return await _db.SemanticLabels
+			.AsNoTracking()
+			.FirstOrDefaultAsync(
+				l => l.Id == id && (l.TenantId == tenantId || l.TenantId == 0),
+				cancellationToken);
+	}
+
 	/// <summary>把候选标签按回退链顺序排列（链上越靠前优先级越高）。</summary>
 	private static IOrderedEnumerable<SemanticLabel> OrderByChain(
 		IEnumerable<SemanticLabel> candidates,

@@ -133,6 +133,17 @@ public sealed class SemanticLabelController : ControllerBase
 		}
 	}
 
+	/// <summary>按 Id 获取单条语义标签详情（M0-02 补齐契约）。共享标签(TenantId=0)对任意租户可见。</summary>
+	[HttpGet("{id:long}")]
+	public async Task<IActionResult> GetById(long id, [FromQuery] long? tenantId, CancellationToken cancellationToken = default)
+	{
+		var tenant = TenantDataPlanePolicy.Resolve(User, tenantId);
+		if (!tenant.Authorized) return TenantMismatch();
+		var label = await _labels.GetByIdAsync(id, tenant.EffectiveTenantId, cancellationToken);
+		if (label is null) return NotFound(new ApiError { Code = ErrorCodes.NotFound, Message = "标签不存在或不属于当前租户。" });
+		return Ok(ToSummary(label));
+	}
+
 	private ObjectResult TenantMismatch() => StatusCode(403,
 		new ApiError { Code = ErrorCodes.TenantIsolated, Message = "禁止：数据面请求租户必须与认证租户一致。" });
 

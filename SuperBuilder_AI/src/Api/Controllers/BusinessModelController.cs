@@ -52,6 +52,17 @@ public sealed class BusinessModelController : ControllerBase
 		return Ok(await _mapper.ResolveAsync(resolution.EffectiveTenantId, dataSourceId, q, topPerDomain, cancellationToken));
 	}
 
+	/// <summary>按 Id 获取单个业务实体详情（M0-02 补齐契约）。租户隔离由注册表服务保证。</summary>
+	[HttpGet("entities/{id:long}")]
+	public async Task<IActionResult> GetEntity(long id, [FromQuery] long? tenantId, CancellationToken cancellationToken = default)
+	{
+		var resolution = TenantDataPlanePolicy.Resolve(User, tenantId);
+		if (!resolution.Authorized) return TenantMismatch();
+		var entity = await _registry.GetAsync(resolution.EffectiveTenantId, id, cancellationToken);
+		if (entity is null) return NotFound(new ApiError { Code = ErrorCodes.NotFound, Message = "实体不存在或不属于当前租户。" });
+		return Ok(entity);
+	}
+
 	private ObjectResult TenantMismatch() => StatusCode(403,
 		new ApiError { Code = ErrorCodes.TenantIsolated, Message = "禁止：数据面请求租户必须与认证租户一致。" });
 }
