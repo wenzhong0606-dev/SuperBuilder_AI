@@ -6,6 +6,8 @@ using System.Data.Common;
 using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
+using System.Text.RegularExpressions;
+using System.Threading;
 
 namespace SuperBuilder_AI.Controllers;
 
@@ -141,20 +143,31 @@ public sealed class LocalRuntimeDiagnosticsController : ControllerBase
         });
     }
 
+    /// <summary>
+    /// 连接测试硬性超时，避免诊断端点被挂起连接无限期阻塞。
+    /// </summary>
+    private static readonly TimeSpan ConnectionTestTimeout = TimeSpan.FromSeconds(15);
+
     private async Task<DataSourceConnectionCheck> CheckDbConnectionAsync(long dataSourceId, CancellationToken cancellationToken)
     {
         var sw = Stopwatch.StartNew();
         try
         {
+            using var timeoutCts = new CancellationTokenSource(ConnectionTestTimeout);
+            using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
+            var token = linked.Token;
+
             await using var connection = await _dataSourceConnectionFactory.CreateAsync(dataSourceId);
             var before = connection.State.ToString();
-            await connection.OpenAsync(cancellationToken);
+            await connection.OpenAsync(token);
             var after = connection.State.ToString();
 
             await using var command = connection.CreateCommand();
             command.CommandText = "SELECT 1";
-            var value = await command.ExecuteScalarAsync(cancellationToken);
+            command.CommandTimeout = (int)ConnectionTestTimeout.TotalSeconds;
+            var value = await command.ExecuteScalarAsync(token);
 
+            await RecordLastTestAsync(dataSourceId, "Ok", null, token);
             return new DataSourceConnectionCheck(
                 true,
                 sw.ElapsedMilliseconds,
@@ -167,6 +180,8 @@ public sealed class LocalRuntimeDiagnosticsController : ControllerBase
         }
         catch (Exception ex)
         {
+            var errorCode = ClassifyError(ex);
+            await RecordLastTestAsync(dataSourceId, "Failed", errorCode, cancellationToken);
             return new DataSourceConnectionCheck(
                 false,
                 sw.ElapsedMilliseconds,
@@ -175,8 +190,52 @@ public sealed class LocalRuntimeDiagnosticsController : ControllerBase
                 null,
                 null,
                 null,
-                FlattenException(ex));
+                SanitizeErrorMessage(FlattenException(ex)));
         }
+    }
+
+    /// <summary>
+    /// 记录最近一次连接测试结果（尽力而为，失败不影响诊断主流程）。仅写入脱敏错误码（异常类型名）。
+    /// </summary>
+    private async Task RecordLastTestAsync(long dataSourceId, string status, string? errorCode, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var ds = await _context.DataSources.IgnoreQueryFilters().FirstOrDefaultAsync(x => x.Id == dataSourceId, cancellationToken);
+            if (ds is null) return;
+            ds.LastTestStatus = status;
+            ds.LastTestTime = DateTime.UtcNow;
+            ds.LastErrorCode = errorCode;
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+        catch
+        {
+            // 记录测试结果是辅助能力，不应影响诊断。
+        }
+    }
+
+    /// <summary>
+    /// 将异常归类为安全错误码：超时返回 "Timeout"，其余返回异常类型名（不含连接细节/凭据）。
+    /// </summary>
+    private static string ClassifyError(Exception ex)
+    {
+        for (var c = ex; c != null; c = c.InnerException)
+        {
+            if (c is OperationCanceledException or TimeoutException) return "Timeout";
+        }
+        return ex.GetType().Name;
+    }
+
+    /// <summary>
+    /// 脱敏：移除错误消息中可能泄露的凭据键值对（Password/Pwd/User Id/Uid）。
+    /// </summary>
+    private static string SanitizeErrorMessage(string message)
+    {
+        return Regex.Replace(
+            message,
+            @"(Password|Pwd|User\s*Id|Uid)\s*=\s*[^;]*",
+            "$1=***",
+            RegexOptions.IgnoreCase);
     }
 
     private static SafeConnectionInfo BuildSafeConnectionInfo(string? connectionString, string? dbType)
@@ -275,8 +334,10 @@ public sealed class LocalRuntimeDiagnosticsController : ControllerBase
     {
         try
         {
+            using var timeoutCts = new CancellationTokenSource(ConnectionTestTimeout);
+            using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
             await using var connection = await _dataSourceConnectionFactory.CreateAsync(dataSourceId);
-            await connection.OpenAsync(cancellationToken);
+            await connection.OpenAsync(linked.Token);
             var type = DetectDatabaseType(connection);
             var foreignKeys = new List<object>();
             var referenced = new List<object>();

@@ -204,17 +204,28 @@ public sealed class DataSourcesController : ControllerBase
 		if (!await _identity.HasPermissionAsync(tenantId, userId, IdentityPermissions.MetadataEdit, cancellationToken))
 			return StatusCode(403, new ApiError { Code = ErrorCodes.Forbidden, Message = "禁止：缺少 metadata:edit 权限。" });
 
-		var name = (request.Name ?? string.Empty).Trim();
+		var rawName = (request.Name ?? string.Empty).Trim();
 		var dbType = (request.DbType ?? string.Empty).Trim().ToUpperInvariant();
 		var connectionString = (request.ConnectionString ?? string.Empty).Trim();
-		if (name.Length == 0 || dbType.Length == 0 || connectionString.Length == 0)
+		var normalizedName = DataSource.NormalizeName(rawName);
+		if (rawName.Length == 0 || dbType.Length == 0 || connectionString.Length == 0)
 			return BadRequest(new ApiError { Code = ErrorCodes.BadRequest, Message = "名称、数据库类型和连接字符串均为必填项。" });
+		if (rawName.Length > 128)
+			return BadRequest(new ApiError { Code = ErrorCodes.BadRequest, Message = "名称长度不能超过 128 个字符。" });
+		if (connectionString.Length > 2048)
+			return BadRequest(new ApiError { Code = ErrorCodes.BadRequest, Message = "连接字符串长度不能超过 2048 个字符。" });
+		if (!DataSource.IsSupportedDbType(dbType))
+			return BadRequest(new ApiError { Code = ErrorCodes.BadRequest, Message = $"不支持的数据库类型: {request.DbType}。支持: {string.Join("/", DataSource.SupportedDbTypes)}。" });
+		// 租户内名称唯一（规范化后比对；写入路径强制，DB 层因测试种子保持可空兼容）。
+		if (await _db.DataSources.AsNoTracking().AnyAsync(x => x.TenantId == tenantId && x.NormalizedName == normalizedName, cancellationToken))
+			return Conflict(new ApiError { Code = ErrorCodes.BadRequest, Message = $"本租户内已存在同名数据源: {rawName}" });
 
 		await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
 		var source = new DataSource
 		{
 			TenantId = tenantId,
-			Name = name,
+			Name = rawName,
+			NormalizedName = normalizedName,
 			DbType = dbType,
 			ConnectionString = connectionString,
 			Enabled = true,

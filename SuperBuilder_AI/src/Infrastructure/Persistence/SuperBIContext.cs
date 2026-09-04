@@ -218,8 +218,22 @@ public class SuperBIContext : DbContext
         #region DataSource
         builder.Entity<DataSource>().HasOne(x => x.Tenant).WithMany(x => x.DataSources).HasForeignKey(x => x.TenantId);
         builder.Entity<DataSource>().ToTable(tb => tb.HasComment("数据源"));
-        builder.Entity<DataSource>().Property(x => x.ConnectionString).HasComment("连接字符串");
-        builder.Entity<DataSource>().Property(x => x.DbType).HasComment("数据库类型");
+        // M1-04：保留按 TenantId 的常规查询索引（List/Manage 按租户过滤），与下方过滤唯一索引共存。
+        builder.Entity<DataSource>().HasIndex(x => x.TenantId).HasDatabaseName("IX_DataSources_TenantId");
+        // M1-04：名称规范化 + 租户内唯一（过滤 NULL 兼容存量/测试种子，写入路径强制必填与去重）。
+        builder.Entity<DataSource>().Property(x => x.Name).HasMaxLength(128).HasComment("名称（展示用，保留原始大小写）");
+        builder.Entity<DataSource>().Property(x => x.NormalizedName).HasMaxLength(128).HasComment("规范化名称（小写去空白），租户内唯一键");
+        builder.Entity<DataSource>().HasIndex(x => new { x.TenantId, x.NormalizedName }).IsUnique()
+            .HasDatabaseName("IX_DataSources_TenantId_NormalizedName")
+            .HasFilter("[NormalizedName] IS NOT NULL");
+        builder.Entity<DataSource>().Property(x => x.DbType).HasMaxLength(32).HasComment("数据库类型(MYSQL/SQLSERVER/POSTGRESQL)");
+        builder.Entity<DataSource>().Property(x => x.ConnectionString).HasMaxLength(2048).HasComment("连接字符串（敏感，禁止日志记录）");
+        // M1-04：Enabled 非空（默认启用），兼容既有种子与查询计划测试。
+        builder.Entity<DataSource>().Property(x => x.Enabled).IsRequired().HasDefaultValue(true).HasComment("是否启用");
+        // M1-04：连接测试记录（脱敏）。
+        builder.Entity<DataSource>().Property(x => x.LastTestStatus).HasMaxLength(32).HasComment("最近连接测试状态(Ok/Failed/Unknown)");
+        builder.Entity<DataSource>().Property(x => x.LastTestTime).HasConversion(UtcNullableDateTimeConverter).HasComment("最近连接测试时间(UTC)");
+        builder.Entity<DataSource>().Property(x => x.LastErrorCode).HasMaxLength(64).HasComment("最近连接测试错误码(仅异常类型名,脱敏)");
         #endregion
 
         #region MetadataTable

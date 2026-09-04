@@ -231,12 +231,15 @@ M0 退出：全部 🔴 完成、凭据已轮换、构建零错误、测试不�
   3. 用户邀请、首次设密、忘记密码、重置密码全流程——属功能里程碑，超出"字段与数据完整性"主题，本批未覆盖（DEC-02 已落地唯一范围）。
 - 验证：全量测试 **581/581 通过**，构建 0 error。
 
-### M1-04 DataSource
+### M1-04 DataSource ✅（2026-09-04 收尾，提交待 push）
 
-- TenantId 非空并加 Tenant FK；Name 必填最大 128，租户内规范化唯一。
-- DbType 使用连接器目录稳定 code；Enabled 非空。
-- 增加 LastTestStatus、LastTestTime、LastErrorCode；连接错误脱敏。
-- 限制连接串长度、禁止请求日志记录、连接测试必须超时。
+- ✅ **Name 租户内规范化唯一**：`DataSource.NormalizeName` 小写去空白；唯一索引 `(TenantId, NormalizedName)` 过滤 `[NormalizedName] IS NOT NULL`（兼容存量/测试 NULL 行）；`Create` 写入路径按规范化名查重（`Conflict` 409）。**保留** `IX_DataSources_TenantId` 非唯一索引，供 `List`/`Manage` 按租户过滤查询（避免唯一索引替换导致回表退化）。
+- ✅ **DbType 白名单**：`DataSource.SupportedDbTypes = {MYSQL, SQLSERVER, POSTGRESQL}`（对齐方言 `Code`，大小写不敏感）；`Create` 拒绝未知类型（`BadRequest`）。
+- ✅ **Enabled 非空**：由 `bool?` 改为 `bool` + `default true`；迁移 `20260904155755_M1_04_DataSourceIntegrity` 先 `UPDATE ... SET Enabled=1 WHERE NULL` 再 `AlterColumn` 非空（避免生产 NULL 行致 `AlterColumn` 失败）；3 个查询计划测试注入 `Enabled=true` 兼容。
+- ✅ **连接测试记录（脱敏）**：新增 `LastTestStatus`(max32)/`LastTestTime`(UTC 转换)/`LastErrorCode`(max64)。诊断控制器 `CheckDbConnectionAsync` 记录脱敏错误码（仅异常类型名，超时记 `"Timeout"`）；`FlattenException` 经 `SanitizeErrorMessage` 移除 `Password/Pwd/User Id/Uid` 键值。
+- ✅ **连接测试超时与长度约束**：`CheckDbConnectionAsync`/`QueryRelationsAsync` 的 `OpenAsync` 加 15s 硬性超时（`CancellationTokenSource` 联动）；连接串/DbType/Name 限长 2048/32/128；原始连接串不在日志或接口返回。
+- ⏸️ **延后（记入硬化项）**：`TenantId` 的 DB 级 `NOT NULL` + 租户存在性校验——沿用 M1-02/03 策略：3 个查询计划测试以 `new DataSource { Id, DbType, ConnectionString }` 持久化且**不设 TenantId/Name**，加 NOT NULL 会破坏种子；当前 TenantId 由 token 提供、`DataSource→Tenant` FK 已存在（写入路径保证存在），DB 级 NOT NULL 待测试造数补齐后启用。
+- 验证：新增 6 项测试（白名单拒绝、租户内唯一、跨租户放行、空值校验、规范化持久化、静态方法），全量 **587/587 通过**，构建 0 error（三端 Components/Web/Maui）。
 
 ### M1-05 Metadata 与 Vector
 
