@@ -399,6 +399,8 @@ app.UseHttpsRedirection();
 app.UseRouting();
 // P11 错误治理：统一异常 → 结构化友好 JSON（错误码 + 关联ID），须位于路由之后、端点之前，包裹后续所有中间件
 app.UseMiddleware<UnifiedExceptionMiddleware>();
+// M1-01：乐观并发冲突 → HTTP 409（须位于 UnifiedExceptionMiddleware 之后/更内层，优先捕获 DbUpdateConcurrencyException）
+app.UseMiddleware<ConcurrencyExceptionMiddleware>();
 // P0-10：审计必须包裹鉴权/限流/端点，确保入口拒绝与异常拒绝均入账。
 app.UseMiddleware<AuditMiddleware>();
 // P11.0 安全轨道：CORS → 鉴权 → 限流（顺序：路由之后、授权之前；与 Observability/Audit 互不干扰）

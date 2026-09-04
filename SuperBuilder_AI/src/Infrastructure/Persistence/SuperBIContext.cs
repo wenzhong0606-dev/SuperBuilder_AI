@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using SuperBuilder_AI.Models.Agent;
 using SuperBuilder_AI.Models.AppBuilder;
 using SuperBuilder_AI.Models.Identity;
@@ -9,6 +10,7 @@ using SuperBuilder_AI.Models.Localization;
 using SuperBuilder_AI.Models.Metadata;
 using SuperBuilder_AI.Models.Organization;
 using SuperBuilder_AI.Models.Theme;
+using SuperBuilder_AI.Models;
 using SuperBuilder_AI.Data.Configurations;
 
 namespace SuperBuilder_AI.Data;
@@ -25,6 +27,15 @@ public class SuperBIContext : DbContext
     // （此前 P4.3 曾因读取 System 上下文的 TenantId=0 而过度过滤，触发 Golden 回归）。
     private bool _tenantFilterEnabled;
     private long _scopedTenantId;
+
+    /// <summary>M1-01：审计时间 UTC 转换器。写入时转为 UTC，读回时强制 Kind=Utc（EF 提供程序默认读回 Unspecified）。</summary>
+    private static readonly ValueConverter<DateTime, DateTime> UtcDateTimeConverter =
+        new(v => v.ToUniversalTime(), v => DateTime.SpecifyKind(v, DateTimeKind.Utc));
+
+    /// <summary>M1-01：可空审计时间 UTC 转换器（UpdatedTime）。</summary>
+    private static readonly ValueConverter<DateTime?, DateTime?> UtcNullableDateTimeConverter =
+        new(v => v == null ? null : v.Value.ToUniversalTime(),
+            v => v == null ? null : DateTime.SpecifyKind(v.Value, DateTimeKind.Utc));
 
     /// <summary>
     /// 在请求作用域内开启全局租户过滤（P4.3 防御性隔离）。
@@ -45,15 +56,40 @@ public class SuperBIContext : DbContext
 			throw new InvalidOperationException("AuditLog is append-only and cannot be updated or deleted.");
 	}
 
+	/// <summary>
+	/// M1-01：写入期统一回填审计字段与乐观并发版本。
+	/// - 新增：RowVersion 初始为 1。
+	/// - 修改：UpdatedTime 置为当前 UTC；RowVersion 自增 1。
+	/// 由 SaveChanges/SaveChangesAsync 在落库前调用，确保 CreatedTime 恒为 UTC 且并发令牌一致推进。
+	/// </summary>
+	private void ApplyAuditAndConcurrency()
+	{
+		foreach (var entry in ChangeTracker.Entries<IAuditable>())
+		{
+			switch (entry.State)
+			{
+				case EntityState.Added:
+					if (entry.Entity.RowVersion == 0) entry.Entity.RowVersion = 1;
+					break;
+				case EntityState.Modified:
+					entry.Entity.UpdatedTime = DateTime.UtcNow;
+					entry.Entity.RowVersion += 1;
+					break;
+			}
+		}
+	}
+
 	public override int SaveChanges(bool acceptAllChangesOnSuccess)
 	{
 		EnforceAuditAppendOnly();
+		ApplyAuditAndConcurrency();
 		return base.SaveChanges(acceptAllChangesOnSuccess);
 	}
 
 	public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
 	{
 		EnforceAuditAppendOnly();
+		ApplyAuditAndConcurrency();
 		return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
 	}
 
@@ -125,12 +161,35 @@ public class SuperBIContext : DbContext
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
-
         foreach (var entityType in builder.Model.GetEntityTypes())
         {
             entityType.FindProperty("Id")?.SetComment("主键");
             entityType.FindProperty("CreatedTime")?.SetComment("创建时间");
         }
+
+        #region M1-01 审计与乐观并发（RowVersion / ETag）
+        // 对所有实现 IAuditable 的实体（BaseEntity 派生类与 Role）配置应用层托管的并发令牌与 UTC 时间转换。
+        // 采用 long + IsConcurrencyToken（而非数据库 rowversion），以兼容 SQL Server 与 SQLite（测试）。
+        // UTC 转换器确保审计时间在数据库往返后 Kind 恒为 Utc（EF 提供程序默认会将其读回为 Unspecified）。
+        foreach (var entityType in builder.Model.GetEntityTypes())
+        {
+            if (typeof(IAuditable).IsAssignableFrom(entityType.ClrType))
+            {
+                builder.Entity(entityType.ClrType)
+                    .Property("CreatedTime")
+                    .HasConversion(UtcDateTimeConverter);
+                builder.Entity(entityType.ClrType)
+                    .Property("UpdatedTime")
+                    .HasConversion(UtcNullableDateTimeConverter);
+                builder.Entity(entityType.ClrType)
+                    .Property("RowVersion")
+                    .IsRequired()
+                    .IsConcurrencyToken()
+                    .HasDefaultValue(1)
+                    .HasComment("乐观并发版本(ETag)，每次更新自增");
+            }
+        }
+        #endregion
 
         #region Tenant
         builder.Entity<Tenant>().HasIndex(x => x.TenantCode).IsUnique();
