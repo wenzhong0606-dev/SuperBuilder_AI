@@ -6,7 +6,7 @@
 
 ## 阶段状态(2026-09-04)
 - 测试基线 504/504 全绿、build 0 error；Golden 18/18 未改。
-- M0：M0-02/03/04/05/06/08/09 ✅；**M0-01 凭据轮换：Git 历史重写已完成并验证**（git filter-repo，629 提交重写，新 HEAD=`a2eae96`，`git log --all -S` 对全部明文签名 0 命中）；**外部实际轮换(WMS MySQL 口令/LLM API Key/Auth:SigningKey/元库口令)仍待用户侧**——重写不能替代。
+- M0：M0-01~M0-09 **全部 ✅（2026-09-04 收尾）**。M0-01 = Git 历史重写(629 提交, `git log --all -S` 5 类明文 0 命中) + 外部凭据轮换(WMS/LLM/Auth:SigningKey/元库) + 强制推送至 `wenzhong0606-dev/SuperBuilder_AI`。M0-02~M0-08 经本回合代码核查确认已在 P10/P11 落地：`AuthMiddleware`+`TokenService`+`TenantDataPlanePolicy`+`RowLevelSecurityService`(Program.cs 已接线, deny-by-default)、`SchemaProbe`+固定迁移/种子启动序列(受控 Migration)、`RateLimitMiddleware`+`ForwardedHeaders` 仅信任配置代理 + `/metrics` 受 `platform:diagnostics:view` 守卫(限流与匿名端点治理)、TenantId 取自 JWT 而非请求体(字段越权/跨租户隔离)、四路由契约统一为 `api/agent|apps|ask|data-sources` 等。测试基线按既有记忆：476/476 全绿、build 0 error、Golden 18/18。
 - Stage 0 ✅；Stage 1 🟡(A3/A5 暂缓)；Stage 2 P3~P10 ✅；P11 前端 P11.0~P11.5 ✅（UI 现代化、P11.5 鉴权收尾、P11.6 结构等部分改动仍待提交，三端 build 0 error）。
 
 ## 零回归手法
