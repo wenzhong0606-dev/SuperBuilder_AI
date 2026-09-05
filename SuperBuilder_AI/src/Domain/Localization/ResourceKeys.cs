@@ -162,6 +162,7 @@ public static class ResourceKeys
     public static class Page
     {
         public const string TitleHome = "Page.Title.Home";
+        public const string DescHome = "Page.Desc.Home";
         public const string TitleProfile = "Page.Title.Profile";
         public const string DescProfile = "Page.Desc.Profile";
         public const string TitleTenants = "Page.Title.Tenants";
@@ -1164,6 +1165,30 @@ public static class ResourceKeys
         public const string ProfileLoginStatus = "Content.ProfileLoginStatus";
         public const string ProfileSignedIn = "Content.ProfileSignedIn";
         public const string ProfileSignedOut = "Content.ProfileSignedOut";
+        public const string HomeStartAsk = "Content.HomeStartAsk";
+        public const string HomeStatDashboards = "Content.HomeStatDashboards";
+        public const string HomeStatDashboardsSub = "Content.HomeStatDashboardsSub";
+        public const string HomeStatApps = "Content.HomeStatApps";
+        public const string HomeStatAppsSub = "Content.HomeStatAppsSub";
+        public const string HomeStatLabels = "Content.HomeStatLabels";
+        public const string HomeStatLabelsSub = "Content.HomeStatLabelsSub";
+        public const string HomeStatPlans = "Content.HomeStatPlans";
+        public const string HomeStatPlansSub = "Content.HomeStatPlansSub";
+        public const string HomeCardAskTitle = "Content.HomeCardAskTitle";
+        public const string HomeCardAskDesc = "Content.HomeCardAskDesc";
+        public const string HomeCardDashboardsTitle = "Content.HomeCardDashboardsTitle";
+        public const string HomeCardDashboardsDesc = "Content.HomeCardDashboardsDesc";
+        public const string HomeCardAppsTitle = "Content.HomeCardAppsTitle";
+        public const string HomeCardAppsDesc = "Content.HomeCardAppsDesc";
+        public const string HomeCardDataSourcesTitle = "Content.HomeCardDataSourcesTitle";
+        public const string HomeCardDataSourcesDesc = "Content.HomeCardDataSourcesDesc";
+        public const string HomePanelQuickStart = "Content.HomePanelQuickStart";
+        public const string HomeStep1 = "Content.HomeStep1";
+        public const string HomeStep2 = "Content.HomeStep2";
+        public const string HomeStep3 = "Content.HomeStep3";
+        public const string HomeStep4 = "Content.HomeStep4";
+        public const string ThemeEditorSaveTheme = "Content.ThemeEditorSaveTheme";
+        public const string ThemeEditorSampleReady = "Content.ThemeEditorSampleReady";
 
     }
 
@@ -1357,6 +1382,7 @@ public static class ResourceKeys
         [Error.SB_SECURITY_001] = new("Error", DefaultValue: "The query plan failed the final security validation and was blocked before execution."),
 
         [Page.TitleHome] = new("Page", Page: "Home", DefaultValue: "Workspace"),
+        [Page.DescHome] = new("Page", Page: "Home", DefaultValue: "Start with a question, turn analysis into dashboards and apps, and reuse them across your team."),
         [Page.TitleProfile] = new("Page", Page: "Profile", DefaultValue: "Profile"),
         [Page.DescProfile] = new("Page", Page: "Profile", DefaultValue: "View account and tenant info, and adjust interface preferences."),
         [Page.TitleTenants] = new("Page", Page: "Tenants", DefaultValue: "Tenants"),
@@ -2369,6 +2395,30 @@ public static class ResourceKeys
         [Content.ProfileLoginStatus] = new("Content", Page: "Profile", DefaultValue: "Sign-in status"),
         [Content.ProfileSignedIn] = new("Content", Page: "Profile", DefaultValue: "Signed in"),
         [Content.ProfileSignedOut] = new("Content", Page: "Profile", DefaultValue: "Signed out"),
+        [Content.HomeStartAsk] = new("Content", Page: "Home", DefaultValue: "Start asking"),
+        [Content.HomeStatDashboards] = new("Content", Page: "Home", DefaultValue: "Dashboards"),
+        [Content.HomeStatDashboardsSub] = new("Content", Page: "Home", DefaultValue: "Reusable boards"),
+        [Content.HomeStatApps] = new("Content", Page: "Home", DefaultValue: "Apps"),
+        [Content.HomeStatAppsSub] = new("Content", Page: "Home", DefaultValue: "Published analytics apps"),
+        [Content.HomeStatLabels] = new("Content", Page: "Home", DefaultValue: "Semantic labels"),
+        [Content.HomeStatLabelsSub] = new("Content", Page: "Home", DefaultValue: "Business glossary mapping"),
+        [Content.HomeStatPlans] = new("Content", Page: "Home", DefaultValue: "Agent plans"),
+        [Content.HomeStatPlansSub] = new("Content", Page: "Home", DefaultValue: "Copilot orchestration"),
+        [Content.HomeCardAskTitle] = new("Content", Page: "Home", DefaultValue: "Ask BI Smart Q&A"),
+        [Content.HomeCardAskDesc] = new("Content", Page: "Home", DefaultValue: "Ask in natural language; automatically performs semantic parsing, query planning, SQL generation, and result interpretation."),
+        [Content.HomeCardDashboardsTitle] = new("Content", Page: "Home", DefaultValue: "Dashboards"),
+        [Content.HomeCardDashboardsDesc] = new("Content", Page: "Home", DefaultValue: "Turn an analysis into a dashboard with chart composition, sharing, and scheduled refresh."),
+        [Content.HomeCardAppsTitle] = new("Content", Page: "Home", DefaultValue: "App factory"),
+        [Content.HomeCardAppsDesc] = new("Content", Page: "Home", DefaultValue: "Describe pages and components with App DSL; generate distributable lightweight analytics apps in one click."),
+        [Content.HomeCardDataSourcesTitle] = new("Content", Page: "Home", DefaultValue: "Data sources & authorization"),
+        [Content.HomeCardDataSourcesDesc] = new("Content", Page: "Home", DefaultValue: "Register business databases, configure access authorization and row-level security policies to control the data scope."),
+        [Content.HomePanelQuickStart] = new("Content", Page: "Home", DefaultValue: "Quick start"),
+        [Content.HomeStep1] = new("Content", Page: "Home", DefaultValue: "Register a business database in Data Source Management and complete the connection test."),
+        [Content.HomeStep2] = new("Content", Page: "Home", DefaultValue: "Complete the business glossary in Semantic Model / Semantic Labels so the AI understands your jargon."),
+        [Content.HomeStep3] = new("Content", Page: "Home", DefaultValue: "Ask in Ask BI Smart Q&A; review the results and generated SQL."),
+        [Content.HomeStep4] = new("Content", Page: "Home", DefaultValue: "Publish satisfying results as a dashboard or app in one click."),
+        [Content.ThemeEditorSaveTheme] = new("Content", Page: "ThemeEditor", DefaultValue: "theme"),
+        [Content.ThemeEditorSampleReady] = new("Content", Page: "ThemeEditor", DefaultValue: "Ready"),
 
     };
 

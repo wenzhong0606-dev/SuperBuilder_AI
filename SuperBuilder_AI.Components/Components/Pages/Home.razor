@@ -8,47 +8,47 @@
 <AuthGuard AutoRedirect="true">
     <PageHead Icon="sb-ico-home" Key="Home" Title="工作台" Desc="从一次提问开始，把分析沉淀为仪表盘与应用，并在团队内复用。">
         <button class="btn btn-primary btn-sm" @onclick='() => Nav.NavigateTo("ask")'>
-            <svg class="btn-ico"><use href="#sb-ico-ask" /></svg> 开始提问
+            <svg class="btn-ico"><use href="#sb-ico-ask" /></svg> @L10n.T(Keys.Content.HomeStartAsk, "开始提问")
         </button>
     </PageHead>
 
     <div class="stat-grid">
-        <SbStatTile Label="仪表盘" Value="@_dashboards" Sub="可复用看板" Accent="info" />
-        <SbStatTile Label="应用" Value="@_apps" Sub="已发布的分析应用" Accent="success" />
-        <SbStatTile Label="语义标签" Value="@_labels" Sub="业务口径映射" Accent="warning" />
-        <SbStatTile Label="智能体计划" Value="@_plans" Sub="Copilot 编排" />
+        <SbStatTile Label="@L10n.T(Keys.Content.HomeStatDashboards, "仪表盘")" Value="@_dashboards" Sub="@L10n.T(Keys.Content.HomeStatDashboardsSub, "可复用看板")" Accent="info" />
+        <SbStatTile Label="@L10n.T(Keys.Content.HomeStatApps, "应用")" Value="@_apps" Sub="@L10n.T(Keys.Content.HomeStatAppsSub, "已发布的分析应用")" Accent="success" />
+        <SbStatTile Label="@L10n.T(Keys.Content.HomeStatLabels, "语义标签")" Value="@_labels" Sub="@L10n.T(Keys.Content.HomeStatLabelsSub, "业务口径映射")" Accent="warning" />
+        <SbStatTile Label="@L10n.T(Keys.Content.HomeStatPlans, "智能体计划")" Value="@_plans" Sub="@L10n.T(Keys.Content.HomeStatPlansSub, "Copilot 编排")" />
     </div>
 
     <div class="card-grid">
         <a class="feature-card" href="ask">
             <div class="fc-ico"><svg><use href="#sb-ico-ask" /></svg></div>
-            <div class="fc-title">Ask BI 智能问数</div>
-            <div class="fc-desc">用自然语言提问，自动完成语义解析、查询计划、SQL 生成与结果解读。</div>
+            <div class="<div class="fc-title">@L10n.T(Keys.Content.HomeCardAskTitle, "Ask BI 智能问数")</div>
+            <div class="<div class="fc-desc">@L10n.T(Keys.Content.HomeCardAskDesc, "用自然语言提问，自动完成语义解析、查询计划、SQL 生成与结果解读。")</div>
         </a>
         <a class="feature-card" href="dashboards">
             <div class="fc-ico"><svg><use href="#sb-ico-dash" /></svg></div>
-            <div class="fc-title">仪表盘</div>
-            <div class="fc-desc">把一次分析固化为看板，支持图表组合、共享与定时刷新。</div>
+            <div class="<div class="fc-title">@L10n.T(Keys.Content.HomeCardDashboardsTitle, "仪表盘")</div>
+            <div class="<div class="fc-desc">@L10n.T(Keys.Content.HomeCardDashboardsDesc, "把一次分析固化为看板，支持图表组合、共享与定时刷新。")</div>
         </a>
         <a class="feature-card" href="apps">
             <div class="fc-ico"><svg><use href="#sb-ico-app" /></svg></div>
-            <div class="fc-title">应用工厂</div>
-            <div class="fc-desc">以 App DSL 描述页面与组件，一键生成可分发的轻量分析应用。</div>
+            <div class="<div class="fc-title">@L10n.T(Keys.Content.HomeCardAppsTitle, "应用工厂")</div>
+            <div class="<div class="fc-desc">@L10n.T(Keys.Content.HomeCardAppsDesc, "以 App DSL 描述页面与组件，一键生成可分发的轻量分析应用。")</div>
         </a>
         <a class="feature-card" href="data-sources">
             <div class="fc-ico"><svg><use href="#sb-ico-db" /></svg></div>
-            <div class="fc-title">数据源与授权</div>
-            <div class="fc-desc">登记业务库、配置访问授权与行级安全策略，控制可取数范围。</div>
+            <div class="<div class="fc-title">@L10n.T(Keys.Content.HomeCardDataSourcesTitle, "数据源与授权")</div>
+            <div class="<div class="fc-desc">@L10n.T(Keys.Content.HomeCardDataSourcesDesc, "登记业务库、配置访问授权与行级安全策略，控制可取数范围。")</div>
         </a>
     </div>
 
-    <SbPanel Icon="sb-ico-activity" Title="快速开始">
+    <SbPanel Icon="sb-ico-activity" Title="@L10n.T(Keys.Content.HomePanelQuickStart, "快速开始")">
         <Body>
             <ol class="sb-steps">
-                <li>在「数据源管理」登记业务库并完成连接测试。</li>
-                <li>在「语义模型 / 语义标签」补齐业务口径，让 AI 听得懂行话。</li>
-                <li>进入「Ask BI 智能问数」提问，检查结果与生成的 SQL。</li>
-                <li>把满意的结果一键发布为仪表盘或应用。</li>
+                <li>@L10n.T(Keys.Content.HomeStep1, "在「数据源管理」登记业务库并完成连接测试。")</li>
+                <li>@L10n.T(Keys.Content.HomeStep2, "在「语义模型 / 语义标签」补齐业务口径，让 AI 听得懂行话。")</li>
+                <li>@L10n.T(Keys.Content.HomeStep3, "进入「Ask BI 智能问数」提问，检查结果与生成的 SQL。")</li>
+                <li>@L10n.T(Keys.Content.HomeStep4, "把满意的结果一键发布为仪表盘或应用。")</li>
             </ol>
         </Body>
     </SbPanel>

@@ -9,7 +9,7 @@
     </div>
     <div class="spacer"></div>
     <button class="btn btn-outline-secondary btn-sm" @onclick="ResetTokens">@L10n.T(Keys.Action.Reset, "重置")</button>
-    <button class="btn btn-primary btn-sm" @onclick="Save">@L10n.T(Keys.Action.Save, "保存") 主题</button>
+    <button class="btn btn-primary btn-sm" @onclick="Save">@L10n.T(Keys.Action.Save, "保存") @L10n.T(Keys.Content.ThemeEditorSaveTheme, "主题")</button>
 </div>
 
 <div style="@_previewStyle">
@@ -19,7 +19,7 @@
             <div class="stat-grid">
                 <div class="stat-tile"><div class="st-label">@L10n.T(Keys.Content.ThemeEditorSampleMetric, "示例指标")</div><div class="st-value">86.4%</div><div class="st-delta up">↑ 5.2%</div></div>
                 <div class="stat-tile accent-accent"><div class="st-label">@L10n.T(Keys.Content.ThemeEditorSampleMetric, "示例指标")</div><div class="st-value">1,204</div></div>
-                <div class="stat-tile accent-success"><div class="st-label">@L10n.T(Keys.Content.ThemeEditorSampleMetric, "示例指标")</div><div class="st-value">就绪</div></div>
+                <div class="stat-tile accent-success"><div class="st-label">@L10n.T(Keys.Content.ThemeEditorSampleMetric, "示例指标")</div><div class="st-value">@L10n.T(Keys.Content.ThemeEditorSampleReady, "就绪")</div></div>
             </div>
             <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
                 <button class="btn btn-primary btn-sm">@L10n.T(Keys.Content.ThemeEditorBtnPrimary, "主要按钮")</button>

@@ -464,6 +464,13 @@ M3-G0 是 M4/M7/M8 的最小前置，不等同于完成全部 i18n。它只包�
   - 接线陷阱：标签文本「管理员用户名/管理员口令」同时是 `@code` 错误提示文案的前缀子串，改用「仅替换首次出现」消解；「已有账户？返回登录」实际 `<a>` 无 `class` 属性，须按真实标记匹配。
   - RCL 0 错误 / 护栏 6/6 / 全量回归 708/708 / 四端（后端/RCL/Web/Maui-Windows）构建 0 错误均通过。L3 剩余：L3-C2（Home/ThemeEditor）。
 
+- M3-05-M **L3-C2 层（Home / ThemeEditor）**：本地化 Home 工作台首页与 ThemeEditor 主题编辑器用户可见文案，五处注册表严格同步（后端常量 + Catalog + ZhCnDefaults、RCL `Keys.Content` + `Keys.Defaults`），护栏 6/6 全绿。
+  - Home：开始提问按钮、四个统计磁贴（仪表盘/应用/语义标签/智能体计划，各 Label+Sub）、四张功能卡片标题与描述（Ask BI 智能问数/仪表盘/应用工厂/数据源与授权）、快速开始面板标题、四个步骤 `<li>`（连接数据源/定义语义标签/创建仪表盘/邀请成员）全部接入 `L10n.T`；`PageHead` 带 `Key="Home"`，`Title` 已由 `Page.Title.Home` 接管，补登记 `Page.Desc.Home`（五处同步）使 `Desc` 回退值合法可种子化。
+  - ThemeEditor：仅余 2 处裸中文——保存主题按钮「主题」后缀、示例就绪指标「就绪」，本批接入 `L10n.T`（其余文案已在前序 M3-05 批次接好）；主题字段与分段文本此前已覆盖。
+  - 新增 25 个键（22 `Home*` + 2 `ThemeEditor*` + 1 `Page.Desc.Home`），`DescHome` 在 `LocalizationSeedService` Page 键单行多条目区就地追加。
+  - 接线策略：共享组件 `SbStatTile`/`SbPanel`/`SbField`/`SbBadge` 直接渲染属性（无内部 L10n），其 Label/Sub/标题/描述须显式包裹；`PageHead` 的 `Title/Desc` 字面量已有 `Page.Title.*`/`Page.Desc.*` 接管，仅未登记键需补。
+  - RCL 0 错误 / 护栏 6/6 / 全量回归 708/708 / 四端（后端/RCL/Web/Maui-Windows）构建 0 错误均通过。L3 全部批次完成（A1/A2/B1/B2/C1/C2）。
+
 ### M3-06 用户语言偏好
 
 - 首次登录用租户默认语言；切换后按 TenantId+UserId 服务端持久化，浏览器缓存只做快速恢复。

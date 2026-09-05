@@ -198,6 +198,7 @@ public static class Keys
     public static class Page
     {
         public const string TitleHome = "Page.Title.Home";
+        public const string DescHome = "Page.Desc.Home";
         public const string TitleProfile = "Page.Title.Profile";
         public const string DescProfile = "Page.Desc.Profile";
         public const string TitleTenants = "Page.Title.Tenants";
@@ -1196,6 +1197,30 @@ public static class Keys
         public const string ProfileLoginStatus = "Content.ProfileLoginStatus";
         public const string ProfileSignedIn = "Content.ProfileSignedIn";
         public const string ProfileSignedOut = "Content.ProfileSignedOut";
+        public const string HomeStartAsk = "Content.HomeStartAsk";
+        public const string HomeStatDashboards = "Content.HomeStatDashboards";
+        public const string HomeStatDashboardsSub = "Content.HomeStatDashboardsSub";
+        public const string HomeStatApps = "Content.HomeStatApps";
+        public const string HomeStatAppsSub = "Content.HomeStatAppsSub";
+        public const string HomeStatLabels = "Content.HomeStatLabels";
+        public const string HomeStatLabelsSub = "Content.HomeStatLabelsSub";
+        public const string HomeStatPlans = "Content.HomeStatPlans";
+        public const string HomeStatPlansSub = "Content.HomeStatPlansSub";
+        public const string HomeCardAskTitle = "Content.HomeCardAskTitle";
+        public const string HomeCardAskDesc = "Content.HomeCardAskDesc";
+        public const string HomeCardDashboardsTitle = "Content.HomeCardDashboardsTitle";
+        public const string HomeCardDashboardsDesc = "Content.HomeCardDashboardsDesc";
+        public const string HomeCardAppsTitle = "Content.HomeCardAppsTitle";
+        public const string HomeCardAppsDesc = "Content.HomeCardAppsDesc";
+        public const string HomeCardDataSourcesTitle = "Content.HomeCardDataSourcesTitle";
+        public const string HomeCardDataSourcesDesc = "Content.HomeCardDataSourcesDesc";
+        public const string HomePanelQuickStart = "Content.HomePanelQuickStart";
+        public const string HomeStep1 = "Content.HomeStep1";
+        public const string HomeStep2 = "Content.HomeStep2";
+        public const string HomeStep3 = "Content.HomeStep3";
+        public const string HomeStep4 = "Content.HomeStep4";
+        public const string ThemeEditorSaveTheme = "Content.ThemeEditorSaveTheme";
+        public const string ThemeEditorSampleReady = "Content.ThemeEditorSampleReady";
 
     }
 
@@ -1366,6 +1391,7 @@ public static class Keys
         [Theme.Switch] = new("切换主题", "Toggle theme"),
 
         [Page.TitleHome] = new("工作台", "Workspace"),
+        [Page.DescHome] = new("从一次提问开始，把分析沉淀为仪表盘与应用，并在团队内复用。", "Start with a question, turn analysis into dashboards and apps, and reuse them across your team."),
         [Page.TitleProfile] = new("个人设置", "Profile"),
         [Page.DescProfile] = new("查看账号与租户信息，调整界面偏好。", "View account and tenant info, and adjust interface preferences."),
         [Page.TitleTenants] = new("租户管理", "Tenants"),
@@ -2347,6 +2373,30 @@ public static class Keys
         [Content.ProfileLoginStatus] = new("登录状态", "Sign-in status"),
         [Content.ProfileSignedIn] = new("已登录", "Signed in"),
         [Content.ProfileSignedOut] = new("未登录", "Signed out"),
+        [Content.HomeStartAsk] = new("开始提问", "Start asking"),
+        [Content.HomeStatDashboards] = new("仪表盘", "Dashboards"),
+        [Content.HomeStatDashboardsSub] = new("可复用看板", "Reusable boards"),
+        [Content.HomeStatApps] = new("应用", "Apps"),
+        [Content.HomeStatAppsSub] = new("已发布的分析应用", "Published analytics apps"),
+        [Content.HomeStatLabels] = new("语义标签", "Semantic labels"),
+        [Content.HomeStatLabelsSub] = new("业务口径映射", "Business glossary mapping"),
+        [Content.HomeStatPlans] = new("智能体计划", "Agent plans"),
+        [Content.HomeStatPlansSub] = new("Copilot 编排", "Copilot orchestration"),
+        [Content.HomeCardAskTitle] = new("Ask BI 智能问数", "Ask BI Smart Q&A"),
+        [Content.HomeCardAskDesc] = new("用自然语言提问，自动完成语义解析、查询计划、SQL 生成与结果解读。", "Ask in natural language; automatically performs semantic parsing, query planning, SQL generation, and result interpretation."),
+        [Content.HomeCardDashboardsTitle] = new("仪表盘", "Dashboards"),
+        [Content.HomeCardDashboardsDesc] = new("把一次分析固化为看板，支持图表组合、共享与定时刷新。", "Turn an analysis into a dashboard with chart composition, sharing, and scheduled refresh."),
+        [Content.HomeCardAppsTitle] = new("应用工厂", "App factory"),
+        [Content.HomeCardAppsDesc] = new("以 App DSL 描述页面与组件，一键生成可分发的轻量分析应用。", "Describe pages and components with App DSL; generate distributable lightweight analytics apps in one click."),
+        [Content.HomeCardDataSourcesTitle] = new("数据源与授权", "Data sources & authorization"),
+        [Content.HomeCardDataSourcesDesc] = new("登记业务库、配置访问授权与行级安全策略，控制可取数范围。", "Register business databases, configure access authorization and row-level security policies to control the data scope."),
+        [Content.HomePanelQuickStart] = new("快速开始", "Quick start"),
+        [Content.HomeStep1] = new("在「数据源管理」登记业务库并完成连接测试。", "Register a business database in Data Source Management and complete the connection test."),
+        [Content.HomeStep2] = new("在「语义模型 / 语义标签」补齐业务口径，让 AI 听得懂行话。", "Complete the business glossary in Semantic Model / Semantic Labels so the AI understands your jargon."),
+        [Content.HomeStep3] = new("进入「Ask BI 智能问数」提问，检查结果与生成的 SQL。", "Ask in Ask BI Smart Q&A; review the results and generated SQL."),
+        [Content.HomeStep4] = new("把满意的结果一键发布为仪表盘或应用。", "Publish satisfying results as a dashboard or app in one click."),
+        [Content.ThemeEditorSaveTheme] = new("主题", "theme"),
+        [Content.ThemeEditorSampleReady] = new("就绪", "Ready"),
 
     };
 }
