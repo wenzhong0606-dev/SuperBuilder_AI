@@ -2,7 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Bunit;
+using Microsoft.Extensions.DependencyInjection;
 using SuperBuilder_AI.Components.Components.Shared.UI;
+using SuperBuilder_AI.Components.Services;
 using Xunit;
 
 namespace SuperBuilder_AI.Tests;
@@ -10,6 +12,11 @@ namespace SuperBuilder_AI.Tests;
 /// <summary>S5-5 · SbDataTable 组件单测（bUnit 渲染 + 排序）。</summary>
 public class SbDataTableTests : BunitContext
 {
+    public SbDataTableTests()
+    {
+        Services.AddSingleton<LocalizationService>(new LocalizationService(null!, null!));
+    }
+
     private sealed record Sample(string Name, int Score);
 
     private static IReadOnlyList<SbColumn<Sample>> Columns() => new SbColumn<Sample>[]

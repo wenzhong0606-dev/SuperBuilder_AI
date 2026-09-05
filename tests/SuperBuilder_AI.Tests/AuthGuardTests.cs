@@ -16,6 +16,11 @@ public class AuthGuardTests : BunitContext
         protected override void NavigateToCore(string uri, bool forceLoad) { }
     }
 
+    public AuthGuardTests()
+    {
+        Services.AddSingleton<LocalizationService>(new LocalizationService(null!, null!));
+    }
+
     private IRenderedComponent<AuthGuard> Render(AppState state, bool autoRedirect = false)
     {
         Services.AddSingleton(state);

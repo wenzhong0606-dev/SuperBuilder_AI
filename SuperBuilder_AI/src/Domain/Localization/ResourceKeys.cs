@@ -104,12 +104,36 @@ public static class ResourceKeys
         public const string LocalizationTextEmpty = "Error.Localization.TextEmpty";
         public const string LocalizationPlaceholderMismatch = "Error.Localization.PlaceholderMismatch";
         public const string LocalizationBaselineReset = "Error.Localization.BaselineReset";
+        public const string OperationFailed = "Error.OperationFailed";
+        public const string CodeLabel = "Error.CodeLabel";
+        public const string TraceIdLabel = "Error.TraceIdLabel";
     }
 
     /// <summary>空状态文案。</summary>
     public static class Empty
     {
         public const string NoData = "Empty.NoData";
+    }
+
+    /// <summary>
+    /// 页面页头标题（M3-05 批2）。<c>PageHead</c> 以稳定标识 <c>Key</c> 解析 <c>Page.Title.{Key}</c>，
+    /// 避免旧约定 <c>Page.Title.{中文标题}</c> 退化成中文资源键。说明文案（Page.Desc.*）待下一批次登记。
+    /// </summary>
+    public static class Page
+    {
+        public const string TitleHome = "Page.Title.Home";
+        public const string TitleProfile = "Page.Title.Profile";
+        public const string TitleTenants = "Page.Title.Tenants";
+        public const string TitleTenantMembers = "Page.Title.TenantMembers";
+        public const string TitleIdentity = "Page.Title.Identity";
+        public const string TitleQuota = "Page.Title.Quota";
+        public const string TitlePlatformAdmins = "Page.Title.PlatformAdmins";
+        public const string TitlePlatformAdminScopes = "Page.Title.PlatformAdminScopes";
+        public const string TitleSelfRegistrationAdmin = "Page.Title.SelfRegistrationAdmin";
+        public const string TitleSystemStatus = "Page.Title.SystemStatus";
+        public const string TitleLocalization = "Page.Title.Localization";
+        public const string TitleThemes = "Page.Title.Themes";
+        public const string TitleDemoData = "Page.Title.DemoData";
     }
 
     /// <summary>导航菜单文本（M3-04 增补，M3-05 扩展全量）。</summary>
@@ -262,6 +286,23 @@ public static class ResourceKeys
         [Error.LocalizationTextEmpty] = new("Error", Page: "Localization", DefaultValue: "Text cannot be empty."),
         [Error.LocalizationPlaceholderMismatch] = new("Error", Page: "Localization", DefaultValue: "Translation placeholders do not match the platform baseline."),
         [Error.LocalizationBaselineReset] = new("Error", Page: "Localization", DefaultValue: "The platform baseline cannot be reset via override."),
+        [Error.OperationFailed] = new("Error", DefaultValue: "Operation failed."),
+        [Error.CodeLabel] = new("Error", DefaultValue: "Error code: "),
+        [Error.TraceIdLabel] = new("Error", DefaultValue: "Trace ID: "),
+
+        [Page.TitleHome] = new("Page", Page: "Home", DefaultValue: "Workspace"),
+        [Page.TitleProfile] = new("Page", Page: "Profile", DefaultValue: "Profile"),
+        [Page.TitleTenants] = new("Page", Page: "Tenants", DefaultValue: "Tenants"),
+        [Page.TitleTenantMembers] = new("Page", Page: "TenantMembers", DefaultValue: "Tenant Members"),
+        [Page.TitleIdentity] = new("Page", Page: "Identity", DefaultValue: "Identity & Permissions"),
+        [Page.TitleQuota] = new("Page", Page: "Quota", DefaultValue: "Quota"),
+        [Page.TitlePlatformAdmins] = new("Page", Page: "PlatformAdmins", DefaultValue: "Platform Admins"),
+        [Page.TitlePlatformAdminScopes] = new("Page", Page: "PlatformAdminScopes", DefaultValue: "Admin Tenant Scope"),
+        [Page.TitleSelfRegistrationAdmin] = new("Page", Page: "SelfRegistrationAdmin", DefaultValue: "Self Registration"),
+        [Page.TitleSystemStatus] = new("Page", Page: "SystemStatus", DefaultValue: "System Status"),
+        [Page.TitleLocalization] = new("Page", Page: "Localization", DefaultValue: "Localization"),
+        [Page.TitleThemes] = new("Page", Page: "Themes", DefaultValue: "Themes"),
+        [Page.TitleDemoData] = new("Page", Page: "DemoData", DefaultValue: "Demo Data"),
 
         [Nav.Home] = new("Nav", Page: "Home", DefaultValue: "Home"),
         [Nav.Ask] = new("Nav", Page: "Ask", DefaultValue: "Ask BI"),

@@ -4,10 +4,10 @@
     <div class="ph-title">
         <span class="ph-ico"><svg><use href="@Icon" /></svg></span>
         <div>
-            <h2>@L10n.T($"Page.Title.{Title}", Title)</h2>
+            <h2>@L10n.T(TitleKey, Title)</h2>
             @if (!string.IsNullOrWhiteSpace(Desc))
             {
-                <p class="ph-desc">@L10n.T($"Page.Desc.{Title}", Desc)</p>
+                <p class="ph-desc">@L10n.T(DescKey, Desc)</p>
             }
         </div>
     </div>
@@ -18,5 +18,14 @@
     [Parameter] public string Icon { get; set; } = "";
     [Parameter] public string Title { get; set; } = "";
     [Parameter] public string? Desc { get; set; }
+    /// <summary>稳定页面标识（英文语义名，如 <c>Tenants</c> / <c>Identity</c>）；决定资源键 Page.Title.{Key} / Page.Desc.{Key}。</summary>
+    [Parameter] public string? Key { get; set; }
     [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>
+    /// 指定 <see cref="Key"/> 时用 Page.Title.{Key}；否则回退旧约定 Page.Title.{Title}
+    /// （Title 为中文时会退化成中文键、必然查不到，最终回退到 Title 原文——即未迁移页面的当前行为，无回归）。
+    /// </summary>
+    private string TitleKey => string.IsNullOrWhiteSpace(Key) ? $"Page.Title.{Title}" : $"Page.Title.{Key}";
+    private string DescKey => string.IsNullOrWhiteSpace(Key) ? $"Page.Desc.{Title}" : $"Page.Desc.{Key}";
 }

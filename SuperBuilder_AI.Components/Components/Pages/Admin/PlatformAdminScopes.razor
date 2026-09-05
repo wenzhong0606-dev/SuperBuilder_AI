@@ -9,7 +9,7 @@
 
 <AuthGuard>
     <PermissionGuard Require="@(new[]{ PermissionCodes.PlatformAdminManage })">
-        <PageHead Icon="sb-ico-scope" Title="管理员租户范围"
+        <PageHead Icon="sb-ico-scope" Key="PlatformAdminScopes" Title="管理员租户范围"
                   Desc="为平台管理员设定可管理的租户范围：默认管理全部租户，也可显式限定为特定租户。超出授权范围的租户操作将被拒绝。">
             <button class="btn btn-outline-secondary btn-sm" @onclick="Reload">刷新</button>
         </PageHead>

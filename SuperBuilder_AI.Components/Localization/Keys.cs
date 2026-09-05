@@ -108,6 +108,9 @@ public static class Keys
         public const string LocalizationTextEmpty = "Error.Localization.TextEmpty";
         public const string LocalizationPlaceholderMismatch = "Error.Localization.PlaceholderMismatch";
         public const string LocalizationBaselineReset = "Error.Localization.BaselineReset";
+        public const string OperationFailed = "Error.OperationFailed";
+        public const string CodeLabel = "Error.CodeLabel";
+        public const string TraceIdLabel = "Error.TraceIdLabel";
     }
 
     /// <summary>空状态文案。</summary>
@@ -129,6 +132,9 @@ public static class Keys
         public const string Components = "Nav.Components";
         public const string ThemeEditor = "Nav.ThemeEditor";
         public const string DataSources = "Nav.DataSources";
+        // 历史别名：早期种子/菜单沿用，保留以与后端 ResourceKeys 保持键集合一致（勿删，删则镜像漂移）。
+        public const string Dashboard = "Nav.Dashboard";
+        public const string Admin = "Nav.Admin";
         public const string ModelAccounts = "Nav.ModelAccounts";
         public const string Tenants = "Nav.Tenants";
         public const string TenantMembers = "Nav.TenantMembers";
@@ -147,6 +153,24 @@ public static class Keys
         public const string GroupCustom = "Nav.Group.Custom";
         public const string GroupPlatformExt = "Nav.Group.PlatformExt";
         public const string GroupAdmin = "Nav.Group.Admin";
+    }
+
+    /// <summary>页面页头标题（M3-05 批2），与后端 ResourceKeys.Page 一一对应。</summary>
+    public static class Page
+    {
+        public const string TitleHome = "Page.Title.Home";
+        public const string TitleProfile = "Page.Title.Profile";
+        public const string TitleTenants = "Page.Title.Tenants";
+        public const string TitleTenantMembers = "Page.Title.TenantMembers";
+        public const string TitleIdentity = "Page.Title.Identity";
+        public const string TitleQuota = "Page.Title.Quota";
+        public const string TitlePlatformAdmins = "Page.Title.PlatformAdmins";
+        public const string TitlePlatformAdminScopes = "Page.Title.PlatformAdminScopes";
+        public const string TitleSelfRegistrationAdmin = "Page.Title.SelfRegistrationAdmin";
+        public const string TitleSystemStatus = "Page.Title.SystemStatus";
+        public const string TitleLocalization = "Page.Title.Localization";
+        public const string TitleThemes = "Page.Title.Themes";
+        public const string TitleDemoData = "Page.Title.DemoData";
     }
 
     /// <summary>无障碍文本。</summary>
@@ -238,6 +262,9 @@ public static class Keys
         [Error.LocalizationTextEmpty] = new("文本不能为空。", "Text cannot be empty."),
         [Error.LocalizationPlaceholderMismatch] = new("译文占位符与平台基线不一致。", "Translation placeholders do not match the platform baseline."),
         [Error.LocalizationBaselineReset] = new("平台基线不能使用重置覆盖操作。", "The platform baseline cannot be reset via override."),
+        [Error.OperationFailed] = new("操作失败。", "Operation failed."),
+        [Error.CodeLabel] = new("错误码：", "Error code: "),
+        [Error.TraceIdLabel] = new("追踪 ID：", "Trace ID: "),
 
         [Empty.NoData] = new("暂无数据。", "No data available."),
 
@@ -251,6 +278,8 @@ public static class Keys
         [Nav.Components] = new("组件库", "Component Library"),
         [Nav.ThemeEditor] = new("主题编辑器", "Theme Editor"),
         [Nav.DataSources] = new("数据源", "Data Sources"),
+        [Nav.Dashboard] = new("仪表盘", "Dashboard"),
+        [Nav.Admin] = new("管理", "Admin"),
         [Nav.ModelAccounts] = new("模型与账号", "Models & Accounts"),
         [Nav.Tenants] = new("租户", "Tenants"),
         [Nav.TenantMembers] = new("租户成员", "Tenant Members"),
@@ -274,5 +303,19 @@ public static class Keys
         [Theme.Light] = new("浅色", "Light"),
         [Theme.Dark] = new("深色", "Dark"),
         [Theme.Switch] = new("切换主题", "Toggle theme"),
+
+        [Page.TitleHome] = new("工作台", "Workspace"),
+        [Page.TitleProfile] = new("个人设置", "Profile"),
+        [Page.TitleTenants] = new("租户管理", "Tenants"),
+        [Page.TitleTenantMembers] = new("租户成员", "Tenant Members"),
+        [Page.TitleIdentity] = new("身份与权限", "Identity & Permissions"),
+        [Page.TitleQuota] = new("配额管理", "Quota"),
+        [Page.TitlePlatformAdmins] = new("平台管理员", "Platform Admins"),
+        [Page.TitlePlatformAdminScopes] = new("管理员租户范围", "Admin Tenant Scope"),
+        [Page.TitleSelfRegistrationAdmin] = new("自助注册", "Self Registration"),
+        [Page.TitleSystemStatus] = new("系统状态", "System Status"),
+        [Page.TitleLocalization] = new("多语言中心", "Localization"),
+        [Page.TitleThemes] = new("主题（租户级）", "Themes"),
+        [Page.TitleDemoData] = new("演示数据", "Demo Data"),
     };
 }

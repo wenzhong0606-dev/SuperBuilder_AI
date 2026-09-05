@@ -4,7 +4,7 @@
 
 <AuthGuard>
     <PermissionGuard Require="@(new[]{ PermissionCodes.PlatformAdminManage })">
-    <PageHead Icon="sb-ico-db" Title="演示数据" Desc="安装独立的演示租户与示例业务数据（数据源/元数据/语义/仪表盘）。生产默认不安装，可重复安装受保护。" />
+    <PageHead Icon="sb-ico-db" Key="DemoData" Title="演示数据" Desc="安装独立的演示租户与示例业务数据（数据源/元数据/语义/仪表盘）。生产默认不安装，可重复安装受保护。" />
 
     <div class="sb-page-body">
         @if (_loading)

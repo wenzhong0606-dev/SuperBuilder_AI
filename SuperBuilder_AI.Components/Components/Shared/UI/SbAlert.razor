@@ -1,3 +1,4 @@
+@inject LocalizationService L10n
 @* 提示条：tone = info|warning|danger|success；可选关闭按钮 *@
 @if (Visible)
 {
@@ -11,7 +12,7 @@
         </div>
         @if (Dismissible)
         {
-            <button type="button" class="sb-alert-close" @onclick="Dismiss" aria-label="关闭">×</button>
+            <button type="button" class="sb-alert-close" @onclick="Dismiss" aria-label="@L10n.T(Keys.Common.Close, "关闭")">×</button>
         }
     </div>
 }

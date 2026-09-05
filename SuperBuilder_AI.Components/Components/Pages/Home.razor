@@ -6,7 +6,7 @@
 
 @* 工作台首页：会话自举完成前不判定登录态 *@
 <AuthGuard AutoRedirect="true">
-    <PageHead Icon="sb-ico-home" Title="工作台" Desc="从一次提问开始，把分析沉淀为仪表盘与应用，并在团队内复用。">
+    <PageHead Icon="sb-ico-home" Key="Home" Title="工作台" Desc="从一次提问开始，把分析沉淀为仪表盘与应用，并在团队内复用。">
         <button class="btn btn-primary btn-sm" @onclick='() => Nav.NavigateTo("ask")'>
             <svg class="btn-ico"><use href="#sb-ico-ask" /></svg> 开始提问
         </button>

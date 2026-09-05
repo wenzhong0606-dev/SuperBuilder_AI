@@ -429,8 +429,11 @@ M3-G0 是 M4/M7/M8 的最小前置，不等同于完成全部 i18n。它只包�
 - M3-05-B 前端取数重构：`LocalizationService.T(key)` 优先运行时字典，回退 `Keys.Defaults`，再回退页面 fallback；登录语言列表改为 API 动态驱动。
 - M3-05-C 资源键登记与种子：后端 `ResourceKeys` 增补 Common/Login/Nav/Error/Theme 全量键 + `Catalog` 元数据；`LocalizationSeedService` 重构为「键驱动」种子（zh-CN 取内置 `ZhCnDefaults`、en-US 取 `Catalog.DefaultValue`、zh-TW/ja/KO 保留母语基线并回退 en-US），覆盖 `ResourceKeys.All()` 全部键，通过 `EnsureSeedAsync_Covers_Registered_ResourceKeys`。
 - M3-05-D 后端错误本地化基础：`LocalizationController` 4 处裸 `BadRequest(ex.Message)` 与 3 处内联中文改为返回 `ApiError`（稳定 code `Error.Localization.*` + 服务端中文文案，不泄漏内部细节）；新增后端测试验证 `ApiError` 形状与 code 稳定性。
+- M3-05-E 防漂移护栏：新增 `ResourceKeyRegistryTests` 六例，校验「后端注册表 ↔ Catalog 元数据 ↔ zh-CN 基线 ↔ RCL `Keys`/`Defaults`」四处严格一致；任一处键集合或中英双语文案漂移直接变红（上一轮种子脱节正因缺此类护栏而潜伏）。
+- M3-05-F 共享反馈组件本地化：`ErrorState`/`LoadingState`/`SbEmptyState`/`SbAlert`/`PageHead` 接入统一 L10n（错误码、追踪 ID、重试、关闭、加载中、暂无数据等），全部保留原中文 fallback，无回归。
+- M3-05-G 页头稳定键：`PageHead` 新增稳定 `Key` 参数解析 `Page.Title.{Key}`（旧 `Page.Title.{中文标题}` 约定会退化成中文键、必然查不到，作为未迁移页回退）；登记 `Page.Title.*` 13 个键（五处同步：后端常量 + `Catalog`、zh-CN `ZhCnDefaults`、RCL `Keys`/`Defaults`），并迁移工作台/管理后台 13 个页面 `<PageHead Key=...>`。
 
-批次范围说明（递延）：Ask/Dashboards/Apps/DataSources/Admin 等重型内容页的全量 L10n 接入，以及前端按 `L10n.T("Error."+code, serverMessage)` 消费 `ApiError` 的友好提示层，列为后续批次；本轮已打通基础设施与核心外壳。
+批次范围说明（递延）：Ask/Dashboards/Apps 详情页、BusinessModel/ComponentGallery/ThemeEditor/DataSources 列表等重型内容页的全量 L10n，以及前端按 `L10n.T("Error."+code, serverMessage)` 消费 `ApiError` 的友好提示层，仍列为后续批次；本批已打通页头与共享反馈组件本地化，并补齐防漂移护栏。
 
 ### M3-06 用户语言偏好
 

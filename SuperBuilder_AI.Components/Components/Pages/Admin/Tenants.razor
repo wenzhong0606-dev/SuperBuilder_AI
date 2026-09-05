@@ -6,7 +6,7 @@
 
 <AuthGuard>
     <PermissionGuard Require="@(new[]{ PermissionCodes.PlatformTenantView })">
-    <PageHead Icon="sb-ico-tenant" Title="租户管理" Desc="管理多租户：创建租户、配置隔离作用域与默认配额，平台运营入口。" />
+    <PageHead Icon="sb-ico-tenant" Key="Tenants" Title="租户管理" Desc="管理多租户：创建租户、配置隔离作用域与默认配额，平台运营入口。" />
 
     <SbListPage TItem="JsonElement" Icon="sb-ico-tenant" Title="租户列表"
                 Items="@_rows" Columns="@Columns" Loading="@_loading" Error="@_error"

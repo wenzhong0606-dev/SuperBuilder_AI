@@ -5,7 +5,7 @@
 
 <AuthGuard>
     <PermissionGuard Require="@(new[]{ PermissionCodes.PlatformTenantManage })">
-    <PageHead Icon="sb-ico-users" Title="租户成员" Desc="管理用户与额外可切换租户之间的成员关系：为用户授予跨租户切换资格，或撤销其成员资格。" />
+    <PageHead Icon="sb-ico-users" Key="TenantMembers" Title="租户成员" Desc="管理用户与额外可切换租户之间的成员关系：为用户授予跨租户切换资格，或撤销其成员资格。" />
 
     <SbListPage TItem="MembershipRow" Icon="sb-ico-users" Title="成员关系"
                 Items="@_rows" Columns="@Columns" Loading="@_loading" Error="@_error"

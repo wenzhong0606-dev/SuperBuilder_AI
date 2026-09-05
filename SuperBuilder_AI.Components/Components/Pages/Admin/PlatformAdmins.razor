@@ -8,7 +8,7 @@
 
 <AuthGuard>
     <PermissionGuard Require="@(new[]{ PermissionCodes.PlatformAdminManage })">
-        <PageHead Icon="sb-ico-user" Title="平台管理员"
+        <PageHead Icon="sb-ico-user" Key="PlatformAdmins" Title="平台管理员"
                   Desc="管理平台治理账号：新增、停用 / 启用、重置口令，并审计所有治理操作。始终至少保留一名有效管理员。">
             <button class="btn btn-primary btn-sm" @onclick="OpenCreate">新建管理员</button>
             <button class="btn btn-outline-secondary btn-sm" @onclick="Reload">刷新</button>

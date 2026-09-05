@@ -4,7 +4,7 @@
 
 <AuthGuard>
     <PermissionGuard>
-        <PageHead Icon="sb-ico-activity" Title="系统状态" Desc="后端健康检查与运行时指标（只读）。">
+        <PageHead Icon="sb-ico-activity" Key="SystemStatus" Title="系统状态" Desc="后端健康检查与运行时指标（只读）。">
             <button class="btn btn-outline-secondary btn-sm" @onclick="() => Load()" disabled="@_loading">
                 @(_loading ? "刷新中…" : "刷新")
             </button>

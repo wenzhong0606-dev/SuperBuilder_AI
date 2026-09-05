@@ -161,8 +161,11 @@ public sealed class LocalizationSeedService : ILocalizationSeedService
         await _db.SaveChangesAsync(ct);
     }
 
-    /// <summary>平台基线简体中文文案（zh-CN），与前端 RCL <c>Keys.Defaults</c> 的 ZhCn 镜像一致；后端单一事实来源。</summary>
-    private static readonly Dictionary<string, string> ZhCnDefaults = new()
+    /// <summary>
+    /// 平台基线简体中文文案（zh-CN），与前端 RCL <c>Keys.Defaults</c> 的 ZhCn 镜像一致；后端单一事实来源。
+    /// 公开以便回归测试断言「每个已登记键都有 zh-CN 基线」，避免新增键被静默降级为英文或键名。
+    /// </summary>
+    public static readonly Dictionary<string, string> ZhCnDefaults = new()
     {
         ["Common.Login"] = "登录", ["Common.Confirm"] = "确认", ["Common.Cancel"] = "取消",
         ["Common.Save"] = "保存", ["Common.Close"] = "关闭", ["Common.Settings"] = "个人设置",
@@ -196,12 +199,21 @@ public sealed class LocalizationSeedService : ILocalizationSeedService
         ["Error.TechDetails"] = "技术详情",
         ["Error.Localization.CultureInvalid"] = "文化格式无效。", ["Error.Localization.TextEmpty"] = "文本不能为空。",
         ["Error.Localization.PlaceholderMismatch"] = "译文占位符与平台基线不一致。", ["Error.Localization.BaselineReset"] = "平台基线不能使用重置覆盖操作。",
+        ["Error.OperationFailed"] = "操作失败。", ["Error.CodeLabel"] = "错误码：", ["Error.TraceIdLabel"] = "追踪 ID：",
+
+        ["Page.Title.Home"] = "工作台", ["Page.Title.Profile"] = "个人设置", ["Page.Title.Tenants"] = "租户管理",
+        ["Page.Title.TenantMembers"] = "租户成员", ["Page.Title.Identity"] = "身份与权限", ["Page.Title.Quota"] = "配额管理",
+        ["Page.Title.PlatformAdmins"] = "平台管理员", ["Page.Title.PlatformAdminScopes"] = "管理员租户范围",
+        ["Page.Title.SelfRegistrationAdmin"] = "自助注册", ["Page.Title.SystemStatus"] = "系统状态",
+        ["Page.Title.Localization"] = "多语言中心", ["Page.Title.Themes"] = "主题（租户级）", ["Page.Title.DemoData"] = "演示数据",
 
         ["Empty.NoData"] = "暂无数据。",
 
         ["Nav.Home"] = "首页", ["Nav.Ask"] = "Ask BI 智能问数", ["Nav.Dashboards"] = "仪表盘", ["Nav.Apps"] = "应用工厂",
         ["Nav.Agent"] = "智能体 / Copilot", ["Nav.SemanticLabels"] = "语义标签", ["Nav.BusinessModel"] = "语义模型",
         ["Nav.Components"] = "组件库", ["Nav.ThemeEditor"] = "主题编辑器", ["Nav.DataSources"] = "数据源",
+        // 历史别名：与 RCL 镜像、后端 Catalog 保持一致（护栏测试 All_RegisteredKeys_HaveZhCnBaseline 会校验）。
+        ["Nav.Dashboard"] = "仪表盘", ["Nav.Admin"] = "管理",
         ["Nav.ModelAccounts"] = "模型与账号", ["Nav.Tenants"] = "租户", ["Nav.TenantMembers"] = "租户成员",
         ["Nav.SelfRegistration"] = "自助注册", ["Nav.DemoData"] = "演示数据", ["Nav.PlatformAdmins"] = "平台管理员",
         ["Nav.PlatformAdminScopes"] = "管理员租户范围", ["Nav.Identity"] = "身份权限", ["Nav.Audit"] = "审计",

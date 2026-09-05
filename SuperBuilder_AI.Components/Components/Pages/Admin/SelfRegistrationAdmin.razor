@@ -5,7 +5,7 @@
 
 <AuthGuard>
     <PermissionGuard Require="@(new[]{ PermissionCodes.PlatformAdminManage })">
-    <PageHead Icon="sb-ico-tenant" Title="自助注册" Desc="查看自助注册开放状态与配置。默认关闭，由平台按环境配置开启。" />
+    <PageHead Icon="sb-ico-tenant" Key="SelfRegistrationAdmin" Title="自助注册" Desc="查看自助注册开放状态与配置。默认关闭，由平台按环境配置开启。" />
 
     <div class="sb-page-body">
         @if (_loading)
