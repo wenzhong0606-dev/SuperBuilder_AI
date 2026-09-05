@@ -7,10 +7,10 @@
 @using SuperBuilder_AI.Components.Models
 
 <AuthGuard>
-    <PageHead Icon="sb-ico-lang" Key="Localization" Title="多语言中心" Desc="平台维护语言与标准文本；租户自动继承，并只覆盖自己的差异文案。" />
+    <PageHead Icon="sb-ico-lang" Key="Localization" Title="多语言中心" Desc="@L10n.T(Keys.Content.AdminLocalizationDesc, "平台维护语言与标准文本；租户自动继承，并只覆盖自己的差异文案。")" />
     <div class="locale-console">
         <aside class="locale-rail">
-            <div class="locale-rail-title">语言目录 <span>@_languages.Count</span></div>
+            <div class="locale-rail-title">@L10n.T(Keys.Content.AdminLocalizationRailTitle, "语言目录") <span>@_languages.Count</span></div>
             @foreach (var language in _languages)
             {
                 <div class="locale-item @(language.Culture == _culture ? "active" : "") @(!language.Enabled ? "disabled" : "")">
@@ -20,25 +20,25 @@
                     </button>
                     @if (language.TotalKeys > 0 && language.PendingCount > 0)
                     {
-                        <span class="pending-chip" title="尚未翻译的键数">待翻译 @language.PendingCount</span>
+                        <span class="pending-chip" title="@L10n.T(Keys.Content.AdminLocalizationPendingTitle, "尚未翻译的键数")">@L10n.T(Keys.Content.AdminLocalizationPendingChip, "待翻译") @language.PendingCount</span>
                     }
                     @if (!language.Enabled)
                     {
-                        <span class="disabled-chip">已停用</span>
+                        <span class="disabled-chip">@L10n.T(Keys.Content.AdminLocalizationDisabledChip, "已停用")</span>
                     }
                     @if (_isPlatform)
                     {
                         <span class="locale-item-ops">
-                            <button class="icon-btn" title="上移" @onclick="() => MoveLanguage(language, -1)">▲</button>
-                            <button class="icon-btn" title="下移" @onclick="() => MoveLanguage(language, 1)">▼</button>
-                            <button class="icon-btn" title="编辑名称" @onclick="() => OpenEdit(language)">✎</button>
+                            <button class="icon-btn" title="@L10n.T(Keys.Content.AdminLocalizationMoveUp, "上移")" @onclick="() => MoveLanguage(language, -1)">▲</button>
+                            <button class="icon-btn" title="@L10n.T(Keys.Content.AdminLocalizationMoveDown, "下移")" @onclick="() => MoveLanguage(language, 1)">▼</button>
+                            <button class="icon-btn" title="@L10n.T(Keys.Content.AdminLocalizationEditName, "编辑名称")" @onclick="() => OpenEdit(language)">✎</button>
                             @if (language.Enabled)
                             {
-                                <button class="icon-btn danger" title="停用" @onclick='() => ToggleEnabled(language, false)'>⏻</button>
+                                <button class="icon-btn danger" title="@L10n.T(Keys.Content.AdminLocalizationDisable, "停用")" @onclick='() => ToggleEnabled(language, false)'>⏻</button>
                             }
                             else
                             {
-                                <button class="icon-btn ok" title="启用" @onclick='() => ToggleEnabled(language, true)'>⏻</button>
+                                <button class="icon-btn ok" title="@L10n.T(Keys.Content.AdminLocalizationEnable, "启用")" @onclick='() => ToggleEnabled(language, true)'>⏻</button>
                             }
                         </span>
                     }
@@ -46,15 +46,15 @@
             }
             @if (_isPlatform)
             {
-                <button class="btn btn-primary btn-sm" style="width:100%;margin-top:10px" @onclick="() => _addingLanguage = true">＋ 添加语言</button>
+                <button class="btn btn-primary btn-sm" style="width:100%;margin-top:10px" @onclick="() => _addingLanguage = true">@L10n.T(Keys.Content.AdminLocalizationAddLanguage, "＋ 添加语言")</button>
             }
         </aside>
         <section class="locale-workspace">
             <header class="locale-workspace-head">
-                <div><span class="eyebrow">TEXT RESOURCE MATRIX</span><h3>@_culture 系统文本</h3><p>@(_isPlatform ? "正在维护平台基线，修改会自动影响未覆盖该文本的租户。" : "默认继承平台文本；标记为“租户专属”的项目仅对当前租户生效。")</p></div>
-                <div>@if (_isPlatform) { <button class="btn btn-primary btn-sm" @onclick="() => _addingText=true">＋ 新增文本键</button> } <span class="inherit-badge">@(_isPlatform ? "平台基线" : "继承 + 差异覆盖")</span></div>
+                <div><span class="eyebrow">TEXT RESOURCE MATRIX</span><h3>@_culture @L10n.T(Keys.Content.AdminLocalizationSystemTexts, "系统文本")</h3><p>@(_isPlatform ? L10n.T(Keys.Content.AdminLocalizationPlatformBaselineDesc, "正在维护平台基线，修改会自动影响未覆盖该文本的租户。") : L10n.T(Keys.Content.AdminLocalizationTenantInheritDesc, "默认继承平台文本；标记为「租户专属」的项目仅对当前租户生效。"))</p></div>
+                <div>@if (_isPlatform) { <button class="btn btn-primary btn-sm" @onclick="() => _addingText=true">@L10n.T(Keys.Content.AdminLocalizationAddText, "＋ 新增文本键")</button> } <span class="inherit-badge">@(_isPlatform ? L10n.T(Keys.Content.AdminLocalizationPlatformBadge, "平台基线") : L10n.T(Keys.Content.AdminLocalizationInheritBadge, "继承 + 差异覆盖"))</span></div>
             </header>
-            @if (_loading) { <LoadingState Text="正在加载语言资源…" /> }
+            @if (_loading) { <LoadingState Text="@L10n.T(Keys.Content.AdminLocalizationLoadingText, "正在加载语言资源…")" /> }
             else if (!string.IsNullOrWhiteSpace(_error)) { <ErrorState Message="@_error" OnRetry="LoadTexts" /> }
             else
             {
@@ -64,11 +64,11 @@
                     var key = Cell(row, "resourceKey"); var overridden = Flag(row, "isOverridden");
                     <div class="text-resource-row @(_isPlatform ? "platform" : "")">
                         <div class="text-resource-key"><code>@key</code><small>@Cell(row, "description")</small></div>
-                        @if (!_isPlatform) { <div class="text-resource-base"><label>平台默认</label><div>@Cell(row, "platformValue")</div></div> }
-                        <div class="text-resource-edit"><label>@(_isPlatform ? "平台文本" : "租户显示文本")</label><input value="@Cell(row, "value")" @onchange="e => Save(key, e.Value?.ToString() ?? string.Empty)" /></div>
+                        @if (!_isPlatform) { <div class="text-resource-base"><label>@L10n.T(Keys.Content.AdminLocalizationPlatformDefault, "平台默认")</label><div>@Cell(row, "platformValue")</div></div> }
+                        <div class="text-resource-edit"><label>@(_isPlatform ? L10n.T(Keys.Content.AdminLocalizationPlatformText, "平台文本") : L10n.T(Keys.Content.AdminLocalizationTenantText, "租户显示文本"))</label><input value="@Cell(row, "value")" @onchange="e => Save(key, e.Value?.ToString() ?? string.Empty)" /></div>
                         <div class="text-resource-state">
-                            @if (!_isPlatform && overridden) { <span class="override-chip">租户专属</span><button class="btn btn-sm btn-outline-secondary" @onclick="() => Reset(key)">恢复继承</button> }
-                            else { <span class="inherit-chip">@(_isPlatform ? "基线" : "已继承")</span> }
+                            @if (!_isPlatform && overridden) { <span class="override-chip">@L10n.T(Keys.Content.AdminLocalizationTenantOverride, "租户专属")</span><button class="btn btn-sm btn-outline-secondary" @onclick="() => Reset(key)">@L10n.T(Keys.Content.AdminLocalizationRestoreInherit, "恢复继承")</button> }
+                            else { <span class="inherit-chip">@(_isPlatform ? L10n.T(Keys.Content.AdminLocalizationBaselineChip, "基线") : L10n.T(Keys.Content.AdminLocalizationInheritedChip, "已继承"))</span> }
                         </div>
                     </div>
                 }
@@ -76,26 +76,26 @@
             }
         </section>
     </div>
-    <SbModal Visible="@_addingLanguage" VisibleChanged="v => _addingLanguage = v" Title="添加平台语言">
+    <SbModal Visible="@_addingLanguage" VisibleChanged="v => _addingLanguage = v" Title="@L10n.T(Keys.Content.AdminLocalizationAddLangTitle, "添加平台语言")">
         <Body>
-            <SbField Label="Culture 代码" Full="true" Required="true"><input @bind="_newCulture" placeholder="如：fr-FR" /></SbField>
-            <SbField Label="显示名称" Full="true"><input @bind="_newDisplayName" placeholder="如：法语（法国）" /></SbField>
-            <SbField Label="本地名称" Full="true"><input @bind="_newNativeName" placeholder="如：Français" /></SbField>
-            <SbField Label="初始文本复制自" Full="true"><select @bind="_copyFrom">@foreach(var language in _languages){<option value="@language.Culture">@language.NativeName</option>}</select></SbField>
+            <SbField Label="@L10n.T(Keys.Content.AdminLocalizationCultureCode, "Culture 代码")" Full="true" Required="true"><input @bind="_newCulture" placeholder="@L10n.T(Keys.Content.AdminLocalizationCulturePlaceholder, "如：fr-FR")" /></SbField>
+            <SbField Label="@L10n.T(Keys.Content.AdminLocalizationDisplayName, "显示名称")" Full="true"><input @bind="_newDisplayName" placeholder="@L10n.T(Keys.Content.AdminLocalizationDisplayNamePlaceholder, "如：法语（法国）")" /></SbField>
+            <SbField Label="@L10n.T(Keys.Content.AdminLocalizationNativeName, "本地名称")" Full="true"><input @bind="_newNativeName" placeholder="@L10n.T(Keys.Content.AdminLocalizationNativePlaceholder, "如：Français")" /></SbField>
+            <SbField Label="@L10n.T(Keys.Content.AdminLocalizationCopyFrom, "初始文本复制自")" Full="true"><select @bind="_copyFrom">@foreach(var language in _languages){<option value="@language.Culture">@language.NativeName</option>}</select></SbField>
         </Body>
-        <Footer><button class="btn btn-outline-secondary btn-sm" @onclick="() => _addingLanguage=false">取消</button><button class="btn btn-primary btn-sm" @onclick="AddLanguage">创建语言</button></Footer>
+        <Footer><button class="btn btn-outline-secondary btn-sm" @onclick="() => _addingLanguage=false">@L10n.T(Keys.Content.CommonCancel, "取消")</button><button class="btn btn-primary btn-sm" @onclick="AddLanguage">@L10n.T(Keys.Content.AdminLocalizationCreateLanguage, "创建语言")</button></Footer>
     </SbModal>
-    <SbModal Visible="@_editingLanguage" VisibleChanged="v => _editingLanguage = v" Title="编辑语言名称">
+    <SbModal Visible="@_editingLanguage" VisibleChanged="v => _editingLanguage = v" Title="@L10n.T(Keys.Content.AdminLocalizationEditLangTitle, "编辑语言名称")">
         <Body>
-            <SbField Label="Culture 代码" Full="true"><input value="@_editCulture" disabled="disabled" /></SbField>
-            <SbField Label="显示名称" Full="true"><input @bind="_editDisplayName" placeholder="如：法语（法国）" /></SbField>
-            <SbField Label="本地名称" Full="true"><input @bind="_editNativeName" placeholder="如：Français" /></SbField>
+            <SbField Label="@L10n.T(Keys.Content.AdminLocalizationCultureCode, "Culture 代码")" Full="true"><input value="@_editCulture" disabled="disabled" /></SbField>
+            <SbField Label="@L10n.T(Keys.Content.AdminLocalizationDisplayName, "显示名称")" Full="true"><input @bind="_editDisplayName" placeholder="@L10n.T(Keys.Content.AdminLocalizationDisplayNamePlaceholder, "如：法语（法国）")" /></SbField>
+            <SbField Label="@L10n.T(Keys.Content.AdminLocalizationNativeName, "本地名称")" Full="true"><input @bind="_editNativeName" placeholder="@L10n.T(Keys.Content.AdminLocalizationNativePlaceholder, "如：Français")" /></SbField>
         </Body>
-        <Footer><button class="btn btn-outline-secondary btn-sm" @onclick="() => _editingLanguage=false">取消</button><button class="btn btn-primary btn-sm" @onclick="SaveEdit">保存</button></Footer>
+        <Footer><button class="btn btn-outline-secondary btn-sm" @onclick="() => _editingLanguage=false">@L10n.T(Keys.Content.CommonCancel, "取消")</button><button class="btn btn-primary btn-sm" @onclick="SaveEdit">@L10n.T(Keys.Content.CommonSave, "保存")</button></Footer>
     </SbModal>
-    <SbModal Visible="@_addingText" VisibleChanged="v => _addingText=v" Title="新增系统文本键">
-        <Body><SbField Label="资源键" Full="true" Required="true"><input @bind="_newTextKey" placeholder="如：Page.Title.订单" /></SbField><SbField Label="当前语言文本" Full="true" Required="true"><input @bind="_newTextValue" /></SbField></Body>
-        <Footer><button class="btn btn-outline-secondary btn-sm" @onclick="() => _addingText=false">取消</button><button class="btn btn-primary btn-sm" @onclick="AddText">保存</button></Footer>
+    <SbModal Visible="@_addingText" VisibleChanged="v => _addingText=v" Title="@L10n.T(Keys.Content.AdminLocalizationAddTextTitle, "新增系统文本键")">
+        <Body><SbField Label="@L10n.T(Keys.Content.AdminLocalizationResourceKey, "资源键")" Full="true" Required="true"><input @bind="_newTextKey" placeholder="@L10n.T(Keys.Content.AdminLocalizationResourceKeyPlaceholder, "如：Page.Title.订单")" /></SbField><SbField Label="@L10n.T(Keys.Content.AdminLocalizationCurrentText, "当前语言文本")" Full="true" Required="true"><input @bind="_newTextValue" /></SbField></Body>
+        <Footer><button class="btn btn-outline-secondary btn-sm" @onclick="() => _addingText=false">@L10n.T(Keys.Content.CommonCancel, "取消")</button><button class="btn btn-primary btn-sm" @onclick="AddText">@L10n.T(Keys.Content.CommonSave, "保存")</button></Footer>
     </SbModal>
 </AuthGuard>
 
@@ -118,29 +118,29 @@
     }
     private async Task SelectCulture(string culture) { _culture = culture; await LoadTexts(); }
     private async Task LoadTexts() { _loading = true; StateHasChanged(); var (data, _, err, _) = await Api.GetJsonAsync($"api/localization/texts?culture={Uri.EscapeDataString(_culture)}"); _texts = data is { ValueKind: JsonValueKind.Array } ? data.Value.EnumerateArray().ToList() : new(); _error = err ?? ""; _loading = false; StateHasChanged(); }
-    private async Task Save(string key, string value) { var (ok, _, err, _) = await Api.PutAsync($"api/localization/texts/{Uri.EscapeDataString(_culture)}/{Uri.EscapeDataString(key)}", new { value }); if (!ok) Toast.Error(err ?? "保存失败。"); else { Toast.Success(_isPlatform ? "平台文本已更新。" : "租户专属文本已保存。"); await LoadTexts(); } }
-    private async Task Reset(string key) { var (ok, _, err, _) = await Api.DeleteAsync($"api/localization/texts/{Uri.EscapeDataString(_culture)}/{Uri.EscapeDataString(key)}/override"); if (!ok) Toast.Error(err ?? "恢复失败。"); else { Toast.Success("已恢复继承平台文本。"); await LoadTexts(); } }
+    private async Task Save(string key, string value) { var (ok, _, err, _) = await Api.PutAsync($"api/localization/texts/{Uri.EscapeDataString(_culture)}/{Uri.EscapeDataString(key)}", new { value }); if (!ok) Toast.Error(err ?? L10n.T(Keys.Content.AdminLocalizationSaveFailed, "保存失败。")); else { Toast.Success(_isPlatform ? L10n.T(Keys.Content.AdminLocalizationPlatformUpdated, "平台文本已更新。") : L10n.T(Keys.Content.AdminLocalizationTenantSaved, "租户专属文本已保存。")); await LoadTexts(); } }
+    private async Task Reset(string key) { var (ok, _, err, _) = await Api.DeleteAsync($"api/localization/texts/{Uri.EscapeDataString(_culture)}/{Uri.EscapeDataString(key)}/override"); if (!ok) Toast.Error(err ?? L10n.T(Keys.Content.AdminLocalizationRestoreFailed, "恢复失败。")); else { Toast.Success(L10n.T(Keys.Content.AdminLocalizationRestored, "已恢复继承平台文本。")); await LoadTexts(); } }
     private async Task AddLanguage()
     {
         var model = new AdminLanguageCreate { Culture = _newCulture, DisplayName = _newDisplayName, NativeName = _newNativeName, CopyFromCulture = _copyFrom };
         var (ok, err) = await Api.CreateLanguageAsync(model);
-        if (!ok) { Toast.Error(err ?? "创建失败。"); return; }
+        if (!ok) { Toast.Error(err ?? L10n.T(Keys.Content.AdminLocalizationCreateFailed, "创建失败。")); return; }
         _addingLanguage = false; _culture = (_newCulture ?? "").Trim(); _newCulture = _newDisplayName = _newNativeName = "";
-        Toast.Success("语言已创建，可开始维护对应文本。"); await LoadLanguages(); await LoadTexts();
+        Toast.Success(L10n.T(Keys.Content.AdminLocalizationCreated, "语言已创建，可开始维护对应文本。")); await LoadLanguages(); await LoadTexts();
     }
     private void OpenEdit(AdminLanguageView lang) { _editId = lang.Id; _editCulture = lang.Culture; _editDisplayName = lang.DisplayName; _editNativeName = lang.NativeName; _editingLanguage = true; }
     private async Task SaveEdit()
     {
         var model = new AdminLanguageUpdate { DisplayName = _editDisplayName, NativeName = _editNativeName };
         var (ok, err) = await Api.UpdateLanguageAsync(_editId, model);
-        if (!ok) { Toast.Error(err ?? "保存失败。"); return; }
-        _editingLanguage = false; Toast.Success("语言名称已更新。"); await LoadLanguages();
+        if (!ok) { Toast.Error(err ?? L10n.T(Keys.Content.AdminLocalizationSaveFailed, "保存失败。")); return; }
+        _editingLanguage = false; Toast.Success(L10n.T(Keys.Content.AdminLocalizationNameUpdated, "语言名称已更新。")); await LoadLanguages();
     }
     private async Task ToggleEnabled(AdminLanguageView lang, bool enabled)
     {
         var (ok, err) = await Api.SetLanguageEnabledAsync(lang.Id, enabled);
-        if (!ok) { Toast.Error(err ?? "操作失败。"); return; }
-        Toast.Success(enabled ? "语言已启用。" : "语言已停用，相关租户默认语言已迁移。"); await LoadLanguages();
+        if (!ok) { Toast.Error(err ?? L10n.T(Keys.Content.AdminLocalizationOpFailed, "操作失败。")); return; }
+        Toast.Success(enabled ? L10n.T(Keys.Content.AdminLocalizationEnabled, "语言已启用。") : L10n.T(Keys.Content.AdminLocalizationDisabled, "语言已停用，相关租户默认语言已迁移。")); await LoadLanguages();
     }
     private async Task MoveLanguage(AdminLanguageView lang, int dir)
     {
@@ -150,7 +150,7 @@
         (list[index], list[index + dir]) = (list[index + dir], list[index]);
         var orderedIds = list.Select(x => x.Id).ToList();
         var (ok, err) = await Api.ReorderLanguagesAsync(orderedIds);
-        if (!ok) { Toast.Error(err ?? "排序失败。"); return; }
+        if (!ok) { Toast.Error(err ?? L10n.T(Keys.Content.AdminLocalizationReorderFailed, "排序失败。")); return; }
         await LoadLanguages();
     }
     private async Task AddText() { if(string.IsNullOrWhiteSpace(_newTextKey)||string.IsNullOrWhiteSpace(_newTextValue))return; await Save(_newTextKey.Trim(),_newTextValue); _addingText=false; _newTextKey=_newTextValue=""; }
