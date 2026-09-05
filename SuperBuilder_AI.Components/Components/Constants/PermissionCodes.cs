@@ -16,6 +16,7 @@ public static class PermissionCodes
     public const string PlatformTenantView = "platform:tenant:view";
     public const string PlatformDiagnosticsView = "platform:diagnostics:view";
     public const string PlatformQuotaManage = "platform:quota:manage";
+    public const string PlatformAdminManage = "platform:admin:manage";
 
     // —— 租户内管理面 ——
     public const string IdentityManage = "identity:manage";

@@ -51,6 +51,7 @@ public static class IdentityPermissions
     public const string PlatformTenantSettingsManage = "platform:tenant-settings:manage";
     public const string PlatformAuditView = "platform:audit:view";
     public const string PlatformQuotaManage = "platform:quota:manage";
+    public const string PlatformAdminManage = "platform:admin:manage";
 }
 
 /// <summary>权限定义（种子用）。</summary>
@@ -103,6 +104,7 @@ public static class IdentityCatalog
         new(IdentityPermissions.PlatformTenantSettingsManage, "管理租户设置", "platform", "管理目标租户的平台设置"),
         new(IdentityPermissions.PlatformAuditView, "查看平台审计", "platform", "查看平台治理审计"),
         new(IdentityPermissions.PlatformQuotaManage, "管理平台配额", "platform", "管理租户配额策略"),
+        new(IdentityPermissions.PlatformAdminManage, "管理平台管理员", "platform", "新增/停用/启用/重置平台治理管理员口令"),
     };
 
     public static readonly IReadOnlyList<RoleDef> Roles = new List<RoleDef>
@@ -111,8 +113,9 @@ public static class IdentityCatalog
         {
             IdentityPermissions.PlatformDiagnosticsView, IdentityPermissions.PlatformDiagnosticsManage,
             IdentityPermissions.PlatformTenantView, IdentityPermissions.PlatformTenantManage,
-            IdentityPermissions.PlatformTenantSettingsManage, IdentityPermissions.PlatformAuditView,
+            IdentityPermissions.PlatformTenantSettingsManage,             IdentityPermissions.PlatformAuditView,
             IdentityPermissions.PlatformQuotaManage,
+            IdentityPermissions.PlatformAdminManage,
         }),
         new(IdentityRoles.TenantAdmin, "租户管理员", "租户内管理权限（不含平台账单）", new[]
         {

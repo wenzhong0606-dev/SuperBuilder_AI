@@ -45,7 +45,7 @@ public class IdentityServiceTests
 
         var permCount = await ctx.Permissions.CountAsync(p => p.TenantId == 0);
         var roleCount = await ctx.Roles.CountAsync(r => r.TenantId == 0);
-        Assert.Equal(31, permCount);
+        Assert.Equal(32, permCount);
         Assert.Equal(4, roleCount);
 		Assert.Single(await ctx.Tenants.Where(t => t.TenantCode == IdentityService.PlatformTenantCode).ToListAsync());
     }

@@ -268,14 +268,15 @@ M1 退出：Migration 可在历史副本执行；无孤儿；跨租户组合均�
 
 ## 6. M2：平台初始化与身份治理
 
-### M2-01 多平台管理员（后端治理 ✅ / Blazor 管理页面待补）
+### M2-01 多平台管理员（后端治理 + Blazor 管理页面 ✅）
 
 - ✅ 新增 `PlatformAdminService`（列表/新增/停用/启用/重置密码）+ 专用治理端点 `api/platform-admin`（仅 `platform:*` 治理主体可访问）。
 - ✅ `platform-admin` 角色通过直接授予 `UserRole` 实现（被 `IdentityService.ResolveRoleId(s)Async` 刻意排除，防普通身份流越权），与 `PlatformAdminBootstrapper` 一致。
 - ✅ 不变量：始终保留至少一名有效（Active）平台管理员，`DisableAsync` 在降至最后一名时拒绝。
 - ✅ 治理动作写入 append-only `AuditLog`（Actor/Action=platform.admin.*/EntityType=PlatformAdmin）。
 - ✅ 新增 10 例 `M2_01_PlatformAdminTests`；全量回归 629/629 通过（619+10），构建 0 error。
-- ⬜ Blazor 管理页面（列表/新增/停用/重置密码/审计视图）待补（M2-01 UI 子项），跨 Web/Maui/RCL。
+- ✅ Blazor 管理页面 `Admin/PlatformAdmins.razor`（列表 / 新建 / 停用·启用 / 重置口令 + 操作审计页签），经 `PermissionGuard(PlatformAdminManage)` 守卫；`NavMenuItems` 已登记「平台管理员」入口；RCL+Web+Maui 三端构建 0 error，全量回归 629/629 通过。
+- 新增客户端权限码 `PermissionCodes.PlatformAdminManage = "platform:admin:manage"`，并补入 `IdentityCatalog`（PlatformAdmin 角色 + PermissionDef），种子幂等授予。
 
 ### M2-02 管理员—租户范围
 

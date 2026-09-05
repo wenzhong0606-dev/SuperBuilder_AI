@@ -9,6 +9,7 @@ using SuperBuilder_AI.Interfaces.Audit;
 using SuperBuilder_AI.Interfaces.Identity;
 using SuperBuilder_AI.Models.Identity;
 using SuperBuilder_AI.Services.Auth;
+using System.Text.Json.Serialization;
 
 namespace SuperBuilder_AI.Services.Identity;
 
@@ -18,7 +19,7 @@ public sealed record PlatformAdminView(
     string Username,
     string DisplayName,
     string Email,
-    UserStatus Status,
+    [property: JsonConverter(typeof(JsonStringEnumConverter))] UserStatus Status,
     DateTime CreatedTime);
 
 /// <summary>新增平台管理员请求。</summary>
