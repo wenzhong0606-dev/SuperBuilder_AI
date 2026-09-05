@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
@@ -156,5 +157,113 @@ public class DataSourcesControllerTests
 		Assert.False(DataSource.IsSupportedDbType("oracle"));
 		Assert.False(DataSource.IsSupportedDbType(null));
 		Assert.False(DataSource.IsSupportedDbType(""));
+	}
+
+	[Fact]
+	public async Task Update_ChangesName_And_ResetsConnectionString()
+	{
+		var ctx = CreateContext(out var connection);
+		await using var _ = connection;
+		await using var __ = ctx;
+
+		var ctrl = Build(ctx, TenantA);
+		Assert.IsType<OkObjectResult>(await ctrl.Create(new CreateDataSourceRequest("Primary", "MYSQL", "Server=localhost;"), CancellationToken.None));
+		var id = await ctx.DataSources.Select(x => x.Id).FirstAsync();
+
+		var result = await ctrl.Update(id, new UpdateDataSourceRequest("Primary Renamed", "POSTGRESQL", "Host=localhost;"), CancellationToken.None);
+		Assert.IsType<OkObjectResult>(result);
+		var saved = await ctx.DataSources.FirstAsync(x => x.Id == id);
+		Assert.Equal("Primary Renamed", saved.Name);
+		Assert.Equal("primary renamed", saved.NormalizedName);
+		Assert.Equal("POSTGRESQL", saved.DbType);
+		Assert.Equal("Host=localhost;", saved.ConnectionString);
+	}
+
+	[Fact]
+	public async Task Update_ReturnsNotFound_ForOtherTenant()
+	{
+		var ctx = CreateContext(out var connection);
+		await using var _ = connection;
+		await using var __ = ctx;
+		var ctrlA = Build(ctx, TenantA);
+		Assert.IsType<OkObjectResult>(await ctrlA.Create(new CreateDataSourceRequest("Primary", "MYSQL", "Server=localhost;"), CancellationToken.None));
+		var id = await ctx.DataSources.Select(x => x.Id).FirstAsync();
+		var ctrlB = Build(ctx, TenantB);
+		Assert.IsType<NotFoundObjectResult>(await ctrlB.Update(id, new UpdateDataSourceRequest("x", null, null), CancellationToken.None));
+	}
+
+	[Fact]
+	public async Task Update_RejectsEmptyName()
+	{
+		var ctx = CreateContext(out var connection);
+		await using var _ = connection;
+		await using var __ = ctx;
+		var ctrl = Build(ctx, TenantA);
+		Assert.IsType<OkObjectResult>(await ctrl.Create(new CreateDataSourceRequest("Primary", "MYSQL", "Server=localhost;"), CancellationToken.None));
+		var id = await ctx.DataSources.Select(x => x.Id).FirstAsync();
+		Assert.IsType<BadRequestObjectResult>(await ctrl.Update(id, new UpdateDataSourceRequest("", null, null), CancellationToken.None));
+	}
+
+	[Fact]
+	public async Task EnableDisable_TogglesEnabled()
+	{
+		var ctx = CreateContext(out var connection);
+		await using var _ = connection;
+		await using var __ = ctx;
+		var ctrl = Build(ctx, TenantA);
+		Assert.IsType<OkObjectResult>(await ctrl.Create(new CreateDataSourceRequest("Primary", "MYSQL", "Server=localhost;"), CancellationToken.None));
+		var id = await ctx.DataSources.Select(x => x.Id).FirstAsync();
+		Assert.True((await ctx.DataSources.FindAsync(id))!.Enabled);
+		Assert.IsType<OkObjectResult>(await ctrl.Disable(id, CancellationToken.None));
+		Assert.False((await ctx.DataSources.FindAsync(id))!.Enabled);
+		Assert.IsType<OkObjectResult>(await ctrl.Enable(id, CancellationToken.None));
+		Assert.True((await ctx.DataSources.FindAsync(id))!.Enabled);
+	}
+
+	[Fact]
+	public async Task TestConnection_ReturnsNotFound_ForMissingSource()
+	{
+		var ctx = CreateContext(out var connection);
+		await using var _ = connection;
+		await using var __ = ctx;
+		var ctrl = Build(ctx, TenantA);
+		Assert.IsType<NotFoundObjectResult>(await ctrl.TestConnection(9999, CancellationToken.None));
+	}
+
+	[Fact]
+	public async Task TestConnection_ReturnsBadRequest_ForEmptyConnectionString()
+	{
+		var ctx = CreateContext(out var connection);
+		await using var _ = connection;
+		await using var __ = ctx;
+		var ctrl = Build(ctx, TenantA);
+		ctx.DataSources.Add(new DataSource { TenantId = TenantA, Name = "X", NormalizedName = "x", DbType = "MYSQL", ConnectionString = "", Enabled = true });
+		await ctx.SaveChangesAsync();
+		var id = await ctx.DataSources.Select(x => x.Id).FirstAsync();
+		Assert.IsType<BadRequestObjectResult>(await ctrl.TestConnection(id, CancellationToken.None));
+	}
+
+	[Fact]
+	public async Task TestConnection_ReturnsFailed_ForRefusedConnection()
+	{
+		var ctx = CreateContext(out var connection);
+		await using var _ = connection;
+		await using var __ = ctx;
+		var ctrl = Build(ctx, TenantA);
+		Assert.IsType<OkObjectResult>(await ctrl.Create(new CreateDataSourceRequest("Primary", "MYSQL", "Server=127.0.0.1;Port=1;User=root;"), CancellationToken.None));
+		var id = await ctx.DataSources.Select(x => x.Id).FirstAsync();
+		var result = await ctrl.TestConnection(id, CancellationToken.None);
+		Assert.IsType<OkObjectResult>(result);
+		Assert.Equal("Failed", ReadStatus(result));
+		// 连接失败也会被记录到数据源测试状态字段。
+		var saved = await ctx.DataSources.FirstAsync(x => x.Id == id);
+		Assert.Equal("Failed", saved.LastTestStatus);
+	}
+
+	private static string? ReadStatus(IActionResult result)
+	{
+		if (result is not OkObjectResult ok || ok.Value is null) return null;
+		var prop = ok.Value.GetType().GetProperty("status");
+		return prop?.GetValue(ok.Value)?.ToString();
 	}
 }

@@ -64,6 +64,12 @@ public class DataSource : BaseEntity
 	public string? LastErrorCode { get; set; }
 
 
+	/// <summary>
+	/// 最近一次元数据扫描完成时间(UTC)；null 表示从未扫描。
+	/// </summary>
+	public DateTime? LastScanAt { get; set; }
+
+
 	public ICollection<MetadataTable>? Tables { get; set; }
 
 		= new List<MetadataTable>();

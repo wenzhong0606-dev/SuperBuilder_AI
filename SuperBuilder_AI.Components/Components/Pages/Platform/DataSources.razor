@@ -41,18 +41,27 @@
             {
                 <div class="table-wrap">
                     <table class="data-table">
-                        <thead><tr><th>@L10n.T(Keys.Content.DataSourcesColId, "ID")</th><th>@L10n.T(Keys.Content.DataSourcesColName, "名称")</th><th>@L10n.T(Keys.Content.DataSourcesColType, "类型")</th><th>@L10n.T(Keys.Content.DataSourcesColStatus, "状态")</th><th>@L10n.T(Keys.Content.DataSourcesColTables, "元数据表")</th><th>@L10n.T(Keys.Content.DataSourcesColColumns, "字段")</th><th></th></tr></thead>
+                        <thead><tr><th>@L10n.T(Keys.Content.DataSourcesColId, "ID")</th><th>@L10n.T(Keys.Content.DataSourcesColName, "名称")</th><th>@L10n.T(Keys.Content.DataSourcesColType, "类型")</th><th>@L10n.T(Keys.Content.DataSourcesColStatus, "状态")</th><th>@L10n.T(Keys.Content.DataSourcesColConnStatus, "连接状态")</th><th>@L10n.T(Keys.Content.DataSourcesColTables, "元数据表")</th><th>@L10n.T(Keys.Content.DataSourcesColColumns, "字段")</th><th>@L10n.T(Keys.Content.DataSourcesColLastScan, "最后扫描")</th><th></th></tr></thead>
                         <tbody>
                         @foreach (var source in FilteredSources)
                         {
-                            <tr>
-                                <td><span class="ds-id">DS-@Cell(source, "id")</span></td>
-                                <td><div class="ds-name-cell"><span class="ds-type-mark">@Initial(source)</span><div><strong>@Cell(source, "name")</strong><small>@L10n.T(Keys.Content.DataSourcesTenantScoped, "租户专属连接")</small></div></div></td>
-                                <td><span class="ds-engine">@Cell(source, "dbType")</span></td>
-                                <td><span class="ds-status @(Bool(source, "enabled") ? "is-active" : "")"><i></i>@(Bool(source, "enabled") ? L10n.T(Keys.Content.DataSourcesStatusOnline, "运行中") : L10n.T(Keys.Content.DataSourcesStatusOffline, "已停用"))</span></td>
-                                <td>@Cell(source, "tableCount")</td><td>@Cell(source, "columnCount")</td>
-                                <td class="ta-right"><button class="btn btn-outline-secondary btn-sm" @onclick="() => Open(source)">@L10n.T(Keys.Content.DataSourcesManage, "管理连接 →")</button></td>
-                            </tr>
+						<tr>
+							<td><span class="ds-id">DS-@Cell(source, "id")</span></td>
+							<td><div class="ds-name-cell"><span class="ds-type-mark">@Initial(source)</span><div><strong>@Cell(source, "name")</strong><small>@L10n.T(Keys.Content.DataSourcesTenantScoped, "租户专属连接")</small></div></div></td>
+							<td><span class="ds-engine">@Cell(source, "dbType")</span></td>
+							<td><span class="ds-status @(Bool(source, "enabled") ? "is-active" : "")"><i></i>@(Bool(source, "enabled") ? L10n.T(Keys.Content.DataSourcesStatusOnline, "运行中") : L10n.T(Keys.Content.DataSourcesStatusOffline, "已停用"))</span></td>
+							<td>@{ var conn = Cell(source, "lastTestStatus"); }<span class="ds-conn @(conn == "Ok" ? "is-ok" : conn == "Failed" ? "is-fail" : "")"><i></i>@(conn == "Ok" ? L10n.T(Keys.Content.DataSourcesConnOk, "已连通") : conn == "Failed" ? L10n.T(Keys.Content.DataSourcesConnFailed, "连接失败") : L10n.T(Keys.Content.DataSourcesConnUnknown, "未测试"))</span></td>
+							<td>@Cell(source, "tableCount")</td><td>@Cell(source, "columnCount")</td>
+							<td>@(string.IsNullOrWhiteSpace(Cell(source, "lastScanAt")) ? L10n.T(Keys.Content.DataSourcesConnNever, "从未扫描") : FormatScan(Cell(source, "lastScanAt")))</td>
+							<td class="ta-right">
+								<div class="ds-row-actions">
+									<button class="btn btn-outline-secondary btn-sm" @onclick="() => Open(source)">@L10n.T(Keys.Content.DataSourcesManage, "管理连接 →")</button>
+									<button class="btn btn-outline-secondary btn-sm" @onclick="() => OpenEdit(source)">@L10n.T(Keys.Action.Edit, "编辑")</button>
+									<button class="btn btn-outline-secondary btn-sm" @onclick="() => Toggle(source)" disabled="@(TogglingId == Cell(source, "id"))">@(Bool(source, "enabled") ? L10n.T(Keys.Content.DataSourcesDisable, "停用") : L10n.T(Keys.Content.DataSourcesEnable, "启用"))</button>
+									<button class="btn btn-outline-secondary btn-sm" @onclick="() => Test(source)" disabled="@(TestingId == Cell(source, "id"))">@(TestingId == Cell(source, "id") ? L10n.T(Keys.Content.DataSourcesTesting, "测试中…") : L10n.T(Keys.Content.DataSourcesTestConn, "测试连接"))</button>
+								</div>
+							</td>
+						</tr>
                         }
                         </tbody>
                     </table>
@@ -86,6 +95,24 @@
             <button class="btn btn-primary" @onclick="Save" disabled="@Saving">@(Saving ? L10n.T(Keys.Content.DataSourcesSaving, "正在保存…") : L10n.T(Keys.Content.DataSourcesSaveAndConnect, "保存并接入"))</button>
         </Footer>
     </SbModal>
+
+    <SbModal Visible="@EditVisible" VisibleChanged="v => EditVisible = v" Title="@L10n.T(Keys.Content.DataSourcesEditTitle, "编辑数据源")" Size="lg">
+        <Body>
+            <div class="field-grid ds-create-fields">
+                <SbField Label="@L10n.T(Keys.Content.DataSourcesFieldName, "数据源名称")"><input @bind="EditName" placeholder="@L10n.T(Keys.Content.DataSourcesFieldNamePlaceholder, "如：WMS 生产库")" /></SbField>
+                <SbField Label="@L10n.T(Keys.Content.DataSourcesFieldType, "连接器类型")"><input value="@EditDbType" disabled /></SbField>
+            </div>
+            <SbField Label="@L10n.T(Keys.Content.DataSourcesEditConnStr, "重置连接串")" Full="true">
+                <input @bind="EditConnStr" placeholder="@L10n.T(Keys.Content.DataSourcesEditConnStrPlaceholder, "输入新连接串以重置（原值不回显）")" />
+            </SbField>
+            <div class="alert alert-info tiny" style="margin-top:12px">@L10n.T(Keys.Content.DataSourcesEditResetNote, "连接串仅可重置，原值不会回显。")</div>
+            @if (!string.IsNullOrWhiteSpace(EditError)) { <div class="alert alert-danger tiny" style="margin-top:12px">@EditError</div> }
+        </Body>
+        <Footer>
+            <button class="btn btn-outline-secondary" @onclick="() => EditVisible = false">@L10n.T(Keys.Action.Cancel, "取消")</button>
+            <button class="btn btn-primary" @onclick="SaveEdit" disabled="@SavingEdit">@(SavingEdit ? L10n.T(Keys.Content.DataSourcesSaving, "正在保存…") : L10n.T(Keys.Action.Save, "保存"))</button>
+        </Footer>
+    </SbModal>
 </AuthGuard>
 
 @code {
@@ -112,6 +139,11 @@
     private bool Loading = true;
     private string ListError = "";
     private List<JsonElement> Sources = new();
+    private bool EditVisible;
+    private string EditId = "", EditName = "", EditDbType = "", EditConnStr = "", EditError = "";
+    private bool SavingEdit;
+    private string TogglingId = "";
+    private string TestingId = "";
     private IEnumerable<JsonElement> FilteredSources => string.IsNullOrWhiteSpace(Search)
         ? Sources
         : Sources.Where(s => Cell(s, "name").Contains(Search, StringComparison.OrdinalIgnoreCase) || Cell(s, "dbType").Contains(Search, StringComparison.OrdinalIgnoreCase));
@@ -151,6 +183,60 @@
 
     private void Select(string n) { Type = n; Toast.Info(string.Format(L10n.T(Keys.Content.DataSourcesConnectorSelected, "已选择连接器：{0}"), n)); }
     private void TestConn() => Toast.Info(L10n.T(Keys.Content.DataSourcesTestSubmitted, "连通性测试已提交（Multi-DB Connector 后端计划于 P12 实现）。"));
+
+    private async Task Test(JsonElement row)
+    {
+        var id = Cell(row, "id");
+        TestingId = id;
+        var (ok, _, err, _) = await Api.PostAsync($"api/data-sources/{id}/test-connection");
+        TestingId = "";
+        if (!ok) { Toast.Error(err ?? L10n.T(Keys.Content.DataSourcesConnFailed, "连接失败")); return; }
+        await LoadSources();
+        var updated = Sources.FirstOrDefault(s => Cell(s, "id") == id);
+        var status = updated.ValueKind == JsonValueKind.Object ? Cell(updated, "lastTestStatus") : "";
+        var label = status == "Ok" ? L10n.T(Keys.Content.DataSourcesConnOk, "已连通") : L10n.T(Keys.Content.DataSourcesConnFailed, "连接失败");
+        if (status == "Ok") Toast.Success(string.Format(L10n.T(Keys.Content.DataSourcesTestedToast, "连接测试：{0}"), label));
+        else Toast.Error(string.Format(L10n.T(Keys.Content.DataSourcesTestedToast, "连接测试：{0}"), label));
+    }
+
+    private void OpenEdit(JsonElement row)
+    {
+        EditId = Cell(row, "id"); EditName = Cell(row, "name"); EditDbType = Cell(row, "dbType");
+        EditConnStr = ""; EditError = ""; EditVisible = true;
+    }
+
+    private async Task SaveEdit()
+    {
+        EditError = "";
+        if (string.IsNullOrWhiteSpace(EditName)) { EditError = L10n.T(Keys.Content.DataSourcesRequiredError, "数据源名称和连接串必填。"); return; }
+        SavingEdit = true;
+        var (ok, _, err, _) = await Api.PutAsync($"api/data-sources/{EditId}", new { name = EditName, dbType = EditDbType, connectionString = EditConnStr });
+        SavingEdit = false;
+        if (!ok) { EditError = err ?? L10n.T(Keys.Content.DataSourcesEditFailed, "保存失败。"); return; }
+        EditVisible = false;
+        Toast.Success(L10n.T(Keys.Content.DataSourcesEditSavedToast, "数据源已保存。"));
+        await LoadSources();
+    }
+
+    private async Task Toggle(JsonElement row)
+    {
+        var id = Cell(row, "id");
+        var enabled = Bool(row, "enabled");
+        TogglingId = id;
+        var endpoint = enabled ? $"api/data-sources/{id}/disable" : $"api/data-sources/{id}/enable";
+        var (ok, _, err, _) = await Api.PatchAsync(endpoint);
+        TogglingId = "";
+        if (!ok) { Toast.Error(err ?? L10n.T(Keys.Content.DataSourcesEditFailed, "保存失败。")); return; }
+        Toast.Success(string.Format(L10n.T(Keys.Content.DataSourcesToggledToast, "数据源已{0}"), enabled ? L10n.T(Keys.Content.DataSourcesDisable, "停用") : L10n.T(Keys.Content.DataSourcesEnable, "启用")));
+        await LoadSources();
+    }
+
+    private static string FormatScan(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return "";
+        if (DateTime.TryParse(value, out var dt)) return dt.ToLocalTime().ToString("yyyy-MM-dd HH:mm");
+        return value;
+    }
     private async Task Save()
     {
         Error = "";

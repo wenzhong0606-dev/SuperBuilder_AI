@@ -73,6 +73,12 @@ public class MetadataController : Controller
 			return StatusCode(403, new ApiError { Code = ErrorCodes.DataSourceForbidden, Message = ErrorCodes.Message(ErrorCodes.DataSourceForbidden) });
 
 		await _scanner.ScanAsync(tenantId, dataSourceId, source.ConnectionString);
+		var scanned = await _db.DataSources.FindAsync(dataSourceId, cancellationToken);
+		if (scanned is not null)
+		{
+			scanned.LastScanAt = DateTime.UtcNow;
+			await _db.SaveChangesAsync(cancellationToken);
+		}
 		return Ok(new { dataSourceId, status = "completed" });
 	}
 

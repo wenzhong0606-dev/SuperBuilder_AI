@@ -496,6 +496,12 @@ M3 退出：平台/租户视图严格分离；租户只能使用授权语言；�
 - 创建、编辑、启停、测试、扫描都有明确成功/失败反馈。
 - 连接串只能重新设置，不回显原值。
 
+- M4-01 数据源页面增强 ✅ 完成（本地提交待推送 origin/master）。M4-02/03/04 经 M1 审计确认后端（`DataSourceAccessController`+`DataSourceAuthorizationService`、`MetadataController`、`DataSourceDetail` 关系导航）与前端三页面已就绪，本批仅补齐 M4-01 真实缺口。
+  - **后端（`SuperBuilder_AI/src`）**：`DataSource` 实体新增 `LastScanAt`(UTC, nullable) 字段 + 迁移 `20260905233450_M4_01_DataSourceScanAt`（`SuperBIContextModelSnapshot` 同步）；`DataSourcesController` 新增 `PUT {id}` `Update`（名称必填/≤128 规范化、DbType 白名单校验、连接串仅非空时重置且不回显）、`PATCH {id}/enable`、`PATCH {id}/disable`、`POST {id}/test-connection`（复用 `RecordLastTestAsync` 与 `DataSourceConnectionFactory` 连接构造，返回 `{status,elapsedMs,errorCode}`，Ok/Failed/Timeout/脱敏异常类型名）；全部端点带 `metadata:edit` 守卫、`tid` 解析与 `DataSource` 归属校验；`MetadataController` 扫描成功后回写 `LastScanAt`。
+  - **测试**：`DataSourcesControllerTests` 扩至 13 例（新增 7：更新改名下重置连接串/越租户 NotFound/空名拒绝/启停切换/测试连接 MissingSource/空连接串 BadRequest/拒绝连接 Failed 断言 `LastTestStatus=="Failed"`）；`ResourceKeyRegistryTests` 6/6（17 新键五处注册表同步护栏）；全量回归 **718/718**（预期 711-6+13）。
+  - **前端（`SuperBuilder_AI.Components`）**：五处注册表同步新增 17 扁平 camelCase 键（`DataSourcesColConnStatus`/`DataSourcesColLastScan`/`DataSourcesConnOk`/`DataSourcesConnFailed`/`DataSourcesConnUnknown`/`DataSourcesConnNever`/`DataSourcesEnable`/`DataSourcesDisable`/`DataSourcesTesting`/`DataSourcesEditTitle`/`DataSourcesEditConnStr`/`DataSourcesEditConnStrPlaceholder`/`DataSourcesEditResetNote`/`DataSourcesTestedToast`/`DataSourcesToggledToast`/`DataSourcesEditSavedToast`/`DataSourcesEditFailed`），格式 `Content.Xxx` 严禁点号；`DataSources.razor` 五处编辑：列表新增「连接状态」「最后扫描」两列（状态 span 带 is-ok/is-fail 样式、`FormatScan` UTC→本地 `yyyy-MM-dd HH:mm`、空值「从未扫描」），操作列新增「编辑」「停用/启用」「测试连接」按钮（带 `TogglingId`/`TestingId` 禁用态），新增 `SbModal` 编辑弹窗（名称/`dbType` 只读/仅重置连接串输入框+说明）。
+  - **验证**：RCL 构建 128 警告/0 错误；后端 28 警告/0 错误；Web、Maui-Windows 构建 0 错误；四端构建全绿。
+
 ### M4-02 数据源授权
 
 - 数据源和创建者授权事务一致。

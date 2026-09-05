@@ -280,6 +280,23 @@ public static class ResourceKeys
         public const string DataSourcesSaveFailed = "Content.DataSourcesSaveFailed";
         public const string DataSourcesSavedToast = "Content.DataSourcesSavedToast";
         public const string DataSourcesSaving = "Content.DataSourcesSaving";
+        public const string DataSourcesColConnStatus = "Content.DataSourcesColConnStatus";
+        public const string DataSourcesColLastScan = "Content.DataSourcesColLastScan";
+        public const string DataSourcesConnOk = "Content.DataSourcesConnOk";
+        public const string DataSourcesConnFailed = "Content.DataSourcesConnFailed";
+        public const string DataSourcesConnUnknown = "Content.DataSourcesConnUnknown";
+        public const string DataSourcesConnNever = "Content.DataSourcesConnNever";
+        public const string DataSourcesEnable = "Content.DataSourcesEnable";
+        public const string DataSourcesDisable = "Content.DataSourcesDisable";
+        public const string DataSourcesTesting = "Content.DataSourcesTesting";
+        public const string DataSourcesEditTitle = "Content.DataSourcesEditTitle";
+        public const string DataSourcesEditConnStr = "Content.DataSourcesEditConnStr";
+        public const string DataSourcesEditConnStrPlaceholder = "Content.DataSourcesEditConnStrPlaceholder";
+        public const string DataSourcesEditResetNote = "Content.DataSourcesEditResetNote";
+        public const string DataSourcesTestedToast = "Content.DataSourcesTestedToast";
+        public const string DataSourcesToggledToast = "Content.DataSourcesToggledToast";
+        public const string DataSourcesEditSavedToast = "Content.DataSourcesEditSavedToast";
+        public const string DataSourcesEditFailed = "Content.DataSourcesEditFailed";
 
         // DataSourceDetail（数据源详情）
         public const string DataSourceBackList = "Content.DataSourceBackList";
@@ -1482,6 +1499,23 @@ public static class ResourceKeys
         [Content.DataSourcesConnectorSelected] = new("Content", Page: "DataSources", DefaultValue: "Connector selected: {0}"),
         [Content.DataSourcesTestSubmitted] = new("Content", Page: "DataSources", DefaultValue: "Connectivity test submitted (Multi-DB Connector backend planned for P12)."),
         [Content.DataSourcesRequiredError] = new("Content", Page: "DataSources", DefaultValue: "Data source name and connection string are required."),
+        [Content.DataSourcesColConnStatus] = new("Content", Page: "DataSources", DefaultValue: "Connection status"),
+        [Content.DataSourcesColLastScan] = new("Content", Page: "DataSources", DefaultValue: "Last scan"),
+        [Content.DataSourcesConnOk] = new("Content", Page: "DataSources", DefaultValue: "Connected"),
+        [Content.DataSourcesConnFailed] = new("Content", Page: "DataSources", DefaultValue: "Connection failed"),
+        [Content.DataSourcesConnUnknown] = new("Content", Page: "DataSources", DefaultValue: "Not tested"),
+        [Content.DataSourcesConnNever] = new("Content", Page: "DataSources", DefaultValue: "Never scanned"),
+        [Content.DataSourcesEnable] = new("Content", Page: "DataSources", DefaultValue: "Enable"),
+        [Content.DataSourcesDisable] = new("Content", Page: "DataSources", DefaultValue: "Disable"),
+        [Content.DataSourcesTesting] = new("Content", Page: "DataSources", DefaultValue: "Testing…"),
+        [Content.DataSourcesEditTitle] = new("Content", Page: "DataSources", DefaultValue: "Edit data source"),
+        [Content.DataSourcesEditConnStr] = new("Content", Page: "DataSources", DefaultValue: "Reset connection string"),
+        [Content.DataSourcesEditConnStrPlaceholder] = new("Content", Page: "DataSources", DefaultValue: "Enter a new connection string to reset (original is never shown)"),
+        [Content.DataSourcesEditResetNote] = new("Content", Page: "DataSources", DefaultValue: "The connection string can only be reset; the original value is never shown."),
+        [Content.DataSourcesTestedToast] = new("Content", Page: "DataSources", DefaultValue: "Connection test: {0}"),
+        [Content.DataSourcesToggledToast] = new("Content", Page: "DataSources", DefaultValue: "Data source {0}"),
+        [Content.DataSourcesEditSavedToast] = new("Content", Page: "DataSources", DefaultValue: "Data source saved."),
+        [Content.DataSourcesEditFailed] = new("Content", Page: "DataSources", DefaultValue: "Save failed."),
         [Content.DataSourcesSaveFailed] = new("Content", Page: "DataSources", DefaultValue: "Failed to save data source."),
         [Content.DataSourcesSavedToast] = new("Content", Page: "DataSources", DefaultValue: "Data source saved and authorized for the current admin. It is now selectable on the Ask page."),
         [Content.DataSourcesSaving] = new("Content", Page: "DataSources", DefaultValue: "Saving…"),

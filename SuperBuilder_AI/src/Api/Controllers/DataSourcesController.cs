@@ -1,10 +1,15 @@
 using System.Collections.Generic;
+using System.Data.Common;
+using System.Diagnostics;
 using System.Linq;
 using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
+using MySqlConnector;
+using Npgsql;
 using SuperBuilder_AI.Api.Errors;
 using SuperBuilder_AI.Data;
 using SuperBuilder_AI.Interfaces.Identity;
@@ -98,6 +103,8 @@ public sealed class DataSourcesController : ControllerBase
 				ds.Name,
 				ds.DbType,
 				ds.Enabled,
+				ds.LastTestStatus,
+				ds.LastScanAt,
 				TableCount = _db.MetadataTables.Count(t => t.TenantId == tenantId && t.DataSourceId == ds.Id),
 				ColumnCount = _db.MetadataColumns.Count(c => c.MetadataTable != null &&
 					c.MetadataTable.TenantId == tenantId && c.MetadataTable.DataSourceId == ds.Id),
@@ -244,6 +251,149 @@ public sealed class DataSourcesController : ControllerBase
 		return Ok(new DataSourceSummaryDto(source.Id, source.Name, source.DbType));
 	}
 
+	/// <summary>租户管理员编辑数据源：名称必填，类型白名单校验，连接串仅在提供时重置（绝不回显原值）。</summary>
+	[HttpPut("{id:long}")]
+	public async Task<IActionResult> Update(long id, [FromBody] UpdateDataSourceRequest request, CancellationToken cancellationToken)
+	{
+		var tenantId = ResolveTenantId();
+		var userId = ResolveUserId();
+		if (tenantId <= 0 || userId <= 0)
+			return Unauthorized(new ApiError { Code = ErrorCodes.Unauthorized, Message = "未授权：令牌声明缺失。" });
+		if (!await _identity.HasPermissionAsync(tenantId, userId, IdentityPermissions.MetadataEdit, cancellationToken))
+			return StatusCode(403, new ApiError { Code = ErrorCodes.Forbidden, Message = "禁止：缺少 metadata:edit 权限。" });
+
+		var source = await _db.DataSources.FirstOrDefaultAsync(x => x.Id == id && x.TenantId == tenantId, cancellationToken);
+		if (source is null)
+			return NotFound(new ApiError { Code = ErrorCodes.BadRequest, Message = "数据源不存在或不属于当前租户。" });
+
+		var rawName = (request.Name ?? string.Empty).Trim();
+		if (rawName.Length == 0)
+			return BadRequest(new ApiError { Code = ErrorCodes.BadRequest, Message = "名称不能为空。" });
+		if (rawName.Length > 128)
+			return BadRequest(new ApiError { Code = ErrorCodes.BadRequest, Message = "名称长度不能超过 128 个字符。" });
+		source.NormalizedName = DataSource.NormalizeName(rawName);
+		source.Name = rawName;
+
+		if (!string.IsNullOrWhiteSpace(request.DbType))
+		{
+			var dbType = request.DbType.Trim().ToUpperInvariant();
+			if (!DataSource.IsSupportedDbType(dbType))
+				return BadRequest(new ApiError { Code = ErrorCodes.BadRequest, Message = $"不支持的数据库类型: {request.DbType}。支持: {string.Join("/", DataSource.SupportedDbTypes)}。" });
+			source.DbType = dbType;
+		}
+
+		if (!string.IsNullOrWhiteSpace(request.ConnectionString))
+		{
+			var connectionString = request.ConnectionString.Trim();
+			if (connectionString.Length > 2048)
+				return BadRequest(new ApiError { Code = ErrorCodes.BadRequest, Message = "连接字符串长度不能超过 2048 个字符。" });
+			source.ConnectionString = connectionString;
+		}
+
+		await _db.SaveChangesAsync(cancellationToken);
+		return Ok(new DataSourceSummaryDto(source.Id, source.Name, source.DbType));
+	}
+
+	/// <summary>启用数据源。</summary>
+	[HttpPatch("{id:long}/enable")]
+	public async Task<IActionResult> Enable(long id, CancellationToken cancellationToken) => await SetEnabledAsync(id, true, cancellationToken);
+
+	/// <summary>停用数据源（停用后不参与 Ask 选择与扫描）。</summary>
+	[HttpPatch("{id:long}/disable")]
+	public async Task<IActionResult> Disable(long id, CancellationToken cancellationToken) => await SetEnabledAsync(id, false, cancellationToken);
+
+	private async Task<IActionResult> SetEnabledAsync(long id, bool enabled, CancellationToken cancellationToken)
+	{
+		var tenantId = ResolveTenantId();
+		var userId = ResolveUserId();
+		if (tenantId <= 0 || userId <= 0)
+			return Unauthorized(new ApiError { Code = ErrorCodes.Unauthorized, Message = "未授权：令牌声明缺失。" });
+		if (!await _identity.HasPermissionAsync(tenantId, userId, IdentityPermissions.MetadataEdit, cancellationToken))
+			return StatusCode(403, new ApiError { Code = ErrorCodes.Forbidden, Message = "禁止：缺少 metadata:edit 权限。" });
+
+		var source = await _db.DataSources.FirstOrDefaultAsync(x => x.Id == id && x.TenantId == tenantId, cancellationToken);
+		if (source is null)
+			return NotFound(new ApiError { Code = ErrorCodes.BadRequest, Message = "数据源不存在或不属于当前租户。" });
+		source.Enabled = enabled;
+		await _db.SaveChangesAsync(cancellationToken);
+		return Ok(new DataSourceSummaryDto(source.Id, source.Name, source.DbType));
+	}
+
+	/// <summary>
+	/// 测试数据源连通性：以存储的连接串打开连接并执行 <c>SELECT 1</c>，
+	/// 结果（Ok/Failed + 脱敏错误码）写回 <see cref="DataSource.LastTestStatus"/> 等字段。
+	/// 连接串仅用于本次探测，绝不返回。
+	/// </summary>
+	[HttpPost("{id:long}/test-connection")]
+	public async Task<IActionResult> TestConnection(long id, CancellationToken cancellationToken)
+	{
+		var tenantId = ResolveTenantId();
+		var userId = ResolveUserId();
+		if (tenantId <= 0 || userId <= 0)
+			return Unauthorized(new ApiError { Code = ErrorCodes.Unauthorized, Message = "未授权：令牌声明缺失。" });
+		if (!await _identity.HasPermissionAsync(tenantId, userId, IdentityPermissions.MetadataEdit, cancellationToken))
+			return StatusCode(403, new ApiError { Code = ErrorCodes.Forbidden, Message = "禁止：缺少 metadata:edit 权限。" });
+
+		var source = await _db.DataSources.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id && x.TenantId == tenantId, cancellationToken);
+		if (source is null)
+			return NotFound(new ApiError { Code = ErrorCodes.BadRequest, Message = "数据源不存在或不属于当前租户。" });
+		if (string.IsNullOrWhiteSpace(source.ConnectionString))
+			return BadRequest(new ApiError { Code = ErrorCodes.BadRequest, Message = "连接字符串为空，无法测试。" });
+
+		var sw = Stopwatch.StartNew();
+		string? errorCode = null;
+		try
+		{
+			using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+			using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
+			await using var connection = CreateConnection(source);
+			await connection.OpenAsync(linked.Token);
+			await using var command = connection.CreateCommand();
+			command.CommandText = "SELECT 1";
+			command.CommandTimeout = 15;
+			await command.ExecuteScalarAsync(linked.Token);
+			await RecordLastTestAsync(id, "Ok", null, cancellationToken);
+			return Ok(new { status = "Ok", elapsedMs = sw.ElapsedMilliseconds, errorCode = (string?)null });
+		}
+		catch (Exception ex)
+		{
+			errorCode = ex is OperationCanceledException or TimeoutException ? "Timeout" : ex.GetType().Name;
+			await RecordLastTestAsync(id, "Failed", errorCode, cancellationToken);
+			return Ok(new { status = "Failed", elapsedMs = sw.ElapsedMilliseconds, errorCode });
+		}
+	}
+
+	private static DbConnection CreateConnection(DataSource source)
+	{
+		return source.DbType?.ToUpperInvariant() switch
+		{
+			"SQLSERVER" => new SqlConnection(source.ConnectionString),
+			"MYSQL" => new MySqlConnection(source.ConnectionString),
+			"POSTGRESQL" => new NpgsqlConnection(source.ConnectionString),
+			_ => throw new NotSupportedException($"不支持数据库类型:{source.DbType}"),
+		};
+	}
+
+	/// <summary>
+	/// 记录最近一次连接测试结果（尽力而为，失败不影响主流程）。仅写入脱敏错误码（异常类型名/超时标记）。
+	/// </summary>
+	private async Task RecordLastTestAsync(long dataSourceId, string status, string? errorCode, CancellationToken cancellationToken)
+	{
+		try
+		{
+			var ds = await _db.DataSources.IgnoreQueryFilters().FirstOrDefaultAsync(x => x.Id == dataSourceId, cancellationToken);
+			if (ds is null) return;
+			ds.LastTestStatus = status;
+			ds.LastTestTime = DateTime.UtcNow;
+			ds.LastErrorCode = errorCode;
+			await _db.SaveChangesAsync(cancellationToken);
+		}
+		catch
+		{
+			// 记录测试结果是辅助能力，不应影响主流程。
+		}
+	}
+
 	private sealed record DataSourceSummaryDto(long Id, string Name, string DbType);
 
 	private long ResolveTenantId()
@@ -260,3 +410,5 @@ public sealed class DataSourcesController : ControllerBase
 }
 
 public sealed record CreateDataSourceRequest(string? Name, string? DbType, string? ConnectionString);
+
+public sealed record UpdateDataSourceRequest(string? Name, string? DbType, string? ConnectionString);

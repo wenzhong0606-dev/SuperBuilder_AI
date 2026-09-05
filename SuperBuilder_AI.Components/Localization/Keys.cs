@@ -312,6 +312,23 @@ public static class Keys
         public const string DataSourcesSaveFailed = "Content.DataSourcesSaveFailed";
         public const string DataSourcesSavedToast = "Content.DataSourcesSavedToast";
         public const string DataSourcesSaving = "Content.DataSourcesSaving";
+        public const string DataSourcesColConnStatus = "Content.DataSourcesColConnStatus";
+        public const string DataSourcesColLastScan = "Content.DataSourcesColLastScan";
+        public const string DataSourcesConnOk = "Content.DataSourcesConnOk";
+        public const string DataSourcesConnFailed = "Content.DataSourcesConnFailed";
+        public const string DataSourcesConnUnknown = "Content.DataSourcesConnUnknown";
+        public const string DataSourcesConnNever = "Content.DataSourcesConnNever";
+        public const string DataSourcesEnable = "Content.DataSourcesEnable";
+        public const string DataSourcesDisable = "Content.DataSourcesDisable";
+        public const string DataSourcesTesting = "Content.DataSourcesTesting";
+        public const string DataSourcesEditTitle = "Content.DataSourcesEditTitle";
+        public const string DataSourcesEditConnStr = "Content.DataSourcesEditConnStr";
+        public const string DataSourcesEditConnStrPlaceholder = "Content.DataSourcesEditConnStrPlaceholder";
+        public const string DataSourcesEditResetNote = "Content.DataSourcesEditResetNote";
+        public const string DataSourcesTestedToast = "Content.DataSourcesTestedToast";
+        public const string DataSourcesToggledToast = "Content.DataSourcesToggledToast";
+        public const string DataSourcesEditSavedToast = "Content.DataSourcesEditSavedToast";
+        public const string DataSourcesEditFailed = "Content.DataSourcesEditFailed";
 
         // DataSourceDetail（数据源详情）
         public const string DataSourceBackList = "Content.DataSourceBackList";
@@ -1490,6 +1507,23 @@ public static class Keys
         [Content.DataSourcesConnectorSelected] = new("已选择连接器：{0}", "Connector selected: {0}"),
         [Content.DataSourcesTestSubmitted] = new("连通性测试已提交（Multi-DB Connector 后端计划于 P12 实现）。", "Connectivity test submitted (Multi-DB Connector backend planned for P12)."),
         [Content.DataSourcesRequiredError] = new("数据源名称和连接串必填。", "Data source name and connection string are required."),
+        [Content.DataSourcesColConnStatus] = new("连接状态", "Connection status"),
+        [Content.DataSourcesColLastScan] = new("最后扫描", "Last scan"),
+        [Content.DataSourcesConnOk] = new("已连通", "Connected"),
+        [Content.DataSourcesConnFailed] = new("连接失败", "Connection failed"),
+        [Content.DataSourcesConnUnknown] = new("未测试", "Not tested"),
+        [Content.DataSourcesConnNever] = new("从未扫描", "Never scanned"),
+        [Content.DataSourcesEnable] = new("启用", "Enable"),
+        [Content.DataSourcesDisable] = new("停用", "Disable"),
+        [Content.DataSourcesTesting] = new("测试中…", "Testing…"),
+        [Content.DataSourcesEditTitle] = new("编辑数据源", "Edit data source"),
+        [Content.DataSourcesEditConnStr] = new("重置连接串", "Reset connection string"),
+        [Content.DataSourcesEditConnStrPlaceholder] = new("输入新连接串以重置（原值不回显）", "Enter a new connection string to reset (original is never shown)"),
+        [Content.DataSourcesEditResetNote] = new("连接串仅可重置，原值不会回显。", "The connection string can only be reset; the original value is never shown."),
+        [Content.DataSourcesTestedToast] = new("连接测试：{0}", "Connection test: {0}"),
+        [Content.DataSourcesToggledToast] = new("数据源已{0}", "Data source {0}"),
+        [Content.DataSourcesEditSavedToast] = new("数据源已保存。", "Data source saved."),
+        [Content.DataSourcesEditFailed] = new("保存失败。", "Save failed."),
         [Content.DataSourcesSaveFailed] = new("保存数据源失败。", "Failed to save data source."),
         [Content.DataSourcesSavedToast] = new("数据源已保存，并已授权给当前管理员。Ask 页面现在可以选择它。", "Data source saved and authorized for the current admin. It is now selectable on the Ask page."),
         [Content.DataSourcesSaving] = new("正在保存…", "Saving…"),
