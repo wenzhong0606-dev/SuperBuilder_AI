@@ -1,3 +1,4 @@
+using System;
 using System.Security.Cryptography;
 using System.Text;
 using SuperBuilder_AI.Interfaces;
@@ -69,44 +70,69 @@ public class MetadataVectorService
 		if (!string.IsNullOrWhiteSpace(
 			metadataTable.SearchText))
 		{
-			var tableVector =
-				await _embedding.GenerateAsync(
-					metadataTable.SearchText,
-					"document");
+			try
+			{
+				var tableVector =
+					await _embedding.GenerateAsync(
+						metadataTable.SearchText,
+						"document");
 
-			var tableVectorId =
-				CreateStableVectorId(
-					"table",
-					metadataTable.Id);
-
-			await _qdrant.UpsertAsync(
-				tableVectorId,
-				tableVector,
-				new Dictionary<string, object>
-				{
-					["type"] =
+				var tableVectorId =
+					CreateStableVectorId(
 						"table",
+						metadataTable.Id);
 
-					["metadataType"] =
-						"table",
+				await _qdrant.UpsertAsync(
+					tableVectorId,
+					tableVector,
+					new Dictionary<string, object>
+					{
+						["type"] =
+							"table",
 
-					["metadataId"] =
-						metadataTable.Id,
+						["metadataType"] =
+							"table",
 
-					["tableId"] =
-						metadataTable.Id,
+						["metadataId"] =
+							metadataTable.Id,
 
-					["table"] =
-						metadataTable.TableName
-						?? string.Empty,
+						["tableId"] =
+							metadataTable.Id,
 
-					["description"] =
-						metadataTable.TableComment
-						?? string.Empty
-				});
+						["table"] =
+							metadataTable.TableName
+							?? string.Empty,
 
-			result.TableVectorId =
-				tableVectorId;
+						["description"] =
+							metadataTable.TableComment
+							?? string.Empty
+					});
+
+				metadataTable.VectorId =
+					tableVectorId;
+				metadataTable.VectorDimension =
+					tableVector.Length;
+				metadataTable.VectorStatus =
+					"Synced";
+				metadataTable.VectorSyncTime =
+					DateTime.UtcNow;
+				metadataTable.VectorErrorCode =
+					null;
+
+				result.TableVectorId =
+					tableVectorId;
+			}
+			catch (Exception ex)
+			{
+				// 单表向量失败不影响其它表；记录脱敏后的异常类型名。
+				metadataTable.VectorStatus = "Failed";
+				metadataTable.VectorErrorCode =
+					ex.GetType().Name;
+			}
+		}
+		else
+		{
+			metadataTable.VectorStatus = "Pending";
 		}
 
 		/*
@@ -122,55 +148,70 @@ public class MetadataVectorService
 			if (string.IsNullOrWhiteSpace(
 				column.SearchText))
 			{
+				column.VectorStatus = "Pending";
 				continue;
 			}
 
-			var columnVector =
-				await _embedding.GenerateAsync(
-					column.SearchText,
-					"document");
+			try
+			{
+				var columnVector =
+					await _embedding.GenerateAsync(
+						column.SearchText,
+						"document");
 
-			var columnVectorId =
-				CreateStableVectorId(
-					"column",
-					column.Id);
-
-			await _qdrant.UpsertAsync(
-				columnVectorId,
-				columnVector,
-				new Dictionary<string, object>
-				{
-					["type"] =
+				var columnVectorId =
+					CreateStableVectorId(
 						"column",
+						column.Id);
 
-					["metadataType"] =
-						"column",
+				await _qdrant.UpsertAsync(
+					columnVectorId,
+					columnVector,
+					new Dictionary<string, object>
+					{
+						["type"] =
+							"column",
 
-					["metadataId"] =
-						column.Id,
+						["metadataType"] =
+							"column",
 
-					["columnId"] =
-						column.Id,
+						["metadataId"] =
+							column.Id,
 
-					["tableId"] =
-						metadataTable.Id,
+						["columnId"] =
+							column.Id,
 
-					["table"] =
-						metadataTable.TableName
-						?? string.Empty,
+						["tableId"] =
+							metadataTable.Id,
 
-					["column"] =
-						column.ColumnName
-						?? string.Empty,
+						["table"] =
+							metadataTable.TableName
+							?? string.Empty,
 
-					["description"] =
-						column.ColumnComment
-						?? string.Empty
-				});
+						["column"] =
+							column.ColumnName
+							?? string.Empty,
 
-			result.ColumnVectors.Add(
-				column.Id,
-				columnVectorId);
+						["description"] =
+							column.ColumnComment
+							?? string.Empty
+					});
+
+				column.VectorId = columnVectorId;
+				column.VectorDimension = columnVector.Length;
+				column.VectorStatus = "Synced";
+				column.VectorSyncTime = DateTime.UtcNow;
+				column.VectorErrorCode = null;
+
+				result.ColumnVectors.Add(
+					column.Id,
+					columnVectorId);
+			}
+			catch (Exception ex)
+			{
+				column.VectorStatus = "Failed";
+				column.VectorErrorCode = ex.GetType().Name;
+			}
 		}
 
 		/*
@@ -188,68 +229,84 @@ public class MetadataVectorService
 
 			if (semantic == null)
 			{
+				column.VectorStatus = "Pending";
 				continue;
 			}
 
 			if (string.IsNullOrWhiteSpace(
 				semantic.SearchText))
 			{
+				semantic.VectorStatus = "Pending";
 				continue;
 			}
 
-			var semanticVector =
-				await _embedding.GenerateAsync(
-					semantic.SearchText,
-					"document");
+			try
+			{
+				var semanticVector =
+					await _embedding.GenerateAsync(
+						semantic.SearchText,
+						"document");
 
-			var semanticVectorId =
-				CreateStableVectorId(
-					"semantic",
-					semantic.Id);
-
-			await _qdrant.UpsertAsync(
-				semanticVectorId,
-				semanticVector,
-				new Dictionary<string, object>
-				{
-					["type"] =
+				var semanticVectorId =
+					CreateStableVectorId(
 						"semantic",
+						semantic.Id);
 
-					["metadataType"] =
-						"semantic",
+				await _qdrant.UpsertAsync(
+					semanticVectorId,
+					semanticVector,
+					new Dictionary<string, object>
+					{
+						["type"] =
+							"semantic",
 
-					["metadataId"] =
-						semantic.Id,
+						["metadataType"] =
+							"semantic",
 
-					["semanticId"] =
-						semantic.Id,
+						["metadataId"] =
+							semantic.Id,
 
-					["columnId"] =
-						column.Id,
+						["semanticId"] =
+							semantic.Id,
 
-					["tableId"] =
-						metadataTable.Id,
+						["columnId"] =
+							column.Id,
 
-					["table"] =
-						metadataTable.TableName
-						?? string.Empty,
+						["tableId"] =
+							metadataTable.Id,
 
-					["column"] =
-						column.ColumnName
-						?? string.Empty,
+						["table"] =
+							metadataTable.TableName
+							?? string.Empty,
 
-					["businessMeaning"] =
-						semantic.BusinessMeaning
-						?? string.Empty,
+						["column"] =
+							column.ColumnName
+							?? string.Empty,
 
-					["keywords"] =
-						semantic.Keywords
-						?? string.Empty
-				});
+						["businessMeaning"] =
+							semantic.BusinessMeaning
+							?? string.Empty,
 
-			result.SemanticVectors.Add(
-				semantic.Id,
-				semanticVectorId);
+						["keywords"] =
+							semantic.Keywords
+							?? string.Empty
+					});
+
+				semantic.VectorId = semanticVectorId;
+				semantic.VectorDimension = semanticVector.Length;
+				semantic.VectorStatus = "Synced";
+				semantic.VectorSyncTime = DateTime.UtcNow;
+				semantic.VectorErrorCode = null;
+
+				result.SemanticVectors.Add(
+					semantic.Id,
+					semanticVectorId);
+			}
+			catch (Exception ex)
+			{
+				semantic.VectorStatus = "Failed";
+				semantic.VectorErrorCode = ex.GetType().Name;
+			}
 		}
 
 		return result;

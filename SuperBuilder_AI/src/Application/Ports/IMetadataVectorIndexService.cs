@@ -29,4 +29,18 @@ public interface IMetadataVectorIndexService
 	Task<MetadataVectorIndexResult>
 		IndexAsync(
 			long metadataTableId);
+
+	/// <summary>
+	/// 孤儿检测：找出 Qdrant 中存在但数据库中已无对应记录的 Vector Point。
+	/// </summary>
+	Task<MetadataVectorOrphanResult>
+		DetectOrphansAsync(
+			CancellationToken cancellationToken = default);
+
+	/// <summary>
+	/// 校验向量维度一致性，将维度不匹配的记录标记为 Stale。
+	/// </summary>
+	Task<MetadataVectorValidationResult>
+		ValidateVectorsAsync(
+			CancellationToken cancellationToken = default);
 }

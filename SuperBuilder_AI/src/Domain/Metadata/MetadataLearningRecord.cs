@@ -1,4 +1,5 @@
 ﻿using SuperBuilder_AI.Models;
+using SuperBuilder_AI.Models.Organization;
 
 namespace SuperBuilder_AI.Models.Metadata;
 
@@ -8,9 +9,14 @@ namespace SuperBuilder_AI.Models.Metadata;
 public class MetadataLearningRecord : BaseEntity
 {
 	/// <summary>
-	/// 所属租户的标识。
+	/// 所属租户的标识（必填）。
 	/// </summary>
-	public long? TenantId { get; set; }
+	public long TenantId { get; set; }
+
+	/// <summary>
+	/// 关联租户实体。
+	/// </summary>
+	public Tenant? Tenant { get; set; }
 
 	/// <summary>
 	/// 提示或问题内容。
@@ -23,6 +29,11 @@ public class MetadataLearningRecord : BaseEntity
 	public long? MetadataColumnId { get; set; }
 
 	/// <summary>
+	/// 关联的元数据列实体。
+	/// </summary>
+	public MetadataColumn? MetadataColumn { get; set; }
+
+	/// <summary>
 	/// 用户回答是否正确。
 	/// </summary>
 	public bool? Correct { get; set; }
@@ -31,4 +42,20 @@ public class MetadataLearningRecord : BaseEntity
 	/// 用户或系统提供的反馈信息。
 	/// </summary>
 	public string? Feedback { get; set; }
+
+	/// <summary>
+	/// 校验学习记录的租户一致性：若同时关联了元数据列，
+	/// 则记录的租户必须与列所属表的租户一致。
+	/// </summary>
+	public static bool IsTenantConsistent(
+		long recordTenantId,
+		long? columnTenantId)
+	{
+		if (columnTenantId is null)
+		{
+			return true;
+		}
+
+		return recordTenantId == columnTenantId.Value;
+	}
 }

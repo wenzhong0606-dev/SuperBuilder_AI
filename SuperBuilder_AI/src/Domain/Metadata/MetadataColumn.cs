@@ -66,9 +66,33 @@ public class MetadataColumn : BaseEntity
 
 
 	/// <summary>
-	/// 列名称。
+	/// 列名称（必填）。
 	/// </summary>
 	public string? ColumnName { get; set; }
+
+
+	/// <summary>
+	/// 列序号（在表中的物理顺序，从 0 开始）。
+	/// </summary>
+	public int Ordinal { get; set; }
+
+
+	/// <summary>
+	/// 原生类型（数据库返回的类型名，如 varchar / decimal / bigint）。
+	/// </summary>
+	public string? NativeType { get; set; }
+
+
+	/// <summary>
+	/// 精度（数值/字符类型的精度，如 decimal(18,4) 的 18）。
+	/// </summary>
+	public int? Precision { get; set; }
+
+
+	/// <summary>
+	/// 小数位（数值类型的小数位数，如 decimal(18,4) 的 4）。
+	/// </summary>
+	public int? Scale { get; set; }
 
 
 
@@ -136,5 +160,30 @@ public class MetadataColumn : BaseEntity
 	/// 保存字段对应的Vector Point Id。
 	/// </summary>
 	public string? VectorId { get; set; }
+
+	/// <summary>
+	/// 列向量使用的 Embedding 模型。
+	/// </summary>
+	public string? EmbeddingModel { get; set; }
+
+	/// <summary>
+	/// 列向量维度。
+	/// </summary>
+	public int? VectorDimension { get; set; }
+
+	/// <summary>
+	/// 向量最近同步时间（UTC）。
+	/// </summary>
+	public DateTime? VectorSyncTime { get; set; }
+
+	/// <summary>
+	/// 向量状态：待同步(Pending) / 已同步(Synced) / 同步失败(Failed) / 过期(Stale)。
+	/// </summary>
+	public string? VectorStatus { get; set; }
+
+	/// <summary>
+	/// 向量同步错误码（同步失败时记录脱敏后的异常类型名）。
+	/// </summary>
+	public string? VectorErrorCode { get; set; }
 
 }

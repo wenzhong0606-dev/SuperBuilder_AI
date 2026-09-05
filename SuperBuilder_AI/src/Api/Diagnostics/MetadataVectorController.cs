@@ -120,4 +120,42 @@ public class MetadataVectorController
 
 		return Ok(result);
 	}
+
+	/// <summary>
+	/// 孤儿向量检测。
+	///
+	/// 返回 Qdrant 中存在、但数据库中已无对应 Metadata 记录的 Vector Point。
+	///
+	/// GET:
+	///
+	/// /api/metadata-vector/orphans
+	/// </summary>
+	[HttpGet("orphans")]
+	public async Task<IActionResult> Orphans()
+	{
+		var result =
+			await _service
+				.DetectOrphansAsync();
+
+		return Ok(result);
+	}
+
+	/// <summary>
+	/// 向量维度一致性校验。
+	///
+	/// 将存储维度与当前 Qdrant 配置维度不一致的记录标记为 Stale。
+	///
+	/// GET:
+	///
+	/// /api/metadata-vector/validate
+	/// </summary>
+	[HttpGet("validate")]
+	public async Task<IActionResult> Validate()
+	{
+		var result =
+			await _service
+				.ValidateVectorsAsync();
+
+		return Ok(result);
+	}
 }

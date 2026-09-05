@@ -4,6 +4,8 @@ using Qdrant.Client.Grpc;
 using SuperBuilder_AI.Configuration;
 using SuperBuilder_AI.Interfaces;
 using SuperBuilder_AI.Models.AI;
+using System.Collections.Generic;
+using System.Threading;
 
 namespace SuperBuilder_AI.Services;
 
@@ -237,6 +239,47 @@ public class QdrantService
 						Uuid = id
 					}
 				});
+	}
+
+	/// <summary>
+	/// 列出 Collection 中全部 Vector Point ID（用于孤儿检测）。
+	/// 通过滚动游标分页获取，避免一次性加载向量本身。
+	/// </summary>
+	public async Task<IReadOnlyList<string>> ListPointIdsAsync(
+		CancellationToken cancellationToken = default)
+	{
+		if (!await ExistsAsync())
+		{
+			return Array.Empty<string>();
+		}
+
+		var ids = new List<string>();
+		PointId? offset = null;
+
+		while (true)
+		{
+			var response = await _client.ScrollAsync(
+				collectionName: _options.CollectionName,
+				limit: 256,
+				offset: offset,
+				cancellationToken: cancellationToken);
+
+			var count = 0;
+			foreach (var point in response.Result)
+			{
+				ids.Add(point.Id.Uuid);
+				offset = point.Id;
+				count++;
+			}
+
+			// 当返回数量不足一页时，说明已到达末尾。
+			if (count < 256)
+			{
+				break;
+			}
+		}
+
+		return ids;
 	}
 
 	/// <summary>

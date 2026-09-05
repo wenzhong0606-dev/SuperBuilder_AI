@@ -1,4 +1,5 @@
 ﻿using SuperBuilder_AI.Models.AI;
+using System.Threading;
 
 namespace SuperBuilder_AI.Interfaces;
 
@@ -47,4 +48,11 @@ public interface IQdrantService
 	/// </summary>
 	Task DeleteAsync(
 		string id);
+
+	/// <summary>
+	/// 列出 Collection 中全部 Vector Point ID（用于孤儿检测）。
+	/// 实现应分页滚动获取，避免一次性加载向量本身。
+	/// </summary>
+	Task<IReadOnlyList<string>> ListPointIdsAsync(
+		CancellationToken cancellationToken = default);
 }

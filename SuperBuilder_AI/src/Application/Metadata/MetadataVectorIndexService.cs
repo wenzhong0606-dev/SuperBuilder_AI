@@ -1,7 +1,10 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+using SuperBuilder_AI.Configuration;
 using SuperBuilder_AI.Data;
 using SuperBuilder_AI.Interfaces;
 using SuperBuilder_AI.Models.AI;
+using SuperBuilder_AI.Models.Metadata;
 
 namespace SuperBuilder_AI.Services;
 
@@ -14,6 +17,8 @@ namespace SuperBuilder_AI.Services;
 /// 2. Create
 /// 3. Rebuild
 /// 4. Index
+/// 5. DetectOrphans（孤儿检测）
+/// 6. ValidateVectors（模型/维度校验）
 ///
 /// 数据链路:
 ///
@@ -37,6 +42,7 @@ public class MetadataVectorIndexService
 	private readonly SuperBIContext _context;
 	private readonly IQdrantService _qdrant;
 	private readonly IMetadataVectorService _vectorService;
+	private readonly QdrantOptions _qdrantOptions;
 
 	/// <summary>
 	/// 创建 MetadataVectorIndexService。
@@ -44,11 +50,13 @@ public class MetadataVectorIndexService
 	public MetadataVectorIndexService(
 		SuperBIContext context,
 		IQdrantService qdrant,
-		IMetadataVectorService vectorService)
+		IMetadataVectorService vectorService,
+		IOptions<QdrantOptions> qdrantOptions)
 	{
 		_context = context;
 		_qdrant = qdrant;
 		_vectorService = vectorService;
+		_qdrantOptions = qdrantOptions.Value;
 	}
 
 	/// <summary>
@@ -127,7 +135,6 @@ public class MetadataVectorIndexService
 				await _context.MetadataTables
 					.Include(x => x.Columns)
 						.ThenInclude(x => x.Semantic)
-					.AsNoTracking()
 					.OrderBy(x => x.Id)
 					.ToListAsync();
 
@@ -159,9 +166,12 @@ public class MetadataVectorIndexService
 				result.ColumnVectorCount +=
 					indexResult.ColumnVectors.Count;
 
-				result.SemanticVectorCount +=
-					indexResult.SemanticVectors.Count;
+			result.SemanticVectorCount +=
+				indexResult.SemanticVectors.Count;
 			}
+
+			// 持久化向量同步状态（Synced / Failed / Pending）。
+			await _context.SaveChangesAsync();
 
 			result.Success = true;
 
@@ -222,7 +232,121 @@ public class MetadataVectorIndexService
          * Column
          * Semantic
          */
-		return await _vectorService
-			.IndexAsync(table);
-	}
+        var indexResult =
+            await _vectorService
+                .IndexAsync(table);
+
+        // 持久化向量同步状态。
+        await _context.SaveChangesAsync();
+
+        return indexResult;
+    }
+
+    /// <summary>
+    /// 孤儿检测：找出 Qdrant 中存在、但数据库中已无对应 Metadata 记录的 Vector Point。
+    /// </summary>
+    public async Task<MetadataVectorOrphanResult>
+        DetectOrphansAsync(
+            CancellationToken cancellationToken = default)
+    {
+        var dbIds = new HashSet<string>(
+            await _context.MetadataTables
+                .Where(x => x.VectorId != null)
+                .Select(x => x.VectorId!)
+                .ToListAsync(cancellationToken));
+
+        dbIds.UnionWith(
+            await _context.MetadataColumns
+                .Where(x => x.VectorId != null)
+                .Select(x => x.VectorId!)
+                .ToListAsync(cancellationToken));
+
+        dbIds.UnionWith(
+            await _context.MetadataSemantics
+                .Where(x => x.VectorId != null)
+                .Select(x => x.VectorId!)
+                .ToListAsync(cancellationToken));
+
+        var qdrantIds =
+            await _qdrant.ListPointIdsAsync(cancellationToken);
+
+        var orphans =
+            qdrantIds
+                .Where(id => !dbIds.Contains(id))
+                .ToList();
+
+        return new MetadataVectorOrphanResult
+        {
+            QdrantPointCount = qdrantIds.Count,
+            DatabaseVectorCount = dbIds.Count,
+            OrphanCount = orphans.Count,
+            OrphanIds = orphans
+        };
+    }
+
+    /// <summary>
+    /// 校验向量一致性：将存储的向量维度与当前 Qdrant 配置维度不一致的
+    /// Metadata 记录标记为 <c>Stale</c>，返回受影响数量。
+    /// </summary>
+    public async Task<MetadataVectorValidationResult>
+        ValidateVectorsAsync(
+            CancellationToken cancellationToken = default)
+    {
+        var expected = (int)_qdrantOptions.VectorSize;
+        var mismatched = new List<string>();
+
+        var tables =
+            await _context.MetadataTables
+                .Where(x => x.VectorId != null)
+                .ToListAsync(cancellationToken);
+
+        foreach (var t in tables)
+        {
+            if (t.VectorDimension is { } dim && dim != expected)
+            {
+                t.VectorStatus = "Stale";
+                mismatched.Add($"table:{t.Id}");
+            }
+        }
+
+        var columns =
+            await _context.MetadataColumns
+                .Where(x => x.VectorId != null)
+                .ToListAsync(cancellationToken);
+
+        foreach (var c in columns)
+        {
+            if (c.VectorDimension is { } dim && dim != expected)
+            {
+                c.VectorStatus = "Stale";
+                mismatched.Add($"column:{c.Id}");
+            }
+        }
+
+        var semantics =
+            await _context.MetadataSemantics
+                .Where(x => x.VectorId != null)
+                .ToListAsync(cancellationToken);
+
+        foreach (var s in semantics)
+        {
+            if (s.VectorDimension is { } dim && dim != expected)
+            {
+                s.VectorStatus = "Stale";
+                mismatched.Add($"semantic:{s.Id}");
+            }
+        }
+
+        if (mismatched.Count > 0)
+        {
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+
+        return new MetadataVectorValidationResult
+        {
+            ExpectedDimension = expected,
+            MismatchedCount = mismatched.Count,
+            MismatchedIds = mismatched
+        };
+    }
 }

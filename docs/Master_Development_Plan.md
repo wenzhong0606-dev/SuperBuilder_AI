@@ -241,15 +241,17 @@ M0 退出：全部 🔴 完成、凭据已轮换、构建零错误、测试不�
 - ⏸️ **延后（记入硬化项）**：`TenantId` 的 DB 级 `NOT NULL` + 租户存在性校验——沿用 M1-02/03 策略：3 个查询计划测试以 `new DataSource { Id, DbType, ConnectionString }` 持久化且**不设 TenantId/Name**，加 NOT NULL 会破坏种子；当前 TenantId 由 token 提供、`DataSource→Tenant` FK 已存在（写入路径保证存在），DB 级 NOT NULL 待测试造数补齐后启用。
 - 验证：新增 6 项测试（白名单拒绝、租户内唯一、跨租户放行、空值校验、规范化持久化、静态方法），全量 **587/587 通过**，构建 0 error（三端 Components/Web/Maui）。
 
-### M1-05 Metadata 与 Vector
+### M1-05 Metadata 与 Vector ✅（2026-09-05 收尾，提交待 push）
 
-- MetadataTable.TableName 必填；增加 CatalogName/SchemaName，唯一键含 DataSource/Catalog/Schema/Table。
-- MetadataColumn.MetadataTableId 非空，ColumnName 必填；增加 Ordinal、NativeType、Precision、Scale。
-- MetadataSemantic.MetadataColumnId 非空唯一；Confidence 增 `0..1` 检查约束。
-- Source、Aggregation、RelationshipType、Cardinality、BindingType、PhysicalRole 使用枚举/目录。
-- LearningRecord.TenantId 非空，增加字段 FK 和租户一致性。
-- Keywords/Synonyms/ExampleQuestions 结构化；向量增加模型、维度、同步时间、状态和错误码。
-- 向量检索校验模型/维度；提供删除、重建和孤儿检测任务。
+- ✅ **MetadataTable 字段与唯一键**：`TableName` 必填(max128)；新增 `CatalogName`(max128)、`SchemaName`(max128)、向量字段（`VectorId`/`EmbeddingModel`(max128)/`VectorDimension`/`VectorSyncTime`(UTC)/`VectorStatus`(max16)/`VectorErrorCode`(max64)）。租户内唯一键由 `(DataSourceId, TableName)` 升级为 `(DataSourceId, CatalogName, SchemaName, TableName)` 并加过滤 `WHERE [CatalogName] IS NOT NULL AND [SchemaName] IS NOT NULL`，保留 `IX_MetadataTables_DataSourceId` 供按租户过滤；**存量 NULL Catalog/Schema 同名表可共存**（兼容旧数据与测试种子）。迁移 `20260905004213_M1_05_MetadataVectorIntegrity` 先 `UPDATE ... SET TableName=N'table_'+Id WHERE NULL` 再 `AlterColumn` 非空（写入路径保证）。
+- ✅ **MetadataColumn 字段**：`ColumnName` 必填(max128)；新增 `Ordinal`(default 0)、`NativeType`(max64)、`Precision`、`Scale`、`EmbeddingModel`(max128)、`VectorId`/`VectorDimension`/`VectorSyncTime`/`VectorStatus`/`VectorErrorCode`；唯一键 `(MetadataTableId, ColumnName)`。
+- ✅ **MetadataSemantic 约束与结构化**：`MetadataColumnId` 非空唯一；`Confidence` 增 `decimal(5,4)` + 检查约束 `CK_MetadataSemantics_Confidence`（`0..1`，NULL 放行）；`Source` 由 `string?` 收敛为枚举 `SemanticSource`（`HasConversion<string>()` 存储 max16，默认 `Manual`）；`Keywords`/`Synonyms`/`ExampleQuestions` 经 `MetadataSemantic.ParseList`/`FormatList` 规范化（逗号/分号/换行/制表拆分、去空白、去空、忽略大小写去重，逗号分隔存储 max2048）；`SearchText`/`Vector*` 字段补齐。
+- ✅ **受控词表（枚举化）**：新增 `MetadataVocabularies.cs`，定义 `SemanticSource`/`AggregationType`/`RelationshipKind`/`CardinalityKind`/`BindingKind`/`PhysicalRoleKind` 六枚举 + `MetadataVocabularyValidator`（大小写不敏感校验）；`MetadataCsvFixtureService` 经 `ParseSource` 装载语义来源（空/解析失败回退 `Manual`），`MetadataSemanticService` 新建语义 `Source=AI` 且经规范化与 `Math.Clamp(c,0,1)` 收敛置信度。
+- ✅ **LearningRecord 租户化**：`TenantId` 由 `long?` 改为 `long`（必填）+ `Tenant` 导航 FK（写入路径保证存在）；新增 `MetadataColumn` 导航（`OnDelete SetNull`）；新增静态 `IsTenantConsistent(recordTenantId, columnTenantId)`；using 由 `Models.Identity` 修正为 `Models.Organization`（修复 CS0246）。迁移先 `UPDATE ... SET TenantId=1 WHERE NULL` 再非空。
+- ✅ **向量状态闭环**：`MetadataVectorService.IndexAsync` 三段（Table/Column/Semantic）`try` 成功写 `VectorId`/`VectorDimension`/`VectorStatus="Synced"`/`VectorSyncTime=UtcNow`/`VectorErrorCode=null`，`catch` 写 `VectorStatus="Failed"`/`VectorErrorCode=异常类型名`（脱敏）；无 `SearchText` 置 `Pending`。
+- ✅ **孤儿检测与维度校验**：`MetadataVectorIndexService` 构造函数注入 `IOptions<QdrantOptions>`；新增 `DetectOrphansAsync`（`IQdrantService.ListPointIdsAsync` 滚动列出全部 Point Id，与 DB `VectorId` 比对）与 `ValidateVectorsAsync`（期望维度 `(int)QdrantOptions.VectorSize`，不符标 `Stale`）；`RebuildAsync` 去掉 `AsNoTracking` 并 `SaveChangesAsync` 持久化状态；诊断控制器新增 `GET /api/metadata-vector/orphans`、`GET /api/metadata-vector/validate`。
+- ⏸️ **延后（记入硬化项）**：`MetadataTable.TenantId` / `MetadataColumn.MetadataTableId` 的 DB 级 `NOT NULL` + 租户存在性校验——沿用 M1-02/03/04 策略：多数集成测试以 `new MetadataTable{DataSourceId,...}` 持久化且不建租户/父行，加 NOT NULL 破坏种子；当前由 `DataSource→Tenant` FK 与写入路径保证，DB 级 NOT NULL 待测试造数补齐后启用。
+- 验证：新增 16 项 `MetadataVectorIntegrityTests`（受控词表/结构化辅助、DB 约束：表唯一键/同目录放行/空 Catalog 兼容/列必填/新字段持久化/置信度 CHECK/学习记录租户 FK、向量状态 Synced/Failed、孤儿检测），**16/16 通过**；全量回归构建 0 error（三端 Components/Web/Maui）。
 
 ### M1-06 PhysicalBinding、授权与 RLS
 

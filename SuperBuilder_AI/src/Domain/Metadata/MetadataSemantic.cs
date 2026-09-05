@@ -109,15 +109,9 @@ public class MetadataSemantic
 
 
 	/// <summary>
-	/// 语义来源。
-	///
-	/// 示例:
-	///
-	/// AI
-	/// Manual
-	///
+	/// 语义来源（受控词表）。默认 Manual。
 	/// </summary>
-	public string? Source { get; set; }
+	public SemanticSource Source { get; set; } = SemanticSource.Manual;
 
 
 
@@ -181,6 +175,54 @@ public class MetadataSemantic
 	public int? VectorDimension { get; set; }
 
 
+	/// <summary>
+	/// 向量最近同步时间（UTC）。
+	/// </summary>
+	public DateTime? VectorSyncTime { get; set; }
+
+	/// <summary>
+	/// 向量状态：待同步(Pending) / 已同步(Synced) / 同步失败(Failed) / 过期(Stale)。
+	/// </summary>
+	public string? VectorStatus { get; set; }
+
+	/// <summary>
+	/// 向量同步错误码（同步失败时记录脱敏后的异常类型名）。
+	/// </summary>
+	public string? VectorErrorCode { get; set; }
+
+
+	#endregion
+
+
+	#region 结构化辅助
+
+	/// <summary>
+	/// 将逗号/分号/换行分隔的自由文本解析为去空白、去空项的有序列表。
+	/// 用于 Keywords / Synonyms / ExampleQuestions 的归一化。
+	/// </summary>
+	public static IReadOnlyList<string> ParseList(string? raw)
+	{
+		if (string.IsNullOrWhiteSpace(raw))
+		{
+			return Array.Empty<string>();
+		}
+
+		return raw
+			.Split([',', ';', '\n', '\r', '\t'],
+				StringSplitOptions.RemoveEmptyEntries)
+			.Select(x => x.Trim())
+			.Where(x => x.Length > 0)
+			.Distinct(StringComparer.OrdinalIgnoreCase)
+			.ToList();
+	}
+
+	/// <summary>
+	/// 将字符串列表规范化为逗号分隔的单一文本（保持确定性顺序）。
+	/// </summary>
+	public static string FormatList(IEnumerable<string> items)
+		=> string.Join(", ", items
+			.Select(x => x.Trim())
+			.Where(x => x.Length > 0));
 
 	#endregion
 

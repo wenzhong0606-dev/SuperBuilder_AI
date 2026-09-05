@@ -201,7 +201,7 @@ public sealed class MetadataCsvFixtureService : IMetadataCsvFixtureService
                 ExampleQuestions = Null(row, 5),
                 BusinessDomain = Null(row, 6),
                 Confidence = NullableDecimal(row, 7),
-                Source = Null(row, 8),
+                Source = ParseSource(Null(row, 8)),
                 CreatedTime = Date(row, 9),
                 SearchText = Null(row, 10),
                 VectorId = Null(row, 11),
@@ -227,6 +227,21 @@ public sealed class MetadataCsvFixtureService : IMetadataCsvFixtureService
         if (tables.Any(x => x.Length < 11)) throw new InvalidOperationException("table.csv 字段数量不足。");
         if (columns.Any(x => x.Length < 12)) throw new InvalidOperationException("column.csv 字段数量不足。");
         if (semantics.Any(x => x.Length < 14)) throw new InvalidOperationException("Semantic.csv 字段数量不足。");
+    }
+
+    private static SemanticSource ParseSource(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return SemanticSource.Manual;
+        }
+
+        return Enum.TryParse<SemanticSource>(
+            raw.Trim(),
+            ignoreCase: true,
+            out var parsed)
+            ? parsed
+            : SemanticSource.Manual;
     }
 
     private static async Task<List<string[]>> ReadCsvAsync(string path)

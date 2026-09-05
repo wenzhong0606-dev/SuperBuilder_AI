@@ -258,8 +258,8 @@ public class MetadataSemanticService
 							column.Id,
 
 
-						Source =
-							"AI"
+					Source =
+						SemanticSource.AI
 
 					};
 
@@ -281,23 +281,29 @@ public class MetadataSemanticService
 
 
 			semantic.Keywords =
-				item.Keywords;
+				MetadataSemantic.FormatList(
+					MetadataSemantic.ParseList(item.Keywords));
 
 
 			semantic.Synonyms =
-				item.Synonyms;
+				MetadataSemantic.FormatList(
+					MetadataSemantic.ParseList(item.Synonyms));
 
 
 			semantic.ExampleQuestions =
-				item.ExampleQuestions;
+				MetadataSemantic.FormatList(
+					MetadataSemantic.ParseList(item.ExampleQuestions));
 
 
 			semantic.BusinessDomain =
 				item.BusinessDomain;
 
 
+			// 置信度收敛到 [0,1]，超出范围截断而非报错，避免破坏既有数据。
 			semantic.Confidence =
-				item.Confidence;
+				item.Confidence is { } c
+					? Math.Clamp(c, 0m, 1m)
+					: semantic.Confidence;
 
 
 

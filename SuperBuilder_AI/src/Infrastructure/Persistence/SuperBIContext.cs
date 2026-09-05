@@ -239,36 +239,79 @@ public class SuperBIContext : DbContext
         #region MetadataTable
         builder.Entity<MetadataTable>().HasOne(x => x.DataSource).WithMany(x => x.Tables).HasForeignKey(x => x.DataSourceId);
         builder.Entity<MetadataTable>().ToTable(tb => tb.HasComment("元数据表"));
-        builder.Entity<MetadataTable>().HasIndex(x => new { x.DataSourceId, x.TableName }).IsUnique();
+        // 租户内唯一键：DataSource + Catalog + Schema + Table。
+        // 使用过滤唯一索引：仅当 Catalog/Schema 均非空时才强制唯一，
+        // 兼容存量/测试中以 (DataSourceId, TableName) 唯一的历史数据。
+        builder.Entity<MetadataTable>()
+            .HasIndex(x => new { x.DataSourceId, x.CatalogName, x.SchemaName, x.TableName })
+            .IsUnique()
+            .HasDatabaseName("IX_MetadataTables_DataSourceId_CatalogName_SchemaName_TableName")
+            .HasFilter("[CatalogName] IS NOT NULL AND [SchemaName] IS NOT NULL");
+        builder.Entity<MetadataTable>().HasIndex(x => x.DataSourceId)
+            .HasDatabaseName("IX_MetadataTables_DataSourceId");
+        builder.Entity<MetadataTable>().Property(x => x.TableName).IsRequired().HasMaxLength(128).HasComment("表名");
+        builder.Entity<MetadataTable>().Property(x => x.CatalogName).HasMaxLength(128).HasComment("目录名");
+        builder.Entity<MetadataTable>().Property(x => x.SchemaName).HasMaxLength(128).HasComment("模式名");
         builder.Entity<MetadataTable>().Property(x => x.SearchText).HasComment("Embedding文本");
         builder.Entity<MetadataTable>().Property(x => x.VectorId).HasComment("Qdrant向量ID");
+        builder.Entity<MetadataTable>().Property(x => x.EmbeddingModel).HasMaxLength(128).HasComment("Embedding模型");
+        builder.Entity<MetadataTable>().Property(x => x.VectorDimension).HasComment("向量维度");
+        builder.Entity<MetadataTable>().Property(x => x.VectorSyncTime).HasComment("向量同步时间(UTC)");
+        builder.Entity<MetadataTable>().Property(x => x.VectorStatus).HasMaxLength(16).HasComment("向量状态");
+        builder.Entity<MetadataTable>().Property(x => x.VectorErrorCode).HasMaxLength(64).HasComment("向量错误码");
         #endregion
 
         #region MetadataColumn
         builder.Entity<MetadataColumn>().HasOne(x => x.MetadataTable).WithMany(x => x.Columns).HasForeignKey(x => x.MetadataTableId);
         builder.Entity<MetadataColumn>().ToTable(tb => tb.HasComment("元数据字段"));
         builder.Entity<MetadataColumn>().HasIndex(x => new { x.MetadataTableId, x.ColumnName }).IsUnique();
+        builder.Entity<MetadataColumn>().Property(x => x.ColumnName).IsRequired().HasMaxLength(128).HasComment("列名");
+        builder.Entity<MetadataColumn>().Property(x => x.Ordinal).HasDefaultValue(0).HasComment("列序号");
+        builder.Entity<MetadataColumn>().Property(x => x.NativeType).HasMaxLength(64).HasComment("原生类型");
+        builder.Entity<MetadataColumn>().Property(x => x.Precision).HasComment("精度");
+        builder.Entity<MetadataColumn>().Property(x => x.Scale).HasComment("小数位");
         builder.Entity<MetadataColumn>().Property(x => x.SearchText).HasComment("字段Embedding文本");
         builder.Entity<MetadataColumn>().Property(x => x.VectorId).HasComment("Qdrant字段向量ID");
         builder.Entity<MetadataColumn>().Property(x => x.BusinessKey).HasComment("字段业务唯一标识");
+        builder.Entity<MetadataColumn>().Property(x => x.EmbeddingModel).HasMaxLength(128).HasComment("Embedding模型");
+        builder.Entity<MetadataColumn>().Property(x => x.VectorDimension).HasComment("向量维度");
+        builder.Entity<MetadataColumn>().Property(x => x.VectorSyncTime).HasComment("向量同步时间(UTC)");
+        builder.Entity<MetadataColumn>().Property(x => x.VectorStatus).HasMaxLength(16).HasComment("向量状态");
+        builder.Entity<MetadataColumn>().Property(x => x.VectorErrorCode).HasMaxLength(64).HasComment("向量错误码");
         #endregion
 
         #region MetadataSemantic
         builder.Entity<MetadataSemantic>().HasOne(x => x.MetadataColumn).WithOne(x => x.Semantic).HasForeignKey<MetadataSemantic>(x => x.MetadataColumnId).OnDelete(DeleteBehavior.Cascade);
         builder.Entity<MetadataSemantic>().HasIndex(x => x.MetadataColumnId).IsUnique();
-        builder.Entity<MetadataSemantic>().Property(x => x.Confidence).HasColumnType("decimal(5,4)");
+        builder.Entity<MetadataSemantic>().Property(x => x.Confidence).HasColumnType("decimal(5,4)")
+            .HasComment("AI生成置信度(0-1)");
         builder.Entity<MetadataSemantic>().ToTable(tb => tb.HasComment("字段AI语义"));
+        // 置信度检查约束：NULL 或落在 [0,1]。
+        builder.Entity<MetadataSemantic>().ToTable(tb => tb.HasCheckConstraint(
+            "CK_MetadataSemantics_Confidence",
+            "[Confidence] IS NULL OR ([Confidence] >= 0 AND [Confidence] <= 1)"));
         builder.Entity<MetadataSemantic>().Property(x => x.BusinessMeaning).HasComment("业务含义");
-        builder.Entity<MetadataSemantic>().Property(x => x.Keywords).HasComment("关键词");
-        builder.Entity<MetadataSemantic>().Property(x => x.Synonyms).HasComment("同义词");
-        builder.Entity<MetadataSemantic>().Property(x => x.ExampleQuestions).HasComment("示例问题");
+        builder.Entity<MetadataSemantic>().Property(x => x.Keywords).HasMaxLength(2048).HasComment("关键词");
+        builder.Entity<MetadataSemantic>().Property(x => x.Synonyms).HasMaxLength(2048).HasComment("同义词");
+        builder.Entity<MetadataSemantic>().Property(x => x.ExampleQuestions).HasMaxLength(2048).HasComment("示例问题");
         builder.Entity<MetadataSemantic>().Property(x => x.BusinessDomain).HasComment("业务域");
-        builder.Entity<MetadataSemantic>().Property(x => x.Source).HasComment("来源");
+        builder.Entity<MetadataSemantic>().Property(x => x.Source)
+            .HasConversion<string>()
+            .HasMaxLength(16)
+            .HasDefaultValue(SemanticSource.Manual)
+            .HasComment("来源");
         builder.Entity<MetadataSemantic>().Property(x => x.SearchText).HasComment("语义Embedding文本");
         builder.Entity<MetadataSemantic>().Property(x => x.VectorId).HasComment("Qdrant语义向量ID");
+        builder.Entity<MetadataSemantic>().Property(x => x.EmbeddingModel).HasMaxLength(128).HasComment("Embedding模型");
+        builder.Entity<MetadataSemantic>().Property(x => x.VectorDimension).HasComment("向量维度");
+        builder.Entity<MetadataSemantic>().Property(x => x.VectorSyncTime).HasComment("向量同步时间(UTC)");
+        builder.Entity<MetadataSemantic>().Property(x => x.VectorStatus).HasMaxLength(16).HasComment("向量状态");
+        builder.Entity<MetadataSemantic>().Property(x => x.VectorErrorCode).HasMaxLength(64).HasComment("向量错误码");
         #endregion
 
         #region Learning
+        builder.Entity<MetadataLearningRecord>().HasOne(x => x.Tenant).WithMany().HasForeignKey(x => x.TenantId);
+        builder.Entity<MetadataLearningRecord>().HasOne(x => x.MetadataColumn).WithMany().HasForeignKey(x => x.MetadataColumnId).OnDelete(DeleteBehavior.SetNull);
         builder.Entity<MetadataLearningRecord>().ToTable(tb => tb.HasComment("学习记录"));
         #endregion
 
