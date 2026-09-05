@@ -4,7 +4,7 @@
 @using SuperBuilder_AI.Components.Shared
 
 <AuthGuard>
-    <PageHead Icon="sb-ico-database" Title="元数据关系详情" Desc="查看元数据实体的实际数据、所属对象及向量索引关系。" />
+    <PageHead Icon="sb-ico-database" Key="MetadataEntityDetail" Title="元数据关系详情" Desc="查看元数据实体的实际数据、所属对象及向量索引关系。" />
     @if (_loading) { <LoadingState Text="正在读取元数据实体…" /> }
     else if (!string.IsNullOrWhiteSpace(_error)) { <ErrorState Message="@_error" OnRetry="Load" /> }
     else if (_data.HasValue)

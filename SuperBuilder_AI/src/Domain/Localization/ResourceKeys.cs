@@ -115,9 +115,24 @@ public static class ResourceKeys
         public const string NoData = "Empty.NoData";
     }
 
+    /// <summary>通用操作动词（M3-05 续批），跨页面复用：按钮、菜单项。</summary>
+    public static class Action
+    {
+        public const string New = "Action.New";
+        public const string Create = "Action.Create";
+        public const string Save = "Action.Save";
+        public const string Cancel = "Action.Cancel";
+        public const string Refresh = "Action.Refresh";
+        public const string Delete = "Action.Delete";
+        public const string Edit = "Action.Edit";
+        public const string Search = "Action.Search";
+        public const string Close = "Action.Close";
+        public const string Reset = "Action.Reset";
+    }
+
     /// <summary>
-    /// 页面页头标题（M3-05 批2）。<c>PageHead</c> 以稳定标识 <c>Key</c> 解析 <c>Page.Title.{Key}</c>，
-    /// 避免旧约定 <c>Page.Title.{中文标题}</c> 退化成中文资源键。说明文案（Page.Desc.*）待下一批次登记。
+    /// 页面页头标题与说明（M3-05 批2 起）。<c>PageHead</c> 以稳定标识 <c>Key</c> 解析 <c>Page.Title.{Key}</c> /
+    /// <c>Page.Desc.{Key}</c>，避免旧约定 <c>Page.Title.{中文标题}</c> 退化成中文资源键。
     /// </summary>
     public static class Page
     {
@@ -134,6 +149,31 @@ public static class ResourceKeys
         public const string TitleLocalization = "Page.Title.Localization";
         public const string TitleThemes = "Page.Title.Themes";
         public const string TitleDemoData = "Page.Title.DemoData";
+
+        // M3-05 续批：递延内容页（Analysis/Design/Platform）
+        public const string TitleBusinessModel = "Page.Title.BusinessModel";
+        public const string TitleBusinessModelEntityDetail = "Page.Title.BusinessModelEntityDetail";
+        public const string TitleSemanticLabelDetail = "Page.Title.SemanticLabelDetail";
+        public const string TitleComponentGallery = "Page.Title.ComponentGallery";
+        public const string TitleThemeEditor = "Page.Title.ThemeEditor";
+        public const string TitleDataSources = "Page.Title.DataSources";
+        public const string TitleModelAccounts = "Page.Title.ModelAccounts";
+        public const string TitleMetadataEntityDetail = "Page.Title.MetadataEntityDetail";
+        public const string TitleDataSource = "Page.Title.DataSource";
+
+        public const string DescBusinessModel = "Page.Desc.BusinessModel";
+        public const string DescBusinessModelEntityDetail = "Page.Desc.BusinessModelEntityDetail";
+        public const string DescSemanticLabelDetail = "Page.Desc.SemanticLabelDetail";
+        public const string DescComponentGallery = "Page.Desc.ComponentGallery";
+        public const string DescThemeEditor = "Page.Desc.ThemeEditor";
+        public const string DescDataSources = "Page.Desc.DataSources";
+        public const string DescModelAccounts = "Page.Desc.ModelAccounts";
+        public const string DescMetadataEntityDetail = "Page.Desc.MetadataEntityDetail";
+        public const string DescDataSource = "Page.Desc.DataSource";
+
+        // M3-05 续批：ThemeEditor 面板标题
+        public const string ThemeEditorPreview = "Page.ThemeEditor.Preview";
+        public const string ThemeEditorPalette = "Page.ThemeEditor.Palette";
     }
 
     /// <summary>导航菜单文本（M3-04 增补，M3-05 扩展全量）。</summary>
@@ -273,6 +313,17 @@ public static class ResourceKeys
         [Validation.Format] = new("Validation", DefaultValue: "Invalid format."),
         [Empty.NoData] = new("Empty", DefaultValue: "No data available."),
 
+        [Action.New] = new("Action", DefaultValue: "New"),
+        [Action.Create] = new("Action", DefaultValue: "Create"),
+        [Action.Save] = new("Action", DefaultValue: "Save"),
+        [Action.Cancel] = new("Action", DefaultValue: "Cancel"),
+        [Action.Refresh] = new("Action", DefaultValue: "Refresh"),
+        [Action.Delete] = new("Action", DefaultValue: "Delete"),
+        [Action.Edit] = new("Action", DefaultValue: "Edit"),
+        [Action.Search] = new("Action", DefaultValue: "Search"),
+        [Action.Close] = new("Action", DefaultValue: "Close"),
+        [Action.Reset] = new("Action", DefaultValue: "Reset"),
+
         [Error.Unauthorized] = new("Error", DefaultValue: "Unauthorized."),
         [Error.Forbidden] = new("Error", DefaultValue: "You do not have access to this resource."),
         [Error.Validation] = new("Error", DefaultValue: "Input validation failed."),
@@ -303,6 +354,29 @@ public static class ResourceKeys
         [Page.TitleLocalization] = new("Page", Page: "Localization", DefaultValue: "Localization"),
         [Page.TitleThemes] = new("Page", Page: "Themes", DefaultValue: "Themes"),
         [Page.TitleDemoData] = new("Page", Page: "DemoData", DefaultValue: "Demo Data"),
+
+        [Page.TitleBusinessModel] = new("Page", Page: "BusinessModel", DefaultValue: "Semantic Model"),
+        [Page.TitleBusinessModelEntityDetail] = new("Page", Page: "BusinessModelEntityDetail", DefaultValue: "Entity Details"),
+        [Page.TitleSemanticLabelDetail] = new("Page", Page: "SemanticLabelDetail", DefaultValue: "Semantic Label Details"),
+        [Page.TitleComponentGallery] = new("Page", Page: "ComponentGallery", DefaultValue: "Component Gallery"),
+        [Page.TitleThemeEditor] = new("Page", Page: "ThemeEditor", DefaultValue: "Theme Editor"),
+        [Page.TitleDataSources] = new("Page", Page: "DataSources", DefaultValue: "Data Sources"),
+        [Page.TitleModelAccounts] = new("Page", Page: "ModelAccounts", DefaultValue: "Models & Accounts (BYO)"),
+        [Page.TitleMetadataEntityDetail] = new("Page", Page: "MetadataEntityDetail", DefaultValue: "Metadata Relation Details"),
+        [Page.TitleDataSource] = new("Page", Page: "DataSource", DefaultValue: "Data Source Details"),
+
+        [Page.DescBusinessModel] = new("Page", Page: "BusinessModel", DefaultValue: "Map physical tables into business language: entities, domains, and field synonyms for precise NL querying."),
+        [Page.DescBusinessModelEntityDetail] = new("Page", Page: "BusinessModelEntityDetail", DefaultValue: "View entity mapping, field definitions, and resolution status."),
+        [Page.DescSemanticLabelDetail] = new("Page", Page: "SemanticLabelDetail", DefaultValue: "View label definitions, synonyms, and recall strategy."),
+        [Page.DescComponentGallery] = new("Page", Page: "ComponentGallery", DefaultValue: "A tour of the SuperBuilder design system: reusable components on a Chinese antique palette and Bootstrap."),
+        [Page.DescThemeEditor] = new("Page", Page: "ThemeEditor", DefaultValue: "Customize your visual style on the antique palette: live preview, save and assign to a tenant or copy as a blueprint."),
+        [Page.DescDataSources] = new("Page", Page: "DataSources", DefaultValue: "Manage tenant data connections, metadata overrides, and access status."),
+        [Page.DescModelAccounts] = new("Page", Page: "ModelAccounts", DefaultValue: "Choose the current AI model, or bind your own model API key (BYO), tenant-isolated and masked."),
+        [Page.DescMetadataEntityDetail] = new("Page", Page: "MetadataEntityDetail", DefaultValue: "View the actual data, owning objects, and vector index relations of a metadata entity."),
+        [Page.DescDataSource] = new("Page", Page: "DataSource", DefaultValue: "The data source's authorization list and row-level security (RLS) policies."),
+
+        [Page.ThemeEditorPreview] = new("Page", Page: "ThemeEditor", DefaultValue: "Live Preview"),
+        [Page.ThemeEditorPalette] = new("Page", Page: "ThemeEditor", DefaultValue: "Palette"),
 
         [Nav.Home] = new("Nav", Page: "Home", DefaultValue: "Home"),
         [Nav.Ask] = new("Nav", Page: "Ask", DefaultValue: "Ask BI"),

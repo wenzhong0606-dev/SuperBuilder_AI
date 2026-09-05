@@ -119,6 +119,21 @@ public static class Keys
         public const string NoData = "Empty.NoData";
     }
 
+    /// <summary>通用操作动词（M3-05 续批），跨页面复用。</summary>
+    public static class Action
+    {
+        public const string New = "Action.New";
+        public const string Create = "Action.Create";
+        public const string Save = "Action.Save";
+        public const string Cancel = "Action.Cancel";
+        public const string Refresh = "Action.Refresh";
+        public const string Delete = "Action.Delete";
+        public const string Edit = "Action.Edit";
+        public const string Search = "Action.Search";
+        public const string Close = "Action.Close";
+        public const string Reset = "Action.Reset";
+    }
+
     /// <summary>导航菜单文本。</summary>
     public static class Nav
     {
@@ -171,6 +186,31 @@ public static class Keys
         public const string TitleLocalization = "Page.Title.Localization";
         public const string TitleThemes = "Page.Title.Themes";
         public const string TitleDemoData = "Page.Title.DemoData";
+
+        // M3-05 续批：递延内容页（Analysis/Design/Platform）
+        public const string TitleBusinessModel = "Page.Title.BusinessModel";
+        public const string TitleBusinessModelEntityDetail = "Page.Title.BusinessModelEntityDetail";
+        public const string TitleSemanticLabelDetail = "Page.Title.SemanticLabelDetail";
+        public const string TitleComponentGallery = "Page.Title.ComponentGallery";
+        public const string TitleThemeEditor = "Page.Title.ThemeEditor";
+        public const string TitleDataSources = "Page.Title.DataSources";
+        public const string TitleModelAccounts = "Page.Title.ModelAccounts";
+        public const string TitleMetadataEntityDetail = "Page.Title.MetadataEntityDetail";
+        public const string TitleDataSource = "Page.Title.DataSource";
+
+        public const string DescBusinessModel = "Page.Desc.BusinessModel";
+        public const string DescBusinessModelEntityDetail = "Page.Desc.BusinessModelEntityDetail";
+        public const string DescSemanticLabelDetail = "Page.Desc.SemanticLabelDetail";
+        public const string DescComponentGallery = "Page.Desc.ComponentGallery";
+        public const string DescThemeEditor = "Page.Desc.ThemeEditor";
+        public const string DescDataSources = "Page.Desc.DataSources";
+        public const string DescModelAccounts = "Page.Desc.ModelAccounts";
+        public const string DescMetadataEntityDetail = "Page.Desc.MetadataEntityDetail";
+        public const string DescDataSource = "Page.Desc.DataSource";
+
+        // M3-05 续批：ThemeEditor 面板标题
+        public const string ThemeEditorPreview = "Page.ThemeEditor.Preview";
+        public const string ThemeEditorPalette = "Page.ThemeEditor.Palette";
     }
 
     /// <summary>无障碍文本。</summary>
@@ -268,6 +308,17 @@ public static class Keys
 
         [Empty.NoData] = new("暂无数据。", "No data available."),
 
+        [Action.New] = new("新建", "New"),
+        [Action.Create] = new("创建", "Create"),
+        [Action.Save] = new("保存", "Save"),
+        [Action.Cancel] = new("取消", "Cancel"),
+        [Action.Refresh] = new("刷新", "Refresh"),
+        [Action.Delete] = new("删除", "Delete"),
+        [Action.Edit] = new("编辑", "Edit"),
+        [Action.Search] = new("搜索", "Search"),
+        [Action.Close] = new("关闭", "Close"),
+        [Action.Reset] = new("重置", "Reset"),
+
         [Nav.Home] = new("首页", "Home"),
         [Nav.Ask] = new("Ask BI 智能问数", "Ask BI"),
         [Nav.Dashboards] = new("仪表盘", "Dashboards"),
@@ -317,5 +368,27 @@ public static class Keys
         [Page.TitleLocalization] = new("多语言中心", "Localization"),
         [Page.TitleThemes] = new("主题（租户级）", "Themes"),
         [Page.TitleDemoData] = new("演示数据", "Demo Data"),
+        [Page.TitleBusinessModel] = new("语义模型", "Semantic Model"),
+        [Page.TitleBusinessModelEntityDetail] = new("实体详情", "Entity Details"),
+        [Page.TitleSemanticLabelDetail] = new("语义标签详情", "Semantic Label Details"),
+        [Page.TitleComponentGallery] = new("组件库", "Component Gallery"),
+        [Page.TitleThemeEditor] = new("主题编辑器", "Theme Editor"),
+        [Page.TitleDataSources] = new("数据源管理", "Data Sources"),
+        [Page.TitleModelAccounts] = new("模型与账号（BYO）", "Models & Accounts (BYO)"),
+        [Page.TitleMetadataEntityDetail] = new("元数据关系详情", "Metadata Relation Details"),
+        [Page.TitleDataSource] = new("数据源详情", "Data Source Details"),
+
+        [Page.DescBusinessModel] = new("把物理表结构映射为业务语言：实体、业务域与字段同义词，让自然语言问数更精准。", "Map physical tables into business language: entities, domains, and field synonyms for precise NL querying."),
+        [Page.DescBusinessModelEntityDetail] = new("查看实体映射、字段口径与解析状态。", "View entity mapping, field definitions, and resolution status."),
+        [Page.DescSemanticLabelDetail] = new("查看标签口径、同义词与召回策略。", "View label definitions, synonyms, and recall strategy."),
+        [Page.DescComponentGallery] = new("SuperBuilder 设计系统一览：基于中国古风色板与 Bootstrap 的通用组件，全站统一复用。", "A tour of the SuperBuilder design system: reusable components on a Chinese antique palette and Bootstrap."),
+        [Page.DescThemeEditor] = new("基于古风色板自定义你的视觉风格：实时预览、保存并指派给租户或复制为蓝图。", "Customize your visual style on the antique palette: live preview, save and assign to a tenant or copy as a blueprint."),
+        [Page.DescDataSources] = new("统一管理租户数据连接、元数据覆盖与访问状态。", "Manage tenant data connections, metadata overrides, and access status."),
+        [Page.DescModelAccounts] = new("选择当前 AI 模型，或绑定你自有的模型 API Key（BYO），按租户隔离、密钥掩码存储。", "Choose the current AI model, or bind your own model API key (BYO), tenant-isolated and masked."),
+        [Page.DescMetadataEntityDetail] = new("查看元数据实体的实际数据、所属对象及向量索引关系。", "View the actual data, owning objects, and vector index relations of a metadata entity."),
+        [Page.DescDataSource] = new("数据源的授权清单与行级安全策略（RLS）。", "The data source's authorization list and row-level security (RLS) policies."),
+
+        [Page.ThemeEditorPreview] = new("实时预览", "Live Preview"),
+        [Page.ThemeEditorPalette] = new("调色板", "Palette"),
     };
 }

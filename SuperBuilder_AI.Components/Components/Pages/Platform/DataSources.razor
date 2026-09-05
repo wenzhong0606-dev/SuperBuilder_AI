@@ -6,7 +6,7 @@
 @using SuperBuilder_AI.Components.Shared
 
 <AuthGuard>
-    <PageHead Icon="sb-ico-db" Title="数据源管理" Desc="统一管理租户数据连接、元数据覆盖与访问状态。">
+    <PageHead Icon="sb-ico-db" Key="DataSources" Title="数据源管理" Desc="统一管理租户数据连接、元数据覆盖与访问状态。">
         <button class="btn btn-primary" @onclick="() => CreateVisible = true">
             <svg class="btn-ico"><use href="#sb-ico-plus" /></svg> 新增数据源
         </button>
@@ -23,7 +23,7 @@
         <Body>
             <div class="ds-list-toolbar">
                 <div class="ds-search"><svg><use href="#sb-ico-ask" /></svg><input @bind="Search" @bind:event="oninput" placeholder="搜索名称或数据库类型…" /></div>
-                <button class="btn btn-outline-secondary btn-sm" @onclick="LoadSources">刷新</button>
+                <button class="btn btn-outline-secondary btn-sm" @onclick="LoadSources">@L10n.T(Keys.Action.Refresh, "刷新")</button>
             </div>
             @if (Loading)
             {
@@ -81,9 +81,9 @@
             @if (!string.IsNullOrWhiteSpace(Error)) { <div class="alert alert-danger tiny" style="margin-top:12px">@Error</div> }
         </Body>
         <Footer>
-            <button class="btn btn-outline-secondary" @onclick="() => CreateVisible = false">取消</button>
+            <button class="btn btn-outline-secondary" @onclick="() => CreateVisible = false">@L10n.T(Keys.Action.Cancel, "取消")</button>
             <button class="btn btn-outline-secondary" @onclick="TestConn">测试连接</button>
-            <button class="btn btn-primary" @onclick="Save" disabled="@Saving">@(Saving ? "正在保存…" : "保存并接入")</button>
+            <button class="btn btn-primary" @onclick="Save" disabled="@Saving">@(Saving ? "正在保存…" : @L10n.T(Keys.Action.Save, "保存") + "并接入")</button>
         </Footer>
     </SbModal>
 </AuthGuard>

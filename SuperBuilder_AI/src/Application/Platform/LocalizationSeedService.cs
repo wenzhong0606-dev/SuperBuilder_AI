@@ -206,8 +206,28 @@ public sealed class LocalizationSeedService : ILocalizationSeedService
         ["Page.Title.PlatformAdmins"] = "平台管理员", ["Page.Title.PlatformAdminScopes"] = "管理员租户范围",
         ["Page.Title.SelfRegistrationAdmin"] = "自助注册", ["Page.Title.SystemStatus"] = "系统状态",
         ["Page.Title.Localization"] = "多语言中心", ["Page.Title.Themes"] = "主题（租户级）", ["Page.Title.DemoData"] = "演示数据",
+        ["Page.Title.BusinessModel"] = "语义模型", ["Page.Title.BusinessModelEntityDetail"] = "实体详情",
+        ["Page.Title.SemanticLabelDetail"] = "语义标签详情", ["Page.Title.ComponentGallery"] = "组件库",
+        ["Page.Title.ThemeEditor"] = "主题编辑器", ["Page.Title.DataSources"] = "数据源管理",
+        ["Page.Title.ModelAccounts"] = "模型与账号（BYO）", ["Page.Title.MetadataEntityDetail"] = "元数据关系详情",
+        ["Page.Title.DataSource"] = "数据源详情",
+
+        ["Page.Desc.BusinessModel"] = "把物理表结构映射为业务语言：实体、业务域与字段同义词，让自然语言问数更精准。",
+        ["Page.Desc.BusinessModelEntityDetail"] = "查看实体映射、字段口径与解析状态。",
+        ["Page.Desc.SemanticLabelDetail"] = "查看标签口径、同义词与召回策略。",
+        ["Page.Desc.ComponentGallery"] = "SuperBuilder 设计系统一览：基于中国古风色板与 Bootstrap 的通用组件，全站统一复用。",
+        ["Page.Desc.ThemeEditor"] = "基于古风色板自定义你的视觉风格：实时预览、保存并指派给租户或复制为蓝图。",
+        ["Page.Desc.DataSources"] = "统一管理租户数据连接、元数据覆盖与访问状态。",
+        ["Page.Desc.ModelAccounts"] = "选择当前 AI 模型，或绑定你自有的模型 API Key（BYO），按租户隔离、密钥掩码存储。",
+        ["Page.Desc.MetadataEntityDetail"] = "查看元数据实体的实际数据、所属对象及向量索引关系。",
+        ["Page.Desc.DataSource"] = "数据源的授权清单与行级安全策略（RLS）。",
 
         ["Empty.NoData"] = "暂无数据。",
+
+        ["Action.New"] = "新建", ["Action.Create"] = "创建", ["Action.Save"] = "保存", ["Action.Cancel"] = "取消",
+        ["Action.Refresh"] = "刷新", ["Action.Delete"] = "删除", ["Action.Edit"] = "编辑",         ["Action.Search"] = "搜索", ["Action.Close"] = "关闭", ["Action.Reset"] = "重置",
+
+        ["Page.ThemeEditor.Preview"] = "实时预览", ["Page.ThemeEditor.Palette"] = "调色板",
 
         ["Nav.Home"] = "首页", ["Nav.Ask"] = "Ask BI 智能问数", ["Nav.Dashboards"] = "仪表盘", ["Nav.Apps"] = "应用工厂",
         ["Nav.Agent"] = "智能体 / Copilot", ["Nav.SemanticLabels"] = "语义标签", ["Nav.BusinessModel"] = "语义模型",

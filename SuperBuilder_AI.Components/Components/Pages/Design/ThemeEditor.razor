@@ -1,20 +1,20 @@
 @page "/themes"
 @inject ToastService Toast
-<PageHead Icon="sb-ico-theme" Title="主题编辑器" Desc="基于古风色板自定义你的视觉风格：实时预览、保存并指派给租户或复制为蓝图。" />
+<PageHead Icon="sb-ico-theme" Key="ThemeEditor" Title="主题编辑器" Desc="基于古风色板自定义你的视觉风格：实时预览、保存并指派给租户或复制为蓝图。" />
 
 <div class="toolbar">
     <div class="seg">
-        <button class="@(_mode)" @onclick='() => SetMode("light")'>浅色</button>
-        <button class='@(_mode == "active" ? "" : "active")' @onclick='() => SetMode("dark")'>深色</button>
+        <button class="@(_mode)" @onclick='() => SetMode("light")'>@L10n.T(Keys.Theme.Light, "浅色")</button>
+        <button class='@(_mode == "active" ? "" : "active")' @onclick='() => SetMode("dark")'>@L10n.T(Keys.Theme.Dark, "深色")</button>
     </div>
     <div class="spacer"></div>
-    <button class="btn btn-outline-secondary btn-sm" @onclick="ResetTokens">重置</button>
-    <button class="btn btn-primary btn-sm" @onclick="Save">保存主题</button>
+    <button class="btn btn-outline-secondary btn-sm" @onclick="ResetTokens">@L10n.T(Keys.Action.Reset, "重置")</button>
+    <button class="btn btn-primary btn-sm" @onclick="Save">@L10n.T(Keys.Action.Save, "保存") 主题</button>
 </div>
 
 <div style="@_previewStyle">
     <div class="panel">
-        <div class="panel-head"><div class="panel-title"><svg class="pt-ico"><use href="#sb-ico-theme" /></svg> 实时预览</div></div>
+        <div class="panel-head"><div class="panel-title"><svg class="pt-ico"><use href="#sb-ico-theme" /></svg> @L10n.T(Keys.Page.ThemeEditorPreview, "实时预览")</div></div>
         <div class="panel-body">
             <div class="stat-grid">
                 <div class="stat-tile"><div class="st-label">示例指标</div><div class="st-value">86.4%</div><div class="st-delta up">↑ 5.2%</div></div>
@@ -32,7 +32,7 @@
 </div>
 
 <div class="panel">
-    <div class="panel-head"><div class="panel-title"><svg class="pt-ico"><use href="#sb-ico-theme" /></svg> 调色板</div></div>
+    <div class="panel-head"><div class="panel-title"><svg class="pt-ico"><use href="#sb-ico-theme" /></svg> @L10n.T(Keys.Page.ThemeEditorPalette, "调色板")</div></div>
     <div class="panel-body">
         <div class="swatch-grid">
             @foreach (var key in _tokens.Keys)

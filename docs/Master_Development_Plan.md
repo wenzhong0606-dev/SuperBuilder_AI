@@ -432,8 +432,10 @@ M3-G0 是 M4/M7/M8 的最小前置，不等同于完成全部 i18n。它只包�
 - M3-05-E 防漂移护栏：新增 `ResourceKeyRegistryTests` 六例，校验「后端注册表 ↔ Catalog 元数据 ↔ zh-CN 基线 ↔ RCL `Keys`/`Defaults`」四处严格一致；任一处键集合或中英双语文案漂移直接变红（上一轮种子脱节正因缺此类护栏而潜伏）。
 - M3-05-F 共享反馈组件本地化：`ErrorState`/`LoadingState`/`SbEmptyState`/`SbAlert`/`PageHead` 接入统一 L10n（错误码、追踪 ID、重试、关闭、加载中、暂无数据等），全部保留原中文 fallback，无回归。
 - M3-05-G 页头稳定键：`PageHead` 新增稳定 `Key` 参数解析 `Page.Title.{Key}`（旧 `Page.Title.{中文标题}` 约定会退化成中文键、必然查不到，作为未迁移页回退）；登记 `Page.Title.*` 13 个键（五处同步：后端常量 + `Catalog`、zh-CN `ZhCnDefaults`、RCL `Keys`/`Defaults`），并迁移工作台/管理后台 13 个页面 `<PageHead Key=...>`。
+- M3-05-H 递延内容页页头接入：登记 `Page.Title.*` + `Page.Desc.*` 共 18 个键（BusinessModel/BusinessModelEntityDetail/SemanticLabelDetail/ComponentGallery/ThemeEditor/DataSources/ModelAccounts/MetadataEntityDetail/DataSource），五处同步；迁移 8 个静态标题内容页 `<PageHead Key=...>`（动态标题详情页 DataSourceDetail/AgentPlanDetail/AppDetail/DashboardDetail 本批不迁）。
+- M3-05-I 共享动词与样例页内文案：`_Imports.razor` 全局注入 `LocalizationService L10n`（后续页面批次免逐页注入）；新增 `Action.*`（New/Create/Save/Cancel/Refresh/Delete/Edit/Search/Close/Reset）与 `Page.ThemeEditor.*` 键集（五处同步）；接入 ThemeEditor（浅色/深色/重置/保存主题/实时预览/调色板）、BusinessModel（新建实体）、DataSources（刷新/取消/保存并接入）。
 
-批次范围说明（递延）：Ask/Dashboards/Apps 详情页、BusinessModel/ComponentGallery/ThemeEditor/DataSources 列表等重型内容页的全量 L10n，以及前端按 `L10n.T("Error."+code, serverMessage)` 消费 `ApiError` 的友好提示层，仍列为后续批次；本批已打通页头与共享反馈组件本地化，并补齐防漂移护栏。
+批次范围说明（仍递延）：Ask/Dashboards/Apps 详情页、BusinessModel/DataSources 等重型内容页的**页内正文/表格/状态标签**全量 L10n（目前仅接入页头与少数独立动词），以及前端按 `L10n.T("Error."+code, serverMessage)` 消费 `ApiError` 的友好提示层，仍列为后续批次。框架与页头/共享外壳已全量本地化，剩余为内容密集页正文，建议作为 M3-05 续批或并入 M3-06 收尾。
 
 ### M3-06 用户语言偏好
 

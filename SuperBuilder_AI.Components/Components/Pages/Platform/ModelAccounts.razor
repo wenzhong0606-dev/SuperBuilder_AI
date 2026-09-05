@@ -3,7 +3,7 @@
 @using SuperBuilder_AI.Components.Shared
 
 <AuthGuard>
-    <PageHead Icon="sb-ico-key" Title="模型与账号（BYO）" Desc="选择当前 AI 模型，或绑定你自有的模型 API Key（BYO），按租户隔离、密钥掩码存储。" />
+    <PageHead Icon="sb-ico-key" Key="ModelAccounts" Title="模型与账号（BYO）" Desc="选择当前 AI 模型，或绑定你自有的模型 API Key（BYO），按租户隔离、密钥掩码存储。" />
 
     <div class="card-grid">
         @foreach (var m in _models)
