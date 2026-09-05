@@ -13,28 +13,28 @@
                 <div class="fc-title">@m.Name</div>
                 <div class="fc-desc">@m.Desc</div>
                 <div style="display:flex;gap:6px;align-items:center">
-                    <span class="badge @(m.Bound ? "badge-success" : "badge-muted")">@(m.Bound ? "已绑定" : "未绑定")</span>
-                    @if (m.Default) { <span class="badge badge-primary">默认</span> }
+                    <span class="badge @(m.Bound ? "badge-success" : "badge-muted")">@(m.Bound ? L10n.T(Keys.Content.ModelAccountsBound, "已绑定") : L10n.T(Keys.Content.ModelAccountsUnbound, "未绑定"))</span>
+                    @if (m.Default) { <span class="badge badge-primary">@L10n.T(Keys.Content.ModelAccountsDefault, "默认")</span> }
                     <div class="spacer" style="flex:1"></div>
-                    <button class="btn btn-outline-secondary btn-sm" @onclick="() => SetDefault(m.Name)">设为默认</button>
+                    <button class="btn btn-outline-secondary btn-sm" @onclick="() => SetDefault(m.Name)">@L10n.T(Keys.Content.ModelAccountsSetDefault, "设为默认")</button>
                 </div>
             </div>
         }
     </div>
 
-    <SbPanel Icon="sb-ico-key" Title="绑定自有 API Key">
+    <SbPanel Icon="sb-ico-key" Title="@L10n.T(Keys.Content.ModelAccountsBindPanel, "绑定自有 API Key")">
         <Body>
             <div class="field-grid">
-                <SbField Label="模型">
+                <SbField Label="@L10n.T(Keys.Content.ModelAccountsFieldModel, "模型")">
                     <select @bind="SelModel">
                         @foreach (var m in _models) { <option value="@m.Name">@m.Name</option> }
                     </select>
                 </SbField>
-                <SbField Label="API Key"><input type="password" @bind="Key" placeholder="sk-••••••" /></SbField>
-                <SbField Label="备注" Full="true"><input @bind="Note" placeholder="如：生产环境专用" /></SbField>
+                <SbField Label="@L10n.T(Keys.Content.ModelAccountsFieldApiKey, "API Key")"><input type="password" @bind="Key" placeholder="@L10n.T(Keys.Content.ModelAccountsApiKeyPlaceholder, "sk-••••••")" /></SbField>
+                <SbField Label="@L10n.T(Keys.Content.ModelAccountsFieldNote, "备注")" Full="true"><input @bind="Note" placeholder="@L10n.T(Keys.Content.ModelAccountsNotePlaceholder, "如：生产环境专用")" /></SbField>
             </div>
             <div class="toolbar" style="margin-top:16px;margin-bottom:0">
-                <button class="btn btn-primary btn-sm" @onclick="Bind">保存绑定</button>
+                <button class="btn btn-primary btn-sm" @onclick="Bind">@L10n.T(Keys.Content.ModelAccountsSaveBind, "保存绑定")</button>
             </div>
         </Body>
     </SbPanel>
@@ -61,7 +61,7 @@
     private void SetDefault(string n)
     {
         foreach (var m in _models) m.Default = m.Name == n;
-        Toast.Success($"已将 {n} 设为默认模型");
+        Toast.Success(string.Format(L10n.T(Keys.Content.ModelAccountsSetDefaultToast, "已将 {0} 设为默认模型"), n));
     }
-    private void Bind() => Toast.Info("绑定已提交（ILLMProvider + UserModelBinding 计划于 P13 实现，密钥将以掩码存储）。");
+    private void Bind() => Toast.Info(L10n.T(Keys.Content.ModelAccountsBindSubmitted, "绑定已提交（ILLMProvider + UserModelBinding 计划于 P13 实现，密钥将以掩码存储）。"));
 }

@@ -336,6 +336,109 @@ public static class Keys
         public const string DataSourcePolicyDeleted = "Content.DataSourcePolicyDeleted";
         public const string DataSourceDeleteFailed = "Content.DataSourceDeleteFailed";
         public const string DataSourceLoadGrantsFailed = "Content.DataSourceLoadGrantsFailed";
+
+        // ModelAccounts（模型与账号 BYO）
+        public const string ModelAccountsBound = "Content.ModelAccountsBound";
+        public const string ModelAccountsUnbound = "Content.ModelAccountsUnbound";
+        public const string ModelAccountsDefault = "Content.ModelAccountsDefault";
+        public const string ModelAccountsSetDefault = "Content.ModelAccountsSetDefault";
+        public const string ModelAccountsBindPanel = "Content.ModelAccountsBindPanel";
+        public const string ModelAccountsFieldModel = "Content.ModelAccountsFieldModel";
+        public const string ModelAccountsFieldApiKey = "Content.ModelAccountsFieldApiKey";
+        public const string ModelAccountsApiKeyPlaceholder = "Content.ModelAccountsApiKeyPlaceholder";
+        public const string ModelAccountsFieldNote = "Content.ModelAccountsFieldNote";
+        public const string ModelAccountsNotePlaceholder = "Content.ModelAccountsNotePlaceholder";
+        public const string ModelAccountsSaveBind = "Content.ModelAccountsSaveBind";
+        public const string ModelAccountsSetDefaultToast = "Content.ModelAccountsSetDefaultToast";
+        public const string ModelAccountsBindSubmitted = "Content.ModelAccountsBindSubmitted";
+
+        // SemanticLabelDetail（语义标签详情）
+        public const string SemanticLabelLoading = "Content.SemanticLabelLoading";
+        public const string SemanticLabelPanelDetail = "Content.SemanticLabelPanelDetail";
+        public const string SemanticLabelNotFoundTitle = "Content.SemanticLabelNotFoundTitle";
+        public const string SemanticLabelNotFoundText = "Content.SemanticLabelNotFoundText";
+        public const string SemanticLabelInfoPanel = "Content.SemanticLabelInfoPanel";
+        public const string SemanticLabelBack = "Content.SemanticLabelBack";
+
+        // ComponentGallery（组件库巡展）
+        public const string ComponentGallerySecButtons = "Content.ComponentGallerySecButtons";
+        public const string ComponentGallerySecBadges = "Content.ComponentGallerySecBadges";
+        public const string ComponentGallerySecForms = "Content.ComponentGallerySecForms";
+        public const string ComponentGallerySecProgress = "Content.ComponentGallerySecProgress";
+        public const string ComponentGallerySecSegmented = "Content.ComponentGallerySecSegmented";
+        public const string ComponentGallerySecAlerts = "Content.ComponentGallerySecAlerts";
+        public const string ComponentGallerySecTabs = "Content.ComponentGallerySecTabs";
+        public const string ComponentGallerySecDataTable = "Content.ComponentGallerySecDataTable";
+        public const string ComponentGallerySecModal = "Content.ComponentGallerySecModal";
+        public const string ComponentGallerySecToast = "Content.ComponentGallerySecToast";
+        public const string ComponentGallerySecGuard = "Content.ComponentGallerySecGuard";
+        public const string ComponentGalleryBtnPrimary = "Content.ComponentGalleryBtnPrimary";
+        public const string ComponentGalleryBtnSecondary = "Content.ComponentGalleryBtnSecondary";
+        public const string ComponentGalleryBtnGhost = "Content.ComponentGalleryBtnGhost";
+        public const string ComponentGalleryBtnDanger = "Content.ComponentGalleryBtnDanger";
+        public const string ComponentGalleryBtnDisabled = "Content.ComponentGalleryBtnDisabled";
+        public const string ComponentGalleryBadgePrimary = "Content.ComponentGalleryBadgePrimary";
+        public const string ComponentGalleryBadgePublished = "Content.ComponentGalleryBadgePublished";
+        public const string ComponentGalleryBadgeDraft = "Content.ComponentGalleryBadgeDraft";
+        public const string ComponentGalleryBadgeFailed = "Content.ComponentGalleryBadgeFailed";
+        public const string ComponentGalleryBadgeGlobal = "Content.ComponentGalleryBadgeGlobal";
+        public const string ComponentGalleryBadgeDefault = "Content.ComponentGalleryBadgeDefault";
+        public const string ComponentGalleryFormTextbox = "Content.ComponentGalleryFormTextbox";
+        public const string ComponentGalleryFormDropdown = "Content.ComponentGalleryFormDropdown";
+        public const string ComponentGalleryOptA = "Content.ComponentGalleryOptA";
+        public const string ComponentGalleryOptB = "Content.ComponentGalleryOptB";
+        public const string ComponentGalleryProgressUsed = "Content.ComponentGalleryProgressUsed";
+        public const string ComponentGallerySegDay = "Content.ComponentGallerySegDay";
+        public const string ComponentGallerySegWeek = "Content.ComponentGallerySegWeek";
+        public const string ComponentGallerySegMonth = "Content.ComponentGallerySegMonth";
+        public const string ComponentGalleryAlertInfo = "Content.ComponentGalleryAlertInfo";
+        public const string ComponentGalleryAlertWarning = "Content.ComponentGalleryAlertWarning";
+        public const string ComponentGalleryStatQuestions = "Content.ComponentGalleryStatQuestions";
+        public const string ComponentGalleryStatHitRate = "Content.ComponentGalleryStatHitRate";
+        public const string ComponentGalleryStatPending = "Content.ComponentGalleryStatPending";
+        public const string ComponentGalleryStatActiveTenants = "Content.ComponentGalleryStatActiveTenants";
+        public const string ComponentGallerySampleTable = "Content.ComponentGallerySampleTable";
+        public const string ComponentGalleryColCode = "Content.ComponentGalleryColCode";
+        public const string ComponentGalleryColName = "Content.ComponentGalleryColName";
+        public const string ComponentGalleryColStatus = "Content.ComponentGalleryColStatus";
+        public const string ComponentGalleryColTenant = "Content.ComponentGalleryColTenant";
+        public const string ComponentGalleryCardAskTitle = "Content.ComponentGalleryCardAskTitle";
+        public const string ComponentGalleryCardAskDesc = "Content.ComponentGalleryCardAskDesc";
+        public const string ComponentGalleryCardDashTitle = "Content.ComponentGalleryCardDashTitle";
+        public const string ComponentGalleryCardDashDesc = "Content.ComponentGalleryCardDashDesc";
+        public const string ComponentGalleryCardAppTitle = "Content.ComponentGalleryCardAppTitle";
+        public const string ComponentGalleryCardAppDesc = "Content.ComponentGalleryCardAppDesc";
+        public const string ComponentGalleryTabOverview = "Content.ComponentGalleryTabOverview";
+        public const string ComponentGalleryTabDetail = "Content.ComponentGalleryTabDetail";
+        public const string ComponentGalleryTabSettings = "Content.ComponentGalleryTabSettings";
+        public const string ComponentGalleryDataEmpty = "Content.ComponentGalleryDataEmpty";
+        public const string ComponentGalleryModalTitle = "Content.ComponentGalleryModalTitle";
+        public const string ComponentGalleryOpenModal = "Content.ComponentGalleryOpenModal";
+        public const string ComponentGalleryModalBody = "Content.ComponentGalleryModalBody";
+        public const string ComponentGalleryModalOk = "Content.ComponentGalleryModalOk";
+        public const string ComponentGalleryConfirmTitle = "Content.ComponentGalleryConfirmTitle";
+        public const string ComponentGalleryConfirmMsg = "Content.ComponentGalleryConfirmMsg";
+        public const string ComponentGalleryConfirmText = "Content.ComponentGalleryConfirmText";
+        public const string ComponentGalleryToastInfo = "Content.ComponentGalleryToastInfo";
+        public const string ComponentGalleryToastSuccess = "Content.ComponentGalleryToastSuccess";
+        public const string ComponentGalleryToastWarning = "Content.ComponentGalleryToastWarning";
+        public const string ComponentGalleryToastError = "Content.ComponentGalleryToastError";
+        public const string ComponentGalleryToastDeleted = "Content.ComponentGalleryToastDeleted";
+        public const string ComponentGalleryGuardDesc = "Content.ComponentGalleryGuardDesc";
+        public const string ComponentGalleryGuardHasPerm = "Content.ComponentGalleryGuardHasPerm";
+
+        // ThemeEditor（主题编辑器补充正文）
+        public const string ThemeEditorSampleMetric = "Content.ThemeEditorSampleMetric";
+        public const string ThemeEditorBtnPrimary = "Content.ThemeEditorBtnPrimary";
+        public const string ThemeEditorBtnSecondary = "Content.ThemeEditorBtnSecondary";
+        public const string ThemeEditorBadgePublished = "Content.ThemeEditorBadgePublished";
+        public const string ThemeEditorBadgeDraft = "Content.ThemeEditorBadgeDraft";
+        public const string ThemeEditorSavedToast = "Content.ThemeEditorSavedToast";
+
+        // MetadataEntityDetail（元数据关系详情）
+        public const string MetadataEntityLoading = "Content.MetadataEntityLoading";
+        public const string MetadataEntityIntro = "Content.MetadataEntityIntro";
+        public const string MetadataEntityNotFound = "Content.MetadataEntityNotFound";
     }
 
     /// <summary>无障碍文本。</summary>
@@ -630,5 +733,104 @@ public static class Keys
         [Content.DataSourcePolicyDeleted] = new("策略已删除。", "Policy deleted."),
         [Content.DataSourceDeleteFailed] = new("删除失败（{0}）。", "Delete failed ({0})."),
         [Content.DataSourceLoadGrantsFailed] = new("加载授权失败（{0}）。", "Failed to load grants ({0})."),
+
+        // M3-05 重内容页正文批次（续）：ModelAccounts / SemanticLabel / ComponentGallery / ThemeEditor 补充 / MetadataEntity
+        [Content.ModelAccountsBound] = new("已绑定", "Bound"),
+        [Content.ModelAccountsUnbound] = new("未绑定", "Not bound"),
+        [Content.ModelAccountsDefault] = new("默认", "Default"),
+        [Content.ModelAccountsSetDefault] = new("设为默认", "Set as default"),
+        [Content.ModelAccountsBindPanel] = new("绑定自有 API Key", "Bind your own API Key"),
+        [Content.ModelAccountsFieldModel] = new("模型", "Model"),
+        [Content.ModelAccountsFieldApiKey] = new("API Key", "API Key"),
+        [Content.ModelAccountsApiKeyPlaceholder] = new("sk-••••••", "sk-••••••"),
+        [Content.ModelAccountsFieldNote] = new("备注", "Note"),
+        [Content.ModelAccountsNotePlaceholder] = new("如：生产环境专用", "e.g. Production only"),
+        [Content.ModelAccountsSaveBind] = new("保存绑定", "Save binding"),
+        [Content.ModelAccountsSetDefaultToast] = new("已将 {0} 设为默认模型", "Set {0} as default model"),
+        [Content.ModelAccountsBindSubmitted] = new("绑定已提交（ILLMProvider + UserModelBinding 计划于 P13 实现，密钥将以掩码存储）。", "Binding submitted (ILLMProvider + UserModelBinding planned for P13; key will be stored masked)."),
+
+        [Content.SemanticLabelLoading] = new("正在加载标签详情…", "Loading label details…"),
+        [Content.SemanticLabelPanelDetail] = new("详情", "Details"),
+        [Content.SemanticLabelNotFoundTitle] = new("未找到该标签", "Label not found"),
+        [Content.SemanticLabelNotFoundText] = new("标签可能已被删除，或后端详情端点尚未接入。", "The label may have been deleted, or the backend detail endpoint is not yet connected."),
+        [Content.SemanticLabelInfoPanel] = new("标签信息", "Label information"),
+        [Content.SemanticLabelBack] = new("返回列表", "Back to list"),
+
+        [Content.ComponentGallerySecButtons] = new("按钮", "Buttons"),
+        [Content.ComponentGallerySecBadges] = new("徽标", "Badges"),
+        [Content.ComponentGallerySecForms] = new("表单控件", "Form controls"),
+        [Content.ComponentGallerySecProgress] = new("进度条", "Progress bar"),
+        [Content.ComponentGallerySecSegmented] = new("分段控件", "Segmented control"),
+        [Content.ComponentGallerySecAlerts] = new("告警", "Alerts"),
+        [Content.ComponentGallerySecTabs] = new("标签页 SbTabs", "Tabs SbTabs"),
+        [Content.ComponentGallerySecDataTable] = new("数据表格 SbDataTable", "Data table SbDataTable"),
+        [Content.ComponentGallerySecModal] = new("弹窗 SbModal / SbConfirm", "Modal SbModal / SbConfirm"),
+        [Content.ComponentGallerySecToast] = new("轻提示 Toast", "Toast"),
+        [Content.ComponentGallerySecGuard] = new("守卫 Guard", "Guard"),
+        [Content.ComponentGalleryBtnPrimary] = new("主要", "Primary"),
+        [Content.ComponentGalleryBtnSecondary] = new("次要", "Secondary"),
+        [Content.ComponentGalleryBtnGhost] = new("幽灵", "Ghost"),
+        [Content.ComponentGalleryBtnDanger] = new("危险", "Danger"),
+        [Content.ComponentGalleryBtnDisabled] = new("禁用", "Disabled"),
+        [Content.ComponentGalleryBadgePrimary] = new("主要", "Primary"),
+        [Content.ComponentGalleryBadgePublished] = new("已发布", "Published"),
+        [Content.ComponentGalleryBadgeDraft] = new("草稿", "Draft"),
+        [Content.ComponentGalleryBadgeFailed] = new("失败", "Failed"),
+        [Content.ComponentGalleryBadgeGlobal] = new("全局", "Global"),
+        [Content.ComponentGalleryBadgeDefault] = new("默认", "Default"),
+        [Content.ComponentGalleryFormTextbox] = new("文本框", "Text box"),
+        [Content.ComponentGalleryFormDropdown] = new("下拉", "Dropdown"),
+        [Content.ComponentGalleryOptA] = new("选项 A", "Option A"),
+        [Content.ComponentGalleryOptB] = new("选项 B", "Option B"),
+        [Content.ComponentGalleryProgressUsed] = new("已用 {0}", "Used {0}"),
+        [Content.ComponentGallerySegDay] = new("日", "Day"),
+        [Content.ComponentGallerySegWeek] = new("周", "Week"),
+        [Content.ComponentGallerySegMonth] = new("月", "Month"),
+        [Content.ComponentGalleryAlertInfo] = new("信息提示", "Information"),
+        [Content.ComponentGalleryAlertWarning] = new("注意提示", "Warning"),
+        [Content.ComponentGalleryStatQuestions] = new("今日问数", "Questions today"),
+        [Content.ComponentGalleryStatHitRate] = new("命中率", "Hit rate"),
+        [Content.ComponentGalleryStatPending] = new("待复核", "Pending review"),
+        [Content.ComponentGalleryStatActiveTenants] = new("活跃租户", "Active tenants"),
+        [Content.ComponentGallerySampleTable] = new("示例表格", "Example table"),
+        [Content.ComponentGalleryColCode] = new("编码", "Code"),
+        [Content.ComponentGalleryColName] = new("名称", "Name"),
+        [Content.ComponentGalleryColStatus] = new("状态", "Status"),
+        [Content.ComponentGalleryColTenant] = new("租户", "Tenant"),
+        [Content.ComponentGalleryCardAskTitle] = new("Ask BI", "Ask BI"),
+        [Content.ComponentGalleryCardAskDesc] = new("自然语言问数的旗舰入口。", "The flagship entry for natural-language analytics."),
+        [Content.ComponentGalleryCardDashTitle] = new("仪表盘", "Dashboards"),
+        [Content.ComponentGalleryCardDashDesc] = new("固化可复用的可视化看板。", "Reusable visualization dashboards."),
+        [Content.ComponentGalleryCardAppTitle] = new("应用工厂", "App Factory"),
+        [Content.ComponentGalleryCardAppDesc] = new("把会话沉淀为 BI 应用。", "Turn conversations into BI apps."),
+        [Content.ComponentGalleryTabOverview] = new("概览", "Overview"),
+        [Content.ComponentGalleryTabDetail] = new("明细", "Details"),
+        [Content.ComponentGalleryTabSettings] = new("设置", "Settings"),
+        [Content.ComponentGalleryDataEmpty] = new("无数据", "No data"),
+        [Content.ComponentGalleryModalTitle] = new("示例弹窗", "Example modal"),
+        [Content.ComponentGalleryOpenModal] = new("打开弹窗", "Open modal"),
+        [Content.ComponentGalleryModalBody] = new("弹窗用于承载表单或详情，支持遮罩点击关闭与自定义底部操作。", "Modals host forms or details, supporting backdrop-click close and custom footer actions."),
+        [Content.ComponentGalleryModalOk] = new("知道了", "Got it"),
+        [Content.ComponentGalleryConfirmTitle] = new("删除确认", "Delete confirmation"),
+        [Content.ComponentGalleryConfirmMsg] = new("此操作不可撤销，确定要删除该记录吗？", "This action cannot be undone. Are you sure you want to delete this record?"),
+        [Content.ComponentGalleryConfirmText] = new("删除", "Delete"),
+        [Content.ComponentGalleryToastInfo] = new("信息提示", "Information"),
+        [Content.ComponentGalleryToastSuccess] = new("操作成功", "Operation succeeded"),
+        [Content.ComponentGalleryToastWarning] = new("请注意", "Please note"),
+        [Content.ComponentGalleryToastError] = new("出错了", "Something went wrong"),
+        [Content.ComponentGalleryToastDeleted] = new("已确认删除（演示）。", "Delete confirmed (demo)."),
+        [Content.ComponentGalleryGuardDesc] = new("AuthGuard 等待会话自举完成后渲染子内容；PermissionGuard 按权限码门控（当前未强制，见 NavMenuItems.EnforcePermissions）。", "AuthGuard renders children after session bootstrap; PermissionGuard gates by permission code (not enforced yet; see NavMenuItems.EnforcePermissions)."),
+        [Content.ComponentGalleryGuardHasPerm] = new("你拥有 demo:write 权限", "You have demo:write permission"),
+
+        [Content.ThemeEditorSampleMetric] = new("示例指标", "Sample metric"),
+        [Content.ThemeEditorBtnPrimary] = new("主要按钮", "Primary button"),
+        [Content.ThemeEditorBtnSecondary] = new("次要", "Secondary"),
+        [Content.ThemeEditorBadgePublished] = new("已发布", "Published"),
+        [Content.ThemeEditorBadgeDraft] = new("草稿", "Draft"),
+        [Content.ThemeEditorSavedToast] = new("主题已保存（持久化接入 api/themes，P11.3 收口）。", "Theme saved (persistence to api/themes, closing in P11.3)."),
+
+        [Content.MetadataEntityLoading] = new("正在读取元数据实体…", "Reading metadata entity…"),
+        [Content.MetadataEntityIntro] = new("以下内容来自当前租户的实际元数据记录。", "The following content comes from the current tenant's actual metadata records."),
+        [Content.MetadataEntityNotFound] = new("未找到对应数据（{0}）。", "No corresponding data found ({0})."),
     };
 }

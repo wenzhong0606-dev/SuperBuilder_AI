@@ -303,6 +303,109 @@ public static class ResourceKeys
         public const string DataSourcePolicyDeleted = "Content.DataSourcePolicyDeleted";
         public const string DataSourceDeleteFailed = "Content.DataSourceDeleteFailed";
         public const string DataSourceLoadGrantsFailed = "Content.DataSourceLoadGrantsFailed";
+
+        // ModelAccounts（模型与账号 BYO）
+        public const string ModelAccountsBound = "Content.ModelAccountsBound";
+        public const string ModelAccountsUnbound = "Content.ModelAccountsUnbound";
+        public const string ModelAccountsDefault = "Content.ModelAccountsDefault";
+        public const string ModelAccountsSetDefault = "Content.ModelAccountsSetDefault";
+        public const string ModelAccountsBindPanel = "Content.ModelAccountsBindPanel";
+        public const string ModelAccountsFieldModel = "Content.ModelAccountsFieldModel";
+        public const string ModelAccountsFieldApiKey = "Content.ModelAccountsFieldApiKey";
+        public const string ModelAccountsApiKeyPlaceholder = "Content.ModelAccountsApiKeyPlaceholder";
+        public const string ModelAccountsFieldNote = "Content.ModelAccountsFieldNote";
+        public const string ModelAccountsNotePlaceholder = "Content.ModelAccountsNotePlaceholder";
+        public const string ModelAccountsSaveBind = "Content.ModelAccountsSaveBind";
+        public const string ModelAccountsSetDefaultToast = "Content.ModelAccountsSetDefaultToast";
+        public const string ModelAccountsBindSubmitted = "Content.ModelAccountsBindSubmitted";
+
+        // SemanticLabelDetail（语义标签详情）
+        public const string SemanticLabelLoading = "Content.SemanticLabelLoading";
+        public const string SemanticLabelPanelDetail = "Content.SemanticLabelPanelDetail";
+        public const string SemanticLabelNotFoundTitle = "Content.SemanticLabelNotFoundTitle";
+        public const string SemanticLabelNotFoundText = "Content.SemanticLabelNotFoundText";
+        public const string SemanticLabelInfoPanel = "Content.SemanticLabelInfoPanel";
+        public const string SemanticLabelBack = "Content.SemanticLabelBack";
+
+        // ComponentGallery（组件库巡展，含大量演示标签/状态/正文）
+        public const string ComponentGallerySecButtons = "Content.ComponentGallerySecButtons";
+        public const string ComponentGallerySecBadges = "Content.ComponentGallerySecBadges";
+        public const string ComponentGallerySecForms = "Content.ComponentGallerySecForms";
+        public const string ComponentGallerySecProgress = "Content.ComponentGallerySecProgress";
+        public const string ComponentGallerySecSegmented = "Content.ComponentGallerySecSegmented";
+        public const string ComponentGallerySecAlerts = "Content.ComponentGallerySecAlerts";
+        public const string ComponentGallerySecTabs = "Content.ComponentGallerySecTabs";
+        public const string ComponentGallerySecDataTable = "Content.ComponentGallerySecDataTable";
+        public const string ComponentGallerySecModal = "Content.ComponentGallerySecModal";
+        public const string ComponentGallerySecToast = "Content.ComponentGallerySecToast";
+        public const string ComponentGallerySecGuard = "Content.ComponentGallerySecGuard";
+        public const string ComponentGalleryBtnPrimary = "Content.ComponentGalleryBtnPrimary";
+        public const string ComponentGalleryBtnSecondary = "Content.ComponentGalleryBtnSecondary";
+        public const string ComponentGalleryBtnGhost = "Content.ComponentGalleryBtnGhost";
+        public const string ComponentGalleryBtnDanger = "Content.ComponentGalleryBtnDanger";
+        public const string ComponentGalleryBtnDisabled = "Content.ComponentGalleryBtnDisabled";
+        public const string ComponentGalleryBadgePrimary = "Content.ComponentGalleryBadgePrimary";
+        public const string ComponentGalleryBadgePublished = "Content.ComponentGalleryBadgePublished";
+        public const string ComponentGalleryBadgeDraft = "Content.ComponentGalleryBadgeDraft";
+        public const string ComponentGalleryBadgeFailed = "Content.ComponentGalleryBadgeFailed";
+        public const string ComponentGalleryBadgeGlobal = "Content.ComponentGalleryBadgeGlobal";
+        public const string ComponentGalleryBadgeDefault = "Content.ComponentGalleryBadgeDefault";
+        public const string ComponentGalleryFormTextbox = "Content.ComponentGalleryFormTextbox";
+        public const string ComponentGalleryFormDropdown = "Content.ComponentGalleryFormDropdown";
+        public const string ComponentGalleryOptA = "Content.ComponentGalleryOptA";
+        public const string ComponentGalleryOptB = "Content.ComponentGalleryOptB";
+        public const string ComponentGalleryProgressUsed = "Content.ComponentGalleryProgressUsed";
+        public const string ComponentGallerySegDay = "Content.ComponentGallerySegDay";
+        public const string ComponentGallerySegWeek = "Content.ComponentGallerySegWeek";
+        public const string ComponentGallerySegMonth = "Content.ComponentGallerySegMonth";
+        public const string ComponentGalleryAlertInfo = "Content.ComponentGalleryAlertInfo";
+        public const string ComponentGalleryAlertWarning = "Content.ComponentGalleryAlertWarning";
+        public const string ComponentGalleryStatQuestions = "Content.ComponentGalleryStatQuestions";
+        public const string ComponentGalleryStatHitRate = "Content.ComponentGalleryStatHitRate";
+        public const string ComponentGalleryStatPending = "Content.ComponentGalleryStatPending";
+        public const string ComponentGalleryStatActiveTenants = "Content.ComponentGalleryStatActiveTenants";
+        public const string ComponentGallerySampleTable = "Content.ComponentGallerySampleTable";
+        public const string ComponentGalleryColCode = "Content.ComponentGalleryColCode";
+        public const string ComponentGalleryColName = "Content.ComponentGalleryColName";
+        public const string ComponentGalleryColStatus = "Content.ComponentGalleryColStatus";
+        public const string ComponentGalleryColTenant = "Content.ComponentGalleryColTenant";
+        public const string ComponentGalleryCardAskTitle = "Content.ComponentGalleryCardAskTitle";
+        public const string ComponentGalleryCardAskDesc = "Content.ComponentGalleryCardAskDesc";
+        public const string ComponentGalleryCardDashTitle = "Content.ComponentGalleryCardDashTitle";
+        public const string ComponentGalleryCardDashDesc = "Content.ComponentGalleryCardDashDesc";
+        public const string ComponentGalleryCardAppTitle = "Content.ComponentGalleryCardAppTitle";
+        public const string ComponentGalleryCardAppDesc = "Content.ComponentGalleryCardAppDesc";
+        public const string ComponentGalleryTabOverview = "Content.ComponentGalleryTabOverview";
+        public const string ComponentGalleryTabDetail = "Content.ComponentGalleryTabDetail";
+        public const string ComponentGalleryTabSettings = "Content.ComponentGalleryTabSettings";
+        public const string ComponentGalleryDataEmpty = "Content.ComponentGalleryDataEmpty";
+        public const string ComponentGalleryModalTitle = "Content.ComponentGalleryModalTitle";
+        public const string ComponentGalleryOpenModal = "Content.ComponentGalleryOpenModal";
+        public const string ComponentGalleryModalBody = "Content.ComponentGalleryModalBody";
+        public const string ComponentGalleryModalOk = "Content.ComponentGalleryModalOk";
+        public const string ComponentGalleryConfirmTitle = "Content.ComponentGalleryConfirmTitle";
+        public const string ComponentGalleryConfirmMsg = "Content.ComponentGalleryConfirmMsg";
+        public const string ComponentGalleryConfirmText = "Content.ComponentGalleryConfirmText";
+        public const string ComponentGalleryToastInfo = "Content.ComponentGalleryToastInfo";
+        public const string ComponentGalleryToastSuccess = "Content.ComponentGalleryToastSuccess";
+        public const string ComponentGalleryToastWarning = "Content.ComponentGalleryToastWarning";
+        public const string ComponentGalleryToastError = "Content.ComponentGalleryToastError";
+        public const string ComponentGalleryToastDeleted = "Content.ComponentGalleryToastDeleted";
+        public const string ComponentGalleryGuardDesc = "Content.ComponentGalleryGuardDesc";
+        public const string ComponentGalleryGuardHasPerm = "Content.ComponentGalleryGuardHasPerm";
+
+        // ThemeEditor（主题编辑器补充正文）
+        public const string ThemeEditorSampleMetric = "Content.ThemeEditorSampleMetric";
+        public const string ThemeEditorBtnPrimary = "Content.ThemeEditorBtnPrimary";
+        public const string ThemeEditorBtnSecondary = "Content.ThemeEditorBtnSecondary";
+        public const string ThemeEditorBadgePublished = "Content.ThemeEditorBadgePublished";
+        public const string ThemeEditorBadgeDraft = "Content.ThemeEditorBadgeDraft";
+        public const string ThemeEditorSavedToast = "Content.ThemeEditorSavedToast";
+
+        // MetadataEntityDetail（元数据关系详情）
+        public const string MetadataEntityLoading = "Content.MetadataEntityLoading";
+        public const string MetadataEntityIntro = "Content.MetadataEntityIntro";
+        public const string MetadataEntityNotFound = "Content.MetadataEntityNotFound";
     }
 
     /// <summary>导航菜单文本（M3-04 增补，M3-05 扩展全量）。</summary>
@@ -651,6 +754,105 @@ public static class ResourceKeys
         [Nav.GroupAdmin] = new("Nav", Page: "Admin", DefaultValue: "Admin"),
 
         [Accessibility.SkipToContent] = new("Accessibility", DefaultValue: "Skip to content"),
+
+        // M3-05 重内容页正文批次（续）：ModelAccounts / SemanticLabel / ComponentGallery / ThemeEditor 补充 / MetadataEntity
+        [Content.ModelAccountsBound] = new("Content", Page: "ModelAccounts", DefaultValue: "Bound"),
+        [Content.ModelAccountsUnbound] = new("Content", Page: "ModelAccounts", DefaultValue: "Not bound"),
+        [Content.ModelAccountsDefault] = new("Content", Page: "ModelAccounts", DefaultValue: "Default"),
+        [Content.ModelAccountsSetDefault] = new("Content", Page: "ModelAccounts", DefaultValue: "Set as default"),
+        [Content.ModelAccountsBindPanel] = new("Content", Page: "ModelAccounts", DefaultValue: "Bind your own API Key"),
+        [Content.ModelAccountsFieldModel] = new("Content", Page: "ModelAccounts", DefaultValue: "Model"),
+        [Content.ModelAccountsFieldApiKey] = new("Content", Page: "ModelAccounts", DefaultValue: "API Key"),
+        [Content.ModelAccountsApiKeyPlaceholder] = new("Content", Page: "ModelAccounts", DefaultValue: "sk-••••••"),
+        [Content.ModelAccountsFieldNote] = new("Content", Page: "ModelAccounts", DefaultValue: "Note"),
+        [Content.ModelAccountsNotePlaceholder] = new("Content", Page: "ModelAccounts", DefaultValue: "e.g. Production only"),
+        [Content.ModelAccountsSaveBind] = new("Content", Page: "ModelAccounts", DefaultValue: "Save binding"),
+        [Content.ModelAccountsSetDefaultToast] = new("Content", Page: "ModelAccounts", DefaultValue: "Set {0} as default model"),
+        [Content.ModelAccountsBindSubmitted] = new("Content", Page: "ModelAccounts", DefaultValue: "Binding submitted (ILLMProvider + UserModelBinding planned for P13; key will be stored masked)."),
+
+        [Content.SemanticLabelLoading] = new("Content", Page: "SemanticLabelDetail", DefaultValue: "Loading label details…"),
+        [Content.SemanticLabelPanelDetail] = new("Content", Page: "SemanticLabelDetail", DefaultValue: "Details"),
+        [Content.SemanticLabelNotFoundTitle] = new("Content", Page: "SemanticLabelDetail", DefaultValue: "Label not found"),
+        [Content.SemanticLabelNotFoundText] = new("Content", Page: "SemanticLabelDetail", DefaultValue: "The label may have been deleted, or the backend detail endpoint is not yet connected."),
+        [Content.SemanticLabelInfoPanel] = new("Content", Page: "SemanticLabelDetail", DefaultValue: "Label information"),
+        [Content.SemanticLabelBack] = new("Content", Page: "SemanticLabelDetail", DefaultValue: "Back to list"),
+
+        [Content.ComponentGallerySecButtons] = new("Content", Page: "ComponentGallery", DefaultValue: "Buttons"),
+        [Content.ComponentGallerySecBadges] = new("Content", Page: "ComponentGallery", DefaultValue: "Badges"),
+        [Content.ComponentGallerySecForms] = new("Content", Page: "ComponentGallery", DefaultValue: "Form controls"),
+        [Content.ComponentGallerySecProgress] = new("Content", Page: "ComponentGallery", DefaultValue: "Progress bar"),
+        [Content.ComponentGallerySecSegmented] = new("Content", Page: "ComponentGallery", DefaultValue: "Segmented control"),
+        [Content.ComponentGallerySecAlerts] = new("Content", Page: "ComponentGallery", DefaultValue: "Alerts"),
+        [Content.ComponentGallerySecTabs] = new("Content", Page: "ComponentGallery", DefaultValue: "Tabs SbTabs"),
+        [Content.ComponentGallerySecDataTable] = new("Content", Page: "ComponentGallery", DefaultValue: "Data table SbDataTable"),
+        [Content.ComponentGallerySecModal] = new("Content", Page: "ComponentGallery", DefaultValue: "Modal SbModal / SbConfirm"),
+        [Content.ComponentGallerySecToast] = new("Content", Page: "ComponentGallery", DefaultValue: "Toast"),
+        [Content.ComponentGallerySecGuard] = new("Content", Page: "ComponentGallery", DefaultValue: "Guard"),
+        [Content.ComponentGalleryBtnPrimary] = new("Content", Page: "ComponentGallery", DefaultValue: "Primary"),
+        [Content.ComponentGalleryBtnSecondary] = new("Content", Page: "ComponentGallery", DefaultValue: "Secondary"),
+        [Content.ComponentGalleryBtnGhost] = new("Content", Page: "ComponentGallery", DefaultValue: "Ghost"),
+        [Content.ComponentGalleryBtnDanger] = new("Content", Page: "ComponentGallery", DefaultValue: "Danger"),
+        [Content.ComponentGalleryBtnDisabled] = new("Content", Page: "ComponentGallery", DefaultValue: "Disabled"),
+        [Content.ComponentGalleryBadgePrimary] = new("Content", Page: "ComponentGallery", DefaultValue: "Primary"),
+        [Content.ComponentGalleryBadgePublished] = new("Content", Page: "ComponentGallery", DefaultValue: "Published"),
+        [Content.ComponentGalleryBadgeDraft] = new("Content", Page: "ComponentGallery", DefaultValue: "Draft"),
+        [Content.ComponentGalleryBadgeFailed] = new("Content", Page: "ComponentGallery", DefaultValue: "Failed"),
+        [Content.ComponentGalleryBadgeGlobal] = new("Content", Page: "ComponentGallery", DefaultValue: "Global"),
+        [Content.ComponentGalleryBadgeDefault] = new("Content", Page: "ComponentGallery", DefaultValue: "Default"),
+        [Content.ComponentGalleryFormTextbox] = new("Content", Page: "ComponentGallery", DefaultValue: "Text box"),
+        [Content.ComponentGalleryFormDropdown] = new("Content", Page: "ComponentGallery", DefaultValue: "Dropdown"),
+        [Content.ComponentGalleryOptA] = new("Content", Page: "ComponentGallery", DefaultValue: "Option A"),
+        [Content.ComponentGalleryOptB] = new("Content", Page: "ComponentGallery", DefaultValue: "Option B"),
+        [Content.ComponentGalleryProgressUsed] = new("Content", Page: "ComponentGallery", DefaultValue: "Used {0}"),
+        [Content.ComponentGallerySegDay] = new("Content", Page: "ComponentGallery", DefaultValue: "Day"),
+        [Content.ComponentGallerySegWeek] = new("Content", Page: "ComponentGallery", DefaultValue: "Week"),
+        [Content.ComponentGallerySegMonth] = new("Content", Page: "ComponentGallery", DefaultValue: "Month"),
+        [Content.ComponentGalleryAlertInfo] = new("Content", Page: "ComponentGallery", DefaultValue: "Information"),
+        [Content.ComponentGalleryAlertWarning] = new("Content", Page: "ComponentGallery", DefaultValue: "Warning"),
+        [Content.ComponentGalleryStatQuestions] = new("Content", Page: "ComponentGallery", DefaultValue: "Questions today"),
+        [Content.ComponentGalleryStatHitRate] = new("Content", Page: "ComponentGallery", DefaultValue: "Hit rate"),
+        [Content.ComponentGalleryStatPending] = new("Content", Page: "ComponentGallery", DefaultValue: "Pending review"),
+        [Content.ComponentGalleryStatActiveTenants] = new("Content", Page: "ComponentGallery", DefaultValue: "Active tenants"),
+        [Content.ComponentGallerySampleTable] = new("Content", Page: "ComponentGallery", DefaultValue: "Example table"),
+        [Content.ComponentGalleryColCode] = new("Content", Page: "ComponentGallery", DefaultValue: "Code"),
+        [Content.ComponentGalleryColName] = new("Content", Page: "ComponentGallery", DefaultValue: "Name"),
+        [Content.ComponentGalleryColStatus] = new("Content", Page: "ComponentGallery", DefaultValue: "Status"),
+        [Content.ComponentGalleryColTenant] = new("Content", Page: "ComponentGallery", DefaultValue: "Tenant"),
+        [Content.ComponentGalleryCardAskTitle] = new("Content", Page: "ComponentGallery", DefaultValue: "Ask BI"),
+        [Content.ComponentGalleryCardAskDesc] = new("Content", Page: "ComponentGallery", DefaultValue: "The flagship entry for natural-language analytics."),
+        [Content.ComponentGalleryCardDashTitle] = new("Content", Page: "ComponentGallery", DefaultValue: "Dashboards"),
+        [Content.ComponentGalleryCardDashDesc] = new("Content", Page: "ComponentGallery", DefaultValue: "Reusable visualization dashboards."),
+        [Content.ComponentGalleryCardAppTitle] = new("Content", Page: "ComponentGallery", DefaultValue: "App Factory"),
+        [Content.ComponentGalleryCardAppDesc] = new("Content", Page: "ComponentGallery", DefaultValue: "Turn conversations into BI apps."),
+        [Content.ComponentGalleryTabOverview] = new("Content", Page: "ComponentGallery", DefaultValue: "Overview"),
+        [Content.ComponentGalleryTabDetail] = new("Content", Page: "ComponentGallery", DefaultValue: "Details"),
+        [Content.ComponentGalleryTabSettings] = new("Content", Page: "ComponentGallery", DefaultValue: "Settings"),
+        [Content.ComponentGalleryDataEmpty] = new("Content", Page: "ComponentGallery", DefaultValue: "No data"),
+        [Content.ComponentGalleryModalTitle] = new("Content", Page: "ComponentGallery", DefaultValue: "Example modal"),
+        [Content.ComponentGalleryOpenModal] = new("Content", Page: "ComponentGallery", DefaultValue: "Open modal"),
+        [Content.ComponentGalleryModalBody] = new("Content", Page: "ComponentGallery", DefaultValue: "Modals host forms or details, supporting backdrop-click close and custom footer actions."),
+        [Content.ComponentGalleryModalOk] = new("Content", Page: "ComponentGallery", DefaultValue: "Got it"),
+        [Content.ComponentGalleryConfirmTitle] = new("Content", Page: "ComponentGallery", DefaultValue: "Delete confirmation"),
+        [Content.ComponentGalleryConfirmMsg] = new("Content", Page: "ComponentGallery", DefaultValue: "This action cannot be undone. Are you sure you want to delete this record?"),
+        [Content.ComponentGalleryConfirmText] = new("Content", Page: "ComponentGallery", DefaultValue: "Delete"),
+        [Content.ComponentGalleryToastInfo] = new("Content", Page: "ComponentGallery", DefaultValue: "Information"),
+        [Content.ComponentGalleryToastSuccess] = new("Content", Page: "ComponentGallery", DefaultValue: "Operation succeeded"),
+        [Content.ComponentGalleryToastWarning] = new("Content", Page: "ComponentGallery", DefaultValue: "Please note"),
+        [Content.ComponentGalleryToastError] = new("Content", Page: "ComponentGallery", DefaultValue: "Something went wrong"),
+        [Content.ComponentGalleryToastDeleted] = new("Content", Page: "ComponentGallery", DefaultValue: "Delete confirmed (demo)."),
+        [Content.ComponentGalleryGuardDesc] = new("Content", Page: "ComponentGallery", DefaultValue: "AuthGuard renders children after session bootstrap; PermissionGuard gates by permission code (not enforced yet; see NavMenuItems.EnforcePermissions)."),
+        [Content.ComponentGalleryGuardHasPerm] = new("Content", Page: "ComponentGallery", DefaultValue: "You have demo:write permission"),
+
+        [Content.ThemeEditorSampleMetric] = new("Content", Page: "ThemeEditor", DefaultValue: "Sample metric"),
+        [Content.ThemeEditorBtnPrimary] = new("Content", Page: "ThemeEditor", DefaultValue: "Primary button"),
+        [Content.ThemeEditorBtnSecondary] = new("Content", Page: "ThemeEditor", DefaultValue: "Secondary"),
+        [Content.ThemeEditorBadgePublished] = new("Content", Page: "ThemeEditor", DefaultValue: "Published"),
+        [Content.ThemeEditorBadgeDraft] = new("Content", Page: "ThemeEditor", DefaultValue: "Draft"),
+        [Content.ThemeEditorSavedToast] = new("Content", Page: "ThemeEditor", DefaultValue: "Theme saved (persistence to api/themes, closing in P11.3)."),
+
+        [Content.MetadataEntityLoading] = new("Content", Page: "MetadataEntityDetail", DefaultValue: "Reading metadata entity…"),
+        [Content.MetadataEntityIntro] = new("Content", Page: "MetadataEntityDetail", DefaultValue: "The following content comes from the current tenant's actual metadata records."),
+        [Content.MetadataEntityNotFound] = new("Content", Page: "MetadataEntityDetail", DefaultValue: "No corresponding data found ({0})."),
     };
 
     /// <summary>返回全部已登记键（供种子覆盖校验与 CI 扫描使用）。</summary>

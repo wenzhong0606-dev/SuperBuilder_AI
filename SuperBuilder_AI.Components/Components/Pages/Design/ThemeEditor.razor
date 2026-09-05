@@ -17,14 +17,14 @@
         <div class="panel-head"><div class="panel-title"><svg class="pt-ico"><use href="#sb-ico-theme" /></svg> @L10n.T(Keys.Page.ThemeEditorPreview, "实时预览")</div></div>
         <div class="panel-body">
             <div class="stat-grid">
-                <div class="stat-tile"><div class="st-label">示例指标</div><div class="st-value">86.4%</div><div class="st-delta up">↑ 5.2%</div></div>
-                <div class="stat-tile accent-accent"><div class="st-label">示例指标</div><div class="st-value">1,204</div></div>
-                <div class="stat-tile accent-success"><div class="st-label">示例指标</div><div class="st-value">就绪</div></div>
+                <div class="stat-tile"><div class="st-label">@L10n.T(Keys.Content.ThemeEditorSampleMetric, "示例指标")</div><div class="st-value">86.4%</div><div class="st-delta up">↑ 5.2%</div></div>
+                <div class="stat-tile accent-accent"><div class="st-label">@L10n.T(Keys.Content.ThemeEditorSampleMetric, "示例指标")</div><div class="st-value">1,204</div></div>
+                <div class="stat-tile accent-success"><div class="st-label">@L10n.T(Keys.Content.ThemeEditorSampleMetric, "示例指标")</div><div class="st-value">就绪</div></div>
             </div>
             <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
-                <button class="btn btn-primary btn-sm">主要按钮</button>
-                <button class="btn btn-outline-secondary btn-sm">次要</button>
-                <span class="badge badge-success">已发布</span><span class="badge badge-warning">草稿</span>
+                <button class="btn btn-primary btn-sm">@L10n.T(Keys.Content.ThemeEditorBtnPrimary, "主要按钮")</button>
+                <button class="btn btn-outline-secondary btn-sm">@L10n.T(Keys.Content.ThemeEditorBtnSecondary, "次要")</button>
+                <span class="badge badge-success">@L10n.T(Keys.Content.ThemeEditorBadgePublished, "已发布")</span><span class="badge badge-warning">@L10n.T(Keys.Content.ThemeEditorBadgeDraft, "草稿")</span>
             </div>
             <div class="progress"><span style="width:60%"></span></div>
         </div>
@@ -94,5 +94,5 @@
     private string _previewStyle => "border-radius:var(--sb-radius-lg);" +
         string.Join(";", _tokens.Select(kv => $"--sb-{kv.Key}:{kv.Value}"));
 
-    private void Save() => Toast.Info("主题已保存（持久化接入 api/themes，P11.3 收口）。");
+    private void Save() => Toast.Info(L10n.T(Keys.Content.ThemeEditorSavedToast, "主题已保存（持久化接入 api/themes，P11.3 收口）。"));
 }

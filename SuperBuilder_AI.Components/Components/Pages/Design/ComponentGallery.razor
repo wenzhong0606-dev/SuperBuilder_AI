@@ -6,66 +6,66 @@
 
 <div class="showcase">
     <div class="demo">
-        <div class="d-label">按钮</div>
+        <div class="d-label">@L10n.T(Keys.Content.ComponentGallerySecButtons, "按钮")</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-            <button class="btn btn-primary btn-sm">主要</button>
-            <button class="btn btn-outline-secondary btn-sm">次要</button>
-            <button class="btn btn-ghost btn-sm">幽灵</button>
-            <button class="btn btn-danger btn-sm">危险</button>
-            <button class="btn btn-primary" disabled>禁用</button>
+            <button class="btn btn-primary btn-sm">@L10n.T(Keys.Content.ComponentGalleryBtnPrimary, "主要")</button>
+            <button class="btn btn-outline-secondary btn-sm">@L10n.T(Keys.Content.ComponentGalleryBtnSecondary, "次要")</button>
+            <button class="btn btn-ghost btn-sm">@L10n.T(Keys.Content.ComponentGalleryBtnGhost, "幽灵")</button>
+            <button class="btn btn-danger btn-sm">@L10n.T(Keys.Content.ComponentGalleryBtnDanger, "危险")</button>
+            <button class="btn btn-primary" disabled>@L10n.T(Keys.Content.ComponentGalleryBtnDisabled, "禁用")</button>
         </div>
     </div>
     <div class="demo">
-        <div class="d-label">徽标</div>
+        <div class="d-label">@L10n.T(Keys.Content.ComponentGallerySecBadges, "徽标")</div>
         <div style="display:flex;gap:6px;flex-wrap:wrap">
-            <span class="badge badge-primary">主要</span>
-            <span class="badge badge-success">已发布</span>
-            <span class="badge badge-warning">草稿</span>
-            <span class="badge badge-danger">失败</span>
-            <span class="badge badge-info">全局</span>
-            <span class="badge badge-muted">默认</span>
+            <span class="badge badge-primary">@L10n.T(Keys.Content.ComponentGalleryBadgePrimary, "主要")</span>
+            <span class="badge badge-success">@L10n.T(Keys.Content.ComponentGalleryBadgePublished, "已发布")</span>
+            <span class="badge badge-warning">@L10n.T(Keys.Content.ComponentGalleryBadgeDraft, "草稿")</span>
+            <span class="badge badge-danger">@L10n.T(Keys.Content.ComponentGalleryBadgeFailed, "失败")</span>
+            <span class="badge badge-info">@L10n.T(Keys.Content.ComponentGalleryBadgeGlobal, "全局")</span>
+            <span class="badge badge-muted">@L10n.T(Keys.Content.ComponentGalleryBadgeDefault, "默认")</span>
         </div>
     </div>
     <div class="demo">
-        <div class="d-label">表单控件</div>
-        <label>文本框<input value="示例文本" /></label>
-        <label>下拉<select><option>选项 A</option><option>选项 B</option></select></label>
+        <div class="d-label">@L10n.T(Keys.Content.ComponentGallerySecForms, "表单控件")</div>
+        <label>@L10n.T(Keys.Content.ComponentGalleryFormTextbox, "文本框")<input value="示例文本" /></label>
+        <label>@L10n.T(Keys.Content.ComponentGalleryFormDropdown, "下拉")<select><option>@L10n.T(Keys.Content.ComponentGalleryOptA, "选项 A")</option><option>@L10n.T(Keys.Content.ComponentGalleryOptB, "选项 B")</option></select></label>
     </div>
     <div class="demo">
-        <div class="d-label">进度条</div>
+        <div class="d-label">@L10n.T(Keys.Content.ComponentGallerySecProgress, "进度条")</div>
         <div class="progress"><span style="width:68%"></span></div>
-        <div style="margin-top:8px" class="muted tiny">已用 68%</div>
+        <div style="margin-top:8px" class="muted tiny">@string.Format(L10n.T(Keys.Content.ComponentGalleryProgressUsed, "已用 {0}"), "68%")</div>
     </div>
     <div class="demo">
-        <div class="d-label">分段控件</div>
+        <div class="d-label">@L10n.T(Keys.Content.ComponentGallerySecSegmented, "分段控件")</div>
         <div class="seg">
-            <button class="active">日</button><button>周</button><button>月</button>
+            <button class="active">@L10n.T(Keys.Content.ComponentGallerySegDay, "日")</button><button>@L10n.T(Keys.Content.ComponentGallerySegWeek, "周")</button><button>@L10n.T(Keys.Content.ComponentGallerySegMonth, "月")</button>
         </div>
     </div>
     <div class="demo">
-        <div class="d-label">告警</div>
-        <div class="alert alert-info tiny" style="padding:8px 12px">信息提示</div>
-        <div class="alert alert-warning tiny" style="padding:8px 12px">注意提示</div>
+        <div class="d-label">@L10n.T(Keys.Content.ComponentGallerySecAlerts, "告警")</div>
+        <div class="alert alert-info tiny" style="padding:8px 12px">@L10n.T(Keys.Content.ComponentGalleryAlertInfo, "信息提示")</div>
+        <div class="alert alert-warning tiny" style="padding:8px 12px">@L10n.T(Keys.Content.ComponentGalleryAlertWarning, "注意提示")</div>
     </div>
 </div>
 
 <div class="stat-grid">
-    <div class="stat-tile"><div class="st-label">今日问数</div><div class="st-value">1,284</div><div class="st-delta up">↑ 12.4%</div></div>
-    <div class="stat-tile accent-success"><div class="st-label">命中率</div><div class="st-value">93.6%</div><div class="st-delta up">↑ 2.1%</div></div>
-    <div class="stat-tile accent-warning"><div class="st-label">待复核</div><div class="st-value">17</div><div class="st-delta down">↓ 3</div></div>
-    <div class="stat-tile accent-info"><div class="st-label">活跃租户</div><div class="st-value">42</div></div>
+    <div class="stat-tile"><div class="st-label">@L10n.T(Keys.Content.ComponentGalleryStatQuestions, "今日问数")</div><div class="st-value">1,284</div><div class="st-delta up">↑ 12.4%</div></div>
+    <div class="stat-tile accent-success"><div class="st-label">@L10n.T(Keys.Content.ComponentGalleryStatHitRate, "命中率")</div><div class="st-value">93.6%</div><div class="st-delta up">↑ 2.1%</div></div>
+    <div class="stat-tile accent-warning"><div class="st-label">@L10n.T(Keys.Content.ComponentGalleryStatPending, "待复核")</div><div class="st-value">17</div><div class="st-delta down">↓ 3</div></div>
+    <div class="stat-tile accent-info"><div class="st-label">@L10n.T(Keys.Content.ComponentGalleryStatActiveTenants, "活跃租户")</div><div class="st-value">42</div></div>
 </div>
 
 <div class="panel">
-    <div class="panel-head"><div class="panel-title"><svg class="pt-ico"><use href="#sb-ico-db" /></svg> 示例表格</div></div>
+    <div class="panel-head"><div class="panel-title"><svg class="pt-ico"><use href="#sb-ico-db" /></svg> @L10n.T(Keys.Content.ComponentGallerySampleTable, "示例表格")</div></div>
     <div class="panel-body flush">
         <div class="table-wrap">
             <table class="data-table">
-                <thead><tr><th>编码</th><th>名称</th><th>状态</th><th>租户</th></tr></thead>
+                <thead><tr><th>@L10n.T(Keys.Content.ComponentGalleryColCode, "编码")</th><th>@L10n.T(Keys.Content.ComponentGalleryColName, "名称")</th><th>@L10n.T(Keys.Content.ComponentGalleryColStatus, "状态")</th><th>@L10n.T(Keys.Content.ComponentGalleryColTenant, "租户")</th></tr></thead>
                 <tbody>
-                    <tr><td>demo-sales</td><td>销售看板</td><td><span class="badge badge-success">已发布</span></td><td>租户</td></tr>
-                    <tr><td>demo-stock</td><td>库存预警</td><td><span class="badge badge-warning">草稿</span></td><td>全局</td></tr>
-                    <tr><td>demo-fin</td><td>财务月报</td><td><span class="badge badge-info">全局</span></td><td>全局</td></tr>
+                    <tr><td>demo-sales</td><td>销售看板</td><td><span class="badge badge-success">@L10n.T(Keys.Content.ComponentGalleryBadgePublished, "已发布")</span></td><td>@L10n.T(Keys.Content.ComponentGalleryBadgeGlobal, "全局")</td></tr>
+                    <tr><td>demo-stock</td><td>库存预警</td><td><span class="badge badge-warning">@L10n.T(Keys.Content.ComponentGalleryBadgeDraft, "草稿")</span></td><td>@L10n.T(Keys.Content.ComponentGalleryBadgeGlobal, "全局")</td></tr>
+                    <tr><td>demo-fin</td><td>财务月报</td><td><span class="badge badge-info">@L10n.T(Keys.Content.ComponentGalleryBadgeGlobal, "全局")</span></td><td>@L10n.T(Keys.Content.ComponentGalleryBadgeGlobal, "全局")</td></tr>
                 </tbody>
             </table>
         </div>
@@ -73,57 +73,57 @@
 </div>
 
 <div class="card-grid">
-    <div class="feature-card"><div class="fc-ico"><svg><use href="#sb-ico-ask" /></svg></div><div class="fc-title">Ask BI</div><div class="fc-desc">自然语言问数的旗舰入口。</div></div>
-    <div class="feature-card"><div class="fc-ico"><svg><use href="#sb-ico-dash" /></svg></div><div class="fc-title">仪表盘</div><div class="fc-desc">固化可复用的可视化看板。</div></div>
-    <div class="feature-card"><div class="fc-ico"><svg><use href="#sb-ico-app" /></svg></div><div class="fc-title">应用工厂</div><div class="fc-desc">把会话沉淀为 BI 应用。</div></div>
+    <div class="feature-card"><div class="fc-ico"><svg><use href="#sb-ico-ask" /></svg></div><div class="fc-title">@L10n.T(Keys.Content.ComponentGalleryCardAskTitle, "Ask BI")</div><div class="fc-desc">@L10n.T(Keys.Content.ComponentGalleryCardAskDesc, "自然语言问数的旗舰入口。")</div></div>
+    <div class="feature-card"><div class="fc-ico"><svg><use href="#sb-ico-dash" /></svg></div><div class="fc-title">@L10n.T(Keys.Content.ComponentGalleryCardDashTitle, "仪表盘")</div><div class="fc-desc">@L10n.T(Keys.Content.ComponentGalleryCardDashDesc, "固化可复用的可视化看板。")</div></div>
+    <div class="feature-card"><div class="fc-ico"><svg><use href="#sb-ico-app" /></svg></div><div class="fc-title">@L10n.T(Keys.Content.ComponentGalleryCardAppTitle, "应用工厂")</div><div class="fc-desc">@L10n.T(Keys.Content.ComponentGalleryCardAppDesc, "把会话沉淀为 BI 应用。")</div></div>
 </div>
 
 <div class="showcase">
     <div class="demo">
-        <div class="d-label">标签页 SbTabs</div>
+        <div class="d-label">@L10n.T(Keys.Content.ComponentGallerySecTabs, "标签页 SbTabs")</div>
         <SbTabs>
-            <SbTab Title="概览"><div class="tiny muted" style="padding:8px 2px">概览内容区，用于聚合多视图。</div></SbTab>
-            <SbTab Title="明细"><div class="tiny muted" style="padding:8px 2px">明细内容区。</div></SbTab>
-            <SbTab Title="设置"><div class="tiny muted" style="padding:8px 2px">设置内容区。</div></SbTab>
+            <SbTab Title="@L10n.T(Keys.Content.ComponentGalleryTabOverview, "概览")"><div class="tiny muted" style="padding:8px 2px">@(L10n.T(Keys.Content.ComponentGalleryTabOverview, "概览"))内容区，用于聚合多视图。</div></SbTab>
+            <SbTab Title="@L10n.T(Keys.Content.ComponentGalleryTabDetail, "明细")"><div class="tiny muted" style="padding:8px 2px">@(L10n.T(Keys.Content.ComponentGalleryTabDetail, "明细"))内容区。</div></SbTab>
+            <SbTab Title="@L10n.T(Keys.Content.ComponentGalleryTabSettings, "设置")"><div class="tiny muted" style="padding:8px 2px">@(L10n.T(Keys.Content.ComponentGalleryTabSettings, "设置"))内容区。</div></SbTab>
         </SbTabs>
     </div>
 
     <div class="demo">
-        <div class="d-label">数据表格 SbDataTable</div>
-        <SbDataTable Items="@_rows" Columns="@_cols" PageSize="3" EmptyTitle="无数据" />
+        <div class="d-label">@L10n.T(Keys.Content.ComponentGallerySecDataTable, "数据表格 SbDataTable")</div>
+        <SbDataTable Items="@_rows" Columns="@_cols" PageSize="3" EmptyTitle="@L10n.T(Keys.Content.ComponentGalleryDataEmpty, "无数据")" />
     </div>
 
     <div class="demo">
-        <div class="d-label">弹窗 SbModal / SbConfirm</div>
+        <div class="d-label">@L10n.T(Keys.Content.ComponentGallerySecModal, "弹窗 SbModal / SbConfirm")</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
-            <button class="btn btn-outline-secondary btn-sm" @onclick="() => _modal = true">打开弹窗</button>
-            <button class="btn btn-danger btn-sm" @onclick="() => _confirm = true">删除确认</button>
+            <button class="btn btn-outline-secondary btn-sm" @onclick="() => _modal = true">@L10n.T(Keys.Content.ComponentGalleryOpenModal, "打开弹窗")</button>
+            <button class="btn btn-danger btn-sm" @onclick="() => _confirm = true">@L10n.T(Keys.Content.ComponentGalleryConfirmTitle, "删除确认")</button>
         </div>
-        <SbModal Visible="@_modal" VisibleChanged="v => _modal = v" Title="示例弹窗">
-            <Body><p class="tiny">弹窗用于承载表单或详情，支持遮罩点击关闭与自定义底部操作。</p></Body>
-            <Footer><button class="btn btn-primary btn-sm" @onclick="() => _modal = false">知道了</button></Footer>
+        <SbModal Visible="@_modal" VisibleChanged="v => _modal = v" Title="@L10n.T(Keys.Content.ComponentGalleryModalTitle, "示例弹窗")">
+            <Body><p class="tiny">@L10n.T(Keys.Content.ComponentGalleryModalBody, "弹窗用于承载表单或详情，支持遮罩点击关闭与自定义底部操作。")</p></Body>
+            <Footer><button class="btn btn-primary btn-sm" @onclick="() => _modal = false">@L10n.T(Keys.Content.ComponentGalleryModalOk, "知道了")</button></Footer>
         </SbModal>
-        <SbConfirm Visible="@_confirm" VisibleChanged="v => _confirm = v" Title="删除确认"
-                   Message="此操作不可撤销，确定要删除该记录吗？" ConfirmText="删除"
+        <SbConfirm Visible="@_confirm" VisibleChanged="v => _confirm = v" Title="@L10n.T(Keys.Content.ComponentGalleryConfirmTitle, "删除确认")"
+                   Message="@L10n.T(Keys.Content.ComponentGalleryConfirmMsg, "此操作不可撤销，确定要删除该记录吗？")" ConfirmText="@L10n.T(Keys.Content.ComponentGalleryConfirmText, "删除")"
                    Tone="danger" OnConfirm="OnConfirmDelete" />
     </div>
 
     <div class="demo">
-        <div class="d-label">轻提示 Toast</div>
+        <div class="d-label">@L10n.T(Keys.Content.ComponentGallerySecToast, "轻提示 Toast")</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
-            <button class="btn btn-outline-secondary btn-sm" @onclick='() => Toast.Info("信息提示")'>Info</button>
-            <button class="btn btn-outline-secondary btn-sm" @onclick='() => Toast.Success("操作成功")'>Success</button>
-            <button class="btn btn-outline-secondary btn-sm" @onclick='() => Toast.Warning("请注意")'>Warning</button>
-            <button class="btn btn-outline-secondary btn-sm" @onclick='() => Toast.Error("出错了")'>Error</button>
+            <button class="btn btn-outline-secondary btn-sm" @onclick='() => Toast.Info(L10n.T(Keys.Content.ComponentGalleryToastInfo, "信息提示"))'>Info</button>
+            <button class="btn btn-outline-secondary btn-sm" @onclick='() => Toast.Success(L10n.T(Keys.Content.ComponentGalleryToastSuccess, "操作成功"))'>Success</button>
+            <button class="btn btn-outline-secondary btn-sm" @onclick='() => Toast.Warning(L10n.T(Keys.Content.ComponentGalleryToastWarning, "请注意"))'>Warning</button>
+            <button class="btn btn-outline-secondary btn-sm" @onclick='() => Toast.Error(L10n.T(Keys.Content.ComponentGalleryToastError, "出错了"))'>Error</button>
         </div>
     </div>
 
     <div class="demo">
-        <div class="d-label">守卫 Guard</div>
-        <div class="tiny muted">AuthGuard 等待会话自举完成后渲染子内容；PermissionGuard 按权限码门控（当前未强制，见 NavMenuItems.EnforcePermissions）。</div>
+        <div class="d-label">@L10n.T(Keys.Content.ComponentGallerySecGuard, "守卫 Guard")</div>
+        <div class="tiny muted">@L10n.T(Keys.Content.ComponentGalleryGuardDesc, "AuthGuard 等待会话自举完成后渲染子内容；PermissionGuard 按权限码门控（当前未强制，见 NavMenuItems.EnforcePermissions）。")</div>
         <div style="margin-top:8px">
             <PermissionGuard Require="@(new[] { "demo:write" })" Mode="Any">
-                <span class="badge badge-success">你拥有 demo:write 权限</span>
+                <span class="badge badge-success">@L10n.T(Keys.Content.ComponentGalleryGuardHasPerm, "你拥有 demo:write 权限")</span>
             </PermissionGuard>
         </div>
     </div>
@@ -134,24 +134,30 @@
     private bool _confirm = false;
 
     private record DemoRow(string Code, string Name, string Status);
-    private List<DemoRow> _rows = new()
+    private List<DemoRow> _rows = new();
+    private List<SbColumn<DemoRow>> _cols = new();
+
+    protected override void OnInitialized()
     {
-        new("demo-sales", "销售看板", "已发布"),
-        new("demo-stock", "库存预警", "草稿"),
-        new("demo-fin", "财务月报", "全局"),
-        new("demo-hr", "人力看板", "已发布"),
-        new("demo-ops", "运维大盘", "草稿"),
-    };
-    private List<SbColumn<DemoRow>> _cols = new()
-    {
-        SbCol.Of<DemoRow>("编码", r => r.Code),
-        SbCol.Of<DemoRow>("名称", r => r.Name),
-        SbCol.Of<DemoRow>("状态", r => r.Status, isStatus: true),
-    };
+        _rows = new()
+        {
+            new("demo-sales", "销售看板", L10n.T(Keys.Content.ComponentGalleryBadgePublished, "已发布")),
+            new("demo-stock", "库存预警", L10n.T(Keys.Content.ComponentGalleryBadgeDraft, "草稿")),
+            new("demo-fin", "财务月报", L10n.T(Keys.Content.ComponentGalleryBadgeGlobal, "全局")),
+            new("demo-hr", "人力看板", L10n.T(Keys.Content.ComponentGalleryBadgePublished, "已发布")),
+            new("demo-ops", "运维大盘", L10n.T(Keys.Content.ComponentGalleryBadgeDraft, "草稿")),
+        };
+        _cols = new()
+        {
+            SbCol.Of<DemoRow>(L10n.T(Keys.Content.ComponentGalleryColCode, "编码"), r => r.Code),
+            SbCol.Of<DemoRow>(L10n.T(Keys.Content.ComponentGalleryColName, "名称"), r => r.Name),
+            SbCol.Of<DemoRow>(L10n.T(Keys.Content.ComponentGalleryColStatus, "状态"), r => r.Status, isStatus: true),
+        };
+    }
 
     private void OnConfirmDelete()
     {
         _confirm = false;
-        Toast.Success("已确认删除（演示）。");
+        Toast.Success(L10n.T(Keys.Content.ComponentGalleryToastDeleted, "已确认删除（演示）。"));
     }
 }
