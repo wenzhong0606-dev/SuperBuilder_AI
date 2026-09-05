@@ -7,19 +7,19 @@
 
 <AuthGuard>
     <PageHead Icon="sb-ico-settings" Key="Profile" Title="个人设置" Desc="查看账号与租户信息，调整界面偏好。">
-        <button class="btn btn-outline-secondary btn-sm" @onclick="Logout">退出登录</button>
+        <button class="btn btn-outline-secondary btn-sm" @onclick="Logout">@L10n.T(Keys.Content.ProfileLogout, "退出登录")</button>
     </PageHead>
 
     <div class="field-grid">
-        <SbPanel Icon="sb-ico-user" Title="账号信息">
+        <SbPanel Icon="sb-ico-user" Title="@L10n.T(Keys.Content.ProfilePanelAccount, "账号信息")">
             <Body>
                 <SbKeyValue Items="@AccountInfo" />
                 <div class="mt-3">
-                    <div class="st-label">权限</div>
+                    <div class="st-label">@L10n.T(Keys.Content.ProfilePermissions, "权限")</div>
                     <div class="sb-badge-wrap">
                         @if (State.Permissions.Count == 0)
                         {
-                            <SbBadge Tone="muted">无显式权限</SbBadge>
+                            <SbBadge Tone="muted">@L10n.T(Keys.Content.ProfileNoExplicitPermission, "无显式权限")</SbBadge>
                         }
                         else
                         {
@@ -33,11 +33,11 @@
             </Body>
         </SbPanel>
 
-        <SbPanel Icon="sb-ico-theme" Title="界面偏好">
+        <SbPanel Icon="sb-ico-theme" Title="@L10n.T(Keys.Content.ProfilePanelPreference, "界面偏好")">
             <Body>
-                <SbField Label="主题" Hint="偏好会保存在本地，下次进入自动应用。">
+                <SbField Label="@L10n.T(Keys.Content.ProfileFieldTheme, "主题")" Hint="@L10n.T(Keys.Content.ProfileHintTheme, "偏好会保存在本地，下次进入自动应用。")">
                     <SbSegmented TValue="string" Items="@_themes" Value="@_theme"
-                                 TextSelector="@(t => t == "dark" ? "深色" : "浅色")"
+                                 TextSelector="@(t => t == "dark" ? L10n.T(Keys.Content.ProfileThemeDark, "深色") : L10n.T(Keys.Content.ProfileThemeLight, "浅色"))"
                                  ValueChanged="OnThemeChanged" />
                 </SbField>
             </Body>
@@ -51,10 +51,10 @@
 
     private List<KeyValuePair<string, string>> AccountInfo => new()
     {
-        new KeyValuePair<string, string>("用户名", State.Username),
-        new KeyValuePair<string, string>("用户 ID", State.UserId.ToString()),
-        new KeyValuePair<string, string>("租户 ID", State.TenantId.ToString()),
-        new KeyValuePair<string, string>("登录状态", State.IsAuthenticated ? "已登录" : "未登录")
+        new KeyValuePair<string, string>(L10n.T(Keys.Content.CommonUsername, "用户名"), State.Username),
+        new KeyValuePair<string, string>(L10n.T(Keys.Content.ProfileUserId, "用户 ID"), State.UserId.ToString()),
+        new KeyValuePair<string, string>(L10n.T(Keys.Content.ProfileTenantId, "租户 ID"), State.TenantId.ToString()),
+        new KeyValuePair<string, string>(L10n.T(Keys.Content.ProfileLoginStatus, "登录状态"), State.IsAuthenticated ? L10n.T(Keys.Content.ProfileSignedIn, "已登录") : L10n.T(Keys.Content.ProfileSignedOut, "未登录"))
     };
 
     protected override async Task OnAfterRenderAsync(bool firstRender)

@@ -163,6 +163,7 @@ public static class ResourceKeys
     {
         public const string TitleHome = "Page.Title.Home";
         public const string TitleProfile = "Page.Title.Profile";
+        public const string DescProfile = "Page.Desc.Profile";
         public const string TitleTenants = "Page.Title.Tenants";
         public const string TitleTenantMembers = "Page.Title.TenantMembers";
         public const string TitleIdentity = "Page.Title.Identity";
@@ -1122,6 +1123,47 @@ public static class ResourceKeys
         public const string AgentPlanDetailStepN = "Content.AgentPlanDetailStepN";
         public const string AgentPlanDetailDeleted = "Content.AgentPlanDetailDeleted";
         public const string AgentPlanDetailDeleteFailed = "Content.AgentPlanDetailDeleteFailed";
+        public const string SelfRegistrationTagMultiTenant = "Content.SelfRegistrationTagMultiTenant";
+        public const string SelfRegistrationTagLowCode = "Content.SelfRegistrationTagLowCode";
+        public const string SelfRegistrationTagSaas = "Content.SelfRegistrationTagSaas";
+        public const string SelfRegistrationChecking = "Content.SelfRegistrationChecking";
+        public const string SelfRegistrationClosedTitle = "Content.SelfRegistrationClosedTitle";
+        public const string SelfRegistrationClosedDesc = "Content.SelfRegistrationClosedDesc";
+        public const string SelfRegistrationBackToLogin = "Content.SelfRegistrationBackToLogin";
+        public const string SelfRegistrationHasAccount = "Content.SelfRegistrationHasAccount";
+        public const string SelfRegistrationAlreadyLoggedIn = "Content.SelfRegistrationAlreadyLoggedIn";
+        public const string SelfRegistrationEnterWorkspace = "Content.SelfRegistrationEnterWorkspace";
+        public const string SelfRegistrationApplyTitle = "Content.SelfRegistrationApplyTitle";
+        public const string SelfRegistrationApplyDesc = "Content.SelfRegistrationApplyDesc";
+        public const string SelfRegistrationLabelTenantCode = "Content.SelfRegistrationLabelTenantCode";
+        public const string SelfRegistrationLabelTenantName = "Content.SelfRegistrationLabelTenantName";
+        public const string SelfRegistrationLabelAdminUsername = "Content.SelfRegistrationLabelAdminUsername";
+        public const string SelfRegistrationLabelAdminEmail = "Content.SelfRegistrationLabelAdminEmail";
+        public const string SelfRegistrationLabelAdminPassword = "Content.SelfRegistrationLabelAdminPassword";
+        public const string SelfRegistrationLabelConfirmPassword = "Content.SelfRegistrationLabelConfirmPassword";
+        public const string SelfRegistrationPhTenantName = "Content.SelfRegistrationPhTenantName";
+        public const string SelfRegistrationPhPassword = "Content.SelfRegistrationPhPassword";
+        public const string SelfRegistrationPhConfirmPassword = "Content.SelfRegistrationPhConfirmPassword";
+        public const string SelfRegistrationSubmit = "Content.SelfRegistrationSubmit";
+        public const string SelfRegistrationErrCodeNameRequired = "Content.SelfRegistrationErrCodeNameRequired";
+        public const string SelfRegistrationErrAdminRequired = "Content.SelfRegistrationErrAdminRequired";
+        public const string SelfRegistrationErrPasswordLen = "Content.SelfRegistrationErrPasswordLen";
+        public const string SelfRegistrationErrPasswordMismatch = "Content.SelfRegistrationErrPasswordMismatch";
+        public const string SelfRegistrationErrFailed = "Content.SelfRegistrationErrFailed";
+        public const string ProfileLogout = "Content.ProfileLogout";
+        public const string ProfilePanelAccount = "Content.ProfilePanelAccount";
+        public const string ProfilePermissions = "Content.ProfilePermissions";
+        public const string ProfileNoExplicitPermission = "Content.ProfileNoExplicitPermission";
+        public const string ProfilePanelPreference = "Content.ProfilePanelPreference";
+        public const string ProfileFieldTheme = "Content.ProfileFieldTheme";
+        public const string ProfileHintTheme = "Content.ProfileHintTheme";
+        public const string ProfileThemeDark = "Content.ProfileThemeDark";
+        public const string ProfileThemeLight = "Content.ProfileThemeLight";
+        public const string ProfileUserId = "Content.ProfileUserId";
+        public const string ProfileTenantId = "Content.ProfileTenantId";
+        public const string ProfileLoginStatus = "Content.ProfileLoginStatus";
+        public const string ProfileSignedIn = "Content.ProfileSignedIn";
+        public const string ProfileSignedOut = "Content.ProfileSignedOut";
 
     }
 
@@ -1316,6 +1358,7 @@ public static class ResourceKeys
 
         [Page.TitleHome] = new("Page", Page: "Home", DefaultValue: "Workspace"),
         [Page.TitleProfile] = new("Page", Page: "Profile", DefaultValue: "Profile"),
+        [Page.DescProfile] = new("Page", Page: "Profile", DefaultValue: "View account and tenant info, and adjust interface preferences."),
         [Page.TitleTenants] = new("Page", Page: "Tenants", DefaultValue: "Tenants"),
         [Page.TitleTenantMembers] = new("Page", Page: "TenantMembers", DefaultValue: "Tenant Members"),
         [Page.TitleIdentity] = new("Page", Page: "Identity", DefaultValue: "Identity & Permissions"),
@@ -2285,6 +2328,47 @@ public static class ResourceKeys
         [Content.AgentPlanDetailStepN] = new("Content", Page: "AgentPlans", DefaultValue: "Step {0}"),
         [Content.AgentPlanDetailDeleted] = new("Content", Page: "AgentPlans", DefaultValue: "Plan deleted."),
         [Content.AgentPlanDetailDeleteFailed] = new("Content", Page: "AgentPlans", DefaultValue: "Failed to delete ({0})."),
+        [Content.SelfRegistrationTagMultiTenant] = new("Content", Page: "SelfRegistration", DefaultValue: "Multi-tenant"),
+        [Content.SelfRegistrationTagLowCode] = new("Content", Page: "SelfRegistration", DefaultValue: "Low-code"),
+        [Content.SelfRegistrationTagSaas] = new("Content", Page: "SelfRegistration", DefaultValue: "Enterprise SaaS"),
+        [Content.SelfRegistrationChecking] = new("Content", Page: "SelfRegistration", DefaultValue: "Checking registration channel…"),
+        [Content.SelfRegistrationClosedTitle] = new("Content", Page: "SelfRegistration", DefaultValue: "Registration is closed"),
+        [Content.SelfRegistrationClosedDesc] = new("Content", Page: "SelfRegistration", DefaultValue: "Self-registration is not open on this platform. Contact your platform administrator to request a tenant."),
+        [Content.SelfRegistrationBackToLogin] = new("Content", Page: "SelfRegistration", DefaultValue: "Back to sign in"),
+        [Content.SelfRegistrationHasAccount] = new("Content", Page: "SelfRegistration", DefaultValue: "Already have an account? Back to sign in"),
+        [Content.SelfRegistrationAlreadyLoggedIn] = new("Content", Page: "SelfRegistration", DefaultValue: "Signed in as {0} (tenant {1})"),
+        [Content.SelfRegistrationEnterWorkspace] = new("Content", Page: "SelfRegistration", DefaultValue: "Go to workspace"),
+        [Content.SelfRegistrationApplyTitle] = new("Content", Page: "SelfRegistration", DefaultValue: "Request a new tenant"),
+        [Content.SelfRegistrationApplyDesc] = new("Content", Page: "SelfRegistration", DefaultValue: "Fill in the details to create your dedicated tenant and first admin account."),
+        [Content.SelfRegistrationLabelTenantCode] = new("Content", Page: "SelfRegistration", DefaultValue: "Tenant code (lowercase letters/digits; cannot be changed after creation)"),
+        [Content.SelfRegistrationLabelTenantName] = new("Content", Page: "SelfRegistration", DefaultValue: "Tenant name"),
+        [Content.SelfRegistrationLabelAdminUsername] = new("Content", Page: "SelfRegistration", DefaultValue: "Admin username"),
+        [Content.SelfRegistrationLabelAdminEmail] = new("Content", Page: "SelfRegistration", DefaultValue: "Admin email"),
+        [Content.SelfRegistrationLabelAdminPassword] = new("Content", Page: "SelfRegistration", DefaultValue: "Admin password"),
+        [Content.SelfRegistrationLabelConfirmPassword] = new("Content", Page: "SelfRegistration", DefaultValue: "Confirm password"),
+        [Content.SelfRegistrationPhTenantName] = new("Content", Page: "SelfRegistration", DefaultValue: "e.g. Acme Tech"),
+        [Content.SelfRegistrationPhPassword] = new("Content", Page: "SelfRegistration", DefaultValue: "At least 8 characters"),
+        [Content.SelfRegistrationPhConfirmPassword] = new("Content", Page: "SelfRegistration", DefaultValue: "Re-enter password"),
+        [Content.SelfRegistrationSubmit] = new("Content", Page: "SelfRegistration", DefaultValue: "Create tenant & sign in"),
+        [Content.SelfRegistrationErrCodeNameRequired] = new("Content", Page: "SelfRegistration", DefaultValue: "Tenant code and name are required."),
+        [Content.SelfRegistrationErrAdminRequired] = new("Content", Page: "SelfRegistration", DefaultValue: "Admin username and a valid email are required."),
+        [Content.SelfRegistrationErrPasswordLen] = new("Content", Page: "SelfRegistration", DefaultValue: "Admin password must be at least 8 characters."),
+        [Content.SelfRegistrationErrPasswordMismatch] = new("Content", Page: "SelfRegistration", DefaultValue: "The two passwords do not match."),
+        [Content.SelfRegistrationErrFailed] = new("Content", Page: "SelfRegistration", DefaultValue: "Registration failed. Please try again later."),
+        [Content.ProfileLogout] = new("Content", Page: "Profile", DefaultValue: "Sign out"),
+        [Content.ProfilePanelAccount] = new("Content", Page: "Profile", DefaultValue: "Account info"),
+        [Content.ProfilePermissions] = new("Content", Page: "Profile", DefaultValue: "Permissions"),
+        [Content.ProfileNoExplicitPermission] = new("Content", Page: "Profile", DefaultValue: "No explicit permissions"),
+        [Content.ProfilePanelPreference] = new("Content", Page: "Profile", DefaultValue: "Interface preferences"),
+        [Content.ProfileFieldTheme] = new("Content", Page: "Profile", DefaultValue: "Theme"),
+        [Content.ProfileHintTheme] = new("Content", Page: "Profile", DefaultValue: "Preferences are saved locally and applied automatically next time."),
+        [Content.ProfileThemeDark] = new("Content", Page: "Profile", DefaultValue: "Dark"),
+        [Content.ProfileThemeLight] = new("Content", Page: "Profile", DefaultValue: "Light"),
+        [Content.ProfileUserId] = new("Content", Page: "Profile", DefaultValue: "User ID"),
+        [Content.ProfileTenantId] = new("Content", Page: "Profile", DefaultValue: "Tenant ID"),
+        [Content.ProfileLoginStatus] = new("Content", Page: "Profile", DefaultValue: "Sign-in status"),
+        [Content.ProfileSignedIn] = new("Content", Page: "Profile", DefaultValue: "Signed in"),
+        [Content.ProfileSignedOut] = new("Content", Page: "Profile", DefaultValue: "Signed out"),
 
     };
 

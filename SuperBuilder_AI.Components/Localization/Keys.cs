@@ -199,6 +199,7 @@ public static class Keys
     {
         public const string TitleHome = "Page.Title.Home";
         public const string TitleProfile = "Page.Title.Profile";
+        public const string DescProfile = "Page.Desc.Profile";
         public const string TitleTenants = "Page.Title.Tenants";
         public const string TitleTenantMembers = "Page.Title.TenantMembers";
         public const string TitleIdentity = "Page.Title.Identity";
@@ -1154,6 +1155,47 @@ public static class Keys
         public const string AgentPlanDetailStepN = "Content.AgentPlanDetailStepN";
         public const string AgentPlanDetailDeleted = "Content.AgentPlanDetailDeleted";
         public const string AgentPlanDetailDeleteFailed = "Content.AgentPlanDetailDeleteFailed";
+        public const string SelfRegistrationTagMultiTenant = "Content.SelfRegistrationTagMultiTenant";
+        public const string SelfRegistrationTagLowCode = "Content.SelfRegistrationTagLowCode";
+        public const string SelfRegistrationTagSaas = "Content.SelfRegistrationTagSaas";
+        public const string SelfRegistrationChecking = "Content.SelfRegistrationChecking";
+        public const string SelfRegistrationClosedTitle = "Content.SelfRegistrationClosedTitle";
+        public const string SelfRegistrationClosedDesc = "Content.SelfRegistrationClosedDesc";
+        public const string SelfRegistrationBackToLogin = "Content.SelfRegistrationBackToLogin";
+        public const string SelfRegistrationHasAccount = "Content.SelfRegistrationHasAccount";
+        public const string SelfRegistrationAlreadyLoggedIn = "Content.SelfRegistrationAlreadyLoggedIn";
+        public const string SelfRegistrationEnterWorkspace = "Content.SelfRegistrationEnterWorkspace";
+        public const string SelfRegistrationApplyTitle = "Content.SelfRegistrationApplyTitle";
+        public const string SelfRegistrationApplyDesc = "Content.SelfRegistrationApplyDesc";
+        public const string SelfRegistrationLabelTenantCode = "Content.SelfRegistrationLabelTenantCode";
+        public const string SelfRegistrationLabelTenantName = "Content.SelfRegistrationLabelTenantName";
+        public const string SelfRegistrationLabelAdminUsername = "Content.SelfRegistrationLabelAdminUsername";
+        public const string SelfRegistrationLabelAdminEmail = "Content.SelfRegistrationLabelAdminEmail";
+        public const string SelfRegistrationLabelAdminPassword = "Content.SelfRegistrationLabelAdminPassword";
+        public const string SelfRegistrationLabelConfirmPassword = "Content.SelfRegistrationLabelConfirmPassword";
+        public const string SelfRegistrationPhTenantName = "Content.SelfRegistrationPhTenantName";
+        public const string SelfRegistrationPhPassword = "Content.SelfRegistrationPhPassword";
+        public const string SelfRegistrationPhConfirmPassword = "Content.SelfRegistrationPhConfirmPassword";
+        public const string SelfRegistrationSubmit = "Content.SelfRegistrationSubmit";
+        public const string SelfRegistrationErrCodeNameRequired = "Content.SelfRegistrationErrCodeNameRequired";
+        public const string SelfRegistrationErrAdminRequired = "Content.SelfRegistrationErrAdminRequired";
+        public const string SelfRegistrationErrPasswordLen = "Content.SelfRegistrationErrPasswordLen";
+        public const string SelfRegistrationErrPasswordMismatch = "Content.SelfRegistrationErrPasswordMismatch";
+        public const string SelfRegistrationErrFailed = "Content.SelfRegistrationErrFailed";
+        public const string ProfileLogout = "Content.ProfileLogout";
+        public const string ProfilePanelAccount = "Content.ProfilePanelAccount";
+        public const string ProfilePermissions = "Content.ProfilePermissions";
+        public const string ProfileNoExplicitPermission = "Content.ProfileNoExplicitPermission";
+        public const string ProfilePanelPreference = "Content.ProfilePanelPreference";
+        public const string ProfileFieldTheme = "Content.ProfileFieldTheme";
+        public const string ProfileHintTheme = "Content.ProfileHintTheme";
+        public const string ProfileThemeDark = "Content.ProfileThemeDark";
+        public const string ProfileThemeLight = "Content.ProfileThemeLight";
+        public const string ProfileUserId = "Content.ProfileUserId";
+        public const string ProfileTenantId = "Content.ProfileTenantId";
+        public const string ProfileLoginStatus = "Content.ProfileLoginStatus";
+        public const string ProfileSignedIn = "Content.ProfileSignedIn";
+        public const string ProfileSignedOut = "Content.ProfileSignedOut";
 
     }
 
@@ -1325,6 +1367,7 @@ public static class Keys
 
         [Page.TitleHome] = new("工作台", "Workspace"),
         [Page.TitleProfile] = new("个人设置", "Profile"),
+        [Page.DescProfile] = new("查看账号与租户信息，调整界面偏好。", "View account and tenant info, and adjust interface preferences."),
         [Page.TitleTenants] = new("租户管理", "Tenants"),
         [Page.TitleTenantMembers] = new("租户成员", "Tenant Members"),
         [Page.TitleIdentity] = new("身份与权限", "Identity & Permissions"),
@@ -2263,6 +2306,47 @@ public static class Keys
         [Content.AgentPlanDetailStepN] = new("步骤 {0}", "Step {0}"),
         [Content.AgentPlanDetailDeleted] = new("计划已删除。", "Plan deleted."),
         [Content.AgentPlanDetailDeleteFailed] = new("删除失败（{0}）。", "Failed to delete ({0})."),
+        [Content.SelfRegistrationTagMultiTenant] = new("多租户", "Multi-tenant"),
+        [Content.SelfRegistrationTagLowCode] = new("低代码", "Low-code"),
+        [Content.SelfRegistrationTagSaas] = new("企业级 SaaS", "Enterprise SaaS"),
+        [Content.SelfRegistrationChecking] = new("正在检查注册通道状态…", "Checking registration channel…"),
+        [Content.SelfRegistrationClosedTitle] = new("注册通道未开放", "Registration is closed"),
+        [Content.SelfRegistrationClosedDesc] = new("当前平台未开放自助注册。如需开通租户，请联系平台管理员。", "Self-registration is not open on this platform. Contact your platform administrator to request a tenant."),
+        [Content.SelfRegistrationBackToLogin] = new("返回登录", "Back to sign in"),
+        [Content.SelfRegistrationHasAccount] = new("已有账户？返回登录", "Already have an account? Back to sign in"),
+        [Content.SelfRegistrationAlreadyLoggedIn] = new("当前已登录：{0}（租户 {1}）", "Signed in as {0} (tenant {1})"),
+        [Content.SelfRegistrationEnterWorkspace] = new("进入工作台", "Go to workspace"),
+        [Content.SelfRegistrationApplyTitle] = new("申请开通新租户", "Request a new tenant"),
+        [Content.SelfRegistrationApplyDesc] = new("填写以下信息创建您的专属租户与首位管理员账户。", "Fill in the details to create your dedicated tenant and first admin account."),
+        [Content.SelfRegistrationLabelTenantCode] = new("租户编码（小写字母/数字，创建后不可变更）", "Tenant code (lowercase letters/digits; cannot be changed after creation)"),
+        [Content.SelfRegistrationLabelTenantName] = new("租户名称", "Tenant name"),
+        [Content.SelfRegistrationLabelAdminUsername] = new("管理员用户名", "Admin username"),
+        [Content.SelfRegistrationLabelAdminEmail] = new("管理员邮箱", "Admin email"),
+        [Content.SelfRegistrationLabelAdminPassword] = new("管理员口令", "Admin password"),
+        [Content.SelfRegistrationLabelConfirmPassword] = new("确认口令", "Confirm password"),
+        [Content.SelfRegistrationPhTenantName] = new("例如 Acme 科技", "e.g. Acme Tech"),
+        [Content.SelfRegistrationPhPassword] = new("至少 8 位", "At least 8 characters"),
+        [Content.SelfRegistrationPhConfirmPassword] = new("再次输入口令", "Re-enter password"),
+        [Content.SelfRegistrationSubmit] = new("创建租户并登录", "Create tenant & sign in"),
+        [Content.SelfRegistrationErrCodeNameRequired] = new("租户编码与名称均必填。", "Tenant code and name are required."),
+        [Content.SelfRegistrationErrAdminRequired] = new("管理员用户名与合法邮箱均必填。", "Admin username and a valid email are required."),
+        [Content.SelfRegistrationErrPasswordLen] = new("管理员口令至少 8 位。", "Admin password must be at least 8 characters."),
+        [Content.SelfRegistrationErrPasswordMismatch] = new("两次输入的口令不一致。", "The two passwords do not match."),
+        [Content.SelfRegistrationErrFailed] = new("注册失败，请稍后重试。", "Registration failed. Please try again later."),
+        [Content.ProfileLogout] = new("退出登录", "Sign out"),
+        [Content.ProfilePanelAccount] = new("账号信息", "Account info"),
+        [Content.ProfilePermissions] = new("权限", "Permissions"),
+        [Content.ProfileNoExplicitPermission] = new("无显式权限", "No explicit permissions"),
+        [Content.ProfilePanelPreference] = new("界面偏好", "Interface preferences"),
+        [Content.ProfileFieldTheme] = new("主题", "Theme"),
+        [Content.ProfileHintTheme] = new("偏好会保存在本地，下次进入自动应用。", "Preferences are saved locally and applied automatically next time."),
+        [Content.ProfileThemeDark] = new("深色", "Dark"),
+        [Content.ProfileThemeLight] = new("浅色", "Light"),
+        [Content.ProfileUserId] = new("用户 ID", "User ID"),
+        [Content.ProfileTenantId] = new("租户 ID", "Tenant ID"),
+        [Content.ProfileLoginStatus] = new("登录状态", "Sign-in status"),
+        [Content.ProfileSignedIn] = new("已登录", "Signed in"),
+        [Content.ProfileSignedOut] = new("未登录", "Signed out"),
 
     };
 }
