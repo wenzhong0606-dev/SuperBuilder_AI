@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SuperBuilder_AI.Interfaces.Platform;
+using SuperBuilder_AI.Interfaces.Localization;
 using SuperBuilder_AI.Models.Organization;
 using SuperBuilder_AI.Data;
 using SuperBuilder_AI.Models.Localization;
@@ -25,12 +26,14 @@ public sealed class LocalizationController : ControllerBase
 	private readonly ILocalizationService _localization;
 	private readonly SuperBIContext _db;
 	private readonly ILocalizationSeedService _seed;
+	private readonly ITenantLanguageService _tenantLanguage;
 
-	public LocalizationController(ILocalizationService localization, SuperBIContext db, ILocalizationSeedService seed)
+	public LocalizationController(ILocalizationService localization, SuperBIContext db, ILocalizationSeedService seed, ITenantLanguageService tenantLanguage)
 	{
 		_localization = localization;
 		_db = db;
 		_seed = seed;
+		_tenantLanguage = tenantLanguage;
 	}
 
 	/// <summary>列举平台支持的语言区域。</summary>
@@ -171,9 +174,7 @@ public sealed class LocalizationController : ControllerBase
 		if (User.HasClaim("perm", IdentityPermissions.PlatformTenantView))
 			return await _db.UiLanguages.AsNoTracking().Where(x => x.Enabled).Select(x => x.Culture).ToListAsync(ct);
 		var tenantId = CurrentTenantId();
-		var json = await _db.TenantSettings.AsNoTracking().Where(x => x.TenantId == tenantId && x.Key == "localization:availableCultures").Select(x => x.Value).FirstOrDefaultAsync(ct);
-		try { return System.Text.Json.JsonSerializer.Deserialize<List<string>>(json ?? "[]") ?? new(); }
-		catch { return new(); }
+		return await _tenantLanguage.GetAvailableCulturesAsync(tenantId, ct);
 	}
 
 	private long CurrentTenantId() => long.TryParse(User.FindFirst("tid")?.Value, out var id) ? id : 0;

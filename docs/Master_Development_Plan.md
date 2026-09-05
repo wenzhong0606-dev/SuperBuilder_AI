@@ -361,12 +361,20 @@ M3-G0 是 M4/M7/M8 的最小前置，不等同于完成全部 i18n。它只包�
 - ✅ **G0-G 共享校验/错误组件**：`FieldError.razor`、`ValidationSummary.razor`（role=alert / validation-summary）。
 - ✅ **G0-H 资源键注册表 + 五语言种子**：`ResourceKeys`（Common/Login/App/Document/Validation/Error/Empty 权威键集合，`All()` 反射枚举）；`LocalizationSeedService.defaults` 由 2 语言扩至 5（zh-CN/zh-TW/en-US/ja-JP/ko-KR），每语言 17 键；新增 `EnsureSeedAsync_Covers_Registered_ResourceKeys` 测试。
 
-### M3-01 语言关系模型
+### M3-01 语言关系模型 ✅（2026-09-05 收尾，本地提交待推送）
 
-- 建立 `TenantUiLanguage(TenantId, UiLanguageId, Enabled, SortOrder, IsDefault)` 或等价关系。
-- 每租户至少一种启用语言、只能一个默认语言，且默认值必须属于授权集合。
-- 停用平台语言前展示受影响租户并迁移其默认语言。
-- 将现有 `localization:availableCultures/defaultCulture` JSON 数据迁移到关系模型。
+- 建立 `TenantUiLanguage(TenantId, UiLanguageId, Enabled, SortOrder, IsDefault)` 关系（替代 `TenantSetting` 中 `localization:availableCultures/defaultCulture` JSON）。
+- 每租户至少一种启用语言、只能一个默认语言，且默认值必须属于授权集合（事务内强制）。
+- 停用平台语言前展示受影响租户并迁移其默认语言（含单语言租户回退到首个其他启用平台语言）。
+- 现有 `localization:availableCultures/defaultCulture` JSON 数据在启动播种与租户创建/自助注册/演示安装时迁移到关系模型（`TenantSettingPolicy` 锁定键保留但进入休眠，向后兼容读仅在播种阶段使用）。
+
+> **状态（2026-09-05）**：M3-01 全部交付并验证；测试 674/674 全绿（新增 `TenantLanguageServiceTests` 13 项）、四端构建 0 error。本地提交待推送 `origin/master`。
+
+**交付清单（M3-01-A ~ M3-01-D）：**
+- ✅ **M3-01-A 实体与迁移**：`TenantUiLanguage`（唯一索引 `(TenantId,UiLanguageId)`、索引 `(TenantId,IsDefault)`，级联删除租户、限制删除语言），迁移 `20260905064209_M3_01_TenantUiLanguage`。
+- ✅ **M3-01-B 服务与约束**：`ITenantLanguageService`/`TenantLanguageService`/`TenantLanguageException`；`SetLanguagesAsync` 强制（≥1 启用、恰 1 默认、默认须启用、禁用平台语言不可启用）；`GetAvailableCulturesAsync`/`GetDefaultCultureAsync`/`GetLanguagesForTenantsAsync`（批量）；`DisablePlatformLanguageAsync` 迁移默认租户并停用所有租户侧该语言行。
+- ✅ **M3-01-C 启动播种迁移**：`Program.cs` 启动序列在主题种子之后调用 `EnsureAllTenantsLanguagesAsync`（幂等，按 JSON 或平台默认 zh-CN 迁移）。
+- ✅ **M3-01-D 消费者改走服务**：`AuthController`(登录/LoginOptions)、`TenantMembershipController`、`TenantManagementController`(List/Create/Update)、`LocalizationController.AllowedCultures`、`UserLanguagePreferenceService`、`SelfRegistrationService`、`DemoDataInstaller` 全部改经 `ITenantLanguageService`；`TenantSettingPolicy` 锁定键（含 `localization:*`）保持不变以兼容既有治理测试。
 
 ### M3-02 平台语言维护
 

@@ -6,7 +6,9 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using SuperBuilder_AI.Data;
 using SuperBuilder_AI.Interfaces.Identity;
+using SuperBuilder_AI.Interfaces.Localization;
 using SuperBuilder_AI.Models.Identity;
+using SuperBuilder_AI.Models.Localization;
 using SuperBuilder_AI.Services.Auth;
 using SuperBuilder_AI.Api.Errors;
 using SuperBuilder_AI.Api.Security;
@@ -39,14 +41,16 @@ public sealed class AuthController : ControllerBase
 	private readonly ITokenService _token;
 	private readonly IPasswordHasher _hasher;
 	private readonly IConfiguration _config;
+	private readonly ITenantLanguageService _tenantLanguage;
 
-	public AuthController(SuperBIContext db, IIdentityService identity, ITokenService token, IPasswordHasher hasher, IConfiguration configuration)
+	public AuthController(SuperBIContext db, IIdentityService identity, ITokenService token, IPasswordHasher hasher, IConfiguration configuration, ITenantLanguageService tenantLanguage)
 	{
 		_db = db;
 		_identity = identity;
 		_token = token;
 		_hasher = hasher;
 		_config = configuration;
+		_tenantLanguage = tenantLanguage;
 	}
 
 	/// <summary>登录并签发访问令牌。</summary>
@@ -142,16 +146,9 @@ public sealed class AuthController : ControllerBase
 
 	private async Task<(List<string> Available, string Default)> ResolveTenantLocaleAsync(long tenantId, CancellationToken ct)
 	{
-		var settings = await _db.TenantSettings.AsNoTracking()
-			.Where(s => s.TenantId == tenantId && (s.Key == "localization:availableCultures" || s.Key == "localization:defaultCulture"))
-			.ToDictionaryAsync(s => s.Key, s => s.Value, ct);
-		List<string> available;
-		try { available = System.Text.Json.JsonSerializer.Deserialize<List<string>>(settings.GetValueOrDefault("localization:availableCultures") ?? "[]") ?? new(); }
-		catch { available = new(); }
-		available = available.Where(x => x is "zh-CN" or "en-US").Distinct().ToList();
-		if (available.Count == 0) available.Add("zh-CN");
-		var defaultCulture = settings.GetValueOrDefault("localization:defaultCulture") ?? available[0];
-		if (!available.Contains(defaultCulture)) defaultCulture = available[0];
+		// M3-01：语言关系取自 TenantUiLanguage（替代 localization:* JSON）。
+		var available = await _tenantLanguage.GetAvailableCulturesAsync(tenantId, ct);
+		var defaultCulture = await _tenantLanguage.GetDefaultCultureAsync(tenantId, ct);
 		return (available, defaultCulture);
 	}
 
@@ -171,18 +168,14 @@ public sealed class AuthController : ControllerBase
 		var tenants = await query.OrderBy(x => x.TenantName)
 			.Select(x => new { x.Id, x.TenantCode, x.TenantName }).ToListAsync(cancellationToken);
 
-		var ids = tenants.Select(x => x.Id).ToArray();
-		var settings = await _db.TenantSettings.IgnoreQueryFilters().AsNoTracking()
-			.Where(x => ids.Contains(x.TenantId) && (x.Key == "localization:availableCultures" || x.Key == "localization:defaultCulture"))
-			.ToListAsync(cancellationToken);
-		var platformCultures = await _db.UiLanguages.AsNoTracking().Where(x => x.Enabled).OrderBy(x => x.SortOrder).Select(x => x.Culture).ToListAsync(cancellationToken);
+		var ids = tenants.Select(x => x.Id).ToList();
+		var langMap = await _tenantLanguage.GetLanguagesForTenantsAsync(ids, cancellationToken);
 		return Ok(tenants.Select(x =>
 		{
-			var own = settings.Where(s => s.TenantId == x.Id).ToDictionary(s => s.Key, s => s.Value);
-			List<string> cultures;
-			try { cultures = System.Text.Json.JsonSerializer.Deserialize<List<string>>(own.GetValueOrDefault("localization:availableCultures") ?? "[]") ?? new(); } catch { cultures = new(); }
+			var infos = langMap.TryGetValue(x.Id, out var l) ? l : new List<TenantLanguageInfo>();
+			var cultures = infos.Where(i => i.Enabled).Select(i => i.Culture).ToList();
 			if (cultures.Count == 0) cultures.Add("zh-CN");
-			var defaultCulture = own.GetValueOrDefault("localization:defaultCulture") ?? cultures[0];
+			var defaultCulture = infos.FirstOrDefault(i => i.IsDefault && i.Enabled)?.Culture ?? cultures[0];
 			return new { x.Id, x.TenantCode, Name = x.TenantName, AvailableCultures = cultures, DefaultCulture = defaultCulture };
 		}));
 	}

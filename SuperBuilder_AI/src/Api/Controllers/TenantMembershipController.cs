@@ -11,6 +11,7 @@ using SuperBuilder_AI.Api.Security;
 using SuperBuilder_AI.Data;
 using SuperBuilder_AI.Interfaces.Audit;
 using SuperBuilder_AI.Interfaces.Identity;
+using SuperBuilder_AI.Interfaces.Localization;
 using SuperBuilder_AI.Models.Audit;
 using SuperBuilder_AI.Models.Identity;
 using SuperBuilder_AI.Services.Auth;
@@ -38,19 +39,22 @@ public sealed class TenantMembershipController : ControllerBase
 	private readonly IIdentityService _identity;
 	private readonly ITokenService _token;
 	private readonly IAuditLogService _audit;
+	private readonly ITenantLanguageService _tenantLanguage;
 
 	public TenantMembershipController(
 		SuperBIContext db,
 		ITenantMembershipService membership,
 		IIdentityService identity,
 		ITokenService token,
-		IAuditLogService audit)
+		IAuditLogService audit,
+		ITenantLanguageService tenantLanguage)
 	{
 		_db = db;
 		_membership = membership;
 		_identity = identity;
 		_token = token;
 		_audit = audit;
+		_tenantLanguage = tenantLanguage;
 	}
 
 	private long CallerId()
@@ -181,16 +185,9 @@ public sealed class TenantMembershipController : ControllerBase
 
 	private async Task<(List<string> Available, string Default)> ResolveTenantLocaleAsync(long tenantId, CancellationToken ct)
 	{
-		var settings = await _db.TenantSettings.AsNoTracking()
-			.Where(s => s.TenantId == tenantId && (s.Key == "localization:availableCultures" || s.Key == "localization:defaultCulture"))
-			.ToDictionaryAsync(s => s.Key, s => s.Value, ct);
-		List<string> available;
-		try { available = System.Text.Json.JsonSerializer.Deserialize<List<string>>(settings.GetValueOrDefault("localization:availableCultures") ?? "[]") ?? new(); }
-		catch { available = new(); }
-		available = available.Where(x => x is "zh-CN" or "en-US").Distinct().ToList();
-		if (available.Count == 0) available.Add("zh-CN");
-		var defaultCulture = settings.GetValueOrDefault("localization:defaultCulture") ?? available[0];
-		if (!available.Contains(defaultCulture)) defaultCulture = available[0];
+		// M3-01：语言关系取自 TenantUiLanguage（替代 localization:* JSON）。
+		var available = await _tenantLanguage.GetAvailableCulturesAsync(tenantId, ct);
+		var defaultCulture = await _tenantLanguage.GetDefaultCultureAsync(tenantId, ct);
 		return (available, defaultCulture);
 	}
 }

@@ -14,7 +14,9 @@ using SuperBuilder_AI.Interfaces.Identity;
 using SuperBuilder_AI.Models.Identity;
 using SuperBuilder_AI.Services.Identity;
 using SuperBuilder_AI.Services.Auth;
+using SuperBuilder_AI.Models.Localization;
 using SuperBuilder_AI.Models.Organization;
+using SuperBuilder_AI.Services.Localization;
 using Xunit;
 
 namespace SuperBuilder_AI.Tests;
@@ -73,12 +75,18 @@ public sealed class TenantManagementControllerTests
 		var options = new DbContextOptionsBuilder<SuperBIContext>().UseSqlite(connection).Options;
 		var ctx = new SuperBIContext(options);
 		ctx.Database.EnsureCreated();
+		// M3-01：平台语言目录（创建租户时会按文化映射到 UiLanguageId）
+		ctx.UiLanguages.AddRange(
+			new UiLanguage { Id = 1, Culture = "zh-CN", DisplayName = "中文", NativeName = "简体中文", Enabled = true, SortOrder = 0 },
+			new UiLanguage { Id = 2, Culture = "en-US", DisplayName = "English", NativeName = "English", Enabled = true, SortOrder = 1 },
+			new UiLanguage { Id = 3, Culture = "fr-FR", DisplayName = "Français", NativeName = "Français", Enabled = false, SortOrder = 2 });
+		ctx.SaveChanges();
 		return ctx;
 	}
 
 	private static TenantManagementController Build(SuperBIContext db, ClaimsPrincipal? user = null, IPlatformAdminScopeService? scope = null)
 	{
-		var ctrl = new TenantManagementController(db, new SuccessIdentityService(), scope ?? new SuccessScopeService());
+		var ctrl = new TenantManagementController(db, new SuccessIdentityService(), scope ?? new SuccessScopeService(), new TenantLanguageService(db, new NoopAuditService()));
 		var principal = user ?? new ClaimsPrincipal(new ClaimsIdentity(new[]
 		{
 			new Claim("perm", IdentityPermissions.PlatformTenantManage),
@@ -90,7 +98,7 @@ public sealed class TenantManagementControllerTests
 
 	private static TenantManagementController Build(SuperBIContext db, IIdentityService identity, ClaimsPrincipal? user = null, IPlatformAdminScopeService? scope = null)
 	{
-		var ctrl = new TenantManagementController(db, identity, scope ?? new SuccessScopeService());
+		var ctrl = new TenantManagementController(db, identity, scope ?? new SuccessScopeService(), new TenantLanguageService(db, new NoopAuditService()));
 		var principal = user ?? new ClaimsPrincipal(new ClaimsIdentity(new[]
 		{
 			new Claim("perm", IdentityPermissions.PlatformTenantManage),
@@ -352,8 +360,13 @@ public sealed class TenantManagementControllerTests
 		Assert.IsType<OkObjectResult>(result);
 
 		var tenant = await ctx.Tenants.SingleAsync(t => t.TenantCode == "acme");
-		// 两位默认本地化设置（availableCultures / defaultCulture）随租户一并提交。
-		Assert.Equal(2, await ctx.TenantSettings.CountAsync(s => s.TenantId == tenant.Id));
+		// M3-01：语言授权以关系模型 TenantUiLanguage 落库（默认 zh-CN，恰一个默认），不再写 localization:* JSON。
+		var langRows = await ctx.TenantUiLanguages.Where(x => x.TenantId == tenant.Id).ToListAsync();
+		Assert.Single(langRows);
+		Assert.True(langRows[0].IsDefault);
+		Assert.True(langRows[0].Enabled);
+		Assert.Equal("zh-CN", (await ctx.UiLanguages.FindAsync(langRows[0].UiLanguageId))!.Culture);
+		Assert.Equal(0, await ctx.TenantSettings.CountAsync(s => s.TenantId == tenant.Id));
 		// 首位管理员用户已创建并赋 TenantAdmin 角色、已设置口令（安全戳已生成）。
 		var admin = await ctx.Users.SingleAsync(u => u.TenantId == tenant.Id);
 		Assert.Equal("admin", admin.Username);

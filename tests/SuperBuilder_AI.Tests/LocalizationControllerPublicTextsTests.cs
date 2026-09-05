@@ -5,6 +5,7 @@ using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using SuperBuilder_AI.Controllers;
 using SuperBuilder_AI.Data;
+using SuperBuilder_AI.Services.Localization;
 using SuperBuilder_AI.Services.Platform;
 using Xunit;
 
@@ -28,7 +29,7 @@ public sealed class LocalizationControllerPublicTextsTests
     }
 
     private static LocalizationController Build(SuperBIContext db)
-        => new LocalizationController(new LocalizationService(), db, new LocalizationSeedService(db, new LocalizationService()));
+        => new LocalizationController(new LocalizationService(), db, new LocalizationSeedService(db, new LocalizationService()), new TenantLanguageService(db, new NoopAuditService()));
 
     [Fact]
     public async Task PublicTexts_Returns_Only_Platform_Baseline_TenantZero()

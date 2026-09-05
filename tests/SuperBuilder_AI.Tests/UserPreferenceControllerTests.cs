@@ -28,9 +28,16 @@ public sealed class UserPreferenceControllerTests
         var options = new DbContextOptionsBuilder<SuperBIContext>().UseSqlite(connection).Options;
         var ctx = new SuperBIContext(options);
         await ctx.Database.EnsureCreatedAsync();
+        // 平台语言目录（M3-G0 五文化 + 一个停用语言）
+        ctx.UiLanguages.AddRange(
+            new UiLanguage { Id = 1, Culture = "zh-CN", DisplayName = "中文", NativeName = "简体中文", Enabled = true, SortOrder = 0 },
+            new UiLanguage { Id = 2, Culture = "en-US", DisplayName = "English", NativeName = "English", Enabled = true, SortOrder = 1 },
+            new UiLanguage { Id = 3, Culture = "fr-FR", DisplayName = "Français", NativeName = "Français", Enabled = false, SortOrder = 2 });
         ctx.Tenants.Add(new Tenant { Id = 10, TenantCode = "t10", TenantName = "Tenant 10", Enabled = true });
-        ctx.TenantSettings.Add(new TenantSetting { TenantId = 10, Key = "localization:availableCultures", Value = "[\"zh-CN\",\"en-US\"]", IsLocked = true });
-        ctx.TenantSettings.Add(new TenantSetting { TenantId = 10, Key = "localization:defaultCulture", Value = "zh-CN", IsLocked = true });
+        // M3-01：租户语言关系（替代 localization:* JSON）
+        ctx.TenantUiLanguages.AddRange(
+            new TenantUiLanguage { TenantId = 10, UiLanguageId = 1, Enabled = true, IsDefault = true, SortOrder = 0 },
+            new TenantUiLanguage { TenantId = 10, UiLanguageId = 2, Enabled = true, IsDefault = false, SortOrder = 1 });
         await ctx.SaveChangesAsync();
         return (ctx, connection);
     }
@@ -44,7 +51,7 @@ public sealed class UserPreferenceControllerTests
 
     private static UserPreferenceController Build(SuperBIContext db, ClaimsPrincipal? user = null)
     {
-        var ctrl = new UserPreferenceController(new UserLanguagePreferenceService(db, new NoopAuditService()));
+        var ctrl = new UserPreferenceController(new UserLanguagePreferenceService(db, new NoopAuditService(), new TenantLanguageService(db, new NoopAuditService())));
         ctrl.ControllerContext = new ControllerContext
         {
             HttpContext = new DefaultHttpContext { User = user ?? new ClaimsPrincipal() }

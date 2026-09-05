@@ -10,6 +10,7 @@ using SuperBuilder_AI.Data;
 using SuperBuilder_AI.Models.Organization;
 using SuperBuilder_AI.Services.Auth;
 using SuperBuilder_AI.Services.Identity;
+using SuperBuilder_AI.Services.Localization;
 using Xunit;
 
 namespace SuperBuilder_AI.Tests;
@@ -32,7 +33,7 @@ public sealed class AuthControllerLoginOptionsTests
     }
 
     private static AuthController Build(SuperBIContext db, IConfiguration config)
-        => new AuthController(db, new IdentityService(db, new PasswordHasher()), new TokenService("mw-test-key"), new PasswordHasher(), config);
+        => new AuthController(db, new IdentityService(db, new PasswordHasher()), new TokenService("mw-test-key"), new PasswordHasher(), config, new TenantLanguageService(db, new NoopAuditService()));
 
     private static async Task SeedTenantsAsync(SuperBIContext db)
     {

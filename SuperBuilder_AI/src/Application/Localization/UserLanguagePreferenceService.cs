@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using SuperBuilder_AI.Data;
 using SuperBuilder_AI.Interfaces.Audit;
@@ -9,17 +8,19 @@ namespace SuperBuilder_AI.Services.Localization;
 
 /// <summary>
 /// 用户级界面语言偏好服务（M3-G0「用户语言恢复」）。
-/// <para>读取/写入 <see cref="UserLanguagePreference"/>，写入时强制校验目标文化属于租户可用语言范围，越界则回退租户默认并写审计。</para>
+/// <para>读取/写入 <see cref="UserLanguagePreference"/>，写入时强制校验目标文化属于租户可用语言范围（M3-01 起取自 <see cref="ITenantLanguageService"/> 关系模型），越界则回退租户默认并写审计。</para>
 /// </summary>
 public sealed class UserLanguagePreferenceService : IUserLanguagePreferenceService
 {
     private readonly SuperBIContext _db;
     private readonly IAuditLogService _audit;
+    private readonly ITenantLanguageService _tenantLanguage;
 
-    public UserLanguagePreferenceService(SuperBIContext db, IAuditLogService audit)
+    public UserLanguagePreferenceService(SuperBIContext db, IAuditLogService audit, ITenantLanguageService tenantLanguage)
     {
         _db = db;
         _audit = audit;
+        _tenantLanguage = tenantLanguage;
     }
 
     public async Task<string?> GetAsync(long tenantId, long userId, CancellationToken ct = default)
@@ -70,20 +71,7 @@ public sealed class UserLanguagePreferenceService : IUserLanguagePreferenceServi
 
     private async Task<List<string>> GetAvailableCulturesAsync(long tenantId, CancellationToken ct)
     {
-        var settings = await _db.TenantSettings.AsNoTracking()
-            .Where(s => s.TenantId == tenantId && (s.Key == "localization:availableCultures" || s.Key == "localization:defaultCulture"))
-            .ToDictionaryAsync(s => s.Key, s => s.Value, ct);
-        List<string> available;
-        try
-        {
-            available = JsonSerializer.Deserialize<List<string>>(settings.GetValueOrDefault("localization:availableCultures") ?? "[]") ?? new();
-        }
-        catch (JsonException)
-        {
-            available = new();
-        }
-        available = available.Where(x => !string.IsNullOrWhiteSpace(x)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
-        if (available.Count == 0) available.Add("zh-CN");
-        return available;
+        var available = await _tenantLanguage.GetAvailableCulturesAsync(tenantId, ct);
+        return available.Where(x => !string.IsNullOrWhiteSpace(x)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
     }
 }

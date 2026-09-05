@@ -10,7 +10,9 @@ using SuperBuilder_AI.Data;
 using SuperBuilder_AI.Interfaces.Audit;
 using SuperBuilder_AI.Interfaces.Identity;
 using SuperBuilder_AI.Models.Identity;
+using SuperBuilder_AI.Models.Localization;
 using SuperBuilder_AI.Models.Organization;
+using SuperBuilder_AI.Services.Localization;
 using SuperBuilder_AI.Services.Auth;
 using SuperBuilder_AI.Services.Identity;
 using Xunit;
@@ -31,6 +33,11 @@ public sealed class SelfRegistrationTests
 		var options = new DbContextOptionsBuilder<SuperBIContext>().UseSqlite(connection).Options;
 		var ctx = new SuperBIContext(options);
 		ctx.Database.EnsureCreated();
+		// M3-01：平台语言目录（自助注册会按文化映射到 UiLanguageId）
+		ctx.UiLanguages.AddRange(
+			new UiLanguage { Id = 1, Culture = "zh-CN", DisplayName = "中文", NativeName = "简体中文", Enabled = true, SortOrder = 0 },
+			new UiLanguage { Id = 2, Culture = "en-US", DisplayName = "English", NativeName = "English", Enabled = true, SortOrder = 1 });
+		ctx.SaveChanges();
 		return ctx;
 	}
 
@@ -46,7 +53,7 @@ public sealed class SelfRegistrationTests
 			DefaultCulture = "zh-CN",
 			DefaultAvailableCultures = new[] { "zh-CN" },
 		};
-		return new SelfRegistrationService(ctx, identity, new NoopTokenService(), new NoopAuditService(), Options.Create(options));
+		return new SelfRegistrationService(ctx, identity, new NoopTokenService(), new NoopAuditService(), Options.Create(options), new TenantLanguageService(ctx, new NoopAuditService()));
 	}
 
 	[Fact]
@@ -103,7 +110,12 @@ public sealed class SelfRegistrationTests
 		var tenant = await ctx.Tenants.SingleAsync(t => t.TenantCode == "acme");
 		Assert.True(tenant.Enabled);
 
-		Assert.Equal(2, await ctx.TenantSettings.CountAsync(s => s.TenantId == tenant.Id));
+		// M3-01：语言授权以关系模型 TenantUiLanguage 落库（默认 zh-CN），不再写 localization:* JSON。
+		var langRows = await ctx.TenantUiLanguages.Where(x => x.TenantId == tenant.Id).ToListAsync();
+		Assert.Single(langRows);
+		Assert.True(langRows[0].IsDefault);
+		Assert.Equal("zh-CN", (await ctx.UiLanguages.FindAsync(langRows[0].UiLanguageId))!.Culture);
+		Assert.Equal(0, await ctx.TenantSettings.CountAsync(s => s.TenantId == tenant.Id));
 
 		var admin = await ctx.Users.SingleAsync(u => u.TenantId == tenant.Id && u.Username == "admin");
 		Assert.StartsWith("pbkdf2:", admin.PasswordHash);

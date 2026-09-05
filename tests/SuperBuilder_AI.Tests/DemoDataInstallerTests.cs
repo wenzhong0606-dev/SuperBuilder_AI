@@ -11,8 +11,10 @@ using SuperBuilder_AI.Interfaces.Seed;
 using SuperBuilder_AI.Interfaces.Audit;
 using SuperBuilder_AI.Models.Audit;
 using SuperBuilder_AI.Models.Identity;
+using SuperBuilder_AI.Models.Localization;
 using SuperBuilder_AI.Services.Seed;
 using SuperBuilder_AI.Services.Auth;
+using SuperBuilder_AI.Services.Localization;
 using SuperBuilder_AI.Services.BI.Dashboard;
 using SuperBuilder_AI.Services.Identity;
 using Xunit;
@@ -33,6 +35,11 @@ public sealed class DemoDataInstallerTests
         var options = new DbContextOptionsBuilder<SuperBIContext>().UseSqlite(connection).Options;
         var ctx = new SuperBIContext(options);
         ctx.Database.EnsureCreated();
+        // M3-01：平台语言目录（演示安装器据此为演示租户播种默认语言关系）
+        ctx.UiLanguages.AddRange(
+            new UiLanguage { Id = 1, Culture = "zh-CN", DisplayName = "中文", NativeName = "简体中文", Enabled = true, SortOrder = 0 },
+            new UiLanguage { Id = 2, Culture = "en-US", DisplayName = "English", NativeName = "English", Enabled = true, SortOrder = 1 });
+        ctx.SaveChanges();
         return ctx;
     }
 
@@ -40,7 +47,7 @@ public sealed class DemoDataInstallerTests
     {
         var identity = new IdentityService(ctx, new PasswordHasher());
         identity.SeedAsync().GetAwaiter().GetResult();
-        return new DemoDataInstaller(ctx, identity, audit ?? new NoopAuditService(), new DashboardDslSerializer());
+        return new DemoDataInstaller(ctx, identity, audit ?? new NoopAuditService(), new DashboardDslSerializer(), new TenantLanguageService(ctx, new NoopAuditService()));
     }
 
     [Fact]
@@ -75,8 +82,11 @@ public sealed class DemoDataInstallerTests
         var tenant = await ctx.Tenants.SingleAsync(t => t.TenantCode == "demo");
         Assert.True(tenant.Enabled);
 
-        // 本地化设置（2 条）
-        Assert.Equal(2, await ctx.TenantSettings.CountAsync(s => s.TenantId == tenant.Id));
+        // M3-01：本地化配置以关系模型 TenantUiLanguage 落库（默认 zh-CN），不再写 localization:* JSON。
+        Assert.Equal(0, await ctx.TenantSettings.CountAsync(s => s.TenantId == tenant.Id));
+        var demoLang = await ctx.TenantUiLanguages.SingleAsync(x => x.TenantId == tenant.Id);
+        Assert.True(demoLang.IsDefault);
+        Assert.Equal("zh-CN", (await ctx.UiLanguages.FindAsync(demoLang.UiLanguageId))!.Culture);
 
         // 管理员（TenantAdmin）
         var admin = await ctx.Users.SingleAsync(u => u.TenantId == tenant.Id && u.Username == "demo_admin");

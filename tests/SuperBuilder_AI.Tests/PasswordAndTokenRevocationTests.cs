@@ -14,6 +14,7 @@ using SuperBuilder_AI.Middleware;
 using SuperBuilder_AI.Models.Identity;
 using SuperBuilder_AI.Models.Organization;
 using SuperBuilder_AI.Services.Auth;
+using SuperBuilder_AI.Services.Localization;
 using Xunit;
 
 namespace SuperBuilder_AI.Tests;
@@ -105,7 +106,7 @@ public class PasswordAndTokenRevocationTests
 	public async Task Login_NullPasswordHash_Is_Rejected_As_NotInitialized()
 	{
 		var ctx = CreateUserContext(null, out _);
-		var ctrl = new AuthController(ctx, new FakeIdentity(), new TokenService(Key), new PasswordHasher(), null!);
+		var ctrl = new AuthController(ctx, new FakeIdentity(), new TokenService(Key), new PasswordHasher(), null!, new TenantLanguageService(ctx, new NoopAuditService()));
 
 		var result = await ctrl.Login(new LoginRequest { Username = "alice", TenantId = 1, Password = "whatever" });
 
@@ -117,7 +118,7 @@ public class PasswordAndTokenRevocationTests
 	public async Task Login_WrongPassword_Is_Rejected()
 	{
 		var ctx = CreateUserContext("s3cret", out _);
-		var ctrl = new AuthController(ctx, new FakeIdentity(), new TokenService(Key), new PasswordHasher(), null!);
+		var ctrl = new AuthController(ctx, new FakeIdentity(), new TokenService(Key), new PasswordHasher(), null!, new TenantLanguageService(ctx, new NoopAuditService()));
 
 		var result = await ctrl.Login(new LoginRequest { Username = "alice", TenantId = 1, Password = "wrong" });
 
@@ -129,7 +130,7 @@ public class PasswordAndTokenRevocationTests
 	{
 		var ctx = CreateUserContext("s3cret", out var stamp);
 		var tokenSvc = new TokenService(Key);
-		var ctrl = new AuthController(ctx, new FakeIdentity(), tokenSvc, new PasswordHasher(), null!);
+		var ctrl = new AuthController(ctx, new FakeIdentity(), tokenSvc, new PasswordHasher(), null!, new TenantLanguageService(ctx, new NoopAuditService()));
 
 		var result = await ctrl.Login(new LoginRequest { Username = "alice", TenantId = 1, Password = "s3cret" });
 

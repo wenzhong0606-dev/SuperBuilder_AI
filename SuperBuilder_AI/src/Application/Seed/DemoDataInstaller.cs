@@ -1,10 +1,10 @@
 using System.Collections.Generic;
-using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using SuperBuilder_AI.Data;
 using SuperBuilder_AI.Interfaces.Audit;
 using SuperBuilder_AI.Interfaces.BI;
 using SuperBuilder_AI.Interfaces.Identity;
+using SuperBuilder_AI.Interfaces.Localization;
 using SuperBuilder_AI.Interfaces.Seed;
 using SuperBuilder_AI.Models.Audit;
 using SuperBuilder_AI.Models.Dashboard;
@@ -37,17 +37,20 @@ public sealed class DemoDataInstaller : IDemoDataInstaller
     private readonly IIdentityService _identity;
     private readonly IAuditLogService _audit;
     private readonly IDashboardDslSerializer _dashboardSerializer;
+    private readonly ITenantLanguageService _tenantLanguage;
 
     public DemoDataInstaller(
         SuperBIContext db,
         IIdentityService identity,
         IAuditLogService audit,
-        IDashboardDslSerializer dashboardSerializer)
+        IDashboardDslSerializer dashboardSerializer,
+        ITenantLanguageService tenantLanguage)
     {
         _db = db;
         _identity = identity;
         _audit = audit;
         _dashboardSerializer = dashboardSerializer;
+        _tenantLanguage = tenantLanguage;
     }
 
     public async Task<DemoInstallPlan> PreviewAsync(CancellationToken ct = default)
@@ -90,24 +93,9 @@ public sealed class DemoDataInstaller : IDemoDataInstaller
             _db.Tenants.Add(tenant);
             await _db.SaveChangesAsync(ct);
 
-            _db.TenantSettings.AddRange(
-                new TenantSetting
-                {
-                    TenantId = tenant.Id,
-                    Key = "localization:availableCultures",
-                    Value = JsonSerializer.Serialize(new[] { "zh-CN" }),
-                    DataType = "json",
-                    IsLocked = true,
-                },
-                new TenantSetting
-                {
-                    TenantId = tenant.Id,
-                    Key = "localization:defaultCulture",
-                    Value = "zh-CN",
-                    DataType = "string",
-                    IsLocked = true,
-                });
-            await _db.SaveChangesAsync(ct);
+            // M3-01：语言授权写入关系模型 TenantUiLanguage（替代 localization:* JSON）。
+            // 演示租户默认启用平台 zh-CN（若无显式授权则回退平台默认）。
+            await _tenantLanguage.EnsureTenantLanguagesAsync(tenant.Id, ct);
 
             // 2) 租户管理员
             var created = await _identity.CreateUserAsync(

@@ -16,6 +16,7 @@ using SuperBuilder_AI.Models.Audit;
 using SuperBuilder_AI.Models.Identity;
 using SuperBuilder_AI.Models.Organization;
 using SuperBuilder_AI.Services.Auth;
+using SuperBuilder_AI.Services.Localization;
 using SuperBuilder_AI.Services.Identity;
 using Xunit;
 
@@ -40,7 +41,7 @@ public sealed class TenantMembershipTests
 	private static TenantMembershipController Build(SuperBIContext db, ClaimsPrincipal user)
 	{
 		var ctrl = new TenantMembershipController(
-			db, new TenantMembershipService(db), new NoopIdentityService(), new NoopTokenService(), new NoopAuditService());
+			db, new TenantMembershipService(db), new NoopIdentityService(), new NoopTokenService(), new NoopAuditService(), new TenantLanguageService(db, new NoopAuditService()));
 		ctrl.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext { User = user } };
 		return ctrl;
 	}

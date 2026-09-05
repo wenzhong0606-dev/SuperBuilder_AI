@@ -112,6 +112,7 @@ public class SuperBIContext : DbContext
         public DbSet<UiLanguage> UiLanguages { get; set; }
         public DbSet<UiTextResource> UiTextResources { get; set; }
         public DbSet<UserLanguagePreference> UserLanguagePreferences { get; set; }
+        public DbSet<TenantUiLanguage> TenantUiLanguages { get; set; }
     #endregion
 
     #region P6 Low-code BI
@@ -355,6 +356,20 @@ public class SuperBIContext : DbContext
         builder.Entity<UserLanguagePreference>().ToTable(tb => tb.HasComment("用户界面语言偏好"));
         builder.Entity<UserLanguagePreference>().HasIndex(x => new { x.TenantId, x.UserId }).IsUnique();
         builder.Entity<UserLanguagePreference>().Property(x => x.Culture).IsRequired().HasMaxLength(16);
+
+        // M3-01 租户界面语言关系（替代 localization:availableCultures/defaultCulture JSON）
+        builder.Entity<TenantUiLanguage>().ToTable(tb => tb.HasComment("租户界面语言关系（替代 localization:availableCultures/defaultCulture JSON）"));
+        builder.Entity<TenantUiLanguage>().HasOne<Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Cascade);
+        builder.Entity<TenantUiLanguage>().HasOne<UiLanguage>().WithMany().HasForeignKey(x => x.UiLanguageId).OnDelete(DeleteBehavior.Restrict);
+        builder.Entity<TenantUiLanguage>().HasIndex(x => new { x.TenantId, x.UiLanguageId }).IsUnique();
+        builder.Entity<TenantUiLanguage>().HasIndex(x => new { x.TenantId, x.IsDefault });
+        builder.Entity<TenantUiLanguage>().Property(x => x.TenantId).HasComment("所属租户");
+        builder.Entity<TenantUiLanguage>().Property(x => x.UiLanguageId).HasComment("平台语言目录 Id");
+        builder.Entity<TenantUiLanguage>().Property(x => x.Enabled).IsRequired().HasDefaultValue(true).HasComment("是否启用（租户范围内）");
+        builder.Entity<TenantUiLanguage>().Property(x => x.IsDefault).IsRequired().HasDefaultValue(false).HasComment("是否为租户默认语言（每租户恰一个）");
+        builder.Entity<TenantUiLanguage>().Property(x => x.SortOrder).HasComment("排序");
+
+
         #endregion
 
         #region P6.1 Dashboard

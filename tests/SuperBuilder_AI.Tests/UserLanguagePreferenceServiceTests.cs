@@ -28,9 +28,16 @@ public sealed class UserLanguagePreferenceServiceTests
         var options = new DbContextOptionsBuilder<SuperBIContext>().UseSqlite(connection).Options;
         var ctx = new SuperBIContext(options);
         await ctx.Database.EnsureCreatedAsync();
+        // 平台语言目录（M3-G0 五文化 + 一个停用语言）
+        ctx.UiLanguages.AddRange(
+            new UiLanguage { Id = 1, Culture = "zh-CN", DisplayName = "中文", NativeName = "简体中文", Enabled = true, SortOrder = 0 },
+            new UiLanguage { Id = 2, Culture = "en-US", DisplayName = "English", NativeName = "English", Enabled = true, SortOrder = 1 },
+            new UiLanguage { Id = 3, Culture = "fr-FR", DisplayName = "Français", NativeName = "Français", Enabled = false, SortOrder = 2 });
         ctx.Tenants.Add(new Tenant { Id = 10, TenantCode = "t10", TenantName = "Tenant 10", Enabled = true });
-        ctx.TenantSettings.Add(new TenantSetting { TenantId = 10, Key = "localization:availableCultures", Value = "[\"zh-CN\",\"en-US\"]", IsLocked = true });
-        ctx.TenantSettings.Add(new TenantSetting { TenantId = 10, Key = "localization:defaultCulture", Value = "zh-CN", IsLocked = true });
+        // M3-01：租户语言关系（替代 localization:* JSON）
+        ctx.TenantUiLanguages.AddRange(
+            new TenantUiLanguage { TenantId = 10, UiLanguageId = 1, Enabled = true, IsDefault = true, SortOrder = 0 },
+            new TenantUiLanguage { TenantId = 10, UiLanguageId = 2, Enabled = true, IsDefault = false, SortOrder = 1 });
         await ctx.SaveChangesAsync();
         return (ctx, connection);
     }
@@ -41,7 +48,7 @@ public sealed class UserLanguagePreferenceServiceTests
         var (db, conn) = await CreateContextAsync();
         await using var _ = conn;
         await using var __ = db;
-        var svc = new UserLanguagePreferenceService(db, new NoopAuditService());
+        var svc = new UserLanguagePreferenceService(db, new NoopAuditService(), new TenantLanguageService(db, new NoopAuditService()));
         Assert.Null(await svc.GetAsync(10, 42));
     }
 
@@ -52,7 +59,7 @@ public sealed class UserLanguagePreferenceServiceTests
         await using var _ = conn;
         await using var __ = db;
         var audit = new RecordingAuditService();
-        var svc = new UserLanguagePreferenceService(db, audit);
+        var svc = new UserLanguagePreferenceService(db, audit, new TenantLanguageService(db, new NoopAuditService()));
         var effective = await svc.SetAsync(10, 42, "en-US");
         Assert.Equal("en-US", effective);
         Assert.Equal("en-US", await svc.GetAsync(10, 42));
@@ -66,7 +73,7 @@ public sealed class UserLanguagePreferenceServiceTests
         var (db, conn) = await CreateContextAsync();
         await using var _ = conn;
         await using var __ = db;
-        var svc = new UserLanguagePreferenceService(db, new NoopAuditService());
+        var svc = new UserLanguagePreferenceService(db, new NoopAuditService(), new TenantLanguageService(db, new NoopAuditService()));
         var effective = await svc.SetAsync(10, 42, "fr-FR");
         Assert.Equal("zh-CN", effective);
         Assert.Equal("zh-CN", await svc.GetAsync(10, 42));
@@ -78,7 +85,7 @@ public sealed class UserLanguagePreferenceServiceTests
         var (db, conn) = await CreateContextAsync();
         await using var _ = conn;
         await using var __ = db;
-        var svc = new UserLanguagePreferenceService(db, new NoopAuditService());
+        var svc = new UserLanguagePreferenceService(db, new NoopAuditService(), new TenantLanguageService(db, new NoopAuditService()));
         await svc.SetAsync(10, 42, "en-US");
         await svc.SetAsync(10, 42, "zh-CN");
         Assert.Equal(1, await db.UserLanguagePreferences.CountAsync(x => x.TenantId == 10 && x.UserId == 42));

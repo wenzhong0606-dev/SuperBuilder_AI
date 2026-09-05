@@ -283,6 +283,8 @@ builder.Services.AddScoped<ILocalizationSeedService, LocalizationSeedService>();
 builder.Services.AddScoped<IThemeSeedService, ThemeSeedService>();
 // M3-G0：用户级界面语言偏好服务（按租户维度持久化，写入校验可用语言范围）
 builder.Services.AddScoped<IUserLanguagePreferenceService, UserLanguagePreferenceService>();
+// M3-01：租户界面语言关系服务（替代 localization JSON，约束在事务内强制）
+builder.Services.AddScoped<ITenantLanguageService, TenantLanguageService>();
 // M0-08：限流阈值（绑定配置节 "RateLimit"，缺省使用安全默认值）
 builder.Services.Configure<RateLimitOptions>(builder.Configuration.GetSection("RateLimit"));
 // RL-1/RL-2：限流存储。
@@ -394,6 +396,23 @@ using (var startupScope = app.Services.CreateScope())
             diagnostics.State = BootstrapState.SeedIncomplete;
             diagnostics.Reason = $"默认配额/主题种子失败：{seedEx.Message}";
             logger.LogError(seedEx, "Quota/Theme seed failed.");
+        }
+
+        // 步骤 4.5：租户界面语言关系播种（M3-01；幂等）。
+        // 按 localization:availableCultures/defaultCulture JSON 或平台默认 zh-CN 迁移，
+        // 确保每租户至少一种启用语言且恰一个默认语言。须在平台默认主题之后、Bootstrap 之前。
+        try
+        {
+            var tenantLang = startupScope.ServiceProvider.GetRequiredService<ITenantLanguageService>();
+            await tenantLang.EnsureAllTenantsLanguagesAsync();
+            diagnostics.MarkStep("TenantLanguages");
+            logger.LogInformation("Tenant UI language relationships seeded.");
+        }
+        catch (Exception seedEx)
+        {
+            diagnostics.State = BootstrapState.SeedIncomplete;
+            diagnostics.Reason = $"租户语言关系播种失败：{seedEx.Message}";
+            logger.LogError(seedEx, "Tenant languages seed failed.");
         }
 
         // 步骤 5：平台管理员引导（幂等；缺 Schema/目录时安全返回，不抛异常）

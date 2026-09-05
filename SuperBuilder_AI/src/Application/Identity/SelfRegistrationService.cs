@@ -11,6 +11,7 @@ using SuperBuilder_AI.Application.Common.Options;
 using SuperBuilder_AI.Data;
 using SuperBuilder_AI.Interfaces.Audit;
 using SuperBuilder_AI.Interfaces.Identity;
+using SuperBuilder_AI.Interfaces.Localization;
 using SuperBuilder_AI.Models.Identity;
 using SuperBuilder_AI.Models.Organization;
 using SuperBuilder_AI.Services.Auth;
@@ -30,19 +31,22 @@ public sealed class SelfRegistrationService : ISelfRegistrationService
     private readonly ITokenService _token;
     private readonly IAuditLogService _audit;
     private readonly SelfRegistrationOptions _options;
+    private readonly ITenantLanguageService _tenantLanguage;
 
     public SelfRegistrationService(
         SuperBIContext db,
         IIdentityService identity,
         ITokenService token,
         IAuditLogService audit,
-        IOptions<SelfRegistrationOptions> options)
+        IOptions<SelfRegistrationOptions> options,
+        ITenantLanguageService tenantLanguage)
     {
         _db = db;
         _identity = identity;
         _token = token;
         _audit = audit;
         _options = options.Value;
+        _tenantLanguage = tenantLanguage;
     }
 
     public async Task<SelfRegistrationResult> RegisterAsync(SelfRegistrationRequest request, CancellationToken ct = default)
@@ -97,24 +101,19 @@ public sealed class SelfRegistrationService : ISelfRegistrationService
         if (cultures.Length == 0) cultures = new[] { "zh-CN" };
         var defaultCulture = cultures.Contains(_options.DefaultCulture ?? string.Empty, StringComparer.OrdinalIgnoreCase)
             ? _options.DefaultCulture! : cultures[0];
-        _db.TenantSettings.AddRange(
-            new TenantSetting
-            {
-                TenantId = tenant.Id,
-                Key = "localization:availableCultures",
-                Value = System.Text.Json.JsonSerializer.Serialize(cultures),
-                DataType = "json",
-                IsLocked = true,
-            },
-            new TenantSetting
-            {
-                TenantId = tenant.Id,
-                Key = "localization:defaultCulture",
-                Value = defaultCulture,
-                DataType = "string",
-                IsLocked = true,
-            });
-        await _db.SaveChangesAsync(ct);
+        // M3-01：语言授权写入关系模型 TenantUiLanguage（替代 localization:* JSON）。
+        var supported = await _db.UiLanguages.AsNoTracking().Where(x => x.Enabled)
+            .ToDictionaryAsync(x => x.Culture, x => x, StringComparer.OrdinalIgnoreCase, ct);
+        var order = 0;
+        var updates = cultures.Where(c => supported.TryGetValue(c, out _))
+            .Select(c => new TenantLanguageUpdate(
+                supported[c].Id, Enabled: true,
+                IsDefault: string.Equals(c, defaultCulture, StringComparison.OrdinalIgnoreCase),
+                SortOrder: order++)).ToList();
+        if (updates.Count == 0)
+            await _tenantLanguage.EnsureTenantLanguagesAsync(tenant.Id, ct);
+        else
+            await _tenantLanguage.SetLanguagesAsync(tenant.Id, updates, 0, ct);
 
         // 复用 M2-04 的原子创建链路：用户 + 角色 + 口令，任一失败整体回滚。
         var created = await _identity.CreateUserAsync(

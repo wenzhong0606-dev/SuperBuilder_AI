@@ -6,6 +6,7 @@ using System.Security.Claims;
 using SuperBuilder_AI.Api.Errors;
 using SuperBuilder_AI.Api.Security;
 using SuperBuilder_AI.Data;
+using SuperBuilder_AI.Interfaces.Localization;
 using SuperBuilder_AI.Models.Identity;
 using SuperBuilder_AI.Models.Organization;
 using SuperBuilder_AI.Services.Identity;
@@ -26,12 +27,14 @@ namespace SuperBuilder_AI.Controllers;
 		private readonly SuperBIContext _db;
 		private readonly SuperBuilder_AI.Interfaces.Identity.IIdentityService _identity;
 		private readonly IPlatformAdminScopeService _scope;
+		private readonly ITenantLanguageService _tenantLanguage;
 
-		public TenantManagementController(SuperBIContext db, SuperBuilder_AI.Interfaces.Identity.IIdentityService identity, IPlatformAdminScopeService scope)
+		public TenantManagementController(SuperBIContext db, SuperBuilder_AI.Interfaces.Identity.IIdentityService identity, IPlatformAdminScopeService scope, ITenantLanguageService tenantLanguage)
 		{
 			_db = db;
 			_identity = identity;
 			_scope = scope;
+			_tenantLanguage = tenantLanguage;
 		}
 
 		/// <summary>
@@ -80,11 +83,22 @@ namespace SuperBuilder_AI.Controllers;
 			query = query.Where(t => scopedIds.Contains(t.Id));
 		var tenants = await query
 			.OrderBy(t => t.Id)
-			.Select(t => new TenantSummary(t.Id, t.TenantCode, t.TenantName, t.Enabled,
-				_db.TenantSettings.Where(s => s.TenantId == t.Id && s.Key == "localization:availableCultures").Select(s => s.Value).FirstOrDefault(),
-				_db.TenantSettings.Where(s => s.TenantId == t.Id && s.Key == "localization:defaultCulture").Select(s => s.Value).FirstOrDefault()))
+			.Select(t => new { t.Id, t.TenantCode, t.TenantName, t.Enabled })
 			.ToListAsync(cancellationToken);
-		return Ok(tenants);
+		// M3-01：语言关系取自 TenantUiLanguage，不再读取 localization:* JSON。
+		var ids = tenants.Select(t => t.Id).ToList();
+		var langMap = await _tenantLanguage.GetLanguagesForTenantsAsync(ids, cancellationToken);
+		var summaries = tenants.Select(t =>
+		{
+			var infos = langMap.TryGetValue(t.Id, out var l) ? l : new List<TenantLanguageInfo>();
+			var available = infos.Where(i => i.Enabled).Select(i => i.Culture).ToList();
+			var defaultCulture = infos.FirstOrDefault(i => i.IsDefault && i.Enabled)?.Culture
+				?? available.FirstOrDefault() ?? "zh-CN";
+			return new TenantSummary(t.Id, t.TenantCode, t.TenantName, t.Enabled,
+				available.Count == 0 ? null : System.Text.Json.JsonSerializer.Serialize(available),
+				defaultCulture);
+		}).ToList();
+		return Ok(summaries);
 	}
 
 	[HttpGet("{id:long}")]
@@ -131,15 +145,25 @@ namespace SuperBuilder_AI.Controllers;
 		await _db.SaveChangesAsync(cancellationToken);
 		var cultures = (request.AvailableCultures ?? new[] { "zh-CN" })
 			.Where(x => !string.IsNullOrWhiteSpace(x)).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
-		var supportedCultures = await _db.UiLanguages.AsNoTracking().Where(x => x.Enabled).Select(x => x.Culture).ToListAsync(cancellationToken);
-		if (supportedCultures.Count > 0)
-			cultures = cultures.Where(x => supportedCultures.Contains(x, StringComparer.OrdinalIgnoreCase)).ToArray();
+		var supported = await _db.UiLanguages.AsNoTracking().Where(x => x.Enabled)
+			.ToDictionaryAsync(x => x.Culture, x => x, StringComparer.OrdinalIgnoreCase, cancellationToken);
+		if (supported.Count > 0)
+			cultures = cultures.Where(x => supported.ContainsKey(x)).ToArray();
 		if (cultures.Length == 0) cultures = new[] { "zh-CN" };
-		var defaultCulture = cultures.Contains(request.DefaultCulture ?? "") ? request.DefaultCulture! : cultures[0];
-		_db.TenantSettings.AddRange(
-			new TenantSetting { TenantId = tenant.Id, Key = "localization:availableCultures", Value = System.Text.Json.JsonSerializer.Serialize(cultures), DataType = "json", IsLocked = true },
-			new TenantSetting { TenantId = tenant.Id, Key = "localization:defaultCulture", Value = defaultCulture, DataType = "string", IsLocked = true });
-		await _db.SaveChangesAsync(cancellationToken);
+		var defaultCulture = cultures.Contains(request.DefaultCulture ?? "", StringComparer.OrdinalIgnoreCase) ? request.DefaultCulture! : cultures[0];
+		// M3-01：语言授权写入关系模型 TenantUiLanguage（替代 localization:* JSON）。
+		var order = 0;
+		var updates = cultures
+			.Where(c => supported.TryGetValue(c, out _))
+			.Select(c => new TenantLanguageUpdate(
+				supported[c].Id, Enabled: true,
+				IsDefault: string.Equals(c, defaultCulture, StringComparison.OrdinalIgnoreCase),
+				SortOrder: order++))
+			.ToList();
+		if (updates.Count == 0)
+			await _tenantLanguage.EnsureTenantLanguagesAsync(tenant.Id, cancellationToken);
+		else
+			await _tenantLanguage.SetLanguagesAsync(tenant.Id, updates, CallerId(), cancellationToken);
 		var created = await _identity.CreateUserAsync(
 			tenant.Id, adminUsername, request.AdminDisplayName ?? adminUsername,
 			request.AdminEmail ?? string.Empty, new[] { IdentityRoles.TenantAdmin }, cancellationToken);
@@ -176,8 +200,9 @@ namespace SuperBuilder_AI.Controllers;
 		var tenant = await _db.Tenants.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
 		if (tenant is null) return NotFound();
 		var cultures = (request.AvailableCultures ?? Array.Empty<string>()).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
-		var supported = await _db.UiLanguages.AsNoTracking().Where(x => x.Enabled).Select(x => x.Culture).ToListAsync(cancellationToken);
-		cultures = cultures.Where(x => supported.Contains(x, StringComparer.OrdinalIgnoreCase)).ToArray();
+		var supported = await _db.UiLanguages.AsNoTracking().Where(x => x.Enabled)
+			.ToDictionaryAsync(x => x.Culture, x => x, StringComparer.OrdinalIgnoreCase, cancellationToken);
+		cultures = cultures.Where(x => supported.ContainsKey(x)).ToArray();
 		if (cultures.Length == 0) return BadRequest("至少选择一种平台已启用的语言。");
 		var defaultCulture = cultures.Contains(request.DefaultCulture ?? "", StringComparer.OrdinalIgnoreCase) ? request.DefaultCulture! : cultures[0];
 		// M1-02：TenantName 必填且长度受控；TenantCode 创建后不可变（UpdateTenantRequest 不含该字段，结构即保证）。
@@ -185,8 +210,13 @@ namespace SuperBuilder_AI.Controllers;
 		if (tenantName.Length == 0 || tenantName.Length > Tenant.MaxNameLength)
 			return BadRequest($"TenantName 必填且长度不超过 {Tenant.MaxNameLength}。");
 		tenant.TenantName = tenantName;
-		await UpsertInternalSetting(id, "localization:availableCultures", System.Text.Json.JsonSerializer.Serialize(cultures), "json", cancellationToken);
-		await UpsertInternalSetting(id, "localization:defaultCulture", defaultCulture, "string", cancellationToken);
+		// M3-01：语言授权写入关系模型 TenantUiLanguage（替代 localization:* JSON）。
+		var order = 0;
+		var updates = cultures.Select(c => new TenantLanguageUpdate(
+			supported[c].Id, Enabled: true,
+			IsDefault: string.Equals(c, defaultCulture, StringComparison.OrdinalIgnoreCase),
+			SortOrder: order++)).ToList();
+		await _tenantLanguage.SetLanguagesAsync(id, updates, CallerId(), cancellationToken);
 		await _db.SaveChangesAsync(cancellationToken);
 		return Ok(new TenantSummary(tenant.Id, tenant.TenantCode, tenant.TenantName, tenant.Enabled, System.Text.Json.JsonSerializer.Serialize(cultures), defaultCulture));
 	}
