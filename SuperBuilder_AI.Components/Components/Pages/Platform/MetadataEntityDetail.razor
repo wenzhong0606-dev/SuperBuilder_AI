@@ -32,6 +32,6 @@
     [Parameter] public string EntityId { get; set; } = "";
     private JsonElement? _data; private bool _loading = true; private string _error = "";
     protected override async Task OnParametersSetAsync() => await Load();
-    private async Task Load() { _loading = true; var (data, status, err) = await Api.GetJsonAsync($"api/data-sources/metadata/entities/{Uri.EscapeDataString(Type)}/{Uri.EscapeDataString(EntityId)}"); _data = data; _error = data is null ? (err ?? string.Format(L10n.T(Keys.Content.MetadataEntityNotFound, "未找到对应数据（{0}）。"), status)) : ""; _loading = false; }
+    private async Task Load() { _loading = true; var (data, status, err, _) = await Api.GetJsonAsync($"api/data-sources/metadata/entities/{Uri.EscapeDataString(Type)}/{Uri.EscapeDataString(EntityId)}"); _data = data; _error = data is null ? (err ?? string.Format(L10n.T(Keys.Content.MetadataEntityNotFound, "未找到对应数据（{0}）。"), status)) : ""; _loading = false; }
     private string Value(string key) => _data.HasValue && _data.Value.TryGetProperty(key, out var p) ? p.ToString() : Type;
 }

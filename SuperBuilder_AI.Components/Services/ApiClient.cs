@@ -262,7 +262,7 @@ public sealed class ApiClient : IApiClient
     /// 通用写操作：统一处理 401 回收与错误体解析，避免每个页面重复实现。
     /// DELETE 与 GET 不发送请求体。
     /// </summary>
-    public async Task<(bool Ok, int Status, string? Error)> SendAsync(
+    public async Task<(bool Ok, int Status, string? Error, string? Code)> SendAsync(
         HttpMethod method, string relativeUrl, object? body = null, CancellationToken ct = default)
     {
         var client = CreateClient();
@@ -277,27 +277,27 @@ public sealed class ApiClient : IApiClient
             if (!resp.IsSuccessStatusCode)
             {
                 var raw = await resp.Content.ReadAsStringAsync(ct);
-                var (_, msg, _) = ParseApiError(raw);
-                return (false, (int)resp.StatusCode, msg ?? $"请求失败（{(int)resp.StatusCode}）。");
+                var (code, msg, _) = ParseApiError(raw);
+                return (false, (int)resp.StatusCode, msg ?? $"请求失败（{(int)resp.StatusCode}）。", code);
             }
-            return (true, (int)resp.StatusCode, null);
+            return (true, (int)resp.StatusCode, null, null);
         }
         catch (Exception ex)
         {
-            return (false, 0, "网络错误：" + ex.Message);
+            return (false, 0, "网络错误：" + ex.Message, null);
         }
     }
 
-    public Task<(bool Ok, int Status, string? Error)> PostAsync(string relativeUrl, object? body = null, CancellationToken ct = default)
+    public Task<(bool Ok, int Status, string? Error, string? Code)> PostAsync(string relativeUrl, object? body = null, CancellationToken ct = default)
         => SendAsync(HttpMethod.Post, relativeUrl, body, ct);
 
-    public Task<(bool Ok, int Status, string? Error)> PutAsync(string relativeUrl, object? body, CancellationToken ct = default)
+    public Task<(bool Ok, int Status, string? Error, string? Code)> PutAsync(string relativeUrl, object? body, CancellationToken ct = default)
         => SendAsync(HttpMethod.Put, relativeUrl, body, ct);
 
-    public Task<(bool Ok, int Status, string? Error)> PatchAsync(string relativeUrl, object? body = null, CancellationToken ct = default)
+    public Task<(bool Ok, int Status, string? Error, string? Code)> PatchAsync(string relativeUrl, object? body = null, CancellationToken ct = default)
         => SendAsync(HttpMethod.Patch, relativeUrl, body, ct);
 
-    public Task<(bool Ok, int Status, string? Error)> DeleteAsync(string relativeUrl, CancellationToken ct = default)
+    public Task<(bool Ok, int Status, string? Error, string? Code)> DeleteAsync(string relativeUrl, CancellationToken ct = default)
         => SendAsync(HttpMethod.Delete, relativeUrl, null, ct);
 
     /// <summary>
@@ -353,7 +353,7 @@ public sealed class ApiClient : IApiClient
     /// <summary>M2-06 平台管理员查看自助注册配置（需 platform:admin:manage）。</summary>
     public async Task<(SelfRegistrationConfigView? Result, string? Error)> GetSelfRegistrationConfigAsync(CancellationToken ct = default)
     {
-        var (data, _, err) = await GetJsonAsync("api/self-registration/config", ct);
+        var (data, _, err, _) = await GetJsonAsync("api/self-registration/config", ct);
         if (data is not { ValueKind: System.Text.Json.JsonValueKind.Object })
             return (null, err ?? "无法读取自助注册配置。");
         var v = data.Value;
@@ -381,7 +381,7 @@ public sealed class ApiClient : IApiClient
     /// <summary>M2-07 演示数据：平台管理员预览将创建的演示内容（需 platform:admin:manage）。</summary>
     public async Task<(DemoInstallPlan? Result, string? Error)> GetDemoDataPlanAsync(CancellationToken ct = default)
     {
-        var (data, _, err) = await GetJsonAsync("api/demo-data/preview", ct);
+        var (data, _, err, _) = await GetJsonAsync("api/demo-data/preview", ct);
         if (data is not { ValueKind: System.Text.Json.JsonValueKind.Object })
             return (null, err ?? "无法读取演示数据计划。");
         var v = data.Value;
@@ -428,7 +428,7 @@ public sealed class ApiClient : IApiClient
     /// <summary>M3-G0 读取当前用户的服务端语言偏好。</summary>
     public async Task<(string? Culture, string? Error)> GetUserLanguageAsync(CancellationToken ct = default)
     {
-        var (data, status, error) = await GetJsonAsync("api/user/preferences/language", ct);
+        var (data, status, error, _) = await GetJsonAsync("api/user/preferences/language", ct);
         if (error != null) return (null, error);
         if (data is not { ValueKind: JsonValueKind.Object }) return (null, null);
         var culture = data.Value.TryGetProperty("culture", out var c) ? c.GetString() : null;
@@ -448,7 +448,7 @@ public sealed class ApiClient : IApiClient
                 if (resp.StatusCode == System.Net.HttpStatusCode.Unauthorized) OnUnauthorized();
                 return (null, msg ?? $"保存语言偏好失败（{(int)resp.StatusCode}）。");
             }
-            var (data, _, err) = await GetJsonAsync("api/user/preferences/language", ct);
+            var (data, _, err, _) = await GetJsonAsync("api/user/preferences/language", ct);
             var effective = (err == null && data is { ValueKind: JsonValueKind.Object } && data.Value.TryGetProperty("culture", out var c))
                 ? c.GetString()
                 : culture;
@@ -480,7 +480,7 @@ public sealed class ApiClient : IApiClient
     /// <summary>M3-02 平台管理员新建语言（BCP 47 归一化 + 必填名 + 复制键集合待翻译）。</summary>
     public async Task<(bool Ok, string? Error)> CreateLanguageAsync(AdminLanguageCreate model, CancellationToken ct = default)
     {
-        var (ok, status, error) = await PostAsync("api/localization/languages", model, ct);
+        var (ok, status, error, _) = await PostAsync("api/localization/languages", model, ct);
         if (!ok && status == 401) OnUnauthorized();
         return (ok, error);
     }
@@ -488,7 +488,7 @@ public sealed class ApiClient : IApiClient
     /// <summary>M3-02 平台管理员更新语言显示名/本地名/排序。</summary>
     public async Task<(bool Ok, string? Error)> UpdateLanguageAsync(long id, AdminLanguageUpdate model, CancellationToken ct = default)
     {
-        var (ok, status, error) = await PutAsync($"api/localization/languages/{id}", model, ct);
+        var (ok, status, error, _) = await PutAsync($"api/localization/languages/{id}", model, ct);
         if (!ok && status == 401) OnUnauthorized();
         return (ok, error);
     }
@@ -496,7 +496,7 @@ public sealed class ApiClient : IApiClient
     /// <summary>M3-02 平台管理员启用/停用语言（停用委托租户关系迁移）。</summary>
     public async Task<(bool Ok, string? Error)> SetLanguageEnabledAsync(long id, bool enabled, CancellationToken ct = default)
     {
-        var (ok, status, error) = await PostAsync($"api/localization/languages/{id}/enabled", new { enabled }, ct);
+        var (ok, status, error, _) = await PostAsync($"api/localization/languages/{id}/enabled", new { enabled }, ct);
         if (!ok && status == 401) OnUnauthorized();
         return (ok, error);
     }
@@ -504,7 +504,7 @@ public sealed class ApiClient : IApiClient
     /// <summary>M3-02 平台管理员按 Id 顺序重排语言目录。</summary>
     public async Task<(bool Ok, string? Error)> ReorderLanguagesAsync(IReadOnlyList<long> orderedIds, CancellationToken ct = default)
     {
-        var (ok, status, error) = await PostAsync("api/localization/languages/reorder", new { orderedIds }, ct);
+        var (ok, status, error, _) = await PostAsync("api/localization/languages/reorder", new { orderedIds }, ct);
         if (!ok && status == 401) OnUnauthorized();
         return (ok, error);
     }
@@ -529,7 +529,7 @@ public sealed class ApiClient : IApiClient
     /// 读取任意 JSON 端点为 <see cref="JsonElement"/>，失败时返回错误信息且不抛异常。
     /// 用于在不确定后端 DTO 精确结构时安全渲染列表/详情。
     /// </summary>
-    public async Task<(JsonElement? Data, int Status, string? Error)> GetJsonAsync(string relativeUrl, CancellationToken ct = default)
+    public async Task<(JsonElement? Data, int Status, string? Error, string? Code)> GetJsonAsync(string relativeUrl, CancellationToken ct = default)
     {
         var client = CreateClient();
         try
@@ -538,19 +538,19 @@ public sealed class ApiClient : IApiClient
             var body = await resp.Content.ReadAsStringAsync(ct);
             if (!resp.IsSuccessStatusCode)
             {
-            var (code, msg, _) = ParseApiError(body);
-            if (resp.StatusCode == HttpStatusCode.Unauthorized) OnUnauthorized();
-            return (null, (int)resp.StatusCode, msg ?? $"请求失败（{(int)resp.StatusCode}）。");
+                var (code, msg, _) = ParseApiError(body);
+                if (resp.StatusCode == HttpStatusCode.Unauthorized) OnUnauthorized();
+                return (null, (int)resp.StatusCode, msg ?? $"请求失败（{(int)resp.StatusCode}）。", code);
             }
             if (string.IsNullOrWhiteSpace(body))
-                return (null, 200, null);
+                return (null, 200, null, null);
             using var doc = JsonDocument.Parse(body);
             var el = doc.RootElement.Clone();
-            return (el, 200, null);
+            return (el, 200, null, null);
         }
         catch (Exception ex)
         {
-            return (null, 0, "网络或解析错误：" + ex.Message);
+            return (null, 0, "网络或解析错误：" + ex.Message, null);
         }
     }
 

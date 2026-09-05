@@ -124,7 +124,7 @@
         _loading = true;
         _error = "";
 
-        var (admins, _, aErr) = await Api.GetJsonAsync("api/platform-admin");
+        var (admins, _, aErr, _) = await Api.GetJsonAsync("api/platform-admin");
         if (aErr != null)
         {
             _error = aErr;
@@ -134,7 +134,7 @@
         }
         _admins = admins is { ValueKind: JsonValueKind.Array } ? admins.Value.EnumerateArray().ToList() : new();
 
-        var (tenants, _, _) = await Api.GetJsonAsync("api/tenant-management");
+        var (tenants, _, _, _) = await Api.GetJsonAsync("api/tenant-management");
         _tenants = tenants is { ValueKind: JsonValueKind.Array } ? tenants.Value.EnumerateArray().ToList() : new();
 
         // 拉取每位管理员的范围摘要（管理员数量有限，N+1 可接受）
@@ -142,7 +142,7 @@
         foreach (var a in _admins)
         {
             var id = long.Parse(TablePresenter.Cell(a, "id"));
-            var (v, _, _) = await Api.GetJsonAsync($"api/platform-admin/{id}/scope");
+            var (v, _, _, _) = await Api.GetJsonAsync($"api/platform-admin/{id}/scope");
             if (v is { } jv)
             {
                 var all = TablePresenter.Cell(jv, "allTenants") == "True";
@@ -184,7 +184,7 @@
 
     private async Task LoadScopeAsync()
     {
-        var (v, _, err) = await Api.GetJsonAsync($"api/platform-admin/{_editingId}/scope");
+        var (v, _, err, _) = await Api.GetJsonAsync($"api/platform-admin/{_editingId}/scope");
         if (err != null)
         {
             _scopeErr = err;
@@ -219,7 +219,7 @@
         _saving = true;
         _saveErr = "";
         var tenantIds = _allTenants ? Array.Empty<long>() : _selected.ToArray();
-        var (ok, status, err) = await Api.PutAsync($"api/platform-admin/{_editingId}/scope", new { tenantIds });
+        var (ok, status, err, _) = await Api.PutAsync($"api/platform-admin/{_editingId}/scope", new { tenantIds });
         if (ok)
         {
             Toast.Success(_allTenants

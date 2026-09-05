@@ -92,7 +92,7 @@
             StateHasChanged();
             return;
         }
-        var (data, _, _) = await Api.GetJsonAsync("api/self-registration/status");
+        var (data, _, _, _) = await Api.GetJsonAsync("api/self-registration/status");
         Enabled = data is { ValueKind: System.Text.Json.JsonValueKind.Object }
                   && data.Value.TryGetProperty("enabled", out var e) && e.GetBoolean();
         Checking = false;

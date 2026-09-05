@@ -186,7 +186,7 @@
     private async Task Reload()
     {
         _loading = true;
-        var (languageData, _, _) = await Api.GetJsonAsync("api/localization/languages");
+        var (languageData, _, _, _) = await Api.GetJsonAsync("api/localization/languages");
         _languages = languageData is { ValueKind: JsonValueKind.Array } ? languageData.Value.EnumerateArray().ToList() : new();
         if (_selectedCultures.Count == 0)
         {
@@ -194,7 +194,7 @@
             if (_selectedCultures.Contains("en-US")) _defaultCulture = "en-US";
             else if (_selectedCultures.Count > 0) _defaultCulture = _selectedCultures.First();
         }
-        var (data, _, err) = await Api.GetJsonAsync("api/tenant-management");
+        var (data, _, err, _) = await Api.GetJsonAsync("api/tenant-management");
         _error = err ?? "";
         _rows = data is { ValueKind: JsonValueKind.Array } ? data.Value.EnumerateArray().ToList() : new();
         _cols = TablePresenter.InferColumns(data);
@@ -212,7 +212,7 @@
         if (cultures.Count == 0) { _createErr = "至少选择一种租户语言。"; return; }
         if (!cultures.Contains(_defaultCulture)) _defaultCulture = cultures[0];
         _saving = true;
-        var (ok, status, err) = await Api.PostAsync("api/tenant-management", new
+        var (ok, status, err, _) = await Api.PostAsync("api/tenant-management", new
         {
             tenantCode = _code,
             tenantName = _name,
@@ -271,7 +271,7 @@
     {
         _editError = ""; if (_editCultures.Count == 0) { _editError = "至少选择一种语言。"; return; }
         _savingEdit = true;
-        var (ok, _, err) = await Api.PutAsync($"api/tenant-management/{_editId}", new { tenantName=_editName, availableCultures=_editCultures.ToArray(), defaultCulture=_editDefaultCulture });
+        var (ok, _, err, _) = await Api.PutAsync($"api/tenant-management/{_editId}", new { tenantName=_editName, availableCultures=_editCultures.ToArray(), defaultCulture=_editDefaultCulture });
         _savingEdit = false; if (!ok) { _editError = err ?? "保存失败。"; return; }
         _editing = false; Toast.Success("租户基本信息与语言配置已更新。"); await Reload();
     }
@@ -280,7 +280,7 @@
     {
         var id = TablePresenter.Cell(row, "id");
         if (string.IsNullOrWhiteSpace(id)) { Toast.Warning("该记录缺少 id。"); return; }
-        var (ok, _, err) = await Api.PatchAsync($"api/tenant-management/{id}/{(enabled ? "enable" : "disable")}");
+        var (ok, _, err, _) = await Api.PatchAsync($"api/tenant-management/{id}/{(enabled ? "enable" : "disable")}");
         if (!ok) { Toast.Error(err ?? "操作失败。"); return; }
         Toast.Success(enabled ? "租户已启用。" : "租户已停用。");
         await Reload();
@@ -340,7 +340,7 @@
     {
         _settingsLoading = true;
         StateHasChanged();
-        var (data, _, err) = await Api.GetJsonAsync($"api/tenant-management/{_settingId}/settings");
+        var (data, _, err, _) = await Api.GetJsonAsync($"api/tenant-management/{_settingId}/settings");
         _settingErr = err ?? "";
         _settings = data is { ValueKind: JsonValueKind.Array } ? data.Value.EnumerateArray().ToList() : new();
         _settingsLoading = false;
@@ -352,7 +352,7 @@
         _skErr = ""; _settingErr = "";
         if (string.IsNullOrWhiteSpace(_sKey)) { _skErr = "配置 Key 必填。"; return; }
         _savingSetting = true;
-        var (ok, status, err) = await Api.PostAsync(
+        var (ok, status, err, _) = await Api.PostAsync(
             $"api/tenant-management/{_settingId}/settings",
             new { key = _sKey, value = _sValue, dataType = _sType });
         _savingSetting = false;

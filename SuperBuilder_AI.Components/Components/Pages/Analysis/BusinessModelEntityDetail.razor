@@ -54,7 +54,7 @@
     private async Task Reload()
     {
         _loading = true;
-        var (data, _, err) = await Api.GetJsonAsync($"api/business-model/entities/{Id}?tenantId={State.TenantId}");
+        var (data, _, err, _) = await Api.GetJsonAsync($"api/business-model/entities/{Id}?tenantId={State.TenantId}");
         _error = err ?? "";
         _obj = data is { ValueKind: JsonValueKind.Object } ? data : null;
         _kv = _obj is null ? new() : _obj.Value.EnumerateObject()

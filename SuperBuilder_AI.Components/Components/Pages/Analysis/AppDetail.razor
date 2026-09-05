@@ -6,15 +6,15 @@
 @using SuperBuilder_AI.Components.Shared
 
 <AuthGuard>
-    <PageHead Icon="sb-ico-app" Title="@(_title)" Desc="应用详情：DSL 结构、页面与组件清单。">
-        <button class="btn btn-outline-secondary btn-sm" @onclick='() => Nav.NavigateTo("apps")'>返回列表</button>
-        <button class="btn btn-outline-secondary btn-sm" @onclick="() => Load()">刷新</button>
-        <button class="btn btn-danger btn-sm" @onclick="() => _confirmOpen = true">删除</button>
+    <PageHead Icon="sb-ico-app" Title="@(_title)" Desc="@L10n.T(Keys.Content.AppDetailDesc, "应用详情：DSL 结构、页面与组件清单。")">
+        <button class="btn btn-outline-secondary btn-sm" @onclick='() => Nav.NavigateTo("apps")'>@L10n.T(Keys.Content.AppDetailBack, "返回列表")</button>
+        <button class="btn btn-outline-secondary btn-sm" @onclick="() => Load()">@L10n.T(Keys.Content.AppDetailRefresh, "刷新")</button>
+        <button class="btn btn-danger btn-sm" @onclick="() => _confirmOpen = true">@L10n.T(Keys.Content.AppDetailDelete, "删除")</button>
     </PageHead>
 
     @if (_loading)
     {
-        <LoadingState Text="正在加载应用…" />
+        <LoadingState Text="@L10n.T(Keys.Content.AppDetailLoading, "正在加载应用…")" />
     }
     else if (_error is not null)
     {
@@ -23,18 +23,18 @@
     else
     {
         <SbTabs>
-            <SbTab Title="概览">
-                <SbPanel Icon="sb-ico-app" Title="基本信息">
+            <SbTab Title="@L10n.T(Keys.Content.AppDetailTabOverview, "概览")">
+                <SbPanel Icon="sb-ico-app" Title="@L10n.T(Keys.Content.AppDetailPanelBasic, "基本信息")">
                     <Body><SbKeyValue Items="@JsonRows.Scalars(_detail)" /></Body>
                 </SbPanel>
             </SbTab>
-            <SbTab Title="页面与组件" Badge="@_components.Count.ToString()">
-                <SbPanel Icon="sb-ico-comp" Title="组件清单" Flush="true">
+            <SbTab Title="@L10n.T(Keys.Content.AppDetailTabComponents, "页面与组件")" Badge="@_components.Count.ToString()">
+                <SbPanel Icon="sb-ico-comp" Title="@L10n.T(Keys.Content.AppDetailPanelComponents, "组件清单")" Flush="true">
                     <Body>
                         @if (_components.Count == 0)
                         {
                             <div class="panel-body">
-                                <SbEmptyState Icon="sb-ico-comp" Title="未解析到组件" Text="该应用的 DSL 中暂无可解析的组件定义。" />
+                                <SbEmptyState Icon="sb-ico-comp" Title="@L10n.T(Keys.Content.AppDetailEmptyComponentsTitle, "未解析到组件")" Text="@L10n.T(Keys.Content.AppDetailEmptyComponentsText, "该应用的 DSL 中暂无可解析的组件定义。")" />
                             </div>
                         }
                         else
@@ -55,17 +55,17 @@
                     </Body>
                 </SbPanel>
             </SbTab>
-            <SbTab Title="DSL">
-                <SbPanel Title="App DSL（只读）">
+            <SbTab Title="@L10n.T(Keys.Content.AppDetailTabDsl, "DSL")">
+                <SbPanel Title="@L10n.T(Keys.Content.AppDetailPanelDsl, "App DSL（只读）")">
                     <Body><pre class="sb-pre">@_dslText</pre></Body>
                 </SbPanel>
             </SbTab>
         </SbTabs>
     }
 
-    <SbConfirm @bind-Visible="_confirmOpen" Title="删除应用" Tone="danger"
-               Message="@($"确认删除应用「{_title}」？该操作不可撤销。")"
-               ConfirmText="删除" OnConfirm="DoDelete" />
+    <SbConfirm @bind-Visible="_confirmOpen" Title="@L10n.T(Keys.Content.AppDetailDeleteConfirmTitle, "删除应用")" Tone="danger"
+               Message="@string.Format(L10n.T(Keys.Content.AppDetailDeleteConfirmMsg, "确认删除应用「{0}」？该操作不可撤销。"), _title)"
+               ConfirmText="@L10n.T(Keys.Content.AppDetailDeleteConfirmText, "删除")" OnConfirm="DoDelete" />
 </AuthGuard>
 
 @code {
@@ -79,6 +79,8 @@
     private bool _loading = true;
     private bool _confirmOpen;
 
+    protected override void OnInitialized() => _title = L10n.T(Keys.Content.AppDetailTitleDefault, "应用详情");
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (!firstRender) return;
@@ -89,11 +91,13 @@
     {
         _loading = true;
         _error = null;
-        var (data, status, err) = await Api.GetJsonAsync($"api/apps/{Uri.EscapeDataString(Code)}");
+        var (data, status, err, code) = await Api.GetJsonAsync($"api/apps/{Uri.EscapeDataString(Code)}");
         _loading = false;
         if (data is null)
         {
-            _error = err ?? $"加载失败（{status}）。";
+            _error = err is null
+                ? string.Format(L10n.T(Keys.Content.AppDetailLoadFailed, "加载失败（{0}）。"), status)
+                : L10n.Friendly(code, err);
             return;
         }
         _detail = data;
@@ -107,15 +111,15 @@
 
     private async Task DoDelete()
     {
-        var (ok, status, err) = await Api.DeleteAsync($"api/apps/{Uri.EscapeDataString(Code)}");
+        var (ok, status, err, code) = await Api.DeleteAsync($"api/apps/{Uri.EscapeDataString(Code)}");
         if (ok)
         {
-            Toast.Success("应用已删除。");
+            Toast.Success(L10n.T(Keys.Content.AppDetailDeleteSuccess, "应用已删除。"));
             Nav.NavigateTo("apps");
         }
         else
         {
-            Toast.Error(err ?? $"删除失败（{status}）。");
+            Toast.Error(err is null ? string.Format(L10n.T(Keys.Content.AppDetailDeleteFailed, "删除失败（{0}）。"), status) : L10n.Friendly(code, err));
         }
     }
 }

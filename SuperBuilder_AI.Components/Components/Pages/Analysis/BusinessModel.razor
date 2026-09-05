@@ -100,8 +100,8 @@
     {
         _loading = true;
         var tid = State.TenantId;
-        var (ent, _, eErr) = await Api.GetJsonAsync($"api/business-model/entities?tenantId={tid}");
-        var (dom, _, _) = await Api.GetJsonAsync($"api/business-model/domains?tenantId={tid}");
+        var (ent, _, eErr, _) = await Api.GetJsonAsync($"api/business-model/entities?tenantId={tid}");
+        var (dom, _, _, _) = await Api.GetJsonAsync($"api/business-model/domains?tenantId={tid}");
         _error = eErr ?? "";
         _entityData = ent;
         _entities = ent is { ValueKind: JsonValueKind.Array } ? ent.Value.EnumerateArray().ToList() : new();

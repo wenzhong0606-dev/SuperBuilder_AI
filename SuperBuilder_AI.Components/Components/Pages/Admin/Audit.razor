@@ -68,7 +68,7 @@
     private async Task Reload()
     {
         _loading = true;
-        var (data, _, err) = await Api.GetJsonAsync($"api/audit/logs?tenantId={State.TenantId}&limit=500");
+        var (data, _, err, _) = await Api.GetJsonAsync($"api/audit/logs?tenantId={State.TenantId}&limit=500");
         _error = err ?? "";
         _all = data is { ValueKind: JsonValueKind.Array } ? data.Value.EnumerateArray().ToList() : new();
         _cols = TablePresenter.InferColumns(data);

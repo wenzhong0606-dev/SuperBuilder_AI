@@ -9,25 +9,25 @@
 @inject AskSessionStore Session
 @inject FileDownloadService Download
 
-<h2>Ask BI 智能问数（旗舰）</h2>
+<h2>@L10n.T(Keys.Content.AskTitle, "Ask BI 智能问数（旗舰）")</h2>
 
 @if (!State.SessionRestored)
 {
-    <LoadingState Text="正在恢复登录会话…" />
+    <LoadingState Text="@L10n.T(Keys.Content.AskRestoringSession, "正在恢复登录会话…")" />
 }
 else if (!State.IsAuthenticated)
 {
-    <p class="muted">请先 <a href="" @onclick="@(() => Nav.NavigateTo("/login"))">登录</a> 后再问数。</p>
+    <p class="muted">@L10n.T(Keys.Content.AskLoginHint, "请先")<a href="" @onclick="@(() => Nav.NavigateTo("/login"))">@L10n.T(Keys.Content.AskLoginLink, "登录")</a>@L10n.T(Keys.Content.AskLoginHint2, "后再问数。")</p>
 }
 else
 {
     <div class="card ask-bar">
         <div class="ask-bar-row">
             <div class="ask-ds">
-                可访问数据范围
+                @L10n.T(Keys.Content.AskDataScope, "可访问数据范围")
                 @if (_dsBusy)
                 {
-                    <span class="muted tiny">加载中…</span>
+                    <span class="muted tiny">@L10n.T(Keys.Content.AskDataLoading, "加载中…")</span>
                 }
                 else if (_dsError is not null)
                 {
@@ -38,19 +38,19 @@ else
                     <div class="ask-source-scope">@foreach (var source in _dsOptions) { <span class="badge badge-primary">@source.Name</span> }</div>
                 }
             </div>
-            <label class="ask-q">自然语言问题<textarea class="form-control" @bind="Question" placeholder="例如：上个月各区域销售额对比"></textarea></label>
+            <label class="ask-q">@L10n.T(Keys.Content.AskQuestionLabel, "自然语言问题")<textarea class="form-control" @bind="Question" placeholder="@L10n.T(Keys.Content.AskQuestionPlaceholder, "例如：上个月各区域销售额对比")"></textarea></label>
         </div>
         <div class="ask-actions">
-            <button class="btn btn-primary" @onclick="DoAsk" disabled="@Busy">提问</button>
-            <button class="btn btn-outline-secondary" @onclick="ClearChat" disabled="@Busy">清空对话</button>
-            @if (_sessionLoaded && Turns.Count > 0) { <span class="muted tiny">已恢复 @Turns.Count 轮历史</span> }
+            <button class="btn btn-primary" @onclick="DoAsk" disabled="@Busy">@L10n.T(Keys.Content.AskButtonAsk, "提问")</button>
+            <button class="btn btn-outline-secondary" @onclick="ClearChat" disabled="@Busy">@L10n.T(Keys.Content.AskButtonClear, "清空对话")</button>
+            @if (_sessionLoaded && Turns.Count > 0) { <span class="muted tiny">@string.Format(L10n.T(Keys.Content.AskHistoryRestored, "已恢复 {0} 轮历史"), Turns.Count)</span> }
             @if (!string.IsNullOrEmpty(GlobalError)) { <span class="error">@GlobalError</span> }
         </div>
     </div>
 
     @if (Turns.Count == 0)
     {
-        <p class="muted">还没有对话。试着问一个业务问题，例如「本月各品类销售额 Top 10」。</p>
+        <p class="muted">@L10n.T(Keys.Content.AskNoConversation, "还没有对话。试着问一个业务问题，例如「本月各品类销售额 Top 10」。")</p>
     }
 
     @foreach (var tp in WithParents())
@@ -98,8 +98,8 @@ else
         _dsBusy = true;
         try
         {
-            var (data, _, err) = await Api.GetJsonAsync("api/data-sources");
-            if (data is null) { _dsError = err ?? "数据源列表为空"; return; }
+            var (data, _, err, _) = await Api.GetJsonAsync("api/data-sources");
+            if (data is null) { _dsError = err ?? L10n.T(Keys.Content.AskDataSourceListEmpty, "数据源列表为空"); return; }
             var opts = JsonSerializer.Deserialize<List<DsOption>>(data.Value.GetRawText(), new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
             if (opts is { Count: > 0 })
             {
@@ -107,12 +107,12 @@ else
             }
             else
             {
-                _dsError = "当前账号暂无可用数据源";
+                _dsError = L10n.T(Keys.Content.AskNoDataSources, "当前账号暂无可用数据源");
             }
         }
         catch (Exception ex)
         {
-            _dsError = "数据源加载失败：" + ex.Message;
+            _dsError = string.Format(L10n.T(Keys.Content.AskDataSourceLoadFailed, "数据源加载失败：{0}"), ex.Message);
         }
         finally
         {
@@ -137,8 +137,8 @@ else
 
     private async Task DoAsk()
     {
-        if (string.IsNullOrWhiteSpace(Question)) { GlobalError = "请输入问题。"; return; }
-        if (_dsOptions.Count == 0) { GlobalError = "当前账号尚未获授权任何数据源，请联系租户管理员。"; return; }
+        if (string.IsNullOrWhiteSpace(Question)) { GlobalError = L10n.T(Keys.Content.AskEnterQuestion, "请输入问题。"); return; }
+        if (_dsOptions.Count == 0) { GlobalError = L10n.T(Keys.Content.AskNoAuthorizedDataSource, "当前账号尚未获授权任何数据源，请联系租户管理员。"); return; }
         Busy = true; GlobalError = "";
         var turn = new AskTurn { Question = Question, DataSourceIdHint = 0 };
         Turns.Add(turn);
@@ -154,7 +154,7 @@ else
     private async Task DoRefine(AskTurn turn)
     {
         var instr = turn.RefineInstruction?.Trim();
-        if (string.IsNullOrWhiteSpace(instr)) { turn.RefineError = "请输入细化指令。"; return; }
+        if (string.IsNullOrWhiteSpace(instr)) { turn.RefineError = L10n.T(Keys.Content.AskEnterRefineInstruction, "请输入细化指令。"); return; }
         turn.RefineBusy = true; turn.RefineError = null; turn.RefineInfo = null;
         try
         {
@@ -167,12 +167,12 @@ else
             var child = new AskTurn { Question = $"{turn.Question} → {instr}", IsRefine = true, DataSourceIdHint = DataSourceId };
             ApplyOutcome(child, outcome);
             Turns.Add(child);
-            turn.RefineInfo = "已基于本轮结果重新查询（多轮语义调整）。";
+            turn.RefineInfo = L10n.T(Keys.Content.AskRefineBasedOnResult, "已基于本轮结果重新查询（多轮语义调整）。");
             await PersistAsync();
         }
         catch (Exception ex)
         {
-            turn.RefineError = "细化异常：" + ex.Message;
+            turn.RefineError = string.Format(L10n.T(Keys.Content.AskRefineException, "细化异常：{0}"), ex.Message);
         }
         finally
         {
@@ -180,18 +180,18 @@ else
         }
     }
 
-    private static void ApplyOutcome(AskTurn turn, AskOutcome outcome)
+    private void ApplyOutcome(AskTurn turn, AskOutcome outcome)
     {
         if (!outcome.HasResponse)
         {
-            turn.Error = outcome.Error ?? "问数失败。";
+            turn.Error = outcome.Error ?? L10n.T(Keys.Content.AskFailed, "问数失败。");
             turn.Code = outcome.Code;
             turn.TraceId = outcome.TraceId;
             return;
         }
         turn.Response = outcome.Response;
         if (!outcome.Response.Success && string.IsNullOrEmpty(outcome.Response.ErrorMessage) && outcome.Response.Answer is null)
-            turn.Error = "问数未返回有效结果。";
+            turn.Error = L10n.T(Keys.Content.AskNoValidResult, "问数未返回有效结果。");
         else if (!string.IsNullOrEmpty(outcome.Response.ErrorMessage))
             turn.Error = outcome.Response.ErrorMessage;
     }
@@ -294,7 +294,7 @@ else
         {
             var q = turn.Question;
             var code = "ask-" + State.TenantId + "-" + DateTimeOffset.UtcNow.ToUnixTimeSeconds() + "-" + Guid.NewGuid().ToString("N")[..4];
-            var name = "问数应用：" + (q.Length > 40 ? q[..40] + "…" : q);
+            var name = L10n.T(Keys.Content.AskPublishedAppNamePrefix, "问数应用：") + (q.Length > 40 ? q[..40] + "…" : q);
             var desc = turn.Response.Answer?.Answer;
             if (!string.IsNullOrEmpty(desc) && desc.Length > 200) desc = desc[..200] + "…";
 
@@ -306,19 +306,19 @@ else
             {
                 new
                 {
-                    type = "chart", id = "chart1", title = viz?.Title ?? "结果图", order = 1,
+                    type = "chart", id = "chart1", title = viz?.Title ?? L10n.T(Keys.Content.AskChartTitleDefault, "结果图"), order = 1,
                     properties = new Dictionary<string, string> { { "chartType", chartType }, { "categoryField", viz?.XAxis ?? "" } },
                     style = new { palette = "primary", showBorder = true, padding = "normal" }
                 },
                 new
                 {
-                    type = "table", id = "table1", title = "明细数据", order = 2,
+                    type = "table", id = "table1", title = L10n.T(Keys.Content.AskTableTitleDefault, "明细数据"), order = 2,
                     properties = new Dictionary<string, string> { { "pageSize", "20" } },
                     style = new { showBorder = true }
                 },
                 new
                 {
-                    type = "text", id = "answer1", title = "AI 解读", order = 3,
+                    type = "text", id = "answer1", title = L10n.T(Keys.Content.AskAiSummaryTitle, "AI 解读"), order = 3,
                     properties = new Dictionary<string, string> { { "markdown", desc ?? "" } },
                     style = new { showBorder = true }
                 }
@@ -342,12 +342,12 @@ else
             };
             var json = System.Text.Json.JsonSerializer.Serialize(dsl);
             var (ok, c, err) = await Api.PublishAppAsync(State.TenantId, json, code);
-            if (ok) turn.PublishInfo = $"已发布为应用：{c}";
-            else turn.PublishError = "发布失败：" + (err ?? "未知错误");
+            if (ok) turn.PublishInfo = string.Format(L10n.T(Keys.Content.AskPublishSuccess, "已发布为应用：{0}"), c);
+            else turn.PublishError = string.Format(L10n.T(Keys.Content.AskPublishFailed, "发布失败：{0}"), err ?? "未知错误");
         }
         catch (Exception ex)
         {
-            turn.PublishError = "发布异常：" + ex.Message;
+            turn.PublishError = string.Format(L10n.T(Keys.Content.AskPublishException, "发布异常：{0}"), ex.Message);
         }
         finally
         {

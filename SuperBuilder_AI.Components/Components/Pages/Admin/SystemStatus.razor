@@ -54,7 +54,7 @@
         _loading = true;
         var sw = System.Diagnostics.Stopwatch.StartNew();
 
-        var (health, hStatus, hErr) = await Api.GetJsonAsync("health");
+        var (health, hStatus, hErr, _) = await Api.GetJsonAsync("health");
         _healthStatus = hStatus;
         _healthText = health is not null ? health.Value.ToString() : (hErr ?? "无响应");
         _status = health is not null && health.Value.TryGetProperty("status", out var s) ? (s.GetString() ?? "") : (hStatus == 200 ? "UP" : "DOWN");

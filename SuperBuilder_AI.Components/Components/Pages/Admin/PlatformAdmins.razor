@@ -161,7 +161,7 @@
         _loading = true;
         _error = "";
 
-        var (admins, _, aErr) = await Api.GetJsonAsync("api/platform-admin");
+        var (admins, _, aErr, _) = await Api.GetJsonAsync("api/platform-admin");
         if (aErr != null)
         {
             _error = aErr;
@@ -171,7 +171,7 @@
         }
         _admins = admins is { ValueKind: JsonValueKind.Array } ? admins.Value.EnumerateArray().ToList() : new();
 
-        var (logs, _, _) = await Api.GetJsonAsync($"api/audit/logs?tenantId={State.TenantId}&entityType=PlatformAdmin&limit=500");
+        var (logs, _, _, _) = await Api.GetJsonAsync($"api/audit/logs?tenantId={State.TenantId}&entityType=PlatformAdmin&limit=500");
         _audit = logs is { ValueKind: JsonValueKind.Array } ? logs.Value.EnumerateArray().ToList() : new();
 
         _loading = false;
@@ -197,7 +197,7 @@
             _createErr = "初始口令至少 8 位。";
             return;
         }
-        var (ok, status, err) = await Api.PostAsync("api/platform-admin", new
+        var (ok, status, err, _) = await Api.PostAsync("api/platform-admin", new
         {
             username = _newUsername,
             password = _newPassword,
@@ -232,7 +232,7 @@
             _resetErr = "新口令至少 8 位。";
             return;
         }
-        var (ok, status, err) = await Api.PostAsync($"api/platform-admin/{_resetId}/reset-password", new { newPassword = _resetPassword });
+        var (ok, status, err, _) = await Api.PostAsync($"api/platform-admin/{_resetId}/reset-password", new { newPassword = _resetPassword });
         if (ok)
         {
             Toast.Success($"{_resetUsername} 的口令已重置，旧令牌已失效。");
@@ -261,7 +261,7 @@
 
     private async Task DoDisable()
     {
-        var (ok, status, err) = await Api.PostAsync($"api/platform-admin/{_confirmId}/disable", null);
+        var (ok, status, err, _) = await Api.PostAsync($"api/platform-admin/{_confirmId}/disable", null);
         if (ok)
         {
             Toast.Success($"{_confirmUsername} 已停用。");
@@ -275,7 +275,7 @@
 
     private async Task DoEnable()
     {
-        var (ok, status, err) = await Api.PostAsync($"api/platform-admin/{_confirmId}/enable", null);
+        var (ok, status, err, _) = await Api.PostAsync($"api/platform-admin/{_confirmId}/enable", null);
         if (ok)
         {
             Toast.Success($"{_confirmUsername} 已启用。");

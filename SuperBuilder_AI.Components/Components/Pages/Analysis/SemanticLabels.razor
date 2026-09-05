@@ -101,7 +101,7 @@
     private async Task Reload()
     {
         _loading = true;
-        var (data, _, err) = await Api.GetJsonAsync($"api/semantic-labels?tenantId={State.TenantId}");
+        var (data, _, err, _) = await Api.GetJsonAsync($"api/semantic-labels?tenantId={State.TenantId}");
         _error = err ?? "";
         _rows = data is { ValueKind: JsonValueKind.Array } ? data.Value.EnumerateArray().ToList() : new();
         _cols = TablePresenter.InferColumns(data);
@@ -145,7 +145,7 @@
             source = _source,
             sortOrder = 0
         };
-        var (ok, _, err) = await Api.PostAsync("api/semantic-labels", body);
+        var (ok, _, err, _) = await Api.PostAsync("api/semantic-labels", body);
         _saving = false;
         if (!ok) { _createErr = err ?? "保存失败。"; return; }
         _creating = false;

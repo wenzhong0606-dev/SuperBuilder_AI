@@ -77,7 +77,7 @@
     {
         try
         {
-            var (data, _, _) = await Api.GetJsonAsync(url);
+            var (data, _, _, _) = await Api.GetJsonAsync(url);
             if (data is { ValueKind: JsonValueKind.Array }) return data.Value.GetArrayLength();
             if (data is { ValueKind: JsonValueKind.Object } && data.Value.TryGetProperty("items", out var items)
                 && items.ValueKind == JsonValueKind.Array)

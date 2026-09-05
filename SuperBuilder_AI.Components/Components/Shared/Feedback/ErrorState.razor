@@ -1,7 +1,7 @@
 @inject LocalizationService L10n
 @* 统一错误态：错误码 + 追踪 ID + 可选重试（对齐后端 ApiError） *@
 <div class="alert alert-warning" role="alert">
-    <div class="ask-error-msg">@Message ?? L10n.T(Keys.Error.OperationFailed, "操作失败。")</div>
+    <div class="ask-error-msg">@L10n.Friendly(Code, Message ?? L10n.T(Keys.Error.OperationFailed, "操作失败。"))</div>
     @if (!string.IsNullOrWhiteSpace(Code) || !string.IsNullOrWhiteSpace(TraceId))
     {
         <div class="ask-error-meta">

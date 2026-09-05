@@ -103,7 +103,7 @@
     private async Task Reload()
     {
         _loading = true;
-        var (data, _, err) = await Api.GetJsonAsync("api/tenant-membership/admin");
+        var (data, _, err, _) = await Api.GetJsonAsync("api/tenant-membership/admin");
         _error = err ?? "";
         _rows = new();
         if (data is { ValueKind: JsonValueKind.Array })
@@ -144,7 +144,7 @@
         if (!_addTenantId.HasValue || _addTenantId <= 0) { _addTenantIdErr = "目标租户 ID 必填且须大于 0。"; return; }
 
         _savingAdd = true;
-        var (ok, status, err) = await Api.PostAsync("api/tenant-membership", new
+        var (ok, status, err, _) = await Api.PostAsync("api/tenant-membership", new
         {
             userId = _addUserId.Value,
             tenantId = _addTenantId.Value,
@@ -170,7 +170,7 @@
 
     private async Task Remove(MembershipRow row)
     {
-        var (ok, _, err) = await Api.DeleteAsync($"api/tenant-membership?userId={row.UserId}&tenantId={row.TenantId}");
+        var (ok, _, err, _) = await Api.DeleteAsync($"api/tenant-membership?userId={row.UserId}&tenantId={row.TenantId}");
         if (!ok) { Toast.Error(err ?? "移除失败。"); return; }
         Toast.Success("已移除该租户成员关系。");
         await Reload();

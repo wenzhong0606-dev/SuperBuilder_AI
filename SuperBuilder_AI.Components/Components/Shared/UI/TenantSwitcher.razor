@@ -39,7 +39,7 @@
         if (!firstRender) return;
         if (!State.IsAuthenticated) return;
         // M2-05：拉取当前用户可切换的租户列表（含主租户）。
-        var (data, _, _) = await Api.GetJsonAsync("api/tenant-membership");
+        var (data, _, _, _) = await Api.GetJsonAsync("api/tenant-membership");
         if (data is null) return;
         try
         {

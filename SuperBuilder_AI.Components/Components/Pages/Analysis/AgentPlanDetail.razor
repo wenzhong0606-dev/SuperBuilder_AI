@@ -89,7 +89,7 @@
     {
         _loading = true;
         _error = null;
-        var (data, status, err) = await Api.GetJsonAsync($"api/agent/plans/{Uri.EscapeDataString(Code)}");
+        var (data, status, err, _) = await Api.GetJsonAsync($"api/agent/plans/{Uri.EscapeDataString(Code)}");
         _loading = false;
         if (data is null)
         {
@@ -144,7 +144,7 @@
 
     private async Task DoDelete()
     {
-        var (ok, status, err) = await Api.DeleteAsync($"api/agent/plans/{Uri.EscapeDataString(Code)}");
+        var (ok, status, err, _) = await Api.DeleteAsync($"api/agent/plans/{Uri.EscapeDataString(Code)}");
         if (ok)
         {
             Toast.Success("计划已删除。");

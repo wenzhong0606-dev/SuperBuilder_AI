@@ -103,7 +103,7 @@ public sealed class AuthStore
     public async Task<bool> ValidateAsync()
     {
         if (!_state.IsAuthenticated) return false;
-        var (_, status, _) = await _api.GetJsonAsync("api/auth/me");
+        var (_, status, _, _) = await _api.GetJsonAsync("api/auth/me");
         if (status == 401)
         {
             await ClearAsync();

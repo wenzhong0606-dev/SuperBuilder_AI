@@ -7,57 +7,57 @@
 @using SuperBuilder_AI.Components.Shared
 
 <AuthGuard>
-    <SbListPage TItem="JsonElement" Icon="sb-ico-dash" Title="仪表盘"
-                Desc="将 Ask 分析结果固化为可复用的可视化看板，支持团队共享与定时刷新。"
+    <SbListPage TItem="JsonElement" Icon="sb-ico-dash" Title="@L10n.T(Keys.Content.DashboardsTitle, "仪表盘")"
+                Desc="@L10n.T(Keys.Content.DashboardsDesc, "将 Ask 分析结果固化为可复用的可视化看板，支持团队共享与定时刷新。")"
                 Items="@_rows" Columns="@Columns" Loading="@_loading" Error="@_error"
-                OnReload="Reload" SearchPlaceholder="搜索名称 / 编码…"
-                EmptyTitle="暂无仪表盘"
-                EmptyText="将一次问数结果保存为仪表盘，即可在团队内复用这套分析视角与图表。"
-                LoadingText="正在加载仪表盘…" PageSize="20">
+                OnReload="Reload" SearchPlaceholder="@L10n.T(Keys.Content.DashboardsSearchPlaceholder, "搜索名称 / 编码…")"
+                EmptyTitle="@L10n.T(Keys.Content.DashboardsEmptyTitle, "暂无仪表盘")"
+                EmptyText="@L10n.T(Keys.Content.DashboardsEmptyText, "将一次问数结果保存为仪表盘，即可在团队内复用这套分析视角与图表。")"
+                LoadingText="@L10n.T(Keys.Content.DashboardsLoading, "正在加载仪表盘…")" PageSize="20">
 
         <Actions>
             <button class="btn btn-primary btn-sm" @onclick="Create">
-                <svg class="btn-ico"><use href="#sb-ico-plus" /></svg> 新建仪表盘
+                <svg class="btn-ico"><use href="#sb-ico-plus" /></svg> @L10n.T(Keys.Content.DashboardsNew, "新建仪表盘")
             </button>
         </Actions>
 
         <Stats>
-            <SbStatTile Label="仪表盘总数" Value="@_rows.Count" Sub="含全局模板" />
-            <SbStatTile Label="已发布" Value="@_rows.Count(IsPublished)" Sub="可对外共享" Accent="success" />
-            <SbStatTile Label="草稿" Value="@_rows.Count(r => !IsPublished(r))" Sub="编辑中" Accent="warning" />
+            <SbStatTile Label="@L10n.T(Keys.Content.DashboardsStatTotal, "仪表盘总数")" Value="@_rows.Count" Sub="@L10n.T(Keys.Content.DashboardsStatTotalSub, "含全局模板")" />
+            <SbStatTile Label="@L10n.T(Keys.Content.DashboardsStatPublished, "已发布")" Value="@_rows.Count(IsPublished)" Sub="@L10n.T(Keys.Content.DashboardsStatPublishedSub, "可对外共享")" Accent="success" />
+            <SbStatTile Label="@L10n.T(Keys.Content.DashboardsStatDraft, "草稿")" Value="@_rows.Count(r => !IsPublished(r))" Sub="@L10n.T(Keys.Content.DashboardsStatDraftSub, "编辑中")" Accent="warning" />
         </Stats>
 
         <EmptyActions>
-            <button class="btn btn-primary btn-sm" @onclick='() => Nav.NavigateTo("ask")'>从 Ask 发布</button>
+            <button class="btn btn-primary btn-sm" @onclick='() => Nav.NavigateTo("ask")'>@L10n.T(Keys.Content.DashboardsPublishFromAsk, "从 Ask 发布")</button>
         </EmptyActions>
 
         <RowActions>
-            <button class="btn btn-sm btn-outline-secondary" @onclick="() => Open(context)">详情</button>
-            <button class="btn btn-sm btn-outline-danger" @onclick="() => AskDelete(context)">删除</button>
+            <button class="btn btn-sm btn-outline-secondary" @onclick="() => Open(context)">@L10n.T(Keys.Content.DashboardsRowDetail, "详情")</button>
+            <button class="btn btn-sm btn-outline-danger" @onclick="() => AskDelete(context)">@L10n.T(Keys.Content.DashboardsRowDelete, "删除")</button>
         </RowActions>
     </SbListPage>
 
-    <SbConfirm Visible="@_confirm" VisibleChanged="v => _confirm = v" Title="删除仪表盘"
-               Message="删除后不可恢复，确认要删除该仪表盘吗？" ConfirmText="删除"
+    <SbConfirm Visible="@_confirm" VisibleChanged="v => _confirm = v" Title="@L10n.T(Keys.Content.DashboardsTitle, "仪表盘")"
+               Message="@L10n.T(Keys.Content.DashboardsDeleteConfirmMsg, "删除后不可恢复，确认要删除该仪表盘吗？")" ConfirmText="@L10n.T(Keys.Content.DashboardsDeleteConfirmText, "删除")"
                Tone="danger" OnConfirm="DoDelete" />
 
     <SbModal Visible="@_createModal" VisibleChanged="v => _createModal = v" Title="新建仪表盘" Size="lg">
         <Body>
             <div class="form-stack">
-                <SbField Label="状态">
+                <SbField Label="@L10n.T(Keys.Content.DashboardsFieldStatus, "状态")">
                     <select class="form-select" @bind="_newStatus">
-                        <option value="draft">草稿</option>
-                        <option value="published">已发布</option>
+                        <option value="draft">@L10n.T(Keys.Content.DashboardsStatusDraft, "草稿")</option>
+                        <option value="published">@L10n.T(Keys.Content.DashboardsStatusPublished, "已发布")</option>
                     </select>
                 </SbField>
-                <SbField Label="DslJson" Required="true" Error="@_createErr" Hint="声明式仪表盘定义（DashboardDsl JSON）。保存将校验后创建。">
+                <SbField Label="@L10n.T(Keys.Content.DashboardsFieldDslJson, "DslJson")" Required="true" Error="@_createErr" Hint="@L10n.T(Keys.Content.DashboardsFieldDslJsonHint, "声明式仪表盘定义（DashboardDsl JSON）。保存将校验后创建。")">
                     <textarea class="form-control sb-pre" rows="16" @bind="_newDsl"></textarea>
                 </SbField>
             </div>
         </Body>
         <Footer>
-            <button class="btn btn-outline-secondary btn-sm" @onclick="() => _createModal = false">取消</button>
-            <button class="btn btn-primary btn-sm" @onclick="CreateDashboard">创建</button>
+            <button class="btn btn-outline-secondary btn-sm" @onclick="() => _createModal = false">@L10n.T(Keys.Content.DashboardsModalCancel, "取消")</button>
+            <button class="btn btn-primary btn-sm" @onclick="CreateDashboard">@L10n.T(Keys.Content.DashboardsModalCreate, "创建")</button>
         </Footer>
     </SbModal>
 </AuthGuard>
@@ -83,8 +83,8 @@
     private async Task Reload()
     {
         _loading = true;
-        var (data, _, err) = await Api.GetJsonAsync($"api/dashboards?tenantId={State.TenantId}");
-        _error = err ?? "";
+        var (data, _, err, code) = await Api.GetJsonAsync($"api/dashboards?tenantId={State.TenantId}");
+        _error = L10n.Friendly(code, err ?? L10n.T(Keys.Content.DashboardsLoadFailed, "加载失败。"));
         _rows = data is { ValueKind: JsonValueKind.Array } ? data.Value.EnumerateArray().ToList() : new();
         _cols = TablePresenter.InferColumns(data);
         _loading = false;
@@ -96,7 +96,7 @@
         var id = TablePresenter.Cell(row, "id");
         if (string.IsNullOrWhiteSpace(id))
         {
-            Toast.Warning("该记录缺少 id，无法打开详情。");
+            Toast.Warning(L10n.T(Keys.Content.DashboardsMissingIdOpen, "该记录缺少 id，无法打开详情。"));
             return;
         }
         Nav.NavigateTo($"dashboards/{id}");
@@ -108,7 +108,7 @@
     private void AskDelete(JsonElement row)
     {
         var id = TablePresenter.Cell(row, "id");
-        if (string.IsNullOrWhiteSpace(id)) { Toast.Warning("该记录缺少 id，无法删除。"); return; }
+        if (string.IsNullOrWhiteSpace(id)) { Toast.Warning(L10n.T(Keys.Content.DashboardsMissingIdDelete, "该记录缺少 id，无法删除。")); return; }
         _confirmId = id;
         _confirm = true;
     }
@@ -117,9 +117,9 @@
     {
         _confirm = false;
         if (string.IsNullOrWhiteSpace(_confirmId)) return;
-        var (ok, status, err) = await Api.DeleteAsync($"api/dashboards/{_confirmId}?tenantId={State.TenantId}");
-        if (!ok) { Toast.Error(err ?? "删除失败。"); return; }
-        Toast.Success("仪表盘已删除。");
+        var (ok, status, err, code) = await Api.DeleteAsync($"api/dashboards/{_confirmId}?tenantId={State.TenantId}");
+        if (!ok) { Toast.Error(err is null ? L10n.T(Keys.Content.DashboardsDeleteFailed, "删除失败。") : L10n.Friendly(code, err)); return; }
+        Toast.Success(L10n.T(Keys.Content.DashboardsDeleteSuccess, "仪表盘已删除。"));
         await Reload();
     }
 
@@ -135,7 +135,7 @@
     {
         _createErr = "";
         _newStatus = "draft";
-        var (data, _, err) = await Api.GetJsonAsync("api/dashboards/editor/blueprint");
+        var (data, _, err, _) = await Api.GetJsonAsync("api/dashboards/editor/blueprint");
         if (data is { ValueKind: JsonValueKind.Object } && data.Value.TryGetProperty("skeleton", out var sk) && sk.ValueKind == JsonValueKind.String)
         {
             _newDsl = sk.GetString()!;
@@ -143,15 +143,15 @@
         else
         {
             _newDsl = err ?? "{}";
-            if (string.IsNullOrWhiteSpace(err)) _createErr = "未能获取蓝图骨架，请手动填写 DslJson。";
+            if (string.IsNullOrWhiteSpace(err)) _createErr = L10n.T(Keys.Content.DashboardsBlueprintUnavailable, "未能获取蓝图骨架，请手动填写 DslJson。");
         }
         _createModal = true;
     }
 
     private async Task CreateDashboard()
     {
-        if (string.IsNullOrWhiteSpace(_newDsl)) { _createErr = "DslJson 不能为空。"; return; }
-        var (_, status, err) = await Api.PostAsync("api/dashboards", new
+        if (string.IsNullOrWhiteSpace(_newDsl)) { _createErr = L10n.T(Keys.Content.DashboardsDslJsonEmpty, "DslJson 不能为空。"); return; }
+        var (_, status, err, code) = await Api.PostAsync("api/dashboards", new
         {
             tenantId = State.TenantId,
             dslJson = _newDsl,
@@ -159,13 +159,15 @@
         });
         if (status is >= 200 and < 300)
         {
-            Toast.Success("仪表盘已创建。");
+            Toast.Success(L10n.T(Keys.Content.DashboardsCreateSuccess, "仪表盘已创建。"));
             _createModal = false;
             await Reload();
         }
         else
         {
-            _createErr = err ?? $"创建失败（HTTP {status}）。";
+            _createErr = err is null
+                ? string.Format(L10n.T(Keys.Content.DashboardsCreateFailed, "创建失败（HTTP {0}）。"), status)
+                : L10n.Friendly(code, err);
         }
     }
 

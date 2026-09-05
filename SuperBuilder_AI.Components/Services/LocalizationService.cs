@@ -46,6 +46,19 @@ public sealed class LocalizationService
         return value == key ? fallback : value;
     }
 
+    /// <summary>
+    /// 按后端错误码取本地化友好提示（ApiError 友好层核心）：
+    /// key = <c>"Error." + code</c>（与 <see cref="Keys.Error.SB_*"/> / 后端 <c>ResourceKeys.Error.SB_*</c> 对应），
+    /// 命中则返回当前语言的本地化文案；未命中（未知码 / 离线）则回退到服务端下发的 <paramref name="serverMessage"/>。
+    /// <paramref name="code"/> 或 <paramref name="serverMessage"/> 为空时直接返回 <paramref name="serverMessage"/>。
+    /// 语义：非中文语言下按码本地化，中文或缺失时透传服务端友好文案（与服务端 <c>ErrorCodes.Friendly</c> 一致）。
+    /// </summary>
+    public string Friendly(string? code, string? serverMessage)
+    {
+        if (string.IsNullOrWhiteSpace(code)) return serverMessage ?? "";
+        return T("Error." + code, serverMessage ?? "");
+    }
+
     public async Task InitializeAsync(long tenantId, long userId, IReadOnlyList<string>? available, string? tenantDefault)
     {
         _tenantId = tenantId; _userId = userId;
@@ -115,7 +128,7 @@ public sealed class LocalizationService
         var url = _userId <= 0
             ? $"api/localization/public/texts?culture={Uri.EscapeDataString(CurrentCulture)}&tenantId={_tenantId}"
             : $"api/localization/texts?culture={Uri.EscapeDataString(CurrentCulture)}";
-        var (data, _, _) = await _api.GetJsonAsync(url);
+        var (data, _, _, _) = await _api.GetJsonAsync(url);
         if (data is not { ValueKind: JsonValueKind.Array }) return;
         if (!_strings.TryGetValue(CurrentCulture, out var bundle)) _strings[CurrentCulture] = bundle = new(StringComparer.OrdinalIgnoreCase);
         foreach (var row in data.Value.EnumerateArray())

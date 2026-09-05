@@ -3,7 +3,7 @@
 @using SuperBuilder_AI.Components.Models
 
 <div class="turn @(Turn.IsRefine ? "refine" : "")">
-    <div class="bubble user"><span class="who">我</span>@Turn.Question</div>
+    <div class="bubble user"><span class="who">@L10n.T(Keys.Content.AskTurnMe, "我")</span>@Turn.Question</div>
 
     @if (!string.IsNullOrEmpty(Turn.Error))
     {
@@ -11,7 +11,7 @@
             <div class="ask-error-msg">@Turn.Error</div>
             @if (!string.IsNullOrEmpty(Turn.Code))
             {
-                <div class="ask-error-meta">错误码：<code>@Turn.Code</code>@if (!string.IsNullOrEmpty(Turn.TraceId)) { <text> · 追踪 ID：<code>@Turn.TraceId</code></text> }</div>
+                <div class="ask-error-meta">@L10n.T(Keys.Error.CodeLabel, "错误码：")<code>@Turn.Code</code>@if (!string.IsNullOrEmpty(Turn.TraceId)) { <text> · @L10n.T(Keys.Error.TraceIdLabel, "追踪 ID：")<code>@Turn.TraceId</code></text> }</div>
             }
         </div>
     }
@@ -22,9 +22,9 @@
         @if (resp.Answer is not null && !string.IsNullOrWhiteSpace(resp.Answer.Answer))
         {
             <div class="answer-block">
-                <div class="answer-title">AI 解读</div>
+                <div class="answer-title">@L10n.T(Keys.Content.AskTurnAiSummary, "AI 解读")</div>
                 <div class="answer-text">@resp.Answer.Answer</div>
-                <div class="muted tiny">耗时 @resp.Answer.ElapsedMilliseconds ms · 建议图表 @resp.Answer.Visualizations.Count 个</div>
+                <div class="muted tiny">@string.Format(L10n.T(Keys.Content.AskTurnMeta, "耗时 {0} ms · 建议图表 {1} 个"), resp.Answer.ElapsedMilliseconds, resp.Answer.Visualizations.Count)</div>
             </div>
         }
 
@@ -60,7 +60,7 @@
                 }
                 <div class="viz-card">
                     <div class="viz-head">
-                        <strong>@(string.IsNullOrWhiteSpace(viz.Title) ? $"图表 {vi + 1}" : viz.Title)</strong>
+                        <strong>@(string.IsNullOrWhiteSpace(viz.Title) ? string.Format(L10n.T(Keys.Content.AskTurnChartDefault, "图表 {0}"), vi + 1) : viz.Title)</strong>
                         @if (!string.IsNullOrWhiteSpace(viz.Reason)) { <span class="muted tiny">@viz.Reason</span> }
                     </div>
                     @{ var (labels, datasets) = BuildChart(viz, resp.Data.Rows, ov); }
@@ -69,18 +69,18 @@
                                Stacked="@EffStacked(ov)" Area="@EffArea(ov)" MultiAxis="@EffMultiAxis(ov)"
                                @key="@($"turn{Index}-viz{vIndex}")" />
                     <div class="viz-toolbar">
-                        <span class="tiny">视图：</span>
-                        <button class="btn btn-sm btn-outline-secondary" @onclick='() => SetType(Turn, vIndex, "bar")'>柱状</button>
-                        <button class="btn btn-sm btn-outline-secondary" @onclick='() => SetType(Turn, vIndex, "line")'>折线</button>
-                        <button class="btn btn-sm btn-outline-secondary" @onclick='() => SetType(Turn, vIndex, "pie")'>饼图</button>
-                        <button class="btn btn-sm btn-outline-secondary" @onclick="() => ToggleLegend(Turn, vIndex)">@(EffLegend(ov) ? "隐藏图例" : "显示图例")</button>
-                        <button class="btn btn-sm btn-outline-secondary" @onclick="() => CyclePalette(Turn, vIndex)">换配色</button>
+                        <span class="tiny">@L10n.T(Keys.Content.AskTurnViewLabel, "视图：")</span>
+                        <button class="btn btn-sm btn-outline-secondary" @onclick='() => SetType(Turn, vIndex, "bar")'>@L10n.T(Keys.Content.AskTurnBar, "柱状")</button>
+                        <button class="btn btn-sm btn-outline-secondary" @onclick='() => SetType(Turn, vIndex, "line")'>@L10n.T(Keys.Content.AskTurnLine, "折线")</button>
+                        <button class="btn btn-sm btn-outline-secondary" @onclick='() => SetType(Turn, vIndex, "pie")'>@L10n.T(Keys.Content.AskTurnPie, "饼图")</button>
+                        <button class="btn btn-sm btn-outline-secondary" @onclick="() => ToggleLegend(Turn, vIndex)">@(EffLegend(ov) ? L10n.T(Keys.Content.AskTurnHideLegend, "隐藏图例") : L10n.T(Keys.Content.AskTurnShowLegend, "显示图例"))</button>
+                        <button class="btn btn-sm btn-outline-secondary" @onclick="() => CyclePalette(Turn, vIndex)">@L10n.T(Keys.Content.AskTurnCyclePalette, "换配色")</button>
                         @if (effType != "pie")
                         {
                             <span class="tiny sep">|</span>
-                            <button class="btn btn-sm btn-outline-secondary" @onclick="() => ToggleStacked(Turn, vIndex)">@(EffStacked(ov) ? "取消堆叠" : "堆叠")</button>
-                            <button class="btn btn-sm btn-outline-secondary" @onclick="() => ToggleArea(Turn, vIndex)">@(EffArea(ov) ? "取消面积" : "面积")</button>
-                            <button class="btn btn-sm btn-outline-secondary" @onclick="() => ToggleMultiAxis(Turn, vIndex)">@(EffMultiAxis(ov) ? "取消多轴" : "多轴")</button>
+                            <button class="btn btn-sm btn-outline-secondary" @onclick="() => ToggleStacked(Turn, vIndex)">@(EffStacked(ov) ? L10n.T(Keys.Content.AskTurnUnstacked, "取消堆叠") : L10n.T(Keys.Content.AskTurnStacked, "堆叠"))</button>
+                            <button class="btn btn-sm btn-outline-secondary" @onclick="() => ToggleArea(Turn, vIndex)">@(EffArea(ov) ? L10n.T(Keys.Content.AskTurnUnarea, "取消面积") : L10n.T(Keys.Content.AskTurnArea, "面积"))</button>
+                            <button class="btn btn-sm btn-outline-secondary" @onclick="() => ToggleMultiAxis(Turn, vIndex)">@(EffMultiAxis(ov) ? L10n.T(Keys.Content.AskTurnUnmulti, "取消多轴") : L10n.T(Keys.Content.AskTurnMultiAxis, "多轴"))</button>
                         }
                     </div>
                 </div>
@@ -88,22 +88,22 @@
 
             <div class="table-wrap">
                 <div class="table-toolbar">
-                    <span class="muted tiny">共 @resp.Data.Rows.Count 行</span>
+                    <span class="muted tiny">@string.Format(L10n.T(Keys.Content.AskTurnRowsTotal, "共 {0} 行"), resp.Data.Rows.Count)</span>
                     @if (catCol is not null && resp.Data.Rows.Count > 0)
                     {
-                        <span class="drill-hint tiny">下钻：</span>
+                        <span class="drill-hint tiny">@L10n.T(Keys.Content.AskTurnDrill, "下钻：")</span>
                         @foreach (var c in resp.Data.Rows.Select(r => JsonValue.AsString(r.GetValueOrDefault(catCol))).Where(c => !string.IsNullOrEmpty(c)).Distinct().Take(12))
                         {
                             <button class="chip @(_drillCat == c ? "active" : "")" @onclick="() => SetDrill(c)">@c</button>
                         }
                         @if (!string.IsNullOrEmpty(_drillCat))
                         {
-                            <button class="chip clear" @onclick='() => SetDrill("")'>清除下钻</button>
+                            <button class="chip clear" @onclick='() => SetDrill("")'>@L10n.T(Keys.Content.AskTurnClearDrill, "清除下钻")</button>
                         }
                     }
                     <span class="export-group">
-                        <button class="btn btn-sm btn-outline-secondary" @onclick='() => OnExport.InvokeAsync(new AskTurnExport(Turn, "csv"))'>导出 CSV</button>
-                        <button class="btn btn-sm btn-outline-secondary" @onclick='() => OnExport.InvokeAsync(new AskTurnExport(Turn, "excel"))'>导出 Excel</button>
+                        <button class="btn btn-sm btn-outline-secondary" @onclick='() => OnExport.InvokeAsync(new AskTurnExport(Turn, "csv"))'>@L10n.T(Keys.Content.AskTurnExportCsv, "导出 CSV")</button>
+                        <button class="btn btn-sm btn-outline-secondary" @onclick='() => OnExport.InvokeAsync(new AskTurnExport(Turn, "excel"))'>@L10n.T(Keys.Content.AskTurnExportExcel, "导出 Excel")</button>
                     </span>
                 </div>
                 <table class="data-table">
@@ -121,13 +121,13 @@
         }
         else if (resp.Data is not null && !resp.Data.Success)
         {
-            <p class="error">查询失败：@resp.Data.ErrorMessage</p>
+            <p class="error">@string.Format(L10n.T(Keys.Content.AskTurnQueryFailed, "查询失败：{0}"), resp.Data.ErrorMessage)</p>
         }
 
         @if (!string.IsNullOrWhiteSpace(resp.Sql))
         {
             <details class="sql-block">
-                <summary>查看生成的 SQL</summary>
+                <summary>@L10n.T(Keys.Content.AskTurnViewSql, "查看生成的 SQL")</summary>
                 <pre>@resp.Sql</pre>
             </details>
         }
@@ -135,16 +135,16 @@
         @if (CompareWith is not null)
         {
             <div class="compare-box">
-                <button class="btn btn-sm btn-outline-primary" @onclick="() => _compare = !_compare">@(_compare ? "隐藏对比" : "对比原结果")</button>
+                <button class="btn btn-sm btn-outline-primary" @onclick="() => _compare = !_compare">@(_compare ? L10n.T(Keys.Content.AskTurnHideCompare, "隐藏对比") : L10n.T(Keys.Content.AskTurnShowCompare, "对比原结果"))</button>
                 @if (_compare)
                 {
                     <div class="compare-grid">
                         <div class="compare-col">
-                            <div class="compare-head">原结果 · @CompareWith.Question</div>
+                            <div class="compare-head">@string.Format(L10n.T(Keys.Content.AskTurnOriginalResult, "原结果 · {0}"), CompareWith.Question)</div>
                             @RenderCompact(CompareWith)
                         </div>
                         <div class="compare-col">
-                            <div class="compare-head">细化结果 · @Turn.Question</div>
+                            <div class="compare-head">@string.Format(L10n.T(Keys.Content.AskTurnRefinedResult, "细化结果 · {0}"), Turn.Question)</div>
                             @RenderCompact(Turn)
                         </div>
                     </div>
@@ -153,22 +153,22 @@
         }
 
         <div class="refine-box">
-            <input class="form-control" @bind="Turn.RefineCmd" placeholder="例如：改成柱状图 / 隐藏图例 / 配色换成绿色" />
-            <button class="btn btn-sm btn-outline-secondary" @onclick="() => ApplyViewCommand()">应用调整</button>
+            <input class="form-control" @bind="Turn.RefineCmd" placeholder="@L10n.T(Keys.Content.AskTurnRefinePlaceholder, "例如：改成柱状图 / 隐藏图例 / 配色换成绿色")" />
+            <button class="btn btn-sm btn-outline-secondary" @onclick="() => ApplyViewCommand()">@L10n.T(Keys.Content.AskTurnApplyAdjust, "应用调整")</button>
             @if (!string.IsNullOrEmpty(Turn.RefineMsg)) { <span class="muted tiny">@Turn.RefineMsg</span> }
         </div>
 
         <div class="refine-box semantic">
-            <input class="form-control" @bind="Turn.RefineInstruction" placeholder="基于本轮结果继续追问，如：只看华东地区 / 改成按月统计" />
-            <button class="btn btn-sm btn-primary" @onclick="() => OnRefine.InvokeAsync(Turn)" disabled="@Turn.RefineBusy">语义细化</button>
-            @if (Turn.RefineBusy) { <span class="muted tiny">查询中…</span> }
+            <input class="form-control" @bind="Turn.RefineInstruction" placeholder="@L10n.T(Keys.Content.AskTurnSemanticPlaceholder, "基于本轮结果继续追问，如：只看华东地区 / 改成按月统计")" />
+            <button class="btn btn-sm btn-primary" @onclick="() => OnRefine.InvokeAsync(Turn)" disabled="@Turn.RefineBusy">@L10n.T(Keys.Content.AskTurnSemanticRefine, "语义细化")</button>
+            @if (Turn.RefineBusy) { <span class="muted tiny">@L10n.T(Keys.Content.AskTurnRefining, "查询中…")</span> }
             @if (!string.IsNullOrEmpty(Turn.RefineInfo)) { <span class="ok tiny">@Turn.RefineInfo</span> }
             @if (!string.IsNullOrEmpty(Turn.RefineError)) { <span class="error tiny">@Turn.RefineError</span> }
         </div>
 
         <div class="publish-box">
-            <button class="btn btn-outline-secondary" @onclick="() => OnPublish.InvokeAsync(Turn)" disabled="@Turn.PublishBusy">发布为应用</button>
-            @if (Turn.PublishBusy) { <span class="muted tiny">发布中…</span> }
+            <button class="btn btn-outline-secondary" @onclick="() => OnPublish.InvokeAsync(Turn)" disabled="@Turn.PublishBusy">@L10n.T(Keys.Content.AskTurnPublish, "发布为应用")</button>
+            @if (Turn.PublishBusy) { <span class="muted tiny">@L10n.T(Keys.Content.AskTurnPublishing, "发布中…")</span> }
             @if (!string.IsNullOrEmpty(Turn.PublishInfo)) { <span class="ok tiny">@Turn.PublishInfo</span> }
             @if (!string.IsNullOrEmpty(Turn.PublishError)) { <span class="error tiny">@Turn.PublishError</span> }
         </div>
@@ -224,8 +224,8 @@
     {
         var turn = Turn;
         var cmd = turn.RefineCmd?.Trim() ?? "";
-        if (string.IsNullOrEmpty(cmd)) { turn.RefineMsg = "请输入调整指令。"; return; }
-        if (turn.Response?.Answer is null) { turn.RefineMsg = "当前轮无可视化结果。"; return; }
+        if (string.IsNullOrEmpty(cmd)) { turn.RefineMsg = L10n.T(Keys.Content.AskTurnRefineNoCmd, "请输入调整指令。"); return; }
+        if (turn.Response?.Answer is null) { turn.RefineMsg = L10n.T(Keys.Content.AskTurnRefineNoViz, "当前轮无可视化结果。"); return; }
 
         var n = turn.Response.Answer.Visualizations.Count;
         string? type = cmd.Contains("柱状") ? "bar" : cmd.Contains("折线") ? "line" : cmd.Contains("饼") ? "pie" : null;
@@ -239,7 +239,7 @@
 
         if (type is null && legend is null && palette is null)
         {
-            turn.RefineMsg = "未能识别指令（支持：改成柱状/折线/饼图、显示/隐藏图例、配色换绿/橙/红/灰/蓝）。";
+            turn.RefineMsg = L10n.T(Keys.Content.AskTurnRefineUnrecognized, "未能识别指令（支持：改成柱状/折线/饼图、显示/隐藏图例、配色换绿/橙/红/灰/蓝）。");
             return;
         }
         for (var i = 0; i < n; i++)
@@ -249,7 +249,7 @@
             if (legend is not null) o.ShowLegend = legend;
             if (palette is not null) o.Palette = palette;
         }
-        turn.RefineMsg = "已应用视图调整（纯前端，未发起后端请求）。";
+        turn.RefineMsg = L10n.T(Keys.Content.AskTurnRefineApplied, "已应用视图调整（纯前端，未发起后端请求）。");
     }
 
     /// <summary>推断分类列（用于图表 X 轴与下钻切片）。</summary>

@@ -132,7 +132,7 @@
     private async Task LoadSources()
     {
         Loading = true; ListError = "";
-        var (data, _, err) = await Api.GetJsonAsync("api/data-sources/manage");
+        var (data, _, err, _) = await Api.GetJsonAsync("api/data-sources/manage");
         Sources = data is { ValueKind: JsonValueKind.Array } ? data.Value.EnumerateArray().ToList() : new();
         ListError = data is null ? (err ?? L10n.T(Keys.Content.DataSourcesLoadFailed, "加载数据源失败。")) : "";
         Loading = false;
@@ -155,7 +155,7 @@
             return;
         }
         Saving = true;
-        var (ok, _, err) = await Api.PostAsync("api/data-sources", new
+        var (ok, _, err, _) = await Api.PostAsync("api/data-sources", new
         {
             name = Name,
             dbType = Type,

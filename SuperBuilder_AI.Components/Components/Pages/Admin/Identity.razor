@@ -241,14 +241,14 @@
     {
         _loading = true;
         var tid = State.TenantId;
-        var (u, _, uErr) = await Api.GetJsonAsync($"api/identity/users?tenantId={tid}");
+        var (u, _, uErr, _) = await Api.GetJsonAsync($"api/identity/users?tenantId={tid}");
         _error = uErr ?? "";
         _users = u is { ValueKind: JsonValueKind.Array } ? u.Value.EnumerateArray().ToList() : new();
         _userCols = TablePresenter.InferColumns(u);
-        var (r, _, _) = await Api.GetJsonAsync($"api/identity/roles?tenantId={tid}");
+        var (r, _, _, _) = await Api.GetJsonAsync($"api/identity/roles?tenantId={tid}");
         _roles = r is { ValueKind: JsonValueKind.Array } ? r.Value.EnumerateArray().ToList() : new();
         _roleCols = TablePresenter.InferColumns(r);
-        var (p, _, _) = await Api.GetJsonAsync("api/identity/permissions");
+        var (p, _, _, _) = await Api.GetJsonAsync("api/identity/permissions");
         _permissions = p is { ValueKind: JsonValueKind.Array } ? p.Value.EnumerateArray().ToList() : new();
         _loading = false;
         StateHasChanged();
@@ -275,7 +275,7 @@
             _userErr = "用户名必填。";
             return;
         }
-        var (_, status, err) = await Api.PostAsync("api/identity/users", new
+        var (_, status, err, _) = await Api.PostAsync("api/identity/users", new
         {
             tenantId = State.TenantId,
             username = _newUser,
@@ -309,7 +309,7 @@
             _roleErr = "角色编码必填。";
             return;
         }
-        var (_, status, err) = await Api.PostAsync("api/identity/roles", new
+        var (_, status, err, _) = await Api.PostAsync("api/identity/roles", new
         {
             tenantId = State.TenantId,
             code = _newRoleCode,
@@ -352,7 +352,7 @@
             _assignErr = "请选择角色。";
             return;
         }
-        var (_, status, err) = await Api.PostAsync($"api/identity/users/{_assignUserId}/roles", new { roleCode = _assignRoleCode });
+        var (_, status, err, _) = await Api.PostAsync($"api/identity/users/{_assignUserId}/roles", new { roleCode = _assignRoleCode });
         if (status is >= 200 and < 300)
         {
             Toast.Success($"已为 {_assignUserName} 指派角色 {_assignRoleCode}。");
@@ -380,7 +380,7 @@
 
     private async Task SavePerms()
     {
-        var (_, status, err) = await Api.PutAsync($"api/identity/roles/{_permRoleCode}/permissions", new { permissions = _permSelected.ToArray() });
+        var (_, status, err, _) = await Api.PutAsync($"api/identity/roles/{_permRoleCode}/permissions", new { permissions = _permSelected.ToArray() });
         if (status is >= 200 and < 300)
         {
             Toast.Success($"角色 {_permRoleCode} 权限已更新。");

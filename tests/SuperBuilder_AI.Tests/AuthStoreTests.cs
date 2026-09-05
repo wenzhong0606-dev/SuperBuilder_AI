@@ -53,8 +53,8 @@ public sealed class AuthStoreTests
 
 	private sealed class StatusApiClient(int status) : IApiClient
 	{
-		public Task<(JsonElement? Data, int Status, string? Error)> GetJsonAsync(string relativeUrl, CancellationToken ct = default)
-			=> Task.FromResult<(JsonElement?, int, string?)>((null, status, status == 200 ? null : "temporary"));
+		public Task<(JsonElement? Data, int Status, string? Error, string? Code)> GetJsonAsync(string relativeUrl, CancellationToken ct = default)
+			=> Task.FromResult<(JsonElement?, int, string?, string?)>((null, status, status == 200 ? null : "temporary", null));
 
 		public Task<(AuthResult? Result, string? Error)> LoginAsync(string username, long tenantId, string? password = null, CancellationToken ct = default) => throw new NotSupportedException();
 		public Task<(TenantSwitchResult? Result, string? Error)> SwitchTenantAsync(long tenantId, CancellationToken ct = default) => throw new NotSupportedException();
@@ -65,11 +65,11 @@ public sealed class AuthStoreTests
 		public Task<AskOutcome> RefineAsync(string? question, string instruction, IEnumerable<RefineTurn>? history, long? dataSourceId, CancellationToken ct = default) => throw new NotSupportedException();
 		public Task<(bool Ok, string? Code, string? Error)> PublishAppAsync(long tenantId, string dslJson, string? code, CancellationToken ct = default) => throw new NotSupportedException();
 		public Task<T?> GetAsync<T>(string relativeUrl, CancellationToken ct = default) where T : class => throw new NotSupportedException();
-		public Task<(bool Ok, int Status, string? Error)> SendAsync(HttpMethod method, string relativeUrl, object? body = null, CancellationToken ct = default) => throw new NotSupportedException();
-		public Task<(bool Ok, int Status, string? Error)> PostAsync(string relativeUrl, object? body = null, CancellationToken ct = default) => throw new NotSupportedException();
-		public Task<(bool Ok, int Status, string? Error)> PutAsync(string relativeUrl, object? body, CancellationToken ct = default) => throw new NotSupportedException();
-		public Task<(bool Ok, int Status, string? Error)> PatchAsync(string relativeUrl, object? body = null, CancellationToken ct = default) => throw new NotSupportedException();
-		public Task<(bool Ok, int Status, string? Error)> DeleteAsync(string relativeUrl, CancellationToken ct = default) => throw new NotSupportedException();
+		public Task<(bool Ok, int Status, string? Error, string? Code)> SendAsync(HttpMethod method, string relativeUrl, object? body = null, CancellationToken ct = default) => throw new NotSupportedException();
+		public Task<(bool Ok, int Status, string? Error, string? Code)> PostAsync(string relativeUrl, object? body = null, CancellationToken ct = default) => throw new NotSupportedException();
+		public Task<(bool Ok, int Status, string? Error, string? Code)> PutAsync(string relativeUrl, object? body, CancellationToken ct = default) => throw new NotSupportedException();
+		public Task<(bool Ok, int Status, string? Error, string? Code)> PatchAsync(string relativeUrl, object? body = null, CancellationToken ct = default) => throw new NotSupportedException();
+		public Task<(bool Ok, int Status, string? Error, string? Code)> DeleteAsync(string relativeUrl, CancellationToken ct = default) => throw new NotSupportedException();
 		public Task<(string? Text, int Status, string? Error)> GetTextAsync(string relativeUrl, CancellationToken ct = default) => throw new NotSupportedException();
 		public Task<(DemoInstallPlan? Result, string? Error)> GetDemoDataPlanAsync(CancellationToken ct = default) => throw new NotSupportedException();
 		public Task<(DemoInstallResult? Result, string? Error)> InstallDemoDataAsync(CancellationToken ct = default) => throw new NotSupportedException();

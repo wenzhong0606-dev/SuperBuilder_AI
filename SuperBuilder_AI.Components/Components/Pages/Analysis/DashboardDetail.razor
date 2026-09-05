@@ -101,7 +101,7 @@
     {
         _loading = true;
         _error = null;
-        var (data, status, err) = await Api.GetJsonAsync($"api/dashboards/{Id}");
+        var (data, status, err, _) = await Api.GetJsonAsync($"api/dashboards/{Id}");
         if (data is null)
         {
             _error = err ?? $"加载失败（{status}）。";
@@ -125,7 +125,7 @@
     {
         if (_rendering) return;
         _rendering = true;
-        var (data, status, err) = await Api.GetJsonAsync($"api/dashboards/{Id}/render");
+        var (data, status, err, _) = await Api.GetJsonAsync($"api/dashboards/{Id}/render");
         _rendering = false;
         if (data is not null)
         {

@@ -191,7 +191,7 @@
     private async Task LoadMetadata()
     {
         _loadingMetadata = true;
-        var (data, status, err) = await Api.GetJsonAsync($"api/data-sources/{Id}/metadata");
+        var (data, status, err, _) = await Api.GetJsonAsync($"api/data-sources/{Id}/metadata");
         _metadataError = data is null ? (err ?? string.Format(L10n.T(Keys.Content.DataSourceLoadMetaFailed, "加载元数据失败（{0}）。"), status)) : null;
         _metadata = JsonRows.Extract(data);
         _loadingMetadata = false;
@@ -201,7 +201,7 @@
     private async Task ScanMetadata()
     {
         _scanning = true;
-        var (ok, _, err) = await Api.PostAsync($"api/data-sources/{Id}/metadata/scan");
+        var (ok, _, err, _) = await Api.PostAsync($"api/data-sources/{Id}/metadata/scan");
         _scanning = false;
         if (!ok) { Toast.Error(err ?? L10n.T(Keys.Content.DataSourceScanFailed, "元数据扫描失败。")); return; }
         Toast.Success(L10n.T(Keys.Content.DataSourceScanDone, "元数据扫描完成。"));
@@ -226,11 +226,11 @@
     private async Task LoadGrants()
     {
         _loadingGrants = true;
-        var (data, status, err) = await Api.GetJsonAsync($"api/data-source-access?dataSourceId={Id}");
+        var (data, status, err, _) = await Api.GetJsonAsync($"api/data-source-access?dataSourceId={Id}");
         _grantsError = data is null ? (err ?? string.Format(L10n.T(Keys.Content.DataSourceLoadGrantsFailed, "加载授权失败（{0}）。"), status)) : null;
         _grants = JsonRows.Extract(data);
-        var (users, _, _) = await Api.GetJsonAsync("api/identity/users"); _grantUsers = JsonRows.Extract(users);
-        var (roles, _, _) = await Api.GetJsonAsync("api/identity/roles"); _grantRoles = JsonRows.Extract(roles);
+        var (users, _, _, _) = await Api.GetJsonAsync("api/identity/users"); _grantUsers = JsonRows.Extract(users);
+        var (roles, _, _, _) = await Api.GetJsonAsync("api/identity/roles"); _grantRoles = JsonRows.Extract(roles);
         _loadingGrants = false;
     }
 
@@ -244,17 +244,17 @@
     private async Task GrantAccess()
     {
         if(_grantSubjectId<=0){Toast.Warning(L10n.T(Keys.Content.DataSourceSelectSubject, "请选择用户或角色。"));return;}
-        var(ok,_,err)=await Api.PostAsync("api/data-source-access",new{dataSourceId=Id,subjectType=_grantType,subjectId=_grantSubjectId}); if(!ok){Toast.Error(err??L10n.T(Keys.Content.DataSourceGrantFailed, "授权失败。"));return;} Toast.Success(L10n.T(Keys.Content.DataSourceGranted, "数据源访问权限已授予。")); _grantSubjectId=0; await LoadGrants();
+        var (ok,_,err, _) = await Api.PostAsync("api/data-source-access",new{dataSourceId=Id,subjectType=_grantType,subjectId=_grantSubjectId}); if(!ok){Toast.Error(err??L10n.T(Keys.Content.DataSourceGrantFailed, "授权失败。"));return;} Toast.Success(L10n.T(Keys.Content.DataSourceGranted, "数据源访问权限已授予。")); _grantSubjectId=0; await LoadGrants();
     }
     private async Task RevokeAccess(Dictionary<string,object?> grant)
     {
-        var type=Text(grant,"subjectType"); var id=Text(grant,"subjectId"); var(ok,_,err)=await Api.DeleteAsync($"api/data-source-access?dataSourceId={Id}&subjectType={Uri.EscapeDataString(type)}&subjectId={id}"); if(!ok)Toast.Error(err??L10n.T(Keys.Content.DataSourceRevokeFailed, "撤销失败。"));else{Toast.Success(L10n.T(Keys.Content.DataSourceRevoked, "授权已撤销。"));await LoadGrants();}
+        var type=Text(grant,"subjectType"); var id=Text(grant,"subjectId"); var (ok,_,err, _) = await Api.DeleteAsync($"api/data-source-access?dataSourceId={Id}&subjectType={Uri.EscapeDataString(type)}&subjectId={id}"); if(!ok)Toast.Error(err??L10n.T(Keys.Content.DataSourceRevokeFailed, "撤销失败。"));else{Toast.Success(L10n.T(Keys.Content.DataSourceRevoked, "授权已撤销。"));await LoadGrants();}
     }
 
     private async Task LoadPolicies()
     {
         _loadingPolicies = true;
-        var (data, status, err) = await Api.GetJsonAsync($"api/data-policies/row?dataSourceId={Id}");
+        var (data, status, err, _) = await Api.GetJsonAsync($"api/data-policies/row?dataSourceId={Id}");
         _policiesError = data is null ? (err ?? string.Format(L10n.T(Keys.Content.DataSourceLoadPolicyFailed, "加载策略失败（{0}）。"), status)) : null;
         _policies = JsonRows.Extract(data);
         _policyCols = Columns(_policies);
@@ -265,7 +265,7 @@
     {
         var id = JsonValue.AsString(row.GetValueOrDefault("id"));
         if (string.IsNullOrWhiteSpace(id)) return;
-        var (ok, status, err) = await Api.DeleteAsync($"api/data-policies/row/{id}");
+        var (ok, status, err, _) = await Api.DeleteAsync($"api/data-policies/row/{id}");
         if (ok)
         {
             Toast.Success(L10n.T(Keys.Content.DataSourcePolicyDeleted, "策略已删除。"));

@@ -26,22 +26,23 @@ public interface IApiClient
     Task<T?> GetAsync<T>(string relativeUrl, CancellationToken ct = default) where T : class;
 
     /// <summary>
-    /// 通用写操作（POST/PUT/PATCH/DELETE）：成功返回 Ok=true，否则返回 Status 与统一错误体中的 message。
+    /// 通用写操作（POST/PUT/PATCH/DELETE）：成功返回 Ok=true，否则返回 Status、统一错误体中的 message 与错误码 code。
+    /// <c>code</c> 为后端 <see cref="ErrorCodes"/> 的 <c>SB_*</c> 常量，供前端按 <c>L10n.T("Error."+code, message)</c> 取本地化友好提示。
     /// 401 由实现统一触发会话失效回收（与读路径一致）。
     /// </summary>
-    Task<(bool Ok, int Status, string? Error)> SendAsync(HttpMethod method, string relativeUrl, object? body = null, CancellationToken ct = default);
+    Task<(bool Ok, int Status, string? Error, string? Code)> SendAsync(HttpMethod method, string relativeUrl, object? body = null, CancellationToken ct = default);
 
     /// <summary>POST JSON（body 为 null 时发送空请求）。</summary>
-    Task<(bool Ok, int Status, string? Error)> PostAsync(string relativeUrl, object? body = null, CancellationToken ct = default);
+    Task<(bool Ok, int Status, string? Error, string? Code)> PostAsync(string relativeUrl, object? body = null, CancellationToken ct = default);
 
     /// <summary>PUT JSON（整体更新）。</summary>
-    Task<(bool Ok, int Status, string? Error)> PutAsync(string relativeUrl, object? body, CancellationToken ct = default);
+    Task<(bool Ok, int Status, string? Error, string? Code)> PutAsync(string relativeUrl, object? body, CancellationToken ct = default);
 
     /// <summary>PATCH JSON（局部更新，如启用/禁用）。</summary>
-    Task<(bool Ok, int Status, string? Error)> PatchAsync(string relativeUrl, object? body = null, CancellationToken ct = default);
+    Task<(bool Ok, int Status, string? Error, string? Code)> PatchAsync(string relativeUrl, object? body = null, CancellationToken ct = default);
 
     /// <summary>DELETE。</summary>
-    Task<(bool Ok, int Status, string? Error)> DeleteAsync(string relativeUrl, CancellationToken ct = default);
+    Task<(bool Ok, int Status, string? Error, string? Code)> DeleteAsync(string relativeUrl, CancellationToken ct = default);
 
     /// <summary>M2-05 切换生效租户：校验成员资格后由后端重签令牌，返回新令牌与切换后端租户上下文。</summary>
     Task<(TenantSwitchResult? Result, string? Error)> SwitchTenantAsync(long tenantId, CancellationToken ct = default);
@@ -85,9 +86,10 @@ public interface IApiClient
     Task<(IReadOnlyList<PublicLanguageView>? Result, string? Error)> GetPublicLanguagesAsync(CancellationToken ct = default);
     /// <summary>
     /// 松类型读取：GET 任意端点并以 <see cref="JsonElement"/> 返回（数组或对象皆可）。
-    /// 不抛异常——HTTP 非 2xx 与网络/解析错误一律通过 err 返回，便于页面优雅降级。
+    /// 不抛异常——HTTP 非 2xx 与网络/解析错误一律通过 err 返回；非 2xx 时同时透传后端错误码 <c>code</c>（<c>SB_*</c>），
+    /// 供页面按 <c>L10n.T("Error."+code, err)</c> 取本地化友好提示。
     /// </summary>
-    Task<(JsonElement? Data, int Status, string? Error)> GetJsonAsync(string relativeUrl, CancellationToken ct = default);
+    Task<(JsonElement? Data, int Status, string? Error, string? Code)> GetJsonAsync(string relativeUrl, CancellationToken ct = default);
 
     /// <summary>
     /// 纯文本读取（如 <c>/metrics</c> 的 Prometheus 文本、<c>/health</c> 的探针响应）。

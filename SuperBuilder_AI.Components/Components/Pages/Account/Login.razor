@@ -98,10 +98,10 @@
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (!firstRender) return;
-        var (languages, _, _) = await Api.GetJsonAsync("api/localization/public/languages");
+        var (languages, _, _, _) = await Api.GetJsonAsync("api/localization/public/languages");
         if (languages is { ValueKind: System.Text.Json.JsonValueKind.Array }) _loginCultures = languages.Value.EnumerateArray().Select(x => x.GetProperty("culture").GetString() ?? "").Where(x => x.Length > 0).ToList();
         await L10n.InitializeAsync(0, 0, _loginCultures, L10n.CurrentCulture);
-        var (tenants, _, _) = await Api.GetJsonAsync("api/auth/login-options");
+        var (tenants, _, _, _) = await Api.GetJsonAsync("api/auth/login-options");
         if (tenants is { ValueKind: System.Text.Json.JsonValueKind.Array }) _tenantOptions = tenants.Value.EnumerateArray().ToList();
         if (_tenantOptions.Count > 0)
         {
@@ -144,7 +144,7 @@
 
     private async Task RefreshBootstrapStatus()
     {
-        var (data, _, err) = await Api.GetJsonAsync("api/platform-bootstrap/status");
+        var (data, _, err, _) = await Api.GetJsonAsync("api/platform-bootstrap/status");
         if (data is not { ValueKind: System.Text.Json.JsonValueKind.Object })
         {
             Error = err ?? L10n.T(Keys.Login.InitStatusError, "无法读取平台初始化状态。");
@@ -164,7 +164,7 @@
         if (BootstrapPassword.Length < 8) { Error = L10n.T(Keys.Login.AdminPasswordTooShort, "管理员口令至少 8 位。"); return; }
         if (BootstrapPassword != BootstrapPasswordConfirm) { Error = L10n.T(Keys.Login.AdminPasswordMismatch, "两次输入的口令不一致。"); return; }
         Busy = true;
-        var (ok, _, err) = await Api.PostAsync("api/platform-bootstrap", new
+        var (ok, _, err, _) = await Api.PostAsync("api/platform-bootstrap", new
         {
             username = BootstrapUsername,
             password = BootstrapPassword,

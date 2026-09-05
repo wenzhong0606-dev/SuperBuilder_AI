@@ -7,31 +7,31 @@
 @using SuperBuilder_AI.Components.Shared
 
 <AuthGuard>
-    <SbListPage TItem="JsonElement" Icon="sb-ico-app" Title="应用工厂"
-                Desc="将问数会话沉淀为可复用的 BI 应用：可视化编辑器、DSL 蓝图与一键发布。"
+    <SbListPage TItem="JsonElement" Icon="sb-ico-app" Title="@L10n.T(Keys.Content.AppsTitle, "应用工厂")"
+                Desc="@L10n.T(Keys.Content.AppsDesc, "将问数会话沉淀为可复用的 BI 应用：可视化编辑器、DSL 蓝图与一键发布。")"
                 Items="@_rows" Columns="@Columns" Loading="@_loading" Error="@_error"
-                OnReload="Reload" SearchPlaceholder="搜索应用编码 / 名称…"
-                EmptyTitle="还没有应用"
-                EmptyText="应用是问数能力的封装：把一次典型分析固化为卡片、图表与筛选器，分享给团队即可复用。"
-                LoadingText="正在加载应用…" PanelTitle="应用清单">
+                OnReload="Reload" SearchPlaceholder="@L10n.T(Keys.Content.AppsSearchPlaceholder, "搜索应用编码 / 名称…")"
+                EmptyTitle="@L10n.T(Keys.Content.AppsEmptyTitle, "还没有应用")"
+                EmptyText="@L10n.T(Keys.Content.AppsEmptyText, "应用是问数能力的封装：把一次典型分析固化为卡片、图表与筛选器，分享给团队即可复用。")"
+                LoadingText="@L10n.T(Keys.Content.AppsLoading, "正在加载应用…")" PanelTitle="@L10n.T(Keys.Content.AppsPanelTitle, "应用清单")">
 
         <Actions>
             <button class="btn btn-primary btn-sm" @onclick="OpenGen">
-                <svg class="btn-ico"><use href="#sb-ico-plus" /></svg> 新建应用
+                <svg class="btn-ico"><use href="#sb-ico-plus" /></svg> @L10n.T(Keys.Content.AppsNew, "新建应用")
             </button>
             <button class="btn btn-outline-secondary btn-sm" @onclick='() => Nav.NavigateTo("ask")'>
-                <svg class="btn-ico"><use href="#sb-ico-play" /></svg> 从 Ask 发布
+                <svg class="btn-ico"><use href="#sb-ico-play" /></svg> @L10n.T(Keys.Content.AppsFromAsk, "从 Ask 发布")
             </button>
         </Actions>
 
         <Stats>
-            <SbStatTile Label="应用总数" Value="@_rows.Count" Sub="含全局模板" />
-            <SbStatTile Label="全局模板" Value="@_rows.Count(IsGlobal)" Sub="平台内置" Accent="info" />
-            <SbStatTile Label="租户应用" Value="@_rows.Count(r => !IsGlobal(r))" Sub="本租户自建" Accent="success" />
+            <SbStatTile Label="@L10n.T(Keys.Content.AppsStatTotal, "应用总数")" Value="@_rows.Count" Sub="@L10n.T(Keys.Content.AppsStatTotalSub, "含全局模板")" />
+            <SbStatTile Label="@L10n.T(Keys.Content.AppsStatGlobal, "全局模板")" Value="@_rows.Count(IsGlobal)" Sub="@L10n.T(Keys.Content.AppsStatGlobalSub, "平台内置")" Accent="info" />
+            <SbStatTile Label="@L10n.T(Keys.Content.AppsStatTenant, "租户应用")" Value="@_rows.Count(r => !IsGlobal(r))" Sub="@L10n.T(Keys.Content.AppsStatTenantSub, "本租户自建")" Accent="success" />
         </Stats>
 
         <EmptyActions>
-            <button class="btn btn-primary btn-sm" @onclick='() => Nav.NavigateTo("ask")'>从 Ask 发布</button>
+            <button class="btn btn-primary btn-sm" @onclick='() => Nav.NavigateTo("ask")'>@L10n.T(Keys.Content.AppsFromAsk, "从 Ask 发布")</button>
         </EmptyActions>
 
         @* 应用以卡片墙呈现（表格视图由 SbListPage 在未提供 CardTemplate 时自动启用） *@
@@ -39,57 +39,57 @@
             <div class="feature-card" @onclick="() => Open(context)">
                 <div class="fc-ico"><svg><use href="#sb-ico-app" /></svg></div>
                 <div class="fc-title">@(string.IsNullOrEmpty(Cell(context, "name")) ? Cell(context, "code") : Cell(context, "name"))</div>
-                <div class="fc-desc">@(string.IsNullOrEmpty(Cell(context, "description")) ? "（暂无描述）" : Cell(context, "description"))</div>
+                <div class="fc-desc">@(string.IsNullOrEmpty(Cell(context, "description")) ? L10n.T(Keys.Content.AppsNoDescription, "（暂无描述）") : Cell(context, "description"))</div>
                 <div>
-                    <span class="badge @(IsGlobal(context) ? "badge-info" : "badge-success")">@(IsGlobal(context) ? "全局模板" : "租户")</span>
+                    <span class="badge @(IsGlobal(context) ? "badge-info" : "badge-success")">@(IsGlobal(context) ? L10n.T(Keys.Content.AppsBadgeGlobal, "全局模板") : L10n.T(Keys.Content.AppsBadgeTenant, "租户"))</span>
                     @if (!string.IsNullOrEmpty(Cell(context, "code")))
                     {
                         <span class="badge badge-muted">@Cell(context, "code")</span>
                     }
                     <span style="margin-left:auto; display:inline-flex; gap:6px">
-                        <button class="btn btn-sm btn-outline-secondary" @onclick="e => OpenDsl(context)" @onclick:stopPropagation="true">编辑</button>
-                        <button class="btn btn-sm btn-outline-danger" @onclick="e => AskDelete(context)" @onclick:stopPropagation="true">删除</button>
+                        <button class="btn btn-sm btn-outline-secondary" @onclick="e => OpenDsl(context)" @onclick:stopPropagation="true">@L10n.T(Keys.Content.AppsEdit, "编辑")</button>
+                        <button class="btn btn-sm btn-outline-danger" @onclick="e => AskDelete(context)" @onclick:stopPropagation="true">@L10n.T(Keys.Content.AppsDelete, "删除")</button>
                     </span>
                 </div>
             </div>
         </CardTemplate>
     </SbListPage>
 
-    <SbConfirm Visible="@_confirm" VisibleChanged="v => _confirm = v" Title="删除应用"
-               Message="删除后不可恢复，确认要删除该应用吗？" ConfirmText="删除"
+    <SbConfirm Visible="@_confirm" VisibleChanged="v => _confirm = v" Title="@L10n.T(Keys.Content.AppsDeleteConfirmTitle, "删除应用")"
+               Message="@L10n.T(Keys.Content.AppsDeleteConfirmMsg, "删除后不可恢复，确认要删除该应用吗？")" ConfirmText="@L10n.T(Keys.Content.AppsDeleteConfirmText, "删除")"
                Tone="danger" OnConfirm="DoDelete" />
 
     <SbModal Visible="@_genModal" VisibleChanged="v => _genModal = v" Title="新建应用（自然语言生成）" Size="md">
         <Body>
             <div class="form-stack">
-                <SbField Label="应用描述" Required="true" Error="@_genErr" Hint="用一句话描述你想要的 BI 应用，AI 将生成 DSL。">
-                    <textarea class="form-control" rows="4" @bind="_genDesc" placeholder="例如：销售看板，按地区展示销售额与订单量"></textarea>
+                <SbField Label="@L10n.T(Keys.Content.AppsGenDescLabel, "应用描述")" Required="true" Error="@_genErr" Hint="@L10n.T(Keys.Content.AppsGenDescHint, "用一句话描述你想要的 BI 应用，AI 将生成 DSL。")">
+                    <textarea class="form-control" rows="4" @bind="_genDesc" placeholder="@L10n.T(Keys.Content.AppsGenDescPlaceholder, "例如：销售看板，按地区展示销售额与订单量")"></textarea>
                 </SbField>
-                <SbField Label="应用编码" Hint="留空由系统生成（如 my-app-1733）。">
-                    <input class="form-control" @bind="_genCode" placeholder="可选" />
+                <SbField Label="@L10n.T(Keys.Content.AppsGenCodeLabel, "应用编码")" Hint="@L10n.T(Keys.Content.AppsGenCodeHint, "留空由系统生成（如 my-app-1733）。")">
+                    <input class="form-control" @bind="_genCode" placeholder="@L10n.T(Keys.Content.AppsGenCodePlaceholder, "可选")" />
                 </SbField>
             </div>
         </Body>
         <Footer>
-            <button class="btn btn-outline-secondary btn-sm" @onclick="() => _genModal = false">取消</button>
-            <button class="btn btn-primary btn-sm" @onclick="Generate">生成并创建</button>
+            <button class="btn btn-outline-secondary btn-sm" @onclick="() => _genModal = false">@L10n.T(Keys.Content.AppsGenCancel, "取消")</button>
+            <button class="btn btn-primary btn-sm" @onclick="Generate">@L10n.T(Keys.Content.AppsGenSubmit, "生成并创建")</button>
         </Footer>
     </SbModal>
 
     <SbModal Visible="@_dslModal" VisibleChanged="v => _dslModal = v" Title="编辑应用 DSL" Size="lg">
         <Body>
-            <p class="muted">应用 <strong>@_dslCode</strong> 的声明式定义（AppDsl JSON）。保存将重新校验并覆盖。</p>
+            <p class="muted">@string.Format(L10n.T(Keys.Content.AppsDslIntro, "应用 {0} 的声明式定义（AppDsl JSON）。保存将重新校验并覆盖。"), _dslCode)</p>
             @if (_dslGlobal)
             {
-                <div class="alert alert-warning">该应用为全局模板，不可修改。</div>
+                <div class="alert alert-warning">@L10n.T(Keys.Content.AppsDslGlobalWarning, "该应用为全局模板，不可修改。")</div>
             }
-            <SbField Label="DslJson" Required="true" Error="@_dslErr">
+            <SbField Label="@L10n.T(Keys.Content.AppsDslFieldLabel, "DslJson")" Required="true" Error="@_dslErr">
                 <textarea class="form-control sb-pre" rows="14" @bind="_dslJson" readonly="@_dslGlobal"></textarea>
             </SbField>
         </Body>
         <Footer>
-            <button class="btn btn-outline-secondary btn-sm" @onclick="() => _dslModal = false">取消</button>
-            <button class="btn btn-primary btn-sm" @onclick="SaveDsl" disabled="@_dslGlobal">保存</button>
+            <button class="btn btn-outline-secondary btn-sm" @onclick="() => _dslModal = false">@L10n.T(Keys.Content.AppsGenCancel, "取消")</button>
+            <button class="btn btn-primary btn-sm" @onclick="SaveDsl" disabled="@_dslGlobal">@L10n.T(Keys.Content.AppsDslSave, "保存")</button>
         </Footer>
     </SbModal>
 </AuthGuard>
@@ -114,8 +114,8 @@
     private async Task Reload()
     {
         _loading = true;
-        var (data, _, err) = await Api.GetJsonAsync($"api/apps?tenantId={State.TenantId}");
-        _error = err ?? "";
+        var (data, _, err, code) = await Api.GetJsonAsync($"api/apps?tenantId={State.TenantId}");
+        _error = L10n.Friendly(code, err ?? L10n.T(Keys.Content.AppsLoadFailed, "加载失败。"));
         _rows = data is { ValueKind: JsonValueKind.Array } ? data.Value.EnumerateArray().ToList() : new();
         _cols = TablePresenter.InferColumns(data);
         _loading = false;
@@ -128,7 +128,7 @@
         var code = Cell(row, "code");
         if (string.IsNullOrWhiteSpace(code))
         {
-            Toast.Warning("该记录缺少 code，无法打开详情。");
+            Toast.Warning(L10n.T(Keys.Content.AppsMissingCodeOpen, "该记录缺少 code，无法打开详情。"));
             return;
         }
         Nav.NavigateTo($"apps/{Uri.EscapeDataString(code)}");
@@ -152,10 +152,10 @@
     {
         if (string.IsNullOrWhiteSpace(_genDesc))
         {
-            _genErr = "应用描述必填。";
+            _genErr = L10n.T(Keys.Content.AppsGenDescRequired, "应用描述必填。");
             return;
         }
-        var (_, status, err) = await Api.PostAsync("api/apps/generate", new
+        var (_, status, err, code) = await Api.PostAsync("api/apps/generate", new
         {
             tenantId = State.TenantId,
             description = _genDesc,
@@ -163,13 +163,15 @@
         });
         if (status is >= 200 and < 300)
         {
-            Toast.Success("应用已通过 AI 生成并创建。");
+            Toast.Success(L10n.T(Keys.Content.AppsGenSuccess, "应用已通过 AI 生成并创建。"));
             _genModal = false;
             await Reload();
         }
         else
         {
-            _genErr = err ?? $"生成失败（HTTP {status}）。";
+            _genErr = err is null
+                ? string.Format(L10n.T(Keys.Content.AppsGenFailed, "生成失败（HTTP {0}）。"), status)
+                : L10n.Friendly(code, err);
         }
     }
 
@@ -183,12 +185,12 @@
     private async Task OpenDsl(JsonElement row)
     {
         var code = Cell(row, "code");
-        if (string.IsNullOrWhiteSpace(code)) { Toast.Warning("该记录缺少 code，无法编辑。"); return; }
+        if (string.IsNullOrWhiteSpace(code)) { Toast.Warning(L10n.T(Keys.Content.AppsMissingCodeEdit, "该记录缺少 code，无法编辑。")); return; }
         _dslCode = code;
         _dslGlobal = IsGlobal(row);
         _dslErr = "";
-        var (data, _, err) = await Api.GetJsonAsync($"api/apps/{Uri.EscapeDataString(code)}?tenantId={State.TenantId}");
-        if (data is null) { Toast.Error(err ?? "读取应用失败。"); return; }
+        var (data, _, err, readCode) = await Api.GetJsonAsync($"api/apps/{Uri.EscapeDataString(code)}?tenantId={State.TenantId}");
+        if (data is null) { Toast.Error(err is null ? L10n.T(Keys.Content.AppsReadFailed, "读取应用失败。") : L10n.Friendly(readCode, err)); return; }
         _dslJson = data.Value.TryGetProperty("dslJson", out var dj) && dj.ValueKind == JsonValueKind.String
             ? dj.GetString()!
             : data.Value.GetRawText();
@@ -197,17 +199,19 @@
 
     private async Task SaveDsl()
     {
-        if (string.IsNullOrWhiteSpace(_dslJson)) { _dslErr = "DslJson 不能为空。"; return; }
-        var (_, status, err) = await Api.PutAsync($"api/apps/{Uri.EscapeDataString(_dslCode)}", new { dslJson = _dslJson });
+        if (string.IsNullOrWhiteSpace(_dslJson)) { _dslErr = L10n.T(Keys.Content.AppsDslJsonEmpty, "DslJson 不能为空。"); return; }
+        var (_, status, err, code) = await Api.PutAsync($"api/apps/{Uri.EscapeDataString(_dslCode)}", new { dslJson = _dslJson });
         if (status is >= 200 and < 300)
         {
-            Toast.Success("应用 DSL 已保存。");
+            Toast.Success(L10n.T(Keys.Content.AppsDslSaved, "应用 DSL 已保存。"));
             _dslModal = false;
             await Reload();
         }
         else
         {
-            _dslErr = err ?? $"保存失败（HTTP {status}）。";
+            _dslErr = err is null
+                ? string.Format(L10n.T(Keys.Content.AppsDslSaveFailed, "保存失败（HTTP {0}）。"), status)
+                : L10n.Friendly(code, err);
         }
     }
 
@@ -217,7 +221,7 @@
     private void AskDelete(JsonElement row)
     {
         var code = Cell(row, "code");
-        if (string.IsNullOrWhiteSpace(code)) { Toast.Warning("该记录缺少 code，无法删除。"); return; }
+        if (string.IsNullOrWhiteSpace(code)) { Toast.Warning(L10n.T(Keys.Content.AppsMissingCodeDelete, "该记录缺少 code，无法删除。")); return; }
         _confirmCode = code;
         _confirm = true;
     }
@@ -226,9 +230,9 @@
     {
         _confirm = false;
         if (string.IsNullOrWhiteSpace(_confirmCode)) return;
-        var (ok, _, err) = await Api.DeleteAsync($"api/apps/{Uri.EscapeDataString(_confirmCode)}");
-        if (!ok) { Toast.Error(err ?? "删除失败。"); return; }
-        Toast.Success("应用已删除。");
+        var (ok, _, err, code) = await Api.DeleteAsync($"api/apps/{Uri.EscapeDataString(_confirmCode)}");
+        if (!ok) { Toast.Error(err is null ? L10n.T(Keys.Content.AppsDeleteFailed, "删除失败。") : L10n.Friendly(code, err)); return; }
+        Toast.Success(L10n.T(Keys.Content.AppsDeleteSuccess, "应用已删除。"));
         await Reload();
     }
 

@@ -117,9 +117,9 @@
         if (_languages.Count > 0 && !_languages.Any(x => x.Culture == _culture)) _culture = _languages[0].Culture;
     }
     private async Task SelectCulture(string culture) { _culture = culture; await LoadTexts(); }
-    private async Task LoadTexts() { _loading = true; StateHasChanged(); var (data, _, err) = await Api.GetJsonAsync($"api/localization/texts?culture={Uri.EscapeDataString(_culture)}"); _texts = data is { ValueKind: JsonValueKind.Array } ? data.Value.EnumerateArray().ToList() : new(); _error = err ?? ""; _loading = false; StateHasChanged(); }
-    private async Task Save(string key, string value) { var (ok, _, err) = await Api.PutAsync($"api/localization/texts/{Uri.EscapeDataString(_culture)}/{Uri.EscapeDataString(key)}", new { value }); if (!ok) Toast.Error(err ?? "保存失败。"); else { Toast.Success(_isPlatform ? "平台文本已更新。" : "租户专属文本已保存。"); await LoadTexts(); } }
-    private async Task Reset(string key) { var (ok, _, err) = await Api.DeleteAsync($"api/localization/texts/{Uri.EscapeDataString(_culture)}/{Uri.EscapeDataString(key)}/override"); if (!ok) Toast.Error(err ?? "恢复失败。"); else { Toast.Success("已恢复继承平台文本。"); await LoadTexts(); } }
+    private async Task LoadTexts() { _loading = true; StateHasChanged(); var (data, _, err, _) = await Api.GetJsonAsync($"api/localization/texts?culture={Uri.EscapeDataString(_culture)}"); _texts = data is { ValueKind: JsonValueKind.Array } ? data.Value.EnumerateArray().ToList() : new(); _error = err ?? ""; _loading = false; StateHasChanged(); }
+    private async Task Save(string key, string value) { var (ok, _, err, _) = await Api.PutAsync($"api/localization/texts/{Uri.EscapeDataString(_culture)}/{Uri.EscapeDataString(key)}", new { value }); if (!ok) Toast.Error(err ?? "保存失败。"); else { Toast.Success(_isPlatform ? "平台文本已更新。" : "租户专属文本已保存。"); await LoadTexts(); } }
+    private async Task Reset(string key) { var (ok, _, err, _) = await Api.DeleteAsync($"api/localization/texts/{Uri.EscapeDataString(_culture)}/{Uri.EscapeDataString(key)}/override"); if (!ok) Toast.Error(err ?? "恢复失败。"); else { Toast.Success("已恢复继承平台文本。"); await LoadTexts(); } }
     private async Task AddLanguage()
     {
         var model = new AdminLanguageCreate { Culture = _newCulture, DisplayName = _newDisplayName, NativeName = _newNativeName, CopyFromCulture = _copyFrom };

@@ -88,11 +88,11 @@
     private async Task Reload()
     {
         _loading = true;
-        var (agents, _, aErr) = await Api.GetJsonAsync($"api/agent/plans?tenantId={State.TenantId}");
+        var (agents, _, aErr, _) = await Api.GetJsonAsync($"api/agent/plans?tenantId={State.TenantId}");
         _error = aErr ?? "";
         _agents = agents is { ValueKind: JsonValueKind.Array } ? agents.Value.EnumerateArray().ToList() : new();
 
-        var (tools, _, tErr) = await Api.GetJsonAsync("api/agent/tools");
+        var (tools, _, tErr, _) = await Api.GetJsonAsync("api/agent/tools");
         if (tools is null && string.IsNullOrEmpty(_error)) _error = tErr ?? "";
         _tools = tools is { ValueKind: JsonValueKind.Array } ? tools.Value.EnumerateArray().ToList() : new();
 
@@ -134,7 +134,7 @@
     {
         _confirm = false;
         if (string.IsNullOrWhiteSpace(_confirmCode)) return;
-        var (ok, _, err) = await Api.DeleteAsync($"api/agent/plans/{Uri.EscapeDataString(_confirmCode)}");
+        var (ok, _, err, _) = await Api.DeleteAsync($"api/agent/plans/{Uri.EscapeDataString(_confirmCode)}");
         if (!ok) { Toast.Error(err ?? "删除失败。"); return; }
         Toast.Success("智能体计划已删除。");
         await Reload();
