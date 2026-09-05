@@ -392,12 +392,18 @@ M3-G0 是 M4/M7/M8 的最小前置，不等同于完成全部 i18n。它只包�
 - ✅ **M3-02-D 前端接入**：`IApiClient`/`ApiClient` 新增 6 个方法 + DTO（`AdminLanguageView`/`AdminLanguageCreate`/`AdminLanguageUpdate`/`PublicLanguageView`）；`Localization.razor` 改用强类型目录（启停/排序/改名/待翻译展示）；`LanguageSwitcher` + `LocalizationService` 从 `public/languages` 动态获取 `NativeName`，移除硬编码 5 语言映射。
 - ✅ **M3-02-E 测试与验证**：`PlatformLanguageServiceTests`（13 项：归一化、唯一性、必填、复制待翻译、列表/查看统计、启停委派、排序）、`LocalizationControllerAdminTests`（4 项：声明守卫、包含停用、复制待翻译、非法 Culture 400）；全量回归 691/691 通过。
 
-### M3-03 租户文本覆盖
+### M3-03 租户文本覆盖 ✅（2026-09-05 收尾，本地提交待推送）
 
-- 租户管理员只看到被授权语言。
-- 同时展示平台基线、租户覆盖、最终值和“平台/继承/专属”来源。
-- 删除覆盖即恢复继承，不删除平台基线；平台基线更新后未覆盖租户自动继承。
-- 保存后立即重载客户端资源，不要求重新登录。
+- 租户管理员只看到被授权语言（核心不变量由 `Languages` 端点经 `ITenantLanguageService.GetAvailableCulturesAsync` 按 `TenantUiLanguage` 关系过滤，已由 M3-01 落地并测试锁定）。
+- 同时展示平台基线、租户覆盖、最终值和“平台/继承/专属”来源（`LocalizationController.Texts` 合并平台(tenantId=0)与租户行；前端非平台视图展示 `platformValue`/`value`/`isOverridden`）。
+- 删除覆盖即恢复继承，不删除平台基线（`DELETE texts/{culture}/{key}/override` 仅删租户行）；平台基线更新后未覆盖租户自动继承。
+- 保存后立即重载客户端资源（网格刷新，不要求重新登录）。
+
+> **状态（2026-09-05）**：M3-03 核心能力由 M3-G0/M3-01 已交付并本次补测试锁定；测试 693/693 全绿、四端构建 0 error。本地提交待推送 `origin/master`。
+
+**交付清单（M3-03-A ~ M3-03-B）：**
+- ✅ **M3-03-A 租户授权语言过滤**：`LocalizationController.Languages` 对租户用户仅返回其 `TenantUiLanguage` 授权且启用的文化（平台层启用的非授权语言不出现）；新增 `LocalizationControllerTenantTests`（租户仅见授权语言 / 平台见全部启用语言）。
+- ✅ **M3-03-B 覆盖合并与生命周期**：`Texts` 合并平台基线 + 租户覆盖并标注来源；`SaveText` 写入租户覆盖并置 `IsTranslated=true`；`ResetText` 删除租户覆盖恢复继承。前端 `Localization.razor` 非平台分支展示平台默认/租户显示值/“租户专属”徽标与“恢复继承”操作。
 
 ### M3-04 资源键治理
 
