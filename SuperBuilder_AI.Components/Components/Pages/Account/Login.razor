@@ -71,7 +71,7 @@
                 </label>
                 <button class="btn btn-primary" @onclick="DoLogin" disabled="@Busy">@L10n.T("Common.Login")</button>
                 @if (!string.IsNullOrEmpty(Error)) { <div class="alert alert-danger">@Error</div> }
-                <p class="muted tiny">P0-04A 起登录校验口令：未设置口令的账户需先由管理员初始化。令牌携带安全戳，口令/角色变更后旧令牌立即失效。</p>
+                <p class="muted tiny">@L10n.T(Keys.Content.LoginPasswordNotice, "P0-04A 起登录校验口令：未设置口令的账户需先由管理员初始化。令牌携带安全戳，口令/角色变更后旧令牌立即失效。")</p>
                 <p class="muted tiny"><a href="/register">@L10n.T(Keys.Login.NoTenantRegister, "还没有租户？申请开通")</a></p>
             </div>
         }
@@ -88,7 +88,12 @@
     private bool BootstrapRequired;
     private bool BootstrapAnonymousAllowed = true;
     private string BootstrapUsername = "platform-admin";
-    private string BootstrapDisplayName = "平台系统管理员";
+    private string BootstrapDisplayName = "";
+
+    protected override void OnInitialized()
+    {
+        BootstrapDisplayName = L10n.T(Keys.Content.LoginBootstrapDisplayName, "平台系统管理员");
+    }
     private string BootstrapEmail = "";
     private string BootstrapPassword = "";
     private string BootstrapPasswordConfirm = "";

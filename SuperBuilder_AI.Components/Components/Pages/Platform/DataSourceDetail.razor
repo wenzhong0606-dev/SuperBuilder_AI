@@ -6,7 +6,7 @@
 @using SuperBuilder_AI.Components.Shared
 
 <AuthGuard>
-    <PageHead Icon="sb-ico-db" Title="@($"数据源 #{Id}")" Desc="数据源的授权清单与行级安全策略（RLS）。">
+    <PageHead Icon="sb-ico-db" Title="@string.Format(L10n.T(Keys.Content.DataSourceDetailTitle, "数据源 #{0}"), Id)" Desc="@L10n.T(Keys.Content.DataSourceDetailDesc, "数据源的授权清单与行级安全策略（RLS）。")">
         <button class="btn btn-outline-secondary btn-sm" @onclick='() => Nav.NavigateTo("data-sources")'>@L10n.T(Keys.Content.DataSourceBackList, "返回列表")</button>
         <button class="btn btn-outline-secondary btn-sm" @onclick="() => Load()">@L10n.T(Keys.Action.Refresh, "刷新")</button>
     </PageHead>

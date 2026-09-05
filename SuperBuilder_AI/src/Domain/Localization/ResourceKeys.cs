@@ -898,6 +898,38 @@ public static class ResourceKeys
         public const string SharedCopied = "Content.SharedCopied";
         public const string SharedCopyFailed = "Content.SharedCopyFailed";
         public const string SharedBreadcrumb = "Content.SharedBreadcrumb";
+        public const string ErrForbiddenTitle = "Content.ErrForbiddenTitle";
+        public const string ErrForbiddenText = "Content.ErrForbiddenText";
+        public const string ErrNotFoundTitle = "Content.ErrNotFoundTitle";
+        public const string ErrNotFoundText = "Content.ErrNotFoundText";
+        public const string ErrServerTitle = "Content.ErrServerTitle";
+        public const string ErrServerText = "Content.ErrServerText";
+        public const string ErrBackToWorkbench = "Content.ErrBackToWorkbench";
+        public const string ErrBack = "Content.ErrBack";
+        public const string ErrGoAsk = "Content.ErrGoAsk";
+        public const string ErrReload = "Content.ErrReload";
+        public const string AdminQuotaDesc = "Content.AdminQuotaDesc";
+        public const string AdminQuotaLoading = "Content.AdminQuotaLoading";
+        public const string AdminQuotaPanelTitle = "Content.AdminQuotaPanelTitle";
+        public const string AdminQuotaEmptyTitle = "Content.AdminQuotaEmptyTitle";
+        public const string AdminQuotaEmptyText = "Content.AdminQuotaEmptyText";
+        public const string AdminThemesDesc = "Content.AdminThemesDesc";
+        public const string AdminThemesPanelTitle = "Content.AdminThemesPanelTitle";
+        public const string AdminThemesEmptyTitle = "Content.AdminThemesEmptyTitle";
+        public const string AdminThemesEmptyText = "Content.AdminThemesEmptyText";
+        public const string AdminThemesOpenEditor = "Content.AdminThemesOpenEditor";
+        public const string ModelAccountsDescQwenPlus = "Content.ModelAccountsDescQwenPlus";
+        public const string ModelAccountsDescQwenMax = "Content.ModelAccountsDescQwenMax";
+        public const string ModelAccountsDescGpt4o = "Content.ModelAccountsDescGpt4o";
+        public const string ModelAccountsDescAzureOpenAI = "Content.ModelAccountsDescAzureOpenAI";
+        public const string ModelAccountsDescDeepSeek = "Content.ModelAccountsDescDeepSeek";
+        public const string DataSourceDetailTitle = "Content.DataSourceDetailTitle";
+        public const string DataSourceDetailDesc = "Content.DataSourceDetailDesc";
+        public const string LoginPasswordNotice = "Content.LoginPasswordNotice";
+        public const string LoginBootstrapDisplayName = "Content.LoginBootstrapDisplayName";
+        public const string DashboardsCreateTitle = "Content.DashboardsCreateTitle";
+        public const string AppsCreateTitle = "Content.AppsCreateTitle";
+        public const string AppsEditDslTitle = "Content.AppsEditDslTitle";
 
     }
 
@@ -1837,6 +1869,38 @@ public static class ResourceKeys
         [Content.SharedCopied] = new("Content", Page: "Shared", DefaultValue: "Copied"),
         [Content.SharedCopyFailed] = new("Content", Page: "Shared", DefaultValue: "Copy failed, please select manually"),
         [Content.SharedBreadcrumb] = new("Content", Page: "Shared", DefaultValue: "Breadcrumb"),
+        [Content.ErrForbiddenTitle] = new("Content", Page: "Errors", DefaultValue: "Access denied"),
+        [Content.ErrForbiddenText] = new("Content", Page: "Errors", DefaultValue: "Your account lacks permission to access this resource, or it belongs to another tenant."),
+        [Content.ErrNotFoundTitle] = new("Content", Page: "Errors", DefaultValue: "Page not found"),
+        [Content.ErrNotFoundText] = new("Content", Page: "Errors", DefaultValue: "This address has no matching page; the link may have expired or the URL is incorrect."),
+        [Content.ErrServerTitle] = new("Content", Page: "Errors", DefaultValue: "Something went wrong"),
+        [Content.ErrServerText] = new("Content", Page: "Errors", DefaultValue: "An unexpected error occurred. Please retry later; if it persists, contact an administrator with the trace ID."),
+        [Content.ErrBackToWorkbench] = new("Content", Page: "Errors", DefaultValue: "Back to workbench"),
+        [Content.ErrBack] = new("Content", Page: "Errors", DefaultValue: "Go back"),
+        [Content.ErrGoAsk] = new("Content", Page: "Errors", DefaultValue: "Ask a question"),
+        [Content.ErrReload] = new("Content", Page: "Errors", DefaultValue: "Reload"),
+        [Content.AdminQuotaDesc] = new("Content", Page: "Quota", DefaultValue: "View and configure tenant resource quotas: query count, tokens, storage and concurrency, with threshold alerts."),
+        [Content.AdminQuotaLoading] = new("Content", Page: "Quota", DefaultValue: "Loading quotas…"),
+        [Content.AdminQuotaPanelTitle] = new("Content", Page: "Quota", DefaultValue: "Current tenant quotas"),
+        [Content.AdminQuotaEmptyTitle] = new("Content", Page: "Quota", DefaultValue: "No quota data"),
+        [Content.AdminQuotaEmptyText] = new("Content", Page: "Quota", DefaultValue: "Contact the platform administrator to configure resource quotas for this tenant."),
+        [Content.AdminThemesDesc] = new("Content", Page: "Themes", DefaultValue: "Assign or create theme blueprints for the tenant to unify visual style; for personal preference use the Theme Editor."),
+        [Content.AdminThemesPanelTitle] = new("Content", Page: "Themes", DefaultValue: "Tenant themes"),
+        [Content.AdminThemesEmptyTitle] = new("Content", Page: "Themes", DefaultValue: "Theme backend pending"),
+        [Content.AdminThemesEmptyText] = new("Content", Page: "Themes", DefaultValue: "Tenant-level themes are provided by api/themes (P7.4); the frontend editor is ready (see Theme Editor). Tenant themes will be listed here once management endpoints ship."),
+        [Content.AdminThemesOpenEditor] = new("Content", Page: "Themes", DefaultValue: "Open theme editor"),
+        [Content.ModelAccountsDescQwenPlus] = new("Content", Page: "ModelAccounts", DefaultValue: "Qwen: strong Chinese business understanding"),
+        [Content.ModelAccountsDescQwenMax] = new("Content", Page: "ModelAccounts", DefaultValue: "Qwen flagship: complex reasoning"),
+        [Content.ModelAccountsDescGpt4o] = new("Content", Page: "ModelAccounts", DefaultValue: "Strong general capability"),
+        [Content.ModelAccountsDescAzureOpenAI] = new("Content", Page: "ModelAccounts", DefaultValue: "Enterprise compliant deployment"),
+        [Content.ModelAccountsDescDeepSeek] = new("Content", Page: "ModelAccounts", DefaultValue: "Cost-effective reasoning"),
+        [Content.DataSourceDetailTitle] = new("Content", Page: "DataSourceDetail", DefaultValue: "Data source #{0}"),
+        [Content.DataSourceDetailDesc] = new("Content", Page: "DataSourceDetail", DefaultValue: "Authorization list and row-level security (RLS) policies for this data source."),
+        [Content.LoginPasswordNotice] = new("Content", Page: "Login", DefaultValue: "Since P0-04A, sign-in validates passwords: accounts without a password must be initialized by an administrator first. Tokens carry a security stamp; changing a password or role invalidates old tokens immediately."),
+        [Content.LoginBootstrapDisplayName] = new("Content", Page: "Login", DefaultValue: "Platform system administrator"),
+        [Content.DashboardsCreateTitle] = new("Content", Page: "Dashboards", DefaultValue: "New dashboard"),
+        [Content.AppsCreateTitle] = new("Content", Page: "Apps", DefaultValue: "New app (generate from natural language)"),
+        [Content.AppsEditDslTitle] = new("Content", Page: "Apps", DefaultValue: "Edit app DSL"),
 
     };
 

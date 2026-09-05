@@ -3,14 +3,14 @@
 
 <AuthGuard>
     <PermissionGuard Require="@(new[]{ PermissionCodes.ThemeView })">
-    <PageHead Icon="sb-ico-theme" Key="Themes" Title="主题（租户级）" Desc="为租户指派或创建主题蓝图，统一视觉风格；个人偏好请在「主题编辑器」中调整。" />
+    <PageHead Icon="sb-ico-theme" Key="Themes" Title="主题（租户级）" Desc="@L10n.T(Keys.Content.AdminThemesDesc, "为租户指派或创建主题蓝图，统一视觉风格；个人偏好请在「主题编辑器」中调整。")" />
 
-    <SbPanel Icon="sb-ico-theme" Title="租户主题">
+    <SbPanel Icon="sb-ico-theme" Title="@L10n.T(Keys.Content.AdminThemesPanelTitle, "租户主题")">
         <Body>
-            <SbEmptyState Icon="sb-ico-theme" Title="主题后端待接入"
-                          Text="租户级主题由 P7.4 的 api/themes 提供，前端编辑器已就绪（见「主题编辑器」）。待管理端点上线后此处列出租户主题。">
+            <SbEmptyState Icon="sb-ico-theme" Title="@L10n.T(Keys.Content.AdminThemesEmptyTitle, "主题后端待接入")"
+                          Text="@L10n.T(Keys.Content.AdminThemesEmptyText, "租户级主题由 P7.4 的 api/themes 提供，前端编辑器已就绪（见「主题编辑器」）。待管理端点上线后此处列出租户主题。")">
                 <Actions>
-                    <a class="btn btn-primary btn-sm" href="themes"><svg class="btn-ico"><use href="#sb-ico-theme" /></svg> 打开主题编辑器</a>
+                    <a class="btn btn-primary btn-sm" href="themes"><svg class="btn-ico"><use href="#sb-ico-theme" /></svg> @L10n.T(Keys.Content.AdminThemesOpenEditor, "打开主题编辑器")</a>
                 </Actions>
             </SbEmptyState>
         </Body>

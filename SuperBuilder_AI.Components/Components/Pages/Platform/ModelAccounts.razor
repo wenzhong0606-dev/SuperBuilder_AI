@@ -48,14 +48,19 @@
         public bool Bound { get; set; }
         public bool Default { get; set; }
     }
-    private List<Model> _models = new()
+    private List<Model> _models = new();
+
+    protected override void OnInitialized()
     {
-        new() { Name = "Qwen-Plus", Desc = "通义千问，中文业务理解强", Bound = true, Default = true },
-        new() { Name = "Qwen-Max", Desc = "通义千问旗舰，复杂推理", Bound = true },
-        new() { Name = "OpenAI GPT-4o", Desc = "通用能力强", Bound = false },
-        new() { Name = "Azure OpenAI", Desc = "企业合规部署", Bound = false },
-        new() { Name = "DeepSeek", Desc = "高性价比推理", Bound = false },
-    };
+        _models = new()
+        {
+            new() { Name = "Qwen-Plus", Desc = L10n.T(Keys.Content.ModelAccountsDescQwenPlus, "通义千问，中文业务理解强"), Bound = true, Default = true },
+            new() { Name = "Qwen-Max", Desc = L10n.T(Keys.Content.ModelAccountsDescQwenMax, "通义千问旗舰，复杂推理"), Bound = true },
+            new() { Name = "OpenAI GPT-4o", Desc = L10n.T(Keys.Content.ModelAccountsDescGpt4o, "通用能力强"), Bound = false },
+            new() { Name = "Azure OpenAI", Desc = L10n.T(Keys.Content.ModelAccountsDescAzureOpenAI, "企业合规部署"), Bound = false },
+            new() { Name = "DeepSeek", Desc = L10n.T(Keys.Content.ModelAccountsDescDeepSeek, "高性价比推理"), Bound = false },
+        };
+    }
     private string SelModel = "Qwen-Plus", Key = "", Note = "";
 
     private void SetDefault(string n)

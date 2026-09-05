@@ -5,11 +5,11 @@
 
 <div class="sb-error-page">
     <div class="sb-error-code">403</div>
-    <h2>没有访问权限</h2>
-    <p class="muted">当前账号缺少访问该资源所需的权限，或该资源属于其他租户。</p>
+    <h2>@L10n.T(Keys.Content.ErrForbiddenTitle, "没有访问权限")</h2>
+    <p class="muted">@L10n.T(Keys.Content.ErrForbiddenText, "当前账号缺少访问该资源所需的权限，或该资源属于其他租户。")</p>
     <div class="sb-error-actions">
-        <button class="btn btn-primary" @onclick='() => Nav.NavigateTo("")'>返回工作台</button>
-        <button class="btn btn-outline-secondary" @onclick="Back">返回上一页</button>
+        <button class="btn btn-primary" @onclick='() => Nav.NavigateTo("")'>@L10n.T(Keys.Content.ErrBackToWorkbench, "返回工作台")</button>
+        <button class="btn btn-outline-secondary" @onclick="Back">@L10n.T(Keys.Content.ErrBack, "返回上一页")</button>
     </div>
 </div>
 

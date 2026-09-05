@@ -7,11 +7,11 @@
 
 <AuthGuard>
     <PermissionGuard>
-    <PageHead Icon="sb-ico-quota" Key="Quota" Title="配额管理" Desc="查看与配置租户资源配额：问数次数、Token、存储与并发等，超阈预警。" />
+    <PageHead Icon="sb-ico-quota" Key="Quota" Title="配额管理" Desc="@L10n.T(Keys.Content.AdminQuotaDesc, "查看与配置租户资源配额：问数次数、Token、存储与并发等，超阈预警。")" />
 
     @if (_loading)
     {
-        <LoadingState Text="正在加载配额…" />
+        <LoadingState Text="@L10n.T(Keys.Content.AdminQuotaLoading, "正在加载配额…")" />
     }
     else if (!string.IsNullOrWhiteSpace(_error))
     {
@@ -19,15 +19,15 @@
     }
     else if (_obj is null)
     {
-        <SbPanel Icon="sb-ico-quota" Title="当前租户配额">
+        <SbPanel Icon="sb-ico-quota" Title="@L10n.T(Keys.Content.AdminQuotaPanelTitle, "当前租户配额")">
             <Body>
-                <SbEmptyState Icon="sb-ico-quota" Title="暂无配额数据" Text="联系平台管理员为当前租户配置资源配额。" />
+                <SbEmptyState Icon="sb-ico-quota" Title="@L10n.T(Keys.Content.AdminQuotaEmptyTitle, "暂无配额数据")" Text="@L10n.T(Keys.Content.AdminQuotaEmptyText, "联系平台管理员为当前租户配置资源配额。")" />
             </Body>
         </SbPanel>
     }
     else
     {
-        <SbPanel Icon="sb-ico-quota" Title="当前租户配额">
+        <SbPanel Icon="sb-ico-quota" Title="@L10n.T(Keys.Content.AdminQuotaPanelTitle, "当前租户配额")">
             <Body>
                 <dl class="kv">
                     @foreach (var p in _obj.Value.EnumerateObject())

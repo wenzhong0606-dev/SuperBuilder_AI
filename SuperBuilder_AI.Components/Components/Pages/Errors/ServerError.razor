@@ -4,11 +4,11 @@
 
 <div class="sb-error-page">
     <div class="sb-error-code">500</div>
-    <h2>服务出现异常</h2>
-    <p class="muted">请求处理过程中发生未预期的错误，请稍后重试；若持续出现，请联系管理员并提供追踪 ID。</p>
+    <h2>@L10n.T(Keys.Content.ErrServerTitle, "服务出现异常")</h2>
+    <p class="muted">@L10n.T(Keys.Content.ErrServerText, "请求处理过程中发生未预期的错误，请稍后重试；若持续出现，请联系管理员并提供追踪 ID。")</p>
     <div class="sb-error-actions">
-        <button class="btn btn-primary" @onclick="Reload">重新加载</button>
-        <button class="btn btn-outline-secondary" @onclick='() => Nav.NavigateTo("")'>返回工作台</button>
+        <button class="btn btn-primary" @onclick="Reload">@L10n.T(Keys.Content.ErrReload, "重新加载")</button>
+        <button class="btn btn-outline-secondary" @onclick='() => Nav.NavigateTo("")'>@L10n.T(Keys.Content.ErrBackToWorkbench, "返回工作台")</button>
     </div>
 </div>
 

@@ -930,6 +930,38 @@ public static class Keys
         public const string SharedCopied = "Content.SharedCopied";
         public const string SharedCopyFailed = "Content.SharedCopyFailed";
         public const string SharedBreadcrumb = "Content.SharedBreadcrumb";
+        public const string ErrForbiddenTitle = "Content.ErrForbiddenTitle";
+        public const string ErrForbiddenText = "Content.ErrForbiddenText";
+        public const string ErrNotFoundTitle = "Content.ErrNotFoundTitle";
+        public const string ErrNotFoundText = "Content.ErrNotFoundText";
+        public const string ErrServerTitle = "Content.ErrServerTitle";
+        public const string ErrServerText = "Content.ErrServerText";
+        public const string ErrBackToWorkbench = "Content.ErrBackToWorkbench";
+        public const string ErrBack = "Content.ErrBack";
+        public const string ErrGoAsk = "Content.ErrGoAsk";
+        public const string ErrReload = "Content.ErrReload";
+        public const string AdminQuotaDesc = "Content.AdminQuotaDesc";
+        public const string AdminQuotaLoading = "Content.AdminQuotaLoading";
+        public const string AdminQuotaPanelTitle = "Content.AdminQuotaPanelTitle";
+        public const string AdminQuotaEmptyTitle = "Content.AdminQuotaEmptyTitle";
+        public const string AdminQuotaEmptyText = "Content.AdminQuotaEmptyText";
+        public const string AdminThemesDesc = "Content.AdminThemesDesc";
+        public const string AdminThemesPanelTitle = "Content.AdminThemesPanelTitle";
+        public const string AdminThemesEmptyTitle = "Content.AdminThemesEmptyTitle";
+        public const string AdminThemesEmptyText = "Content.AdminThemesEmptyText";
+        public const string AdminThemesOpenEditor = "Content.AdminThemesOpenEditor";
+        public const string ModelAccountsDescQwenPlus = "Content.ModelAccountsDescQwenPlus";
+        public const string ModelAccountsDescQwenMax = "Content.ModelAccountsDescQwenMax";
+        public const string ModelAccountsDescGpt4o = "Content.ModelAccountsDescGpt4o";
+        public const string ModelAccountsDescAzureOpenAI = "Content.ModelAccountsDescAzureOpenAI";
+        public const string ModelAccountsDescDeepSeek = "Content.ModelAccountsDescDeepSeek";
+        public const string DataSourceDetailTitle = "Content.DataSourceDetailTitle";
+        public const string DataSourceDetailDesc = "Content.DataSourceDetailDesc";
+        public const string LoginPasswordNotice = "Content.LoginPasswordNotice";
+        public const string LoginBootstrapDisplayName = "Content.LoginBootstrapDisplayName";
+        public const string DashboardsCreateTitle = "Content.DashboardsCreateTitle";
+        public const string AppsCreateTitle = "Content.AppsCreateTitle";
+        public const string AppsEditDslTitle = "Content.AppsEditDslTitle";
 
     }
 
@@ -1815,6 +1847,38 @@ public static class Keys
         [Content.SharedCopied] = new("已复制", "Copied"),
         [Content.SharedCopyFailed] = new("复制失败，请手动选择", "Copy failed, please select manually"),
         [Content.SharedBreadcrumb] = new("面包屑", "Breadcrumb"),
+        [Content.ErrForbiddenTitle] = new("没有访问权限", "Access denied"),
+        [Content.ErrForbiddenText] = new("当前账号缺少访问该资源所需的权限，或该资源属于其他租户。", "Your account lacks permission to access this resource, or it belongs to another tenant."),
+        [Content.ErrNotFoundTitle] = new("页面不存在", "Page not found"),
+        [Content.ErrNotFoundText] = new("该地址没有对应的页面，可能是链接已失效或输入有误。", "This address has no matching page; the link may have expired or the URL is incorrect."),
+        [Content.ErrServerTitle] = new("服务出现异常", "Something went wrong"),
+        [Content.ErrServerText] = new("请求处理过程中发生未预期的错误，请稍后重试；若持续出现，请联系管理员并提供追踪 ID。", "An unexpected error occurred. Please retry later; if it persists, contact an administrator with the trace ID."),
+        [Content.ErrBackToWorkbench] = new("返回工作台", "Back to workbench"),
+        [Content.ErrBack] = new("返回上一页", "Go back"),
+        [Content.ErrGoAsk] = new("去提问", "Ask a question"),
+        [Content.ErrReload] = new("重新加载", "Reload"),
+        [Content.AdminQuotaDesc] = new("查看与配置租户资源配额：问数次数、Token、存储与并发等，超阈预警。", "View and configure tenant resource quotas: query count, tokens, storage and concurrency, with threshold alerts."),
+        [Content.AdminQuotaLoading] = new("正在加载配额…", "Loading quotas…"),
+        [Content.AdminQuotaPanelTitle] = new("当前租户配额", "Current tenant quotas"),
+        [Content.AdminQuotaEmptyTitle] = new("暂无配额数据", "No quota data"),
+        [Content.AdminQuotaEmptyText] = new("联系平台管理员为当前租户配置资源配额。", "Contact the platform administrator to configure resource quotas for this tenant."),
+        [Content.AdminThemesDesc] = new("为租户指派或创建主题蓝图，统一视觉风格；个人偏好请在「主题编辑器」中调整。", "Assign or create theme blueprints for the tenant to unify visual style; for personal preference use the Theme Editor."),
+        [Content.AdminThemesPanelTitle] = new("租户主题", "Tenant themes"),
+        [Content.AdminThemesEmptyTitle] = new("主题后端待接入", "Theme backend pending"),
+        [Content.AdminThemesEmptyText] = new("租户级主题由 P7.4 的 api/themes 提供，前端编辑器已就绪（见「主题编辑器」）。待管理端点上线后此处列出租户主题。", "Tenant-level themes are provided by api/themes (P7.4); the frontend editor is ready (see Theme Editor). Tenant themes will be listed here once management endpoints ship."),
+        [Content.AdminThemesOpenEditor] = new("打开主题编辑器", "Open theme editor"),
+        [Content.ModelAccountsDescQwenPlus] = new("通义千问，中文业务理解强", "Qwen: strong Chinese business understanding"),
+        [Content.ModelAccountsDescQwenMax] = new("通义千问旗舰，复杂推理", "Qwen flagship: complex reasoning"),
+        [Content.ModelAccountsDescGpt4o] = new("通用能力强", "Strong general capability"),
+        [Content.ModelAccountsDescAzureOpenAI] = new("企业合规部署", "Enterprise compliant deployment"),
+        [Content.ModelAccountsDescDeepSeek] = new("高性价比推理", "Cost-effective reasoning"),
+        [Content.DataSourceDetailTitle] = new("数据源 #{0}", "Data source #{0}"),
+        [Content.DataSourceDetailDesc] = new("数据源的授权清单与行级安全策略（RLS）。", "Authorization list and row-level security (RLS) policies for this data source."),
+        [Content.LoginPasswordNotice] = new("P0-04A 起登录校验口令：未设置口令的账户需先由管理员初始化。令牌携带安全戳，口令/角色变更后旧令牌立即失效。", "Since P0-04A, sign-in validates passwords: accounts without a password must be initialized by an administrator first. Tokens carry a security stamp; changing a password or role invalidates old tokens immediately."),
+        [Content.LoginBootstrapDisplayName] = new("平台系统管理员", "Platform system administrator"),
+        [Content.DashboardsCreateTitle] = new("新建仪表盘", "New dashboard"),
+        [Content.AppsCreateTitle] = new("新建应用（自然语言生成）", "New app (generate from natural language)"),
+        [Content.AppsEditDslTitle] = new("编辑应用 DSL", "Edit app DSL"),
 
     };
 }

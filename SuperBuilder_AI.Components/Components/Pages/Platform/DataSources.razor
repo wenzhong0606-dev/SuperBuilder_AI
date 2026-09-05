@@ -90,15 +90,20 @@
 
 @code {
     private record Connector(string Name, string Desc, bool Ready);
-    private List<Connector> _connectors = new()
+    private List<Connector> _connectors = new();
+
+    protected override void OnInitialized()
     {
-        new("SQL Server", "企业主流关系型数据库", true),
-        new("MySQL", "WMS 等业务常用", true),
-        new("PostgreSQL", "开源关系型数据库", true),
-        new("Oracle", "大型事务系统", false),
-        new("ClickHouse", "列式分析型数据库", false),
-        new("MongoDB", "文档型 NoSQL", false),
-    };
+        _connectors = new()
+        {
+            new("SQL Server", L10n.T(Keys.Content.DataSourcesConnSqlServer, "企业主流关系型数据库"), true),
+            new("MySQL", L10n.T(Keys.Content.DataSourcesConnMysql, "WMS 等业务常用"), true),
+            new("PostgreSQL", L10n.T(Keys.Content.DataSourcesConnPostgres, "开源关系型数据库"), true),
+            new("Oracle", L10n.T(Keys.Content.DataSourcesConnOracle, "大型事务系统"), false),
+            new("ClickHouse", L10n.T(Keys.Content.DataSourcesConnClickhouse, "列式分析型数据库"), false),
+            new("MongoDB", L10n.T(Keys.Content.DataSourcesConnMongodb, "文档型 NoSQL"), false),
+        };
+    }
     private string Name = "", Type = "MySQL", ConnStr = "";
     private bool Saving;
     private bool CreateVisible;

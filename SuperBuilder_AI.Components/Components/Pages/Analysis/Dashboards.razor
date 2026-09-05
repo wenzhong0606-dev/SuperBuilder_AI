@@ -41,7 +41,7 @@
                Message="@L10n.T(Keys.Content.DashboardsDeleteConfirmMsg, "删除后不可恢复，确认要删除该仪表盘吗？")" ConfirmText="@L10n.T(Keys.Content.DashboardsDeleteConfirmText, "删除")"
                Tone="danger" OnConfirm="DoDelete" />
 
-    <SbModal Visible="@_createModal" VisibleChanged="v => _createModal = v" Title="新建仪表盘" Size="lg">
+    <SbModal Visible="@_createModal" VisibleChanged="v => _createModal = v" Title="@L10n.T(Keys.Content.DashboardsCreateTitle, "新建仪表盘")" Size="lg">
         <Body>
             <div class="form-stack">
                 <SbField Label="@L10n.T(Keys.Content.DashboardsFieldStatus, "状态")">

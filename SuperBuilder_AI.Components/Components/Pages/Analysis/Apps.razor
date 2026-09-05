@@ -59,7 +59,7 @@
                Message="@L10n.T(Keys.Content.AppsDeleteConfirmMsg, "删除后不可恢复，确认要删除该应用吗？")" ConfirmText="@L10n.T(Keys.Content.AppsDeleteConfirmText, "删除")"
                Tone="danger" OnConfirm="DoDelete" />
 
-    <SbModal Visible="@_genModal" VisibleChanged="v => _genModal = v" Title="新建应用（自然语言生成）" Size="md">
+    <SbModal Visible="@_genModal" VisibleChanged="v => _genModal = v" Title="@L10n.T(Keys.Content.AppsCreateTitle, "新建应用（自然语言生成）")" Size="md">
         <Body>
             <div class="form-stack">
                 <SbField Label="@L10n.T(Keys.Content.AppsGenDescLabel, "应用描述")" Required="true" Error="@_genErr" Hint="@L10n.T(Keys.Content.AppsGenDescHint, "用一句话描述你想要的 BI 应用，AI 将生成 DSL。")">
@@ -76,7 +76,7 @@
         </Footer>
     </SbModal>
 
-    <SbModal Visible="@_dslModal" VisibleChanged="v => _dslModal = v" Title="编辑应用 DSL" Size="lg">
+    <SbModal Visible="@_dslModal" VisibleChanged="v => _dslModal = v" Title="@L10n.T(Keys.Content.AppsEditDslTitle, "编辑应用 DSL")" Size="lg">
         <Body>
             <p class="muted">@string.Format(L10n.T(Keys.Content.AppsDslIntro, "应用 {0} 的声明式定义（AppDsl JSON）。保存将重新校验并覆盖。"), _dslCode)</p>
             @if (_dslGlobal)
