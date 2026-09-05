@@ -628,6 +628,10 @@ public class SuperBIContext : DbContext
 
         // QuotaUsage：租户级使用量，不放行 TenantId == 0（用量恒归属某一租户）。
         builder.Entity<QuotaUsage>().HasQueryFilter(e => !_tenantFilterEnabled || e.TenantId == _scopedTenantId);
+
+        // UiTextResource：同 SemanticLabel/Dashboard，放行 TenantId == 0 的平台基线（租户作用域内自动继承基线译文），
+        // 同时仅可见本租户覆盖；租户作用域未开启时为 no-op，不影响平台治理/种子/Golden 路径。
+        builder.Entity<UiTextResource>().HasQueryFilter(e => !_tenantFilterEnabled || e.TenantId == _scopedTenantId || e.TenantId == 0);
         #endregion
 
         // Phase 3.1：Business Entity 只持久化到 SuperBuilder Metadata DB。

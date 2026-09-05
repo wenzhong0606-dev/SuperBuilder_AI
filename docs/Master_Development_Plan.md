@@ -405,15 +405,17 @@ M3-G0 是 M4/M7/M8 的最小前置，不等同于完成全部 i18n。它只包�
 - ✅ **M3-03-A 租户授权语言过滤**：`LocalizationController.Languages` 对租户用户仅返回其 `TenantUiLanguage` 授权且启用的文化（平台层启用的非授权语言不出现）；新增 `LocalizationControllerTenantTests`（租户仅见授权语言 / 平台见全部启用语言）。
 - ✅ **M3-03-B 覆盖合并与生命周期**：`Texts` 合并平台基线 + 租户覆盖并标注来源；`SaveText` 写入租户覆盖并置 `IsTranslated=true`；`ResetText` 删除租户覆盖恢复继承。前端 `Localization.razor` 非平台分支展示平台默认/租户显示值/“租户专属”徽标与“恢复继承”操作。
 
-### M3-04 资源键治理
+### M3-04 资源键治理 ✅（2026-09-05 收尾，本地提交待推送）
 
-- 建立 ResourceKey 目录及 Module/Page/Context/DefaultValue/Deprecated 状态。
-- 合并 PlatformStrings、UiTextResources 和前端 fallback 键空间。
-- 补齐 Nav、Page、Common、Validation、Error、Accessibility、Theme 键。
-- 保存译文时校验 `{0}` 等占位符一致性。
-- CI 扫描硬编码文本、未知键、缺失译文和废弃键。
-- UiTextResource 增加租户 QueryFilter 纵深防御；平台查询显式 IgnoreQueryFilters 并校验治理权限。
-- 新增 `localization:view/manage` 等明确权限码，更新角色种子、权限数量测试和菜单守卫。
+> **状态（2026-09-05）**：M3-04 治理基础闭环已交付并验证；测试 698/698 全绿（新增 `LocalizationControllerTextsTests` 3 项 + `UiTextResourceQueryFilterTests` 2 项）、后端与三端（Components/Web/Maui）构建 0 error。本地提交待推送 `origin/master`。
+
+**交付清单（M3-04-A ~ M3-04-D）：**
+- ✅ **M3-04-A 资源键目录元数据**：`ResourceKeys` 新增 `Nav`（Dashboard/Ask/DataSources/Admin）、`Accessibility`（SkipToContent）、`Theme`（Light/Dark）分组；新增 `ResourceKeyMeta` 记录（Module/Page/DefaultValue/Deprecated）与 `Catalog` 字典，为后续 CI 键空间扫描提供权威注册表。
+- ✅ **M3-04-B 键覆盖与种子补齐**：`LocalizationSeedService` 在上述 7 个新键为 zh-CN/zh-TW/en-US/ja-JP/ko-KR 五语言补齐默认译文，与 `Catalog.DefaultValue` 一致；种子完整性测试 `EnsureSeedAsync_Covers_Registered_ResourceKeys` 仍全绿。
+- ✅ **M3-04-C 占位符一致性校验**：新增 `LocalizationPlaceholderValidator`（提取 `{n}` 占位符并比对基线与译文一致性）；`LocalizationController.SaveText` 在租户覆盖（targetTenant>0）写入前强制校验，不一致返回 400（中文错误文案），平台基线（tenantId=0）免于校验。
+- ✅ **M3-04-D UiTextResource 租户过滤纵深防御**：`SuperBIContext` 为 `UiTextResource` 增加全局 QueryFilter（`!_tenantFilterEnabled || TenantId==_scopedTenantId || TenantId==0`），与 `SemanticLabel`/`Dashboard` 同模式；`Texts`/`SaveText`/`ResetText` 经 `ApplyTenantScope(targetTenant)` 显式启用作用域（传 0 即 no-op，保留平台基线视图）。
+
+**范围说明（递延至 M3-05/06 或后续治理迭代）：** PlatformStrings/UiTextResources/前端 fallback 键空间合并、CI 硬编码/未知键/缺失译文/废弃键扫描，以及 `localization:view/manage` 显式权限码与角色种子/菜单守卫统一，本轮未纳入，由 M3-05（全页面接入）与后续迭代承接。
 
 ### M3-05 全页面接入
 

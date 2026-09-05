@@ -60,6 +60,8 @@ public sealed class LocalizationSeedService : ILocalizationSeedService
                 ["Common.Loading"] = "加载中…",
                 ["Validation.Required"] = "此项为必填。", ["Validation.Email"] = "请输入有效的邮箱地址。", ["Validation.Format"] = "格式不正确。",
                 ["Error.Generic"] = "发生错误，请稍后重试。", ["Error.NotFound"] = "未找到请求的资源。", ["Empty.NoData"] = "暂无数据。",
+                ["Nav.Dashboard"] = "仪表盘", ["Nav.Ask"] = "问数", ["Nav.DataSources"] = "数据源", ["Nav.Admin"] = "管理",
+                ["Accessibility.SkipToContent"] = "跳到主内容", ["Theme.Light"] = "浅色", ["Theme.Dark"] = "深色",
             },
             ["zh-TW"] = new()
             {
@@ -71,6 +73,8 @@ public sealed class LocalizationSeedService : ILocalizationSeedService
                 ["Common.Loading"] = "載入中…",
                 ["Validation.Required"] = "此項為必填。", ["Validation.Email"] = "請輸入有效的電子郵件地址。", ["Validation.Format"] = "格式不正確。",
                 ["Error.Generic"] = "發生錯誤，請稍後再試。", ["Error.NotFound"] = "找不到要求的資源。", ["Empty.NoData"] = "暫無資料。",
+                ["Nav.Dashboard"] = "儀表板", ["Nav.Ask"] = "問數", ["Nav.DataSources"] = "資料來源", ["Nav.Admin"] = "管理",
+                ["Accessibility.SkipToContent"] = "跳到主內容", ["Theme.Light"] = "淺色", ["Theme.Dark"] = "深色",
             },
             ["en-US"] = new()
             {
@@ -82,6 +86,8 @@ public sealed class LocalizationSeedService : ILocalizationSeedService
                 ["Common.Loading"] = "Loading…",
                 ["Validation.Required"] = "This field is required.", ["Validation.Email"] = "Please enter a valid email address.", ["Validation.Format"] = "Invalid format.",
                 ["Error.Generic"] = "An error occurred. Please try again later.", ["Error.NotFound"] = "The requested resource was not found.", ["Empty.NoData"] = "No data available.",
+                ["Nav.Dashboard"] = "Dashboard", ["Nav.Ask"] = "Ask", ["Nav.DataSources"] = "Data Sources", ["Nav.Admin"] = "Admin",
+                ["Accessibility.SkipToContent"] = "Skip to content", ["Theme.Light"] = "Light", ["Theme.Dark"] = "Dark",
             },
             ["ja-JP"] = new()
             {
@@ -93,6 +99,8 @@ public sealed class LocalizationSeedService : ILocalizationSeedService
                 ["Common.Loading"] = "読み込み中…",
                 ["Validation.Required"] = "この項目は必須です。", ["Validation.Email"] = "有効なメールアドレスを入力してください。", ["Validation.Format"] = "形式が正しくありません。",
                 ["Error.Generic"] = "エラーが発生しました。後でもう一度お試しください。", ["Error.NotFound"] = "要求されたリソースが見つかりません。", ["Empty.NoData"] = "データがありません。",
+                ["Nav.Dashboard"] = "ダッシュボード", ["Nav.Ask"] = "質問", ["Nav.DataSources"] = "データソース", ["Nav.Admin"] = "管理",
+                ["Accessibility.SkipToContent"] = "メインコンテンツへ", ["Theme.Light"] = "ライト", ["Theme.Dark"] = "ダーク",
             },
             ["ko-KR"] = new()
             {
@@ -104,6 +112,8 @@ public sealed class LocalizationSeedService : ILocalizationSeedService
                 ["Common.Loading"] = "로딩 중…",
                 ["Validation.Required"] = "이 항목은 필수입니다。", ["Validation.Email"] = "유효한 이메일 주소를 입력하세요。", ["Validation.Format"] = "형식이 올바르지 않습니다。",
                 ["Error.Generic"] = "오류가 발생했습니다. 잠시 후 다시 시도하세요。", ["Error.NotFound"] = "요청한 리소스를 찾을 수 없습니다。", ["Empty.NoData"] = "데이터가 없습니다。",
+                ["Nav.Dashboard"] = "대시보드", ["Nav.Ask"] = "질문", ["Nav.DataSources"] = "데이터 소스", ["Nav.Admin"] = "관리",
+                ["Accessibility.SkipToContent"] = "주요 콘텐츠로 건너뛰기", ["Theme.Light"] = "라이트", ["Theme.Dark"] = "다크",
             },
         };
 

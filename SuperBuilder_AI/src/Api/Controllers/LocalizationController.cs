@@ -7,6 +7,7 @@ using SuperBuilder_AI.Data;
 using SuperBuilder_AI.Models.Localization;
 using SuperBuilder_AI.Models.Identity;
 using SuperBuilder_AI.Services.Platform;
+using SuperBuilder_AI.Services.Localization;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 
@@ -187,6 +188,8 @@ public sealed class LocalizationController : ControllerBase
 		await EnsureSeedAsync(ct);
 		var targetTenant = ResolveTargetTenant(tenantId);
 		if (targetTenant < 0) return Forbid();
+		// M3-04：租户作用域查询过滤纵深防御（ApplyTenantScope(0) 等价关闭，不影响平台基线视图）。
+		_db.ApplyTenantScope(targetTenant);
 		var rows = await _db.UiTextResources.AsNoTracking()
 			.Where(x => x.Culture == culture && (x.TenantId == 0 || x.TenantId == targetTenant)).ToListAsync(ct);
 		var platform = rows.Where(x => x.TenantId == 0).ToDictionary(x => x.ResourceKey, StringComparer.OrdinalIgnoreCase);
@@ -207,6 +210,19 @@ public sealed class LocalizationController : ControllerBase
 		if (targetTenant > 0 && !User.HasClaim("perm", IdentityPermissions.LocalizationView)) return Forbid();
 		var value = (request.Value ?? string.Empty).Trim();
 		if (value.Length == 0) return BadRequest("文本不能为空。");
+		// M3-04：租户覆盖译文须与平台基线占位符一致，避免 string.Format 参数不匹配运行时异常。
+		if (targetTenant > 0)
+		{
+			var baseline = await _db.UiTextResources.AsNoTracking().FirstOrDefaultAsync(x => x.TenantId == 0 && x.Culture == culture && x.ResourceKey == key, ct);
+			if (baseline is not null && !LocalizationPlaceholderValidator.AreConsistent(baseline.Value, value))
+			{
+				var b = string.Join(",", LocalizationPlaceholderValidator.ExtractPlaceholders(baseline.Value));
+				var t = string.Join(",", LocalizationPlaceholderValidator.ExtractPlaceholders(value));
+				return BadRequest($"译文占位符与平台基线不一致：基线 {{{b}}}，译文 {{{t}}}。请保持格式占位符（{{0}}/{{1}}…）一致。");
+			}
+		}
+		// M3-04：租户作用域过滤纵深防御。
+		_db.ApplyTenantScope(targetTenant);
 		var row = await _db.UiTextResources.FirstOrDefaultAsync(x => x.TenantId == targetTenant && x.Culture == culture && x.ResourceKey == key, ct);
 		if (row is null) { row = new UiTextResource { TenantId = targetTenant, Culture = culture, ResourceKey = key }; _db.UiTextResources.Add(row); }
 		row.Value = value;
@@ -222,6 +238,8 @@ public sealed class LocalizationController : ControllerBase
 		var tenantId = CurrentTenantId();
 		if (tenantId <= 0) return BadRequest("平台基线不能使用重置覆盖操作。");
 		if (!User.HasClaim("perm", IdentityPermissions.LocalizationView)) return Forbid();
+		// M3-04：租户作用域过滤纵深防御。
+		_db.ApplyTenantScope(tenantId);
 		var row = await _db.UiTextResources.FirstOrDefaultAsync(x => x.TenantId == tenantId && x.Culture == culture && x.ResourceKey == key, ct);
 		if (row is not null) { _db.UiTextResources.Remove(row); await _db.SaveChangesAsync(ct); }
 		return NoContent();
