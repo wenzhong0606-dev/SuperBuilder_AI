@@ -9,9 +9,9 @@
 <AuthGuard>
     <PermissionGuard Require="@(new[]{ PermissionCodes.PlatformAdminManage })">
         <PageHead Icon="sb-ico-user" Key="PlatformAdmins" Title="平台管理员"
-                  Desc="管理平台治理账号：新增、停用 / 启用、重置口令，并审计所有治理操作。始终至少保留一名有效管理员。">
-            <button class="btn btn-primary btn-sm" @onclick="OpenCreate">新建管理员</button>
-            <button class="btn btn-outline-secondary btn-sm" @onclick="Reload">刷新</button>
+                  Desc="@L10n.T(Keys.Content.AdminPlatformAdminsDesc, "管理平台治理账号：新增、停用 / 启用、重置口令，并审计所有治理操作。始终至少保留一名有效管理员。")">
+            <button class="btn btn-primary btn-sm" @onclick="OpenCreate">@L10n.T(Keys.Content.AdminPlatformAdminsCreate, "新建管理员")</button>
+            <button class="btn btn-outline-secondary btn-sm" @onclick="Reload">@L10n.T(Keys.Content.CommonRefresh, "刷新")</button>
         </PageHead>
 
         @if (!string.IsNullOrWhiteSpace(_error))
@@ -21,24 +21,24 @@
         else
         {
             <SbTabs>
-                <SbTab Title="管理员" Badge="@(_admins.Count.ToString())">
-                    <SbPanel Icon="sb-ico-user" Title="平台管理员" Flush="true">
+                <SbTab Title="@L10n.T(Keys.Content.AdminPlatformAdminsTabAdmins, "管理员")" Badge="@(_admins.Count.ToString())">
+                    <SbPanel Icon="sb-ico-user" Title="@L10n.T(Keys.Content.AdminPlatformAdminsPanelAdmins, "平台管理员")" Flush="true">
                         <Body>
                             <SbDataTable Items="@_admins" Columns="@AdminColumns" RowActions="@AdminRowActions"
                                          PageSize="20" Loading="@_loading"
-                                         EmptyTitle="暂无平台管理员"
-                                         EmptyText="使用「新建管理员」添加首位或额外的平台治理账号。" />
+                                         EmptyTitle="@L10n.T(Keys.Content.AdminPlatformAdminsEmptyAdminsTitle, "暂无平台管理员")"
+                                         EmptyText="@L10n.T(Keys.Content.AdminPlatformAdminsEmptyAdminsText, "使用「新建管理员」添加首位或额外的平台治理账号。")" />
                         </Body>
                     </SbPanel>
                 </SbTab>
 
-                <SbTab Title="操作审计" Badge="@(_audit.Count.ToString())">
-                    <SbPanel Icon="sb-ico-audit" Title="治理操作审计" Flush="true">
+                <SbTab Title="@L10n.T(Keys.Content.AdminPlatformAdminsTabAudit, "操作审计")" Badge="@(_audit.Count.ToString())">
+                    <SbPanel Icon="sb-ico-audit" Title="@L10n.T(Keys.Content.AdminPlatformAdminsPanelAudit, "治理操作审计")" Flush="true">
                         <Body>
                             <SbDataTable Items="@_audit" Columns="@AuditColumns"
                                          PageSize="20" Loading="@_loading"
-                                         EmptyTitle="暂无治理审计"
-                                         EmptyText="对平台管理员的增、停用、启用、重置口令操作都会记录在此。" />
+                                         EmptyTitle="@L10n.T(Keys.Content.AdminPlatformAdminsEmptyAuditTitle, "暂无治理审计")"
+                                         EmptyText="@L10n.T(Keys.Content.AdminPlatformAdminsEmptyAuditText, "对平台管理员的增、停用、启用、重置口令操作都会记录在此。")" />
                         </Body>
                     </SbPanel>
                 </SbTab>
@@ -46,51 +46,51 @@
         }
 
         @* 新建管理员 *@
-        <SbModal Visible="@_createModal" VisibleChanged="v => _createModal = v" Title="新建平台管理员" Size="md">
+        <SbModal Visible="@_createModal" VisibleChanged="v => _createModal = v" Title="@L10n.T(Keys.Content.AdminPlatformAdminsModalCreate, "新建平台管理员")" Size="md">
             <Body>
                 <div class="form-stack">
-                    <SbField Label="用户名" Required="true" Error="@_createErr">
-                        <input class="form-control" @bind="_newUsername" placeholder="登录账号" />
+                    <SbField Label="@L10n.T(Keys.Content.CommonUsername, "用户名")" Required="true" Error="@_createErr">
+                        <input class="form-control" @bind="_newUsername" placeholder="@L10n.T(Keys.Content.AdminPlatformAdminsUsernamePh, "登录账号")" />
                     </SbField>
-                    <SbField Label="初始口令" Required="true" Error="@_createErr">
-                        <input class="form-control" type="password" @bind="_newPassword" placeholder="至少 8 位" />
+                    <SbField Label="@L10n.T(Keys.Content.AdminPlatformAdminsInitialPassword, "初始口令")" Required="true" Error="@_createErr">
+                        <input class="form-control" type="password" @bind="_newPassword" placeholder="@L10n.T(Keys.Content.AdminPlatformAdminsPasswordPh, "至少 8 位")" />
                     </SbField>
-                    <SbField Label="显示名">
-                        <input class="form-control" @bind="_newDisplayName" placeholder="可选" />
+                    <SbField Label="@L10n.T(Keys.Content.CommonDisplayName, "显示名")">
+                        <input class="form-control" @bind="_newDisplayName" placeholder="@L10n.T(Keys.Content.CommonOptional, "可选")" />
                     </SbField>
-                    <SbField Label="邮箱">
-                        <input class="form-control" @bind="_newEmail" placeholder="可选" />
+                    <SbField Label="@L10n.T(Keys.Content.CommonEmail, "邮箱")">
+                        <input class="form-control" @bind="_newEmail" placeholder="@L10n.T(Keys.Content.CommonOptional, "可选")" />
                     </SbField>
                 </div>
             </Body>
             <Footer>
-                <button class="btn btn-outline-secondary btn-sm" @onclick="() => _createModal = false">取消</button>
-                <button class="btn btn-primary btn-sm" @onclick="Create">创建</button>
+                <button class="btn btn-outline-secondary btn-sm" @onclick="() => _createModal = false">@L10n.T(Keys.Content.CommonCancel, "取消")</button>
+                <button class="btn btn-primary btn-sm" @onclick="Create">@L10n.T(Keys.Content.CommonCreate, "创建")</button>
             </Footer>
         </SbModal>
 
         @* 重置口令 *@
-        <SbModal Visible="@_resetModal" VisibleChanged="v => _resetModal = v" Title="重置口令" Size="sm">
+        <SbModal Visible="@_resetModal" VisibleChanged="v => _resetModal = v" Title="@L10n.T(Keys.Content.AdminPlatformAdminsModalReset, "重置口令")" Size="sm">
             <Body>
-                <p class="muted">为 <strong>@_resetUsername</strong> 设置新口令（至少 8 位）。旧令牌将立即失效。</p>
-                <SbField Label="新口令" Required="true" Error="@_resetErr">
-                    <input class="form-control" type="password" @bind="_resetPassword" placeholder="至少 8 位" />
+                <p class="muted">@string.Format(L10n.T(Keys.Content.AdminPlatformAdminsResetHint, "为 {0} 设置新口令（至少 8 位）。旧令牌将立即失效。"), _resetUsername)</p>
+                <SbField Label="@L10n.T(Keys.Content.AdminPlatformAdminsNewPassword, "新口令")" Required="true" Error="@_resetErr">
+                    <input class="form-control" type="password" @bind="_resetPassword" placeholder="@L10n.T(Keys.Content.AdminPlatformAdminsPasswordPh, "至少 8 位")" />
                 </SbField>
             </Body>
             <Footer>
-                <button class="btn btn-outline-secondary btn-sm" @onclick="() => _resetModal = false">取消</button>
-                <button class="btn btn-primary btn-sm" @onclick="ResetConfirm">重置</button>
+                <button class="btn btn-outline-secondary btn-sm" @onclick="() => _resetModal = false">@L10n.T(Keys.Content.CommonCancel, "取消")</button>
+                <button class="btn btn-primary btn-sm" @onclick="ResetConfirm">@L10n.T(Keys.Content.AdminPlatformAdminsResetButton, "重置")</button>
             </Footer>
         </SbModal>
 
         @* 停用 / 启用二次确认 *@
         <SbConfirm Visible="@_confirmDisable" VisibleChanged="v => _confirmDisable = v"
-                   Title="停用平台管理员" Message='@($"确认停用「{_confirmUsername}」？该账号将立即无法登录。")'
-                   ConfirmText="停用" Tone="danger" OnConfirm="DoDisable" />
+                   Title="@L10n.T(Keys.Content.AdminPlatformAdminsDisableTitle, "停用平台管理员")" Message="@string.Format(L10n.T(Keys.Content.AdminPlatformAdminsDisableMsg, "确认停用「{0}」？该账号将立即无法登录。"), _confirmUsername)"
+                   ConfirmText="@L10n.T(Keys.Content.AdminPlatformAdminsDisableBtn, "停用")" Tone="danger" OnConfirm="DoDisable" />
 
         <SbConfirm Visible="@_confirmEnable" VisibleChanged="v => _confirmEnable = v"
-                   Title="启用平台管理员" Message='@($"确认重新启用「{_confirmUsername}」？")'
-                   ConfirmText="启用" Tone="success" OnConfirm="DoEnable" />
+                   Title="@L10n.T(Keys.Content.AdminPlatformAdminsEnableTitle, "启用平台管理员")" Message="@string.Format(L10n.T(Keys.Content.AdminPlatformAdminsEnableMsg, "确认重新启用「{0}」？"), _confirmUsername)"
+                   ConfirmText="@L10n.T(Keys.Content.AdminPlatformAdminsEnableBtn, "启用")" Tone="success" OnConfirm="DoEnable" />
     </PermissionGuard>
 </AuthGuard>
 
@@ -123,32 +123,32 @@
 
     private List<SbColumn<JsonElement>> AdminColumns => new()
     {
-        SbCol.Of<JsonElement>("用户名", r => TablePresenter.Cell(r, "username"), width: "160px"),
-        SbCol.Of<JsonElement>("显示名", r => TablePresenter.Cell(r, "displayName"), width: "160px"),
-        SbCol.Of<JsonElement>("邮箱", r => TablePresenter.Cell(r, "email"), width: "220px"),
-        SbCol.Of<JsonElement>("状态", r => TablePresenter.Cell(r, "status"), width: "110px", isStatus: true),
-        SbCol.Of<JsonElement>("创建时间", r => FormatTime(TablePresenter.Cell(r, "createdTime")), width: "200px"),
+        SbCol.Of<JsonElement>(L10n.T(Keys.Content.CommonUsername, "用户名"), r => TablePresenter.Cell(r, "username"), width: "160px"),
+        SbCol.Of<JsonElement>(L10n.T(Keys.Content.CommonDisplayName, "显示名"), r => TablePresenter.Cell(r, "displayName"), width: "160px"),
+        SbCol.Of<JsonElement>(L10n.T(Keys.Content.CommonEmail, "邮箱"), r => TablePresenter.Cell(r, "email"), width: "220px"),
+        SbCol.Of<JsonElement>(L10n.T(Keys.Content.AdminPlatformAdminsColStatus, "状态"), r => TablePresenter.Cell(r, "status"), width: "110px", isStatus: true),
+        SbCol.Of<JsonElement>(L10n.T(Keys.Content.AdminPlatformAdminsColCreatedTime, "创建时间"), r => FormatTime(TablePresenter.Cell(r, "createdTime")), width: "200px"),
     };
 
     private List<SbColumn<JsonElement>> AuditColumns => new()
     {
-        SbCol.Of<JsonElement>("操作", r => ActionLabel(TablePresenter.Cell(r, "action")), width: "200px"),
-        SbCol.Of<JsonElement>("操作人", r => TablePresenter.Cell(r, "actor"), width: "160px"),
-        SbCol.Of<JsonElement>("结果", r => TablePresenter.Cell(r, "result"), width: "100px", isStatus: true),
-        SbCol.Of<JsonElement>("时间", r => FormatTime(TablePresenter.Cell(r, "timestamp")), width: "200px"),
+        SbCol.Of<JsonElement>(L10n.T(Keys.Content.AdminPlatformAdminsColAction, "操作"), r => ActionLabel(TablePresenter.Cell(r, "action")), width: "200px"),
+        SbCol.Of<JsonElement>(L10n.T(Keys.Content.AdminPlatformAdminsColActor, "操作人"), r => TablePresenter.Cell(r, "actor"), width: "160px"),
+        SbCol.Of<JsonElement>(L10n.T(Keys.Content.AdminPlatformAdminsColResult, "结果"), r => TablePresenter.Cell(r, "result"), width: "100px", isStatus: true),
+        SbCol.Of<JsonElement>(L10n.T(Keys.Content.AdminPlatformAdminsColTime, "时间"), r => FormatTime(TablePresenter.Cell(r, "timestamp")), width: "200px"),
     };
 
     private RenderFragment AdminRowActions(JsonElement u) =>
         @<text>
             @if (TablePresenter.Cell(u, "status") == "Active")
             {
-                <button class="btn btn-sm btn-outline-danger me-1" @onclick='() => AskDisable(u)'>停用</button>
+                <button class="btn btn-sm btn-outline-danger me-1" @onclick='() => AskDisable(u)'>@L10n.T(Keys.Content.AdminPlatformAdminsDisableBtn, "停用")</button>
             }
             else
             {
-                <button class="btn btn-sm btn-outline-success me-1" @onclick='() => AskEnable(u)'>启用</button>
+                <button class="btn btn-sm btn-outline-success me-1" @onclick='() => AskEnable(u)'>@L10n.T(Keys.Content.AdminPlatformAdminsEnableBtn, "启用")</button>
             }
-            <button class="btn btn-sm btn-outline-secondary" @onclick='() => OpenReset(u)'>重置口令</button>
+            <button class="btn btn-sm btn-outline-secondary" @onclick='() => OpenReset(u)'>@L10n.T(Keys.Content.AdminPlatformAdminsResetPassword, "重置口令")</button>
         </text>;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -189,12 +189,12 @@
     {
         if (string.IsNullOrWhiteSpace(_newUsername) || string.IsNullOrWhiteSpace(_newPassword))
         {
-            _createErr = "用户名与初始口令均必填。";
+            _createErr = L10n.T(Keys.Content.AdminPlatformAdminsCreateRequired, "用户名与初始口令均必填。");
             return;
         }
         if (_newPassword.Length < 8)
         {
-            _createErr = "初始口令至少 8 位。";
+            _createErr = L10n.T(Keys.Content.AdminPlatformAdminsInitPasswordTooShort, "初始口令至少 8 位。");
             return;
         }
         var (ok, status, err, _) = await Api.PostAsync("api/platform-admin", new
@@ -206,13 +206,13 @@
         });
         if (ok)
         {
-            Toast.Success($"平台管理员 {_newUsername} 已创建。");
+            Toast.Success(string.Format(L10n.T(Keys.Content.AdminPlatformAdminsCreated, "平台管理员 {0} 已创建。"), _newUsername));
             _createModal = false;
             await Reload();
         }
         else
         {
-            _createErr = err ?? $"创建失败（HTTP {status}）。";
+            _createErr = err ?? string.Format(L10n.T(Keys.Content.AdminPlatformAdminsCreateFailed, "创建失败（HTTP {0}）。"), status);
         }
     }
 
@@ -229,18 +229,18 @@
     {
         if (string.IsNullOrWhiteSpace(_resetPassword) || _resetPassword.Length < 8)
         {
-            _resetErr = "新口令至少 8 位。";
+            _resetErr = L10n.T(Keys.Content.AdminPlatformAdminsNewPasswordTooShort, "新口令至少 8 位。");
             return;
         }
         var (ok, status, err, _) = await Api.PostAsync($"api/platform-admin/{_resetId}/reset-password", new { newPassword = _resetPassword });
         if (ok)
         {
-            Toast.Success($"{_resetUsername} 的口令已重置，旧令牌已失效。");
+            Toast.Success(string.Format(L10n.T(Keys.Content.AdminPlatformAdminsResetDone, "{0} 的口令已重置，旧令牌已失效。"), _resetUsername));
             _resetModal = false;
         }
         else
         {
-            _resetErr = err ?? $"重置失败（HTTP {status}）。";
+            _resetErr = err ?? string.Format(L10n.T(Keys.Content.AdminPlatformAdminsResetFailed, "重置失败（HTTP {0}）。"), status);
         }
     }
 
@@ -264,12 +264,12 @@
         var (ok, status, err, _) = await Api.PostAsync($"api/platform-admin/{_confirmId}/disable", null);
         if (ok)
         {
-            Toast.Success($"{_confirmUsername} 已停用。");
+            Toast.Success(string.Format(L10n.T(Keys.Content.AdminPlatformAdminsDisabled, "{0} 已停用。"), _confirmUsername));
             await Reload();
         }
         else
         {
-            Toast.Error(err ?? $"停用失败（HTTP {status}）。");
+            Toast.Error(err ?? string.Format(L10n.T(Keys.Content.AdminPlatformAdminsDisableFailed, "停用失败（HTTP {0}）。"), status));
         }
     }
 
@@ -278,12 +278,12 @@
         var (ok, status, err, _) = await Api.PostAsync($"api/platform-admin/{_confirmId}/enable", null);
         if (ok)
         {
-            Toast.Success($"{_confirmUsername} 已启用。");
+            Toast.Success(string.Format(L10n.T(Keys.Content.AdminPlatformAdminsEnabled, "{0} 已启用。"), _confirmUsername));
             await Reload();
         }
         else
         {
-            Toast.Error(err ?? $"启用失败（HTTP {status}）。");
+            Toast.Error(err ?? string.Format(L10n.T(Keys.Content.AdminPlatformAdminsEnableFailed, "启用失败（HTTP {0}）。"), status));
         }
     }
 
@@ -295,12 +295,12 @@
         return raw;
     }
 
-    private static string ActionLabel(string action) => action switch
+    private string ActionLabel(string action) => action switch
     {
-        "platform.admin.add" => "新增管理员",
-        "platform.admin.disable" => "停用管理员",
-        "platform.admin.enable" => "启用管理员",
-        "platform.admin.reset-password" => "重置口令",
+        "platform.admin.add" => L10n.T(Keys.Content.AdminPlatformAdminsActAdd, "新增管理员"),
+        "platform.admin.disable" => L10n.T(Keys.Content.AdminPlatformAdminsActDisable, "停用管理员"),
+        "platform.admin.enable" => L10n.T(Keys.Content.AdminPlatformAdminsActEnable, "启用管理员"),
+        "platform.admin.reset-password" => L10n.T(Keys.Content.AdminPlatformAdminsActReset, "重置口令"),
         _ => action
     };
 }
