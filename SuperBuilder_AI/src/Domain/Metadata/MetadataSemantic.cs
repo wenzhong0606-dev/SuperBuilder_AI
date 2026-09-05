@@ -1,4 +1,5 @@
 ﻿using SuperBuilder_AI.Models;
+using SuperBuilder_AI.Models.BI.Entity;
 
 namespace SuperBuilder_AI.Models.Metadata;
 
@@ -83,7 +84,10 @@ public class MetadataSemantic
 
 
 	/// <summary>
-	/// 所属业务领域。
+	/// 所属业务领域（字符串，兼容历史数据）。
+	///
+	/// 自 M1-06 起，新增写入应以 <see cref="BusinessDomainId"/>（外键）为权威，
+	/// 本字符串仅作展示兼容，不再作为唯一来源。
 	///
 	/// 示例:
 	///
@@ -93,6 +97,17 @@ public class MetadataSemantic
 	///
 	/// </summary>
 	public string? BusinessDomain { get; set; }
+
+	/// <summary>
+	/// 所属业务领域 Id（外键，M1-06 新增，作为业务域归属的权威来源）。
+	/// 为 null 时表示尚未收敛到 <see cref="BusinessDomain"/> 实体。
+	/// </summary>
+	public long? BusinessDomainId { get; set; }
+
+	/// <summary>
+	/// 关联的业务领域实体（FK 导航，对应 <see cref="BusinessDomainId"/>）。
+	/// </summary>
+	public BusinessDomain? BusinessDomainRef { get; set; }
 
 
 

@@ -12,8 +12,6 @@ namespace SuperBuilder_AI.Controllers;
 [Route("api/data-policies/row")]
 public sealed class RowLevelSecurityController : ControllerBase
 {
-	private static readonly HashSet<string> Operators = new(StringComparer.OrdinalIgnoreCase)
-		{ "=", "!=", "<>", ">", ">=", "<", "<=", "LIKE", "IN", "IS NULL", "IS NOT NULL" };
 	private readonly SuperBIContext _db;
 	private readonly IIdentityService _identity;
 
@@ -39,9 +37,9 @@ public sealed class RowLevelSecurityController : ControllerBase
 		var scope = await ScopeAsync(ct);
 		if (scope.Error is not null) return scope.Error;
 		if (request is null || request.DataSourceId <= 0 || request.MetadataTableId <= 0 || request.MetadataColumnId <= 0 ||
-			!Operators.Contains(request.Operator ?? string.Empty) || !Enum.IsDefined(request.SubjectType) || !Enum.IsDefined(request.Effect))
+			!RlsVocabularyValidator.IsValidOperator(request.Operator) || !Enum.IsDefined(request.SubjectType) || !Enum.IsDefined(request.Effect))
 			return BadRequest(new ApiError { Code = ErrorCodes.BadRequest, Message = "行级策略参数无效。" });
-		var normalizedOperator = request.Operator!.Trim().ToUpperInvariant();
+		var normalizedOperator = RlsVocabularyValidator.NormalizeToSymbol(request.Operator!);
 		if (normalizedOperator is not ("IS NULL" or "IS NOT NULL") && string.IsNullOrWhiteSpace(request.Value))
 			return BadRequest(new ApiError { Code = ErrorCodes.BadRequest, Message = "行级策略值不能为空。" });
 

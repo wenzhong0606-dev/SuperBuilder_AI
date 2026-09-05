@@ -84,7 +84,6 @@ public sealed class PhysicalBindingConfiguration : IEntityTypeConfiguration<Phys
         builder.ToTable("PhysicalBindings", tb =>
         {
             tb.HasComment("业务语义到物理元数据的映射");
-            tb.HasCheckConstraint("CK_PhysicalBindings_ExactlyOneOwner", "((CASE WHEN BusinessEntityKeyId IS NOT NULL THEN 1 ELSE 0 END) + (CASE WHEN BusinessEntityAttributeId IS NOT NULL THEN 1 ELSE 0 END) + (CASE WHEN BusinessEntityMetricId IS NOT NULL THEN 1 ELSE 0 END) + (CASE WHEN BusinessEntityRelationshipId IS NOT NULL THEN 1 ELSE 0 END)) = 1");
         });
 
         builder.HasIndex(x => new { x.DataSourceId, x.MetadataTableId, x.MetadataColumnId, x.Priority });

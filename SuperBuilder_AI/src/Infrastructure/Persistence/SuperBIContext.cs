@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using SuperBuilder_AI.Models.Agent;
 using SuperBuilder_AI.Models.AppBuilder;
+using SuperBuilder_AI.Models.BI.Entity;
 using SuperBuilder_AI.Models.Identity;
 using SuperBuilder_AI.Models.Audit;
 using SuperBuilder_AI.Models.Quota;
@@ -462,6 +463,7 @@ public class SuperBIContext : DbContext
 		builder.Entity<DataSourceAccessGrant>().HasIndex(x => new { x.TenantId, x.DataSourceId, x.SubjectType, x.SubjectId }).IsUnique();
 		builder.Entity<DataSourceAccessGrant>().HasIndex(x => new { x.TenantId, x.SubjectType, x.SubjectId });
 		builder.Entity<DataSourceAccessGrant>().HasOne<DataSource>().WithMany().HasForeignKey(x => x.DataSourceId).OnDelete(DeleteBehavior.Cascade);
+		builder.Entity<DataSourceAccessGrant>().HasOne<Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Cascade);
 		builder.Entity<RowLevelSecurityPolicy>().ToTable("RowLevelSecurityPolicies");
 		builder.Entity<RowLevelSecurityPolicy>().HasIndex(x => new { x.TenantId, x.DataSourceId, x.MetadataTableId, x.Enabled });
 		builder.Entity<RowLevelSecurityPolicy>().HasIndex(x => new { x.TenantId, x.SubjectType, x.SubjectId });
@@ -472,6 +474,39 @@ public class SuperBIContext : DbContext
 		builder.Entity<RowLevelSecurityPolicy>().HasOne<DataSource>().WithMany().HasForeignKey(x => x.DataSourceId).OnDelete(DeleteBehavior.Restrict);
 		builder.Entity<RowLevelSecurityPolicy>().HasOne<MetadataTable>().WithMany().HasForeignKey(x => x.MetadataTableId).OnDelete(DeleteBehavior.Cascade);
 		builder.Entity<RowLevelSecurityPolicy>().HasOne<MetadataColumn>().WithMany().HasForeignKey(x => x.MetadataColumnId).OnDelete(DeleteBehavior.Restrict);
+		// M1-06 防御性 CHECK：明确 Everyone 类型（SubjectId/SubjectKey 均空），User/Role 必须指定 SubjectId，Attribute 必须指定 SubjectKey。
+		builder.Entity<RowLevelSecurityPolicy>().HasCheckConstraint("CK_RlsPolicies_SubjectConsistency",
+			"([SubjectType] = 0 AND [SubjectId] IS NULL AND [SubjectKey] IS NULL) OR ([SubjectType] = 1 AND [SubjectId] IS NOT NULL) OR ([SubjectType] = 2 AND [SubjectId] IS NOT NULL) OR ([SubjectType] = 3 AND [SubjectKey] IS NOT NULL) OR ([SubjectType] NOT IN (0,1,2,3))");
+		// M1-06 防御性 CHECK：Operator 仅允许受控词表（与 RlsVocabularyValidator.AllowedOperators 对齐）。
+		builder.Entity<RowLevelSecurityPolicy>().HasCheckConstraint("CK_RlsPolicies_Operator",
+			"[Operator] IN ('=', '!=', '>', '>=', '<', '<=', 'LIKE', 'IN', 'IS NULL', 'IS NOT NULL')");
+
+		#endregion
+
+		#region PhysicalBinding (M1-06)
+		builder.Entity<PhysicalBinding>().ToTable("PhysicalBindings");
+		builder.Entity<PhysicalBinding>().HasIndex(x => new { x.DataSourceId, x.MetadataTableId, x.MetadataColumnId });
+		builder.Entity<PhysicalBinding>().HasIndex(x => new { x.BusinessEntityKeyId, x.BusinessEntityAttributeId, x.BusinessEntityMetricId, x.BusinessEntityRelationshipId });
+		builder.Entity<PhysicalBinding>().HasOne(x => x.DataSource).WithMany().HasForeignKey(x => x.DataSourceId).OnDelete(DeleteBehavior.Restrict);
+		builder.Entity<PhysicalBinding>().HasOne(x => x.MetadataTable).WithMany().HasForeignKey(x => x.MetadataTableId).OnDelete(DeleteBehavior.Restrict);
+		builder.Entity<PhysicalBinding>().HasOne(x => x.MetadataColumn).WithMany().HasForeignKey(x => x.MetadataColumnId).OnDelete(DeleteBehavior.Restrict);
+		builder.Entity<PhysicalBinding>().HasOne(x => x.BusinessEntityKey).WithMany().HasForeignKey(x => x.BusinessEntityKeyId).OnDelete(DeleteBehavior.Restrict);
+		builder.Entity<PhysicalBinding>().HasOne(x => x.BusinessEntityAttribute).WithMany().HasForeignKey(x => x.BusinessEntityAttributeId).OnDelete(DeleteBehavior.Restrict);
+		builder.Entity<PhysicalBinding>().HasOne(x => x.BusinessEntityMetric).WithMany().HasForeignKey(x => x.BusinessEntityMetricId).OnDelete(DeleteBehavior.Restrict);
+		builder.Entity<PhysicalBinding>().HasOne(x => x.BusinessEntityRelationship).WithMany().HasForeignKey(x => x.BusinessEntityRelationshipId).OnDelete(DeleteBehavior.Restrict);
+		// Priority 非负由 CHECK 与写入路径(BusinessEntityService.ValidateBindingsAsync)双重保证。
+		// 「恰好一个 Owner」为跨列业务规则，因既有种子(0 owner)存在，按 M1-02/03/04 约定仅在写入路径强制，不加硬 CHECK。
+		builder.Entity<PhysicalBinding>().HasCheckConstraint("CK_PhysicalBindings_PriorityNonNeg", "[Priority] >= 0");
+        #endregion
+
+		#region M1-06 BusinessDomain / MetadataSemantic 收敛
+		builder.Entity<BusinessDomain>().ToTable("BusinessDomains");
+		builder.Entity<BusinessDomain>().HasIndex(x => x.TenantId);
+		builder.Entity<BusinessDomain>().Property(x => x.Name).IsRequired().HasMaxLength(128).HasComment("业务域名称");
+		builder.Entity<BusinessDomain>().HasOne(x => x.Tenant).WithMany().HasForeignKey(x => x.TenantId);
+		// MetadataSemantic.BusinessDomain 字符串保留作展示兼容；BusinessDomainId 为权威外键。
+		builder.Entity<MetadataSemantic>().Property(x => x.BusinessDomainId).HasComment("业务域Id（FK 权威，逐步替代字符串 BusinessDomain）");
+		builder.Entity<MetadataSemantic>().HasOne(x => x.BusinessDomainRef).WithMany().HasForeignKey(x => x.BusinessDomainId).OnDelete(DeleteBehavior.SetNull);
         #endregion
 
         #region P10.3 Audit

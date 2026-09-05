@@ -67,13 +67,27 @@ public sealed class BusinessEntityService(SuperBIContext db) : IBusinessEntitySe
     /// </summary>
     private async Task ValidateBindingsAsync(long tenantId, BusinessEntity entity, CancellationToken cancellationToken)
     {
-        var bindings = entity.Keys.SelectMany(k => k.PhysicalBindings)
-            .Concat(entity.Attributes.SelectMany(a => a.PhysicalBindings))
-            .Concat(entity.Metrics.SelectMany(m => m.PhysicalBindings))
-            .Concat(entity.SourceRelationships.SelectMany(r => r.PhysicalBindings))
-            .Concat(entity.TargetRelationships.SelectMany(r => r.PhysicalBindings))
+        // 收集每条 PhysicalBinding 及其所属的业务实体成员类型（Key=0 / Attribute=1 / Metric=2 / SourceRel=3 / TargetRel=4）。
+        // 注意：CreateAsync 在 db.BusinessEntities.Add 之前调用本方法，FK 列（BusinessEntityKeyId 等）尚未被 EF fixup 填充，
+        // 因此不能依赖 FK 列判断归属；必须以"父集合"为准——对象模型天然保证一条绑定只属于一个父集合。
+        var bindingsWithOwner = new List<(PhysicalBinding B, int Owner)>();
+        bindingsWithOwner.AddRange(entity.Keys.SelectMany(k => k.PhysicalBindings).Select(b => (b, 0)));
+        bindingsWithOwner.AddRange(entity.Attributes.SelectMany(a => a.PhysicalBindings).Select(b => (b, 1)));
+        bindingsWithOwner.AddRange(entity.Metrics.SelectMany(m => m.PhysicalBindings).Select(b => (b, 2)));
+        bindingsWithOwner.AddRange(entity.SourceRelationships.SelectMany(r => r.PhysicalBindings).Select(b => (b, 3)));
+        bindingsWithOwner.AddRange(entity.TargetRelationships.SelectMany(r => r.PhysicalBindings).Select(b => (b, 4)));
+
+        // M1-06：恰好一个 Owner 约束（写入路径）。一条 PhysicalBinding 不得同时挂到多个业务实体成员。
+        // 采用"父集合归属"判定，兼容既有无 Owner 的存量绑定（按 M1-02/03/04 约定不在 DB 层加硬 CHECK）。
+        var multiOwned = bindingsWithOwner
+            .GroupBy(x => x.B)
+            .Where(g => g.Select(x => x.Owner).Distinct().Count() != 1)
             .ToList();
-        foreach (var binding in bindings)
+        if (multiOwned.Count != 0)
+            throw new InvalidOperationException(
+                "PhysicalBinding 必须且只能绑定一个业务实体成员（Key/Attribute/Metric/Relationship），发现同一条绑定挂到多个成员。");
+
+        foreach (var (binding, _) in bindingsWithOwner)
         {
             var column = await db.MetadataColumns.AsNoTracking()
                 .Include(c => c.MetadataTable)
@@ -92,6 +106,11 @@ public sealed class BusinessEntityService(SuperBIContext db) : IBusinessEntitySe
             if (dataSource is null || dataSource.TenantId != tenantId)
                 throw new InvalidOperationException(
                     $"PhysicalBinding 声明的 DataSource {binding.DataSourceId} 不存在或不属于租户 {tenantId}。");
+
+            // M1-06：Priority 非负约束（写入路径 + 数据库 CK_PhysicalBindings_PriorityNonNeg 双重保证）。
+            if (binding.Priority < 0)
+                throw new InvalidOperationException(
+                    $"PhysicalBinding.Priority 不能为负，当前值 {binding.Priority}。");
         }
     }
 

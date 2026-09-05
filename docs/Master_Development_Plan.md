@@ -231,7 +231,7 @@ M0 退出：全部 🔴 完成、凭据已轮换、构建零错误、测试不�
   3. 用户邀请、首次设密、忘记密码、重置密码全流程——属功能里程碑，超出"字段与数据完整性"主题，本批未覆盖（DEC-02 已落地唯一范围）。
 - 验证：全量测试 **581/581 通过**，构建 0 error。
 
-### M1-04 DataSource ✅（2026-09-04 收尾，提交待 push）
+### M1-04 DataSource ✅（2026-09-04 收尾，已推送 origin/master）
 
 - ✅ **Name 租户内规范化唯一**：`DataSource.NormalizeName` 小写去空白；唯一索引 `(TenantId, NormalizedName)` 过滤 `[NormalizedName] IS NOT NULL`（兼容存量/测试 NULL 行）；`Create` 写入路径按规范化名查重（`Conflict` 409）。**保留** `IX_DataSources_TenantId` 非唯一索引，供 `List`/`Manage` 按租户过滤查询（避免唯一索引替换导致回表退化）。
 - ✅ **DbType 白名单**：`DataSource.SupportedDbTypes = {MYSQL, SQLSERVER, POSTGRESQL}`（对齐方言 `Code`，大小写不敏感）；`Create` 拒绝未知类型（`BadRequest`）。
@@ -241,7 +241,7 @@ M0 退出：全部 🔴 完成、凭据已轮换、构建零错误、测试不�
 - ⏸️ **延后（记入硬化项）**：`TenantId` 的 DB 级 `NOT NULL` + 租户存在性校验——沿用 M1-02/03 策略：3 个查询计划测试以 `new DataSource { Id, DbType, ConnectionString }` 持久化且**不设 TenantId/Name**，加 NOT NULL 会破坏种子；当前 TenantId 由 token 提供、`DataSource→Tenant` FK 已存在（写入路径保证存在），DB 级 NOT NULL 待测试造数补齐后启用。
 - 验证：新增 6 项测试（白名单拒绝、租户内唯一、跨租户放行、空值校验、规范化持久化、静态方法），全量 **587/587 通过**，构建 0 error（三端 Components/Web/Maui）。
 
-### M1-05 Metadata 与 Vector ✅（2026-09-05 收尾，提交待 push）
+### M1-05 Metadata 与 Vector ✅（2026-09-05 收尾，已推送 origin/master）
 
 - ✅ **MetadataTable 字段与唯一键**：`TableName` 必填(max128)；新增 `CatalogName`(max128)、`SchemaName`(max128)、向量字段（`VectorId`/`EmbeddingModel`(max128)/`VectorDimension`/`VectorSyncTime`(UTC)/`VectorStatus`(max16)/`VectorErrorCode`(max64)）。租户内唯一键由 `(DataSourceId, TableName)` 升级为 `(DataSourceId, CatalogName, SchemaName, TableName)` 并加过滤 `WHERE [CatalogName] IS NOT NULL AND [SchemaName] IS NOT NULL`，保留 `IX_MetadataTables_DataSourceId` 供按租户过滤；**存量 NULL Catalog/Schema 同名表可共存**（兼容旧数据与测试种子）。迁移 `20260905004213_M1_05_MetadataVectorIntegrity` 先 `UPDATE ... SET TableName=N'table_'+Id WHERE NULL` 再 `AlterColumn` 非空（写入路径保证）。
 - ✅ **MetadataColumn 字段**：`ColumnName` 必填(max128)；新增 `Ordinal`(default 0)、`NativeType`(max64)、`Precision`、`Scale`、`EmbeddingModel`(max128)、`VectorId`/`VectorDimension`/`VectorSyncTime`/`VectorStatus`/`VectorErrorCode`；唯一键 `(MetadataTableId, ColumnName)`。
@@ -253,13 +253,14 @@ M0 退出：全部 🔴 完成、凭据已轮换、构建零错误、测试不�
 - ⏸️ **延后（记入硬化项）**：`MetadataTable.TenantId` / `MetadataColumn.MetadataTableId` 的 DB 级 `NOT NULL` + 租户存在性校验——沿用 M1-02/03/04 策略：多数集成测试以 `new MetadataTable{DataSourceId,...}` 持久化且不建租户/父行，加 NOT NULL 破坏种子；当前由 `DataSource→Tenant` FK 与写入路径保证，DB 级 NOT NULL 待测试造数补齐后启用。
 - 验证：新增 16 项 `MetadataVectorIntegrityTests`（受控词表/结构化辅助、DB 约束：表唯一键/同目录放行/空 Catalog 兼容/列必填/新字段持久化/置信度 CHECK/学习记录租户 FK、向量状态 Synced/Failed、孤儿检测），**16/16 通过**；全量回归构建 0 error（三端 Components/Web/Maui）。
 
-### M1-06 PhysicalBinding、授权与 RLS
+### M1-06 PhysicalBinding、授权与 RLS ✅（2026-09-05 收尾，本地提交待推送）
 
-- 保留 PhysicalBinding “恰好一个 Owner”约束，增加 DataSource/Table/Column 同链、同租户及 Priority 非负校验。
-- BusinessDomain 字符串与 BusinessDomainId 收敛，以 FK 为权威。
-- DataSourceGrant 组合唯一、重复幂等；删除 User/Role 时撤销授权并巡检孤儿。
-- RLS 明确 Everyone 类型，不用 null 猜测；Operator 映射 SQL AST，Value 参数化。
-- 明确 Allow/Deny 冲突规则；更新使用 Version/ETag。
+- ✅ **PhysicalBinding 约束收敛**：移除 P3 遗留硬 CHECK `CK_PhysicalBindings_ExactlyOneOwner`（既有 0-owner 种子不兼容，按 M1-02~M1-05 约定仅在写入路径强制），改由 `BusinessEntityService.ValidateBindingsAsync` 按父集合归属判定「恰好一个 Owner」（修复 detached-graph FK 未 fixup 导致的回归）；新增 DB 级 `CK_PhysicalBindings_PriorityNonNeg`（`[Priority] >= 0`）+ 写入路径双保险；新增两个组合索引（DataSource/Table/Column、四个 Owner 列）。
+- ✅ **BusinessDomain 收敛**：`MetadataSemantic.BusinessDomainId` 为权威 FK（`OnDelete SetNull`），原 `BusinessDomain` 字符串保留作展示兼容；`BusinessDomains.TenantId` 索引。
+- ✅ **DataSourceAccessGrant 治理**：`(TenantId, DataSourceId, SubjectType, SubjectId)` 组合唯一 + 重复幂等；新增 `TenantId→Tenants` 级联 FK（此前仅建至 DataSources）；`RevokeBySubjectAsync`（删除 User/Role 时跨数据源撤销其全部授权）；`DetectOrphanGrantsAsync`（`IgnoreQueryFilters` 巡检指向不存在 User/Role 的孤儿授权）。
+- ✅ **RLS 硬化**：`CK_RlsPolicies_SubjectConsistency`（Everyone 类型 SubjectId/SubjectKey 均空；User/Role 必填 SubjectId；Attribute 必填 SubjectKey）+ `CK_RlsPolicies_Operator`（受控词表 `RlsVocabularyValidator.AllowedOperators`，与 `NormalizeToSymbol` 对齐）；Deny-wins 逐列；`Version` ETag 递增；Value 参数化。
+- ✅ **迁移与快照一致**：`20260905020528_M1_06_PhysicalBindingAuthorizationRls` 先 DROP `CK_PhysicalBindings_ExactlyOneOwner` 再新增上述约束/索引/FK/列；CHECK 字面量统一为 SQLite 与 SQL Server 兼容的纯 `'...'`（去除 SQL Server `N'...'` 前缀）；Designer 快照与 ModelSnapshot 同步去除旧约束，避免未来迁移重复 DROP。
+- 验证：新增 16 项 `M1_06_PhysicalBindingAuthorizationRlsTests`（RlsVocabularyValidator 单元、RevokeBySubject/DetectOrphanGrants 行为、写入路径 Priority 校验、RLS/PhysicalBinding CHECK、BusinessDomain/MetadataSemantic 收敛），**16/16 通过**；全量回归 **619/619 通过**，构建 0 error（三端 Components/Web/Maui）。
 
 M1 退出：Migration 可在历史副本执行；无孤儿；跨租户组合均拒绝；数据库约束与 API 校验一致。
 

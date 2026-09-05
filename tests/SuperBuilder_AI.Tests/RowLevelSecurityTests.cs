@@ -51,7 +51,7 @@ public sealed class RowLevelSecurityTests
 	};
 
 	[Fact]
-	public async Task GovernedTable_RequiresApplicableAllow_AndAddsDeny()
+	public async Task GovernedTable_DenyWins_OverAllowForSameColumn()
 	{
 		await using var db = CreateContext(out var connection);
 		await using var _ = connection;
@@ -64,11 +64,13 @@ public sealed class RowLevelSecurityTests
 		var service = new RowLevelSecurityService(db, identity);
 		var plan = Plan();
 
+		// M1-06 Deny-wins：同一列同时存在 Allow 与 Deny 适用策略时，以 Deny 为权威，仅保留 Deny 过滤。
 		await service.ApplyAsync(plan, 1, 10);
-		Assert.Equal(2, plan.MandatoryRowFilters.Count);
-		Assert.Contains(plan.MandatoryRowFilters, x => !x.Deny && x.Value == "east");
+		Assert.Single(plan.MandatoryRowFilters);
+		Assert.DoesNotContain(plan.MandatoryRowFilters, x => !x.Deny);
 		Assert.Contains(plan.MandatoryRowFilters, x => x.Deny && x.Value == "blocked");
 
+		// 仅 Deny 适用（其余主体不匹配 Allow）时，整列被拒绝。
 		var denied = Plan();
 		identity.Current = new DataSourceExecutionIdentity(1, 11);
 		var ex = await Assert.ThrowsAsync<SuperBuilderException>(() => service.ApplyAsync(denied, 1, 11));

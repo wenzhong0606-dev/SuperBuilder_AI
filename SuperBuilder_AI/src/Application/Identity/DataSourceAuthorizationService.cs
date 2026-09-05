@@ -59,6 +59,51 @@ public sealed class DataSourceAuthorizationService : IDataSourceAuthorizationSer
 		await _db.SaveChangesAsync(ct);
 	}
 
+	/// <summary>
+	/// 撤销某个主体（User/Role）在租户内的全部 DataSource 授权。
+	/// 用于删除 User/Role 时级联清理其显式授权，避免残留无效授权。
+	/// </summary>
+	public async Task RevokeBySubjectAsync(long tenantId, DataSourceGrantSubjectType subjectType, long subjectId, CancellationToken ct = default)
+	{
+		var grants = await _db.DataSourceAccessGrants
+			.Where(x => x.TenantId == tenantId && x.SubjectType == subjectType && x.SubjectId == subjectId)
+			.ToListAsync(ct);
+		_db.DataSourceAccessGrants.RemoveRange(grants);
+		await _db.SaveChangesAsync(ct);
+	}
+
+	/// <summary>
+	/// 巡检孤儿授权：找出租户内引用了已删除 User/Role 或已删除 DataSource 的授权记录。
+	/// 返回的记录应被 <see cref="RevokeBySubjectAsync"/> 或显式删除清理。
+	/// </summary>
+	public async Task<IReadOnlyList<DataSourceAccessGrant>> DetectOrphanGrantsAsync(long tenantId, CancellationToken ct = default)
+	{
+		var grants = await _db.DataSourceAccessGrants.AsNoTracking()
+			.Where(x => x.TenantId == tenantId)
+			.ToListAsync(ct);
+		var orphans = new List<DataSourceAccessGrant>();
+		foreach (var grant in grants)
+		{
+			var sourceExists = await _db.DataSources.IgnoreQueryFilters()
+				.AnyAsync(x => x.Id == grant.DataSourceId && x.TenantId == tenantId, ct);
+			if (!sourceExists)
+			{
+				orphans.Add(grant);
+				continue;
+			}
+
+			var subjectExists = grant.SubjectType == DataSourceGrantSubjectType.User
+				? await _db.Users.IgnoreQueryFilters().AnyAsync(x => x.Id == grant.SubjectId && x.TenantId == tenantId, ct)
+				: await _db.Roles.IgnoreQueryFilters().AnyAsync(x => x.Id == grant.SubjectId && (x.TenantId == tenantId || x.TenantId == 0), ct);
+			if (!subjectExists)
+			{
+				orphans.Add(grant);
+			}
+		}
+
+		return orphans;
+	}
+
 	private async Task<bool> SubjectAndSourceExist(long tenantId, long dataSourceId, DataSourceGrantSubjectType type, long subjectId, CancellationToken ct)
 	{
 		var sourceExists = await _db.DataSources.IgnoreQueryFilters().AnyAsync(x => x.Id == dataSourceId && x.TenantId == tenantId, ct);

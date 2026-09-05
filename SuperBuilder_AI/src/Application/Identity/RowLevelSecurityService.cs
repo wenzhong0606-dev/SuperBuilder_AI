@@ -66,21 +66,47 @@ public sealed class RowLevelSecurityService : IRowLevelSecurityService
 			if (columns.Count != columnIds.Length)
 				throw SuperBuilderException.FromCode(ErrorCodes.RowPolicyForbidden, 403);
 
-			foreach (var policy in applicable)
+			// M1-06：Deny 优先（Deny-wins）。当某列同时存在 Allow 与 Deny 适用策略时，
+			// 以 Deny 为权威，不附加 Allow 过滤（下游以 Deny 显式拦截该列访问）。
+			foreach (var columnId in columnIds)
 			{
-				var column = columns[policy.MetadataColumnId];
-				plan.MandatoryRowFilters.Add(new MandatoryRowFilter
+				var colPolicies = applicable.Where(x => x.MetadataColumnId == columnId).ToList();
+				if (colPolicies.Count == 0) continue;
+				if (!columns.TryGetValue(columnId, out var column)) continue;
+
+				if (colPolicies.Any(x => x.Effect == RowPolicyEffect.Deny))
 				{
-					PolicyId = policy.Id,
-					MetadataTableId = table.MetadataTableId,
-					MetadataColumnId = policy.MetadataColumnId,
-					TableName = table.TableName ?? column.MetadataTable?.TableName ?? string.Empty,
-					Field = column.ColumnName ?? string.Empty,
-					DataType = column.DataType,
-					Operator = policy.Operator,
-					Value = policy.Value,
-					Deny = policy.Effect == RowPolicyEffect.Deny
-				});
+					var deny = colPolicies.First(x => x.Effect == RowPolicyEffect.Deny);
+					plan.MandatoryRowFilters.Add(new MandatoryRowFilter
+					{
+						PolicyId = deny.Id,
+						MetadataTableId = table.MetadataTableId,
+						MetadataColumnId = columnId,
+						TableName = table.TableName ?? column.MetadataTable?.TableName ?? string.Empty,
+						Field = column.ColumnName ?? string.Empty,
+						DataType = column.DataType,
+						Operator = deny.Operator,
+						Value = deny.Value,
+						Deny = true
+					});
+					continue;
+				}
+
+				foreach (var policy in colPolicies.Where(x => x.Effect == RowPolicyEffect.Allow))
+				{
+					plan.MandatoryRowFilters.Add(new MandatoryRowFilter
+					{
+						PolicyId = policy.Id,
+						MetadataTableId = table.MetadataTableId,
+						MetadataColumnId = columnId,
+						TableName = table.TableName ?? column.MetadataTable?.TableName ?? string.Empty,
+						Field = column.ColumnName ?? string.Empty,
+						DataType = column.DataType,
+						Operator = policy.Operator,
+						Value = policy.Value,
+						Deny = false
+					});
+				}
 			}
 		}
 
