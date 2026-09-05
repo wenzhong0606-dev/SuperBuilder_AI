@@ -35,6 +35,8 @@ using SuperBuilder_AI.Services.Quota;
 using SuperBuilder_AI.Middleware;
 using SuperBuilder_AI.Api.Diagnostics;
 using SuperBuilder_AI.Application.Common.Options;
+using SuperBuilder_AI.Interfaces.Seed;
+using SuperBuilder_AI.Services.Seed;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.Configuration;
 using System.Net;
@@ -204,6 +206,7 @@ builder.Services.AddScoped<IAgentPlanner, AgentPlanner>();
 builder.Services.AddScoped<IIdentityService, IdentityService>();
 builder.Services.AddScoped<ITenantMembershipService, TenantMembershipService>();
 builder.Services.AddScoped<ISelfRegistrationService, SelfRegistrationService>();
+builder.Services.AddScoped<IDemoDataInstaller, DemoDataInstaller>();
 builder.Services.AddScoped<IPlatformAdminService, PlatformAdminService>();
 builder.Services.AddScoped<IPlatformAdminScopeService, PlatformAdminScopeService>();
 builder.Services.AddScoped<IDataSourceAuthorizationService, DataSourceAuthorizationService>();
@@ -275,6 +278,7 @@ builder.Services.AddSingleton<SuperBuilder_AI.Middleware.RequestMetricsCollector
 builder.Services.AddSingleton<StartupDiagnostics>();
 // M0-05：本地化目录种子服务，使 UiLanguage/Text 在启动序列中固定顺序执行
 builder.Services.AddScoped<ILocalizationSeedService, LocalizationSeedService>();
+builder.Services.AddScoped<IThemeSeedService, ThemeSeedService>();
 // M0-08：限流阈值（绑定配置节 "RateLimit"，缺省使用安全默认值）
 builder.Services.Configure<RateLimitOptions>(builder.Configuration.GetSection("RateLimit"));
 // RL-1/RL-2：限流存储。
@@ -369,19 +373,23 @@ using (var startupScope = app.Services.CreateScope())
             logger.LogError(seedEx, "Localization seed failed.");
         }
 
-        // 步骤 4：默认策略/主题（Quota 平台默认配额，幂等）
+        // 步骤 4：默认策略/主题（Quota 平台默认配额 + 内置默认主题，均幂等）
         try
         {
             var quota = startupScope.ServiceProvider.GetRequiredService<IQuotaService>();
             await quota.EnsureSeededAsync();
+
+            var themeSeed = startupScope.ServiceProvider.GetRequiredService<IThemeSeedService>();
+            await themeSeed.EnsureSeededAsync();
+
             diagnostics.MarkStep("Quota");
-            logger.LogInformation("Platform default quota seeded.");
+            logger.LogInformation("Platform default quota & built-in theme seeded.");
         }
         catch (Exception seedEx)
         {
             diagnostics.State = BootstrapState.SeedIncomplete;
-            diagnostics.Reason = $"默认配额种子失败：{seedEx.Message}";
-            logger.LogError(seedEx, "Quota seed failed.");
+            diagnostics.Reason = $"默认配额/主题种子失败：{seedEx.Message}";
+            logger.LogError(seedEx, "Quota/Theme seed failed.");
         }
 
         // 步骤 5：平台管理员引导（幂等；缺 Schema/目录时安全返回，不抛异常）

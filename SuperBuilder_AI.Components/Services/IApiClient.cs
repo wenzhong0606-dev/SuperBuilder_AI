@@ -53,6 +53,12 @@ public interface IApiClient
 
     /// <summary>M2-06 平台管理员查看自助注册配置（需 platform:admin:manage）。</summary>
     Task<(SelfRegistrationConfigView? Result, string? Error)> GetSelfRegistrationConfigAsync(CancellationToken ct = default);
+
+    /// <summary>M2-07 平台管理员预览演示数据安装计划（需 platform:admin:manage）。</summary>
+    Task<(DemoInstallPlan? Result, string? Error)> GetDemoDataPlanAsync(CancellationToken ct = default);
+
+    /// <summary>M2-07 平台管理员触发演示数据安装（事务原子、重复执行保护，需 platform:admin:manage）。</summary>
+    Task<(DemoInstallResult? Result, string? Error)> InstallDemoDataAsync(CancellationToken ct = default);
     /// <summary>
     /// 松类型读取：GET 任意端点并以 <see cref="JsonElement"/> 返回（数组或对象皆可）。
     /// 不抛异常——HTTP 非 2xx 与网络/解析错误一律通过 err 返回，便于页面优雅降级。

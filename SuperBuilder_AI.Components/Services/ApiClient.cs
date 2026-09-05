@@ -378,6 +378,53 @@ public sealed class ApiClient : IApiClient
         }, null);
     }
 
+    /// <summary>M2-07 演示数据：平台管理员预览将创建的演示内容（需 platform:admin:manage）。</summary>
+    public async Task<(DemoInstallPlan? Result, string? Error)> GetDemoDataPlanAsync(CancellationToken ct = default)
+    {
+        var (data, _, err) = await GetJsonAsync("api/demo-data/preview", ct);
+        if (data is not { ValueKind: System.Text.Json.JsonValueKind.Object })
+            return (null, err ?? "无法读取演示数据计划。");
+        var v = data.Value;
+        var items = v.TryGetProperty("items", out var its) && its.ValueKind == System.Text.Json.JsonValueKind.Array
+            ? its.EnumerateArray().Select(x => new DemoPlanItem(
+                x.TryGetProperty("entityType", out var et) ? et.GetString() ?? "" : "",
+                x.TryGetProperty("count", out var c) && c.TryGetInt32(out var n) ? n : 0,
+                x.TryGetProperty("description", out var d) ? d.GetString() : null)).ToList()
+            : new System.Collections.Generic.List<DemoPlanItem>();
+        return (new DemoInstallPlan
+        {
+            AlreadyInstalled = v.TryGetProperty("alreadyInstalled", out var a) && a.GetBoolean(),
+            DemoTenantCode = v.TryGetProperty("demoTenantCode", out var tc) ? tc.GetString() ?? "demo" : "demo",
+            DemoTenantName = v.TryGetProperty("demoTenantName", out var tn) ? tn.GetString() ?? "" : "",
+            AdminUsername = v.TryGetProperty("adminUsername", out var au) ? au.GetString() ?? "" : "",
+            AdminEmail = v.TryGetProperty("adminEmail", out var ae) ? ae.GetString() ?? "" : "",
+            Items = items,
+        }, null);
+    }
+
+    /// <summary>M2-07 演示数据：平台管理员触发安装（事务原子、重复执行保护）。</summary>
+    public async Task<(DemoInstallResult? Result, string? Error)> InstallDemoDataAsync(CancellationToken ct = default)
+    {
+        var client = _factory.CreateClient("SuperBuilderApi");
+        try
+        {
+            var resp = await client.PostAsJsonAsync("api/demo-data/install", new { }, ct);
+            if (!resp.IsSuccessStatusCode)
+            {
+                var (_, msg, _) = ParseApiError(await resp.Content.ReadAsStringAsync(ct));
+                if (resp.StatusCode == System.Net.HttpStatusCode.Unauthorized) OnUnauthorized();
+                return (null, msg ?? $"安装失败（{(int)resp.StatusCode}）。");
+            }
+            var r = await resp.Content.ReadFromJsonAsync<DemoInstallResult>(ct);
+            return (r, null);
+        }
+        catch (System.Net.Http.HttpRequestException ex)
+        {
+            return (null, "无法连接服务，请确认 API 已启动且地址配置正确。" +
+                (string.IsNullOrWhiteSpace(ex.Message) ? "" : $"（{ex.Message}）"));
+        }
+    }
+
     /// <summary>
     /// 读取任意 JSON 端点为 <see cref="JsonElement"/>，失败时返回错误信息且不抛异常。
     /// 用于在不确定后端 DTO 精确结构时安全渲染列表/详情。
@@ -482,6 +529,44 @@ public sealed class SelfRegistrationConfigView
     public System.Collections.Generic.List<string>? DefaultAvailableCultures { get; set; }
     public bool ApprovalRequired { get; set; }
     public bool RequireCaptcha { get; set; }
+}
+
+/// <summary>M2-07 演示数据安装预览项。</summary>
+public sealed class DemoPlanItem
+{
+    public DemoPlanItem() { }
+    public DemoPlanItem(string? entityType, int count, string? description)
+    {
+        EntityType = entityType;
+        Count = count;
+        Description = description;
+    }
+    public string? EntityType { get; set; }
+    public int Count { get; set; }
+    public string? Description { get; set; }
+}
+
+/// <summary>M2-07 演示数据安装预览计划。</summary>
+public sealed class DemoInstallPlan
+{
+    public bool AlreadyInstalled { get; set; }
+    public string? DemoTenantCode { get; set; }
+    public string? DemoTenantName { get; set; }
+    public string? AdminUsername { get; set; }
+    public string? AdminEmail { get; set; }
+    public System.Collections.Generic.List<DemoPlanItem>? Items { get; set; }
+}
+
+/// <summary>M2-07 演示数据安装结果。</summary>
+public sealed class DemoInstallResult
+{
+    public bool Success { get; set; }
+    public string? Status { get; set; }
+    public long TenantId { get; set; }
+    public long UserId { get; set; }
+    public string? Username { get; set; }
+    public string? AdminPassword { get; set; }
+    public string? Error { get; set; }
 }
 
 /// <summary>M2-05 切换租户成功响应（含重签令牌与切换后端租户上下文）。</summary>

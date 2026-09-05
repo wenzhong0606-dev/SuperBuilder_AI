@@ -328,11 +328,13 @@ M1 退出：Migration 可在历史副本执行；无孤儿；跨租户组合均�
 **实现要点（M2-06 ✅）**：`SelfRegistrationOptions`（配置节 `SelfRegistration`，`Enabled` 默认 false；`ApprovalRequired`/`RequireCaptcha`/`AllowedEmailDomains`/`DefaultCulture`/`DefaultAvailableCultures`/`DefaultQuotaPolicyCode` 占位）由 `Program.cs` 经 `Configure<>` 绑定。`ISelfRegistrationService`/`SelfRegistrationService` 实现 `RegisterAsync`：开关关闭→`disabled`；待裁决特性开启→`feature_not_implemented`（拒绝，防不安全开放）；通过校验后以与 M2-04 一致的事务原子创建「租户 + 租户设置(localization) + 首位租户管理员(IdentityRoles.TenantAdmin) + 口令(pbkdf2)」，读取真实 `SecurityStamp` 后以 `tid=新租户、htid=新租户` 重签令牌（注册即登录），并写审计 `tenant.self-register`。`SelfRegistrationController` 暴露 `GET status`(匿名，仅回 `enabled`)、`POST register`(匿名，受开关守卫，映射 disabled→403 / feature_not_implemented→501 / conflict→409 / ok→200)、`GET config`(PlatformAdminManage 守卫，只读配置)。前端：RCL 新增 `SelfRegistration.razor` 公开注册页（BlankLayout，先查 status，关闭时显「未开放」，开放时表单校验后注册并自动登录跳转 `/ask`）、`SelfRegistrationAdmin.razor` 治理查看页（PlatformAdminManage 守卫，只读展示状态/域名白名单/语言，并说明开放方式与环境配置约束）；登录页新增「申请开通」入口，管理菜单新增「自助注册」项。新增 4 例测试（`SelfRegistrationTests`：关闭→disabled 无数据、审批开启→feature_not_implemented 无数据、开启→原子创建租户+管理员+设置且令牌非空、编码冲突→conflict），全量回归 **650/650** 通过、四端构建 0 error。
 
 
-### M2-07 默认种子与演示数据
+### M2-07 默认种子与演示数据 ✅
 
 - 启动种子创建默认主题、平台语言、基础文本、角色、权限和配额策略，且全部幂等。
 - 演示数据使用独立 Demo 安装器：可创建 demo 租户、管理员、数据源、元数据、语义和仪表盘。
 - 生产默认不安装 demo；安装器支持预览、事务回滚和重复执行保护。
+
+**实现要点（M2-07 ✅）**：默认主题种子 `ThemeSeedService`（`IThemeSeedService`）在启动序列第 4 步（配额之后）幂等写入 `Theme(TenantId=0, Key="default", DslJson=BuiltInThemes.DefaultDsl())`，补齐此前缺失的内置默认主题。演示数据采用**完全独立、按需触发**的 `DemoDataInstaller`（`IDemoDataInstaller`，DEC-05：不接入启动序列、生产默认不安装）：`PreviewAsync` 返回 8 项计划（Tenant/User/DataSource/MetadataTable/MetadataColumn×5/MetadataSemantic×5/BusinessEntity/Dashboard）并带重复安装保护；`InstallAsync` 在 `BeginTransactionAsync` 内事务原子创建「租户 + 2 条本地化租户设置 + 管理员(IdentityRoles.TenantAdmin, pbkdf2) + 数据源(MySQL) + 元数据表(sales_order) + 5 字段(各带 Manual 语义) + 业务实体 + 已发布仪表盘(ThemeKey=default, DSL 序列化)」，失败整体回滚，成功后写审计 `demo.seed`。`DemoDataController`(`api/demo-data`：`GET preview` / `POST install`) 受 `IdentityPermissions.PlatformAdminManage` 守卫（→403）。前端：RCL 扩展 `IApiClient`/`ApiClient`（`GetDemoDataPlanAsync`/`InstallDemoDataAsync` + DTO `DemoPlanItem`/`DemoInstallPlan`/`DemoInstallResult`）、新增 `DemoData.razor` 管理页（AuthGuard + PermissionGuard）、`NavMenuItems` 新增「演示数据」入口。新增 3 例测试（`DemoDataInstallerTests`：预览 8 项、事务原子安装幂等落库、重复安装返回 already_installed 无重复），全量回归 **653/653** 通过、四端构建 0 error。
 
 ---
 

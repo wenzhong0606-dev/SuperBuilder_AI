@@ -71,5 +71,7 @@ public sealed class AuthStoreTests
 		public Task<(bool Ok, int Status, string? Error)> PatchAsync(string relativeUrl, object? body = null, CancellationToken ct = default) => throw new NotSupportedException();
 		public Task<(bool Ok, int Status, string? Error)> DeleteAsync(string relativeUrl, CancellationToken ct = default) => throw new NotSupportedException();
 		public Task<(string? Text, int Status, string? Error)> GetTextAsync(string relativeUrl, CancellationToken ct = default) => throw new NotSupportedException();
+		public Task<(DemoInstallPlan? Result, string? Error)> GetDemoDataPlanAsync(CancellationToken ct = default) => throw new NotSupportedException();
+		public Task<(DemoInstallResult? Result, string? Error)> InstallDemoDataAsync(CancellationToken ct = default) => throw new NotSupportedException();
 	}
 }

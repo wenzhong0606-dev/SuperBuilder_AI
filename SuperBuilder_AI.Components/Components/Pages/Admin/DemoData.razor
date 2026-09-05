@@ -1,0 +1,146 @@
+@page "/admin/demo-data"
+@inject IApiClient Api
+@inject ToastService Toast
+
+<AuthGuard>
+    <PermissionGuard Require="@(new[]{ PermissionCodes.PlatformAdminManage })">
+    <PageHead Icon="sb-ico-db" Title="演示数据" Desc="安装独立的演示租户与示例业务数据（数据源/元数据/语义/仪表盘）。生产默认不安装，可重复安装受保护。" />
+
+    <div class="sb-page-body">
+        @if (_loading)
+        {
+            <LoadingState Text="加载中…" />
+        }
+        else if (_error != null)
+        {
+            <div class="alert alert-danger">@_error</div>
+        }
+        else
+        {
+            <div class="card mb-3">
+                <h3 class="card-title">安装状态</h3>
+                <table class="table">
+                    <tbody>
+                        <tr><th>是否已安装</th><td>@StatusBadge(_plan?.AlreadyInstalled ?? false)</td></tr>
+                        <tr><th>演示租户</th><td>@(_plan?.DemoTenantName) <span class="muted">(@(_plan?.DemoTenantCode))</span></td></tr>
+                        <tr><th>管理员账号</th><td>@(_plan?.AdminUsername)</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="card mb-3">
+                <h3 class="card-title">将创建的内容</h3>
+                <table class="table">
+                    <thead><tr><th>类型</th><th>数量</th><th>说明</th></tr></thead>
+                    <tbody>
+                    @foreach (var it in _plan?.Items ?? new System.Collections.Generic.List<DemoPlanItem>())
+                    {
+                        <tr><td>@it.EntityType</td><td>@it.Count</td><td>@it.Description</td></tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+
+            @if (_plan?.AlreadyInstalled ?? false)
+            {
+                <div class="alert alert-info">演示数据已安装，再次安装将被跳过（仅返回已有租户）。如需重建，请先删除演示租户。</div>
+            }
+            else if (_installing)
+            {
+                <LoadingState Text="正在安装演示数据…" />
+            }
+            else if (_confirming)
+            {
+                <div class="alert alert-warning">
+                    <p class="mb-2">确认安装演示数据？将创建演示租户、管理员、数据源、元数据、业务语义与仪表盘，并写入多张业务表。</p>
+                    <button class="btn btn-primary" @onclick="DoInstall">确认安装</button>
+                    <button class="btn btn-secondary" @onclick='() => _confirming = false'>取消</button>
+                </div>
+            }
+            else
+            {
+                <button class="btn btn-primary" @onclick='() => _confirming = true'>安装演示数据</button>
+            }
+
+            @if (_result != null)
+            {
+                @if (_result!.Success)
+                {
+                    <div class="alert alert-success mt-3">
+                        <p>演示数据安装完成。</p>
+                        <ul class="mb-0">
+                            <li>租户：@_plan?.DemoTenantName（@_plan?.DemoTenantCode）</li>
+                            <li>管理员：@_result.Username</li>
+                            @if (!string.IsNullOrEmpty(_result.AdminPassword))
+                            {
+                                <li>初始口令：<code>@_result.AdminPassword</code>（请妥善保存，首次登录后建议修改）</li>
+                            }
+                        </ul>
+                    </div>
+                }
+                else
+                {
+                    <div class="alert alert-danger mt-3">安装失败：@_result.Error</div>
+                }
+            }
+        }
+    </div>
+    </PermissionGuard>
+</AuthGuard>
+
+@code {
+    private bool _loading = true;
+    private string? _error;
+    private DemoInstallPlan? _plan;
+    private bool _confirming;
+    private bool _installing;
+    private DemoInstallResult? _result;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        await LoadPlanAsync();
+    }
+
+    private async Task LoadPlanAsync()
+    {
+        _loading = true;
+        StateHasChanged();
+        var (plan, err) = await Api.GetDemoDataPlanAsync();
+        if (plan is null)
+            _error = err ?? "无法加载演示数据计划。";
+        else
+            _plan = plan;
+        _loading = false;
+        StateHasChanged();
+    }
+
+    private async Task DoInstall()
+    {
+        _confirming = false;
+        _installing = true;
+        _result = null;
+        StateHasChanged();
+
+        var (res, err) = await Api.InstallDemoDataAsync();
+        if (res is null)
+        {
+            _error = err ?? "安装失败。";
+            _installing = false;
+            StateHasChanged();
+            return;
+        }
+
+        _result = res;
+        _installing = false;
+        if (res.Success)
+            await LoadPlanAsync();
+        else
+            StateHasChanged();
+    }
+
+    private MarkupString StatusBadge(bool on) =>
+        (MarkupString)(on
+            ? "<span class=\"badge bg-success\">已安装</span>"
+            : "<span class=\"badge bg-secondary\">未安装</span>");
+}
