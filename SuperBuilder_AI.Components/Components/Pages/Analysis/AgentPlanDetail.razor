@@ -6,15 +6,15 @@
 @using SuperBuilder_AI.Components.Shared
 
 <AuthGuard>
-    <PageHead Icon="sb-ico-agent" Title="@(_title)" Desc="智能体计划详情：目标、步骤序列与原始编排数据。">
-        <button class="btn btn-outline-secondary btn-sm" @onclick='() => Nav.NavigateTo("agent")'>返回列表</button>
-        <button class="btn btn-outline-secondary btn-sm" @onclick="() => Load()">刷新</button>
-        <button class="btn btn-danger btn-sm" @onclick="() => _confirmOpen = true">删除</button>
+    <PageHead Icon="sb-ico-agent" Title="@(_title)" Desc="@L10n.T(Keys.Content.AgentPlanDetailDesc, "智能体计划详情：目标、步骤序列与原始编排数据。")">
+        <button class="btn btn-outline-secondary btn-sm" @onclick='() => Nav.NavigateTo("agent")'>@L10n.T(Keys.Content.AgentPlanDetailBack, "返回列表")</button>
+        <button class="btn btn-outline-secondary btn-sm" @onclick="() => Load()">@L10n.T(Keys.Content.CommonRefresh, "刷新")</button>
+        <button class="btn btn-danger btn-sm" @onclick="() => _confirmOpen = true">@L10n.T(Keys.Content.AgentPlanDetailDelete, "删除")</button>
     </PageHead>
 
     @if (_loading)
     {
-        <LoadingState Text="正在加载计划…" />
+        <LoadingState Text="@L10n.T(Keys.Content.AgentPlanDetailLoadingText, "正在加载计划…")" />
     }
     else if (_error is not null)
     {
@@ -23,18 +23,18 @@
     else
     {
         <SbTabs>
-            <SbTab Title="概览">
-                <SbPanel Icon="sb-ico-agent" Title="计划信息">
+            <SbTab Title="@L10n.T(Keys.Content.AgentPlanDetailTabOverview, "概览")">
+                <SbPanel Icon="sb-ico-agent" Title="@L10n.T(Keys.Content.AgentPlanDetailPanelInfo, "计划信息")">
                     <Body><SbKeyValue Items="@JsonRows.Scalars(_detail)" /></Body>
                 </SbPanel>
             </SbTab>
-            <SbTab Title="步骤" Badge="@_steps.Count.ToString()">
-                <SbPanel Icon="sb-ico-play" Title="执行步骤" Flush="true">
+            <SbTab Title="@L10n.T(Keys.Content.AgentPlanDetailTabSteps, "步骤")" Badge="@_steps.Count.ToString()">
+                <SbPanel Icon="sb-ico-play" Title="@L10n.T(Keys.Content.AgentPlanDetailPanelSteps, "执行步骤")" Flush="true">
                     <Body>
                         @if (_steps.Count == 0)
                         {
                             <div class="panel-body">
-                                <SbEmptyState Icon="sb-ico-play" Title="暂无步骤" Text="该计划未包含可解析的步骤序列。" />
+                                <SbEmptyState Icon="sb-ico-play" Title="@L10n.T(Keys.Content.AgentPlanDetailEmptyStepsTitle, "暂无步骤")" Text="@L10n.T(Keys.Content.AgentPlanDetailEmptyStepsText, "该计划未包含可解析的步骤序列。")" />
                             </div>
                         }
                         else
@@ -55,23 +55,28 @@
                     </Body>
                 </SbPanel>
             </SbTab>
-            <SbTab Title="原始数据">
-                <SbPanel Title="编排数据（只读）">
+            <SbTab Title="@L10n.T(Keys.Content.AgentPlanDetailTabRaw, "原始数据")">
+                <SbPanel Title="@L10n.T(Keys.Content.AgentPlanDetailPanelRaw, "编排数据（只读）")">
                     <Body><pre class="sb-pre">@_raw</pre></Body>
                 </SbPanel>
             </SbTab>
         </SbTabs>
     }
 
-    <SbConfirm @bind-Visible="_confirmOpen" Title="删除计划" Tone="danger"
-               Message="@($"确认删除计划「{_title}」？该操作不可撤销。")"
-               ConfirmText="删除" OnConfirm="DoDelete" />
+    <SbConfirm @bind-Visible="_confirmOpen" Title="@L10n.T(Keys.Content.AgentPlanDetailConfirmTitle, "删除计划")" Tone="danger"
+               Message="@string.Format(L10n.T(Keys.Content.AgentPlanDetailConfirmMessage, "确认删除计划「{0}」？该操作不可撤销。"), _title)"
+               ConfirmText="@L10n.T(Keys.Content.AgentPlanDetailDelete, "删除")" OnConfirm="DoDelete" />
 </AuthGuard>
 
 @code {
     [Parameter] public string Code { get; set; } = "";
 
-    private string _title = "计划详情";
+    private string _title = "";
+
+    protected override void OnInitialized()
+    {
+        _title = L10n.T(Keys.Content.AgentPlanDetailDefaultTitle, "计划详情");
+    }
     private JsonElement? _detail;
     private List<Step> _steps = new();
     private string _raw = "";
@@ -93,7 +98,7 @@
         _loading = false;
         if (data is null)
         {
-            _error = err ?? $"加载失败（{status}）。";
+            _error = err ?? string.Format(L10n.T(Keys.Content.AgentPlanDetailLoadFailed, "加载失败（{0}）。"), status);
             return;
         }
         _detail = data;
@@ -107,7 +112,7 @@
     internal sealed record Step(string Title, string Detail);
 
     /// <summary>从计划 JSON 中提取步骤（兼容 steps / plan.steps / stages）。</summary>
-    private static List<Step> ExtractSteps(JsonElement? root)
+    private List<Step> ExtractSteps(JsonElement? root)
     {
         var list = new List<Step>();
         if (root is not { ValueKind: JsonValueKind.Object }) return list;
@@ -122,11 +127,11 @@
                 {
                     var title = JsonRows.Scalar(s, "title", "name", "description");
                     var detail = JsonRows.Scalar(s, "tool", "action", "type", "detail");
-                    list.Add(new Step(string.IsNullOrWhiteSpace(title) ? $"步骤 {index}" : title, detail));
+                    list.Add(new Step(string.IsNullOrWhiteSpace(title) ? string.Format(L10n.T(Keys.Content.AgentPlanDetailStepN, "步骤 {0}"), index) : title, detail));
                 }
                 else if (s.ValueKind == JsonValueKind.String)
                 {
-                    list.Add(new Step($"步骤 {index}", s.GetString() ?? ""));
+                    list.Add(new Step(string.Format(L10n.T(Keys.Content.AgentPlanDetailStepN, "步骤 {0}"), index), s.GetString() ?? ""));
                 }
                 index++;
             }
@@ -147,12 +152,12 @@
         var (ok, status, err, _) = await Api.DeleteAsync($"api/agent/plans/{Uri.EscapeDataString(Code)}");
         if (ok)
         {
-            Toast.Success("计划已删除。");
+            Toast.Success(L10n.T(Keys.Content.AgentPlanDetailDeleted, "计划已删除。"));
             Nav.NavigateTo("agent");
         }
         else
         {
-            Toast.Error(err ?? $"删除失败（{status}）。");
+            Toast.Error(err ?? string.Format(L10n.T(Keys.Content.AgentPlanDetailDeleteFailed, "删除失败（{0}）。"), status));
         }
     }
 }

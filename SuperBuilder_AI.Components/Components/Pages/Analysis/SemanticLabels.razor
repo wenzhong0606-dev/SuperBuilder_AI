@@ -7,63 +7,63 @@
 @using SuperBuilder_AI.Components.Shared
 
 <AuthGuard>
-    <SbListPage TItem="JsonElement" Icon="sb-ico-tag" Title="语义标签"
-                Desc="为字段与指标打上业务标签，并维护同义词与召回策略，让问数更懂你的口径。"
+    <SbListPage TItem="JsonElement" Icon="sb-ico-tag" Title="@L10n.T(Keys.Content.SemanticLabelsTitle, "语义标签")"
+                Desc="@L10n.T(Keys.Content.SemanticLabelsDesc, "为字段与指标打上业务标签，并维护同义词与召回策略，让问数更懂你的口径。")"
                 Items="@_rows" Columns="@Columns" Loading="@_loading" Error="@_error"
-                OnReload="Reload" SearchPlaceholder="搜索标签 / 同义词…"
-                EmptyTitle="暂无语义标签"
-                EmptyText="语义标签把「GMV」「成交额」这类同义表述归一到统一口径，减少问数歧义。"
-                LoadingText="正在加载语义标签…">
+                OnReload="Reload" SearchPlaceholder="@L10n.T(Keys.Content.SemanticLabelsSearchPlaceholder, "搜索标签 / 同义词…")"
+                EmptyTitle="@L10n.T(Keys.Content.SemanticLabelsEmptyTitle, "暂无语义标签")"
+                EmptyText="@L10n.T(Keys.Content.SemanticLabelsEmptyText, "语义标签把「GMV」「成交额」这类同义表述归一到统一口径，减少问数歧义。")"
+                LoadingText="@L10n.T(Keys.Content.SemanticLabelsLoadingText, "正在加载语义标签…")">
 
         <Actions>
             <button class="btn btn-primary btn-sm" @onclick="Create">
-                <svg class="btn-ico"><use href="#sb-ico-plus" /></svg> 新建标签
+                <svg class="btn-ico"><use href="#sb-ico-plus" /></svg> @L10n.T(Keys.Content.SemanticLabelsCreateBtn, "新建标签")
             </button>
         </Actions>
 
         <Stats>
-            <SbStatTile Label="标签总数" Value="@_rows.Count" Sub="当前租户" />
-            <SbStatTile Label="已启用" Value="@_rows.Count(IsEnabled)" Sub="参与召回" Accent="success" />
-            <SbStatTile Label="已停用" Value="@_rows.Count(r => !IsEnabled(r))" Sub="不参与解析" Accent="muted" />
+            <SbStatTile Label="@L10n.T(Keys.Content.SemanticLabelsStatTotal, "标签总数")" Value="@_rows.Count" Sub="当前租户" />
+            <SbStatTile Label="@L10n.T(Keys.Content.SemanticLabelsStatEnabled, "已启用")" Value="@_rows.Count(IsEnabled)" Sub="@L10n.T(Keys.Content.SemanticLabelsStatEnabledSub, "参与召回")" Accent="success" />
+            <SbStatTile Label="@L10n.T(Keys.Content.SemanticLabelsStatDisabled, "已停用")" Value="@_rows.Count(r => !IsEnabled(r))" Sub="@L10n.T(Keys.Content.SemanticLabelsStatDisabledSub, "不参与解析")" Accent="muted" />
         </Stats>
 
         <RowActions>
-            <button class="btn btn-sm btn-outline-secondary" @onclick="() => Open(context)">详情</button>
+            <button class="btn btn-sm btn-outline-secondary" @onclick="() => Open(context)">@L10n.T(Keys.Content.SemanticLabelsRowDetail, "详情")</button>
         </RowActions>
 
         <EmptyActions>
-            <button class="btn btn-primary btn-sm" @onclick="Create">新建标签</button>
+            <button class="btn btn-primary btn-sm" @onclick="Create">@L10n.T(Keys.Content.SemanticLabelsCreateBtn, "新建标签")</button>
         </EmptyActions>
     </SbListPage>
 
-    <SbModal Visible="@_creating" VisibleChanged="v => _creating = v" Title="新建语义标签">
+    <SbModal Visible="@_creating" VisibleChanged="v => _creating = v" Title="@L10n.T(Keys.Content.SemanticLabelsModalTitle, "新建语义标签")">
         <Body>
-            <SbField Label="概念类型" Full="true">
+            <SbField Label="@L10n.T(Keys.Content.SemanticLabelsFieldConceptType, "概念类型")" Full="true">
                 <select @bind="_ct">
-                    <option value="MetadataSemantic">字段级语义</option>
-                    <option value="BusinessEntity">业务实体</option>
-                    <option value="BusinessEntityAttribute">业务实体属性</option>
-                    <option value="BusinessEntityMetric">业务实体指标</option>
-                    <option value="BusinessDomain">业务域</option>
+                    <option value="MetadataSemantic">@L10n.T(Keys.Content.SemanticLabelsCtMetadata, "字段级语义")</option>
+                    <option value="BusinessEntity">@L10n.T(Keys.Content.SemanticLabelsCtEntity, "业务实体")</option>
+                    <option value="BusinessEntityAttribute">@L10n.T(Keys.Content.SemanticLabelsCtEntityAttr, "业务实体属性")</option>
+                    <option value="BusinessEntityMetric">@L10n.T(Keys.Content.SemanticLabelsCtEntityMetric, "业务实体指标")</option>
+                    <option value="BusinessDomain">@L10n.T(Keys.Content.SemanticLabelsCtDomain, "业务域")</option>
                 </select>
             </SbField>
-            <SbField Label="概念 ID" Full="true" Required="true" Error="@_cidErr"><input @bind="_cid" placeholder="如：1001" /></SbField>
-            <SbField Label="区域 (Culture)" Full="true"><input @bind="_culture" placeholder="如：zh-CN" /></SbField>
-            <SbField Label="标签种类" Full="true">
+            <SbField Label="@L10n.T(Keys.Content.SemanticLabelsFieldConceptId, "概念 ID")" Full="true" Required="true" Error="@_cidErr"><input @bind="_cid" placeholder="@L10n.T(Keys.Content.SemanticLabelsConceptIdPh, "如：1001")" /></SbField>
+            <SbField Label="@L10n.T(Keys.Content.SemanticLabelsFieldCulture, "区域 (Culture)")" Full="true"><input @bind="_culture" placeholder="@L10n.T(Keys.Content.SemanticLabelsCulturePh, "如：zh-CN")" /></SbField>
+            <SbField Label="@L10n.T(Keys.Content.SemanticLabelsFieldKind, "标签种类")" Full="true">
                 <select @bind="_kind">
-                    <option value="DisplayName">展示名</option>
-                    <option value="Description">描述</option>
-                    <option value="Synonym">同义词</option>
-                    <option value="Question">示例问句</option>
+                    <option value="DisplayName">@L10n.T(Keys.Content.SemanticLabelsKindDisplayName, "展示名")</option>
+                    <option value="Description">@L10n.T(Keys.Content.SemanticLabelsKindDescription, "描述")</option>
+                    <option value="Synonym">@L10n.T(Keys.Content.SemanticLabelsKindSynonym, "同义词")</option>
+                    <option value="Question">@L10n.T(Keys.Content.SemanticLabelsKindQuestion, "示例问句")</option>
                 </select>
             </SbField>
-            <SbField Label="标签值" Full="true" Required="true" Error="@_valueErr"><input @bind="_value" placeholder="如：销售额" /></SbField>
-            <SbField Label="来源" Full="true"><input @bind="_source" placeholder="如：manual" /></SbField>
+            <SbField Label="@L10n.T(Keys.Content.SemanticLabelsFieldValue, "标签值")" Full="true" Required="true" Error="@_valueErr"><input @bind="_value" placeholder="@L10n.T(Keys.Content.SemanticLabelsValuePh, "如：销售额")" /></SbField>
+            <SbField Label="@L10n.T(Keys.Content.SemanticLabelsFieldSource, "来源")" Full="true"><input @bind="_source" placeholder="@L10n.T(Keys.Content.SemanticLabelsSourcePh, "如：manual")" /></SbField>
             @if (!string.IsNullOrWhiteSpace(_createErr)) { <div class="alert alert-danger tiny" style="padding:8px 12px">@_createErr</div> }
         </Body>
         <Footer>
-            <button class="btn btn-outline-secondary btn-sm" @onclick="() => _creating = false">取消</button>
-            <button class="btn btn-primary btn-sm" @onclick="SaveCreate" disabled="@_saving">保存</button>
+            <button class="btn btn-outline-secondary btn-sm" @onclick="() => _creating = false">@L10n.T(Keys.Content.CommonCancel, "取消")</button>
+            <button class="btn btn-primary btn-sm" @onclick="SaveCreate" disabled="@_saving">@L10n.T(Keys.Content.CommonSave, "保存")</button>
         </Footer>
     </SbModal>
 </AuthGuard>
@@ -114,7 +114,7 @@
         var id = TablePresenter.Cell(row, "id");
         if (string.IsNullOrWhiteSpace(id))
         {
-            Toast.Warning("该记录缺少 id，无法打开详情。");
+            Toast.Warning(L10n.T(Keys.Content.SemanticLabelsOpenNoId, "该记录缺少 id，无法打开详情。"));
             return;
         }
         Nav.NavigateTo($"semantic-labels/{id}");
@@ -125,9 +125,9 @@
     private async Task SaveCreate()
     {
         _cidErr = ""; _valueErr = ""; _createErr = "";
-        if (string.IsNullOrWhiteSpace(_cid)) _cidErr = "概念 ID 必填。";
-        if (string.IsNullOrWhiteSpace(_value)) _valueErr = "标签值必填。";
-        if (!string.IsNullOrWhiteSpace(_cid) && !long.TryParse(_cid, out _)) _cidErr = "概念 ID 必须为数字。";
+        if (string.IsNullOrWhiteSpace(_cid)) _cidErr = L10n.T(Keys.Content.SemanticLabelsCidRequired, "概念 ID 必填。");
+        if (string.IsNullOrWhiteSpace(_value)) _valueErr = L10n.T(Keys.Content.SemanticLabelsValueRequired, "标签值必填。");
+        if (!string.IsNullOrWhiteSpace(_cid) && !long.TryParse(_cid, out _)) _cidErr = L10n.T(Keys.Content.SemanticLabelsCidNumeric, "概念 ID 必须为数字。");
         if (!string.IsNullOrWhiteSpace(_cidErr) || !string.IsNullOrWhiteSpace(_valueErr))
         {
             return;
@@ -147,9 +147,9 @@
         };
         var (ok, _, err, _) = await Api.PostAsync("api/semantic-labels", body);
         _saving = false;
-        if (!ok) { _createErr = err ?? "保存失败。"; return; }
+        if (!ok) { _createErr = err ?? L10n.T(Keys.Content.SemanticLabelsSaveFailed, "保存失败。"); return; }
         _creating = false;
-        Toast.Success("语义标签已保存。");
+        Toast.Success(L10n.T(Keys.Content.SemanticLabelsSaved, "语义标签已保存。"));
         await Reload();
     }
 
