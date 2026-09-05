@@ -8,26 +8,26 @@
 <AuthGuard>
     <PageHead Icon="sb-ico-db" Key="DataSources" Title="数据源管理" Desc="统一管理租户数据连接、元数据覆盖与访问状态。">
         <button class="btn btn-primary" @onclick="() => CreateVisible = true">
-            <svg class="btn-ico"><use href="#sb-ico-plus" /></svg> 新增数据源
+            <svg class="btn-ico"><use href="#sb-ico-plus" /></svg> @L10n.T(Keys.Content.DataSourcesNew, "新增数据源")
         </button>
     </PageHead>
 
     <div class="ds-overview">
-        <div class="ds-metric"><span class="ds-metric-icon"><svg><use href="#sb-ico-db" /></svg></span><div><strong>@Sources.Count</strong><span>数据源总数</span></div></div>
-        <div class="ds-metric"><span class="ds-metric-icon is-online"><span class="status-pulse"></span></span><div><strong>@Sources.Count(s => Bool(s, "enabled"))</strong><span>在线连接</span></div></div>
-        <div class="ds-metric"><span class="ds-metric-icon"><svg><use href="#sb-ico-model" /></svg></span><div><strong>@Sources.Sum(s => Number(s, "tableCount"))</strong><span>元数据表</span></div></div>
-        <div class="ds-metric"><span class="ds-metric-icon"><svg><use href="#sb-ico-tag" /></svg></span><div><strong>@Sources.Sum(s => Number(s, "columnCount"))</strong><span>已识别字段</span></div></div>
+        <div class="ds-metric"><span class="ds-metric-icon"><svg><use href="#sb-ico-db" /></svg></span><div><strong>@Sources.Count</strong><span>@L10n.T(Keys.Content.DataSourcesMetricTotal, "数据源总数")</span></div></div>
+        <div class="ds-metric"><span class="ds-metric-icon is-online"><span class="status-pulse"></span></span><div><strong>@Sources.Count(s => Bool(s, "enabled"))</strong><span>@L10n.T(Keys.Content.DataSourcesMetricOnline, "在线连接")</span></div></div>
+        <div class="ds-metric"><span class="ds-metric-icon"><svg><use href="#sb-ico-model" /></svg></span><div><strong>@Sources.Sum(s => Number(s, "tableCount"))</strong><span>@L10n.T(Keys.Content.DataSourcesMetricTables, "元数据表")</span></div></div>
+        <div class="ds-metric"><span class="ds-metric-icon"><svg><use href="#sb-ico-tag" /></svg></span><div><strong>@Sources.Sum(s => Number(s, "columnCount"))</strong><span>@L10n.T(Keys.Content.DataSourcesMetricColumns, "已识别字段")</span></div></div>
     </div>
 
-    <SbPanel Icon="sb-ico-db" Title="连接资产" Flush="true">
+    <SbPanel Icon="sb-ico-db" Title="@L10n.T(Keys.Content.DataSourcesPanelAssets, "连接资产")" Flush="true">
         <Body>
             <div class="ds-list-toolbar">
-                <div class="ds-search"><svg><use href="#sb-ico-ask" /></svg><input @bind="Search" @bind:event="oninput" placeholder="搜索名称或数据库类型…" /></div>
+                <div class="ds-search"><svg><use href="#sb-ico-ask" /></svg><input @bind="Search" @bind:event="oninput" placeholder="@L10n.T(Keys.Content.DataSourcesSearchPlaceholder, "搜索名称或数据库类型…")" /></div>
                 <button class="btn btn-outline-secondary btn-sm" @onclick="LoadSources">@L10n.T(Keys.Action.Refresh, "刷新")</button>
             </div>
             @if (Loading)
             {
-                <LoadingState Text="正在加载数据源…" />
+                <LoadingState Text="@L10n.T(Keys.Content.DataSourcesLoading, "正在加载数据源…")" />
             }
             else if (!string.IsNullOrWhiteSpace(ListError))
             {
@@ -35,23 +35,23 @@
             }
             else if (Sources.Count == 0)
             {
-                <SbEmptyState Icon="sb-ico-db" Title="暂无数据源" Text="请在下方创建第一个数据源。" />
+                <SbEmptyState Icon="sb-ico-db" Title="@L10n.T(Keys.Content.DataSourcesEmptyTitle, "暂无数据源")" Text="@L10n.T(Keys.Content.DataSourcesEmptyText, "请在下方创建第一个数据源。")" />
             }
             else
             {
                 <div class="table-wrap">
                     <table class="data-table">
-                        <thead><tr><th>ID</th><th>名称</th><th>类型</th><th>状态</th><th>元数据表</th><th>字段</th><th></th></tr></thead>
+                        <thead><tr><th>@L10n.T(Keys.Content.DataSourcesColId, "ID")</th><th>@L10n.T(Keys.Content.DataSourcesColName, "名称")</th><th>@L10n.T(Keys.Content.DataSourcesColType, "类型")</th><th>@L10n.T(Keys.Content.DataSourcesColStatus, "状态")</th><th>@L10n.T(Keys.Content.DataSourcesColTables, "元数据表")</th><th>@L10n.T(Keys.Content.DataSourcesColColumns, "字段")</th><th></th></tr></thead>
                         <tbody>
                         @foreach (var source in FilteredSources)
                         {
                             <tr>
                                 <td><span class="ds-id">DS-@Cell(source, "id")</span></td>
-                                <td><div class="ds-name-cell"><span class="ds-type-mark">@Initial(source)</span><div><strong>@Cell(source, "name")</strong><small>租户专属连接</small></div></div></td>
+                                <td><div class="ds-name-cell"><span class="ds-type-mark">@Initial(source)</span><div><strong>@Cell(source, "name")</strong><small>@L10n.T(Keys.Content.DataSourcesTenantScoped, "租户专属连接")</small></div></div></td>
                                 <td><span class="ds-engine">@Cell(source, "dbType")</span></td>
-                                <td><span class="ds-status @(Bool(source, "enabled") ? "is-active" : "")"><i></i>@(Bool(source, "enabled") ? "运行中" : "已停用")</span></td>
+                                <td><span class="ds-status @(Bool(source, "enabled") ? "is-active" : "")"><i></i>@(Bool(source, "enabled") ? L10n.T(Keys.Content.DataSourcesStatusOnline, "运行中") : L10n.T(Keys.Content.DataSourcesStatusOffline, "已停用"))</span></td>
                                 <td>@Cell(source, "tableCount")</td><td>@Cell(source, "columnCount")</td>
-                                <td class="ta-right"><button class="btn btn-outline-secondary btn-sm" @onclick="() => Open(source)">管理连接 →</button></td>
+                                <td class="ta-right"><button class="btn btn-outline-secondary btn-sm" @onclick="() => Open(source)">@L10n.T(Keys.Content.DataSourcesManage, "管理连接 →")</button></td>
                             </tr>
                         }
                         </tbody>
@@ -61,29 +61,29 @@
         </Body>
     </SbPanel>
 
-    <SbModal Visible="@CreateVisible" VisibleChanged="v => CreateVisible = v" Title="接入新的数据源" Size="lg">
+    <SbModal Visible="@CreateVisible" VisibleChanged="v => CreateVisible = v" Title="@L10n.T(Keys.Content.DataSourcesModalTitle, "接入新的数据源")" Size="lg">
         <Body>
             <div class="connector-picker">
                 @foreach (var c in _connectors)
                 {
                     <button type="button" class="connector-option @(Type == c.Name ? "is-selected" : "") @(c.Ready ? "" : "is-disabled")" disabled="@(!c.Ready)" @onclick="() => Select(c.Name)">
-                        <span class="connector-logo">@c.Name.Substring(0, 1)</span><strong>@c.Name</strong><small>@c.Desc</small>
+                        <span class="connector-logo">@c.Name.Substring(0, 1)</span><strong>@c.Name</strong><small>@ConnectorDesc(c.Name)</small>
                     </button>
                 }
             </div>
             <div class="field-grid ds-create-fields">
-                <SbField Label="数据源名称" Hint="给团队一个易识别的名称"><input @bind="Name" placeholder="如：WMS 生产库" /></SbField>
-                <SbField Label="连接器类型"><input value="@Type" disabled /></SbField>
+                <SbField Label="@L10n.T(Keys.Content.DataSourcesFieldName, "数据源名称")" Hint="@L10n.T(Keys.Content.DataSourcesFieldNameHint, "给团队一个易识别的名称")"><input @bind="Name" placeholder="@L10n.T(Keys.Content.DataSourcesFieldNamePlaceholder, "如：WMS 生产库")" /></SbField>
+                <SbField Label="@L10n.T(Keys.Content.DataSourcesFieldType, "连接器类型")"><input value="@Type" disabled /></SbField>
             </div>
-            <SbField Label="连接串" Full="true">
-                <input @bind="ConnStr" placeholder="Server=host;Database=db;User=...;" />
+            <SbField Label="@L10n.T(Keys.Content.DataSourcesFieldConnStr, "连接串")" Full="true">
+                <input @bind="ConnStr" placeholder="@L10n.T(Keys.Content.DataSourcesFieldConnStrPlaceholder, "Server=host;Database=db;User=...;")" />
             </SbField>
             @if (!string.IsNullOrWhiteSpace(Error)) { <div class="alert alert-danger tiny" style="margin-top:12px">@Error</div> }
         </Body>
         <Footer>
             <button class="btn btn-outline-secondary" @onclick="() => CreateVisible = false">@L10n.T(Keys.Action.Cancel, "取消")</button>
-            <button class="btn btn-outline-secondary" @onclick="TestConn">测试连接</button>
-            <button class="btn btn-primary" @onclick="Save" disabled="@Saving">@(Saving ? "正在保存…" : @L10n.T(Keys.Action.Save, "保存") + "并接入")</button>
+            <button class="btn btn-outline-secondary" @onclick="TestConn">@L10n.T(Keys.Content.DataSourcesTestConn, "测试连接")</button>
+            <button class="btn btn-primary" @onclick="Save" disabled="@Saving">@(Saving ? L10n.T(Keys.Content.DataSourcesSaving, "正在保存…") : L10n.T(Keys.Content.DataSourcesSaveAndConnect, "保存并接入"))</button>
         </Footer>
     </SbModal>
 </AuthGuard>
@@ -111,6 +111,17 @@
         ? Sources
         : Sources.Where(s => Cell(s, "name").Contains(Search, StringComparison.OrdinalIgnoreCase) || Cell(s, "dbType").Contains(Search, StringComparison.OrdinalIgnoreCase));
 
+    private string ConnectorDesc(string name) => name switch
+    {
+        "SQL Server" => L10n.T(Keys.Content.DataSourcesConnSqlServer, "企业主流关系型数据库"),
+        "MySQL" => L10n.T(Keys.Content.DataSourcesConnMysql, "WMS 等业务常用"),
+        "PostgreSQL" => L10n.T(Keys.Content.DataSourcesConnPostgres, "开源关系型数据库"),
+        "Oracle" => L10n.T(Keys.Content.DataSourcesConnOracle, "大型事务系统"),
+        "ClickHouse" => L10n.T(Keys.Content.DataSourcesConnClickhouse, "列式分析型数据库"),
+        "MongoDB" => L10n.T(Keys.Content.DataSourcesConnMongodb, "文档型 NoSQL"),
+        _ => "",
+    };
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (!firstRender) return;
@@ -123,7 +134,7 @@
         Loading = true; ListError = "";
         var (data, _, err) = await Api.GetJsonAsync("api/data-sources/manage");
         Sources = data is { ValueKind: JsonValueKind.Array } ? data.Value.EnumerateArray().ToList() : new();
-        ListError = data is null ? (err ?? "加载数据源失败。") : "";
+        ListError = data is null ? (err ?? L10n.T(Keys.Content.DataSourcesLoadFailed, "加载数据源失败。")) : "";
         Loading = false;
     }
 
@@ -133,14 +144,14 @@
     private static string Initial(JsonElement row) { var value = Cell(row, "dbType"); return string.IsNullOrWhiteSpace(value) ? "DB" : value[..1].ToUpperInvariant(); }
     private void Open(JsonElement row) { if (long.TryParse(Cell(row, "id"), out var id)) Nav.NavigateTo($"data-sources/{id}"); }
 
-    private void Select(string n) { Type = n; Toast.Info($"已选择连接器：{n}"); }
-    private void TestConn() => Toast.Info("连通性测试已提交（Multi-DB Connector 后端计划于 P12 实现）。");
+    private void Select(string n) { Type = n; Toast.Info(string.Format(L10n.T(Keys.Content.DataSourcesConnectorSelected, "已选择连接器：{0}"), n)); }
+    private void TestConn() => Toast.Info(L10n.T(Keys.Content.DataSourcesTestSubmitted, "连通性测试已提交（Multi-DB Connector 后端计划于 P12 实现）。"));
     private async Task Save()
     {
         Error = "";
         if (string.IsNullOrWhiteSpace(Name) || string.IsNullOrWhiteSpace(ConnStr))
         {
-            Error = "数据源名称和连接串必填。";
+            Error = L10n.T(Keys.Content.DataSourcesRequiredError, "数据源名称和连接串必填。");
             return;
         }
         Saving = true;
@@ -151,10 +162,10 @@
             connectionString = ConnStr,
         });
         Saving = false;
-        if (!ok) { Error = err ?? "保存数据源失败。"; return; }
+        if (!ok) { Error = err ?? L10n.T(Keys.Content.DataSourcesSaveFailed, "保存数据源失败。"); return; }
         Name = ""; ConnStr = "";
         CreateVisible = false;
-        Toast.Success("数据源已保存，并已授权给当前管理员。Ask 页面现在可以选择它。");
+        Toast.Success(L10n.T(Keys.Content.DataSourcesSavedToast, "数据源已保存，并已授权给当前管理员。Ask 页面现在可以选择它。"));
         await LoadSources();
     }
 }

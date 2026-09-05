@@ -176,6 +176,135 @@ public static class ResourceKeys
         public const string ThemeEditorPalette = "Page.ThemeEditor.Palette";
     }
 
+    /// <summary>
+    /// 重型内容页正文资源键（M3-05 重内容页正文批次）。
+    /// <para>
+    /// 覆盖 BusinessModel / DataSources 及其详情页的静态正文、表格列、状态标签、空状态、模态框字段与主要提示。
+    /// 采用单级扁平常量（键名含页面前缀，如 <c>Content.BusinessModelDomains</c>），以保证 <see cref="All"/> 反射枚举能一层取到，
+    /// 避免二级嵌套类被 <c>GetNestedTypes().SelectMany(GetFields)</c> 漏枚举。
+    /// </para>
+    /// </summary>
+    public static class Content
+    {
+        // BusinessModel（语义模型列表）
+        public const string BusinessModelDomains = "Content.BusinessModelDomains";
+        public const string BusinessModelDomainsSub = "Content.BusinessModelDomainsSub";
+        public const string BusinessModelEntities = "Content.BusinessModelEntities";
+        public const string BusinessModelEntitiesSub = "Content.BusinessModelEntitiesSub";
+        public const string BusinessModelResolved = "Content.BusinessModelResolved";
+        public const string BusinessModelResolvedSub = "Content.BusinessModelResolvedSub";
+        public const string BusinessModelSearchPlaceholder = "Content.BusinessModelSearchPlaceholder";
+        public const string BusinessModelEmptyDomainsTitle = "Content.BusinessModelEmptyDomainsTitle";
+        public const string BusinessModelEmptyDomainsText = "Content.BusinessModelEmptyDomainsText";
+        public const string BusinessModelEmptyEntitiesTitle = "Content.BusinessModelEmptyEntitiesTitle";
+        public const string BusinessModelEmptyEntitiesText = "Content.BusinessModelEmptyEntitiesText";
+        public const string BusinessModelNoMatch = "Content.BusinessModelNoMatch";
+        public const string BusinessModelDetail = "Content.BusinessModelDetail";
+        public const string BusinessModelEditorNotReady = "Content.BusinessModelEditorNotReady";
+
+        // BusinessModelEntityDetail（实体详情）
+        public const string BusinessModelEntityLoading = "Content.BusinessModelEntityLoading";
+        public const string BusinessModelEntityPanelDetail = "Content.BusinessModelEntityPanelDetail";
+        public const string BusinessModelEntityEmptyTitle = "Content.BusinessModelEntityEmptyTitle";
+        public const string BusinessModelEntityEmptyText = "Content.BusinessModelEntityEmptyText";
+        public const string BusinessModelEntityPanelInfo = "Content.BusinessModelEntityPanelInfo";
+        public const string BusinessModelEntityBack = "Content.BusinessModelEntityBack";
+
+        // DataSources（数据源列表）
+        public const string DataSourcesNew = "Content.DataSourcesNew";
+        public const string DataSourcesMetricTotal = "Content.DataSourcesMetricTotal";
+        public const string DataSourcesMetricOnline = "Content.DataSourcesMetricOnline";
+        public const string DataSourcesMetricTables = "Content.DataSourcesMetricTables";
+        public const string DataSourcesMetricColumns = "Content.DataSourcesMetricColumns";
+        public const string DataSourcesPanelAssets = "Content.DataSourcesPanelAssets";
+        public const string DataSourcesSearchPlaceholder = "Content.DataSourcesSearchPlaceholder";
+        public const string DataSourcesLoading = "Content.DataSourcesLoading";
+        public const string DataSourcesEmptyTitle = "Content.DataSourcesEmptyTitle";
+        public const string DataSourcesEmptyText = "Content.DataSourcesEmptyText";
+        public const string DataSourcesColId = "Content.DataSourcesColId";
+        public const string DataSourcesColName = "Content.DataSourcesColName";
+        public const string DataSourcesColType = "Content.DataSourcesColType";
+        public const string DataSourcesColStatus = "Content.DataSourcesColStatus";
+        public const string DataSourcesColTables = "Content.DataSourcesColTables";
+        public const string DataSourcesColColumns = "Content.DataSourcesColColumns";
+        public const string DataSourcesTenantScoped = "Content.DataSourcesTenantScoped";
+        public const string DataSourcesStatusOnline = "Content.DataSourcesStatusOnline";
+        public const string DataSourcesStatusOffline = "Content.DataSourcesStatusOffline";
+        public const string DataSourcesManage = "Content.DataSourcesManage";
+        public const string DataSourcesModalTitle = "Content.DataSourcesModalTitle";
+        public const string DataSourcesConnSqlServer = "Content.DataSourcesConnSqlServer";
+        public const string DataSourcesConnMysql = "Content.DataSourcesConnMysql";
+        public const string DataSourcesConnPostgres = "Content.DataSourcesConnPostgres";
+        public const string DataSourcesConnOracle = "Content.DataSourcesConnOracle";
+        public const string DataSourcesConnClickhouse = "Content.DataSourcesConnClickhouse";
+        public const string DataSourcesConnMongodb = "Content.DataSourcesConnMongodb";
+        public const string DataSourcesFieldName = "Content.DataSourcesFieldName";
+        public const string DataSourcesFieldNameHint = "Content.DataSourcesFieldNameHint";
+        public const string DataSourcesFieldNamePlaceholder = "Content.DataSourcesFieldNamePlaceholder";
+        public const string DataSourcesFieldType = "Content.DataSourcesFieldType";
+        public const string DataSourcesFieldConnStr = "Content.DataSourcesFieldConnStr";
+        public const string DataSourcesFieldConnStrPlaceholder = "Content.DataSourcesFieldConnStrPlaceholder";
+        public const string DataSourcesTestConn = "Content.DataSourcesTestConn";
+        public const string DataSourcesSaveAndConnect = "Content.DataSourcesSaveAndConnect";
+        public const string DataSourcesLoadFailed = "Content.DataSourcesLoadFailed";
+        public const string DataSourcesConnectorSelected = "Content.DataSourcesConnectorSelected";
+        public const string DataSourcesTestSubmitted = "Content.DataSourcesTestSubmitted";
+        public const string DataSourcesRequiredError = "Content.DataSourcesRequiredError";
+        public const string DataSourcesSaveFailed = "Content.DataSourcesSaveFailed";
+        public const string DataSourcesSavedToast = "Content.DataSourcesSavedToast";
+        public const string DataSourcesSaving = "Content.DataSourcesSaving";
+
+        // DataSourceDetail（数据源详情）
+        public const string DataSourceBackList = "Content.DataSourceBackList";
+        public const string DataSourceTabMeta = "Content.DataSourceTabMeta";
+        public const string DataSourceRescan = "Content.DataSourceRescan";
+        public const string DataSourceScanning = "Content.DataSourceScanning";
+        public const string DataSourceLoadingMeta = "Content.DataSourceLoadingMeta";
+        public const string DataSourceEmptyMetaTitle = "Content.DataSourceEmptyMetaTitle";
+        public const string DataSourceEmptyMetaText = "Content.DataSourceEmptyMetaText";
+        public const string DataSourceFieldsBadge = "Content.DataSourceFieldsBadge";
+        public const string DataSourceColFieldRel = "Content.DataSourceColFieldRel";
+        public const string DataSourceColType = "Content.DataSourceColType";
+        public const string DataSourceColNullable = "Content.DataSourceColNullable";
+        public const string DataSourceColSemantic = "Content.DataSourceColSemantic";
+        public const string DataSourceColVector = "Content.DataSourceColVector";
+        public const string DataSourceColBusinessKey = "Content.DataSourceColBusinessKey";
+        public const string DataSourceNotVectorized = "Content.DataSourceNotVectorized";
+        public const string DataSourceTabGrants = "Content.DataSourceTabGrants";
+        public const string DataSourceGrantUser = "Content.DataSourceGrantUser";
+        public const string DataSourceGrantRole = "Content.DataSourceGrantRole";
+        public const string DataSourceGrantSubjectPlaceholder = "Content.DataSourceGrantSubjectPlaceholder";
+        public const string DataSourceGrantAccess = "Content.DataSourceGrantAccess";
+        public const string DataSourceRefreshGrants = "Content.DataSourceRefreshGrants";
+        public const string DataSourceLoadingGrants = "Content.DataSourceLoadingGrants";
+        public const string DataSourceEmptyGrantsTitle = "Content.DataSourceEmptyGrantsTitle";
+        public const string DataSourceEmptyGrantsText = "Content.DataSourceEmptyGrantsText";
+        public const string DataSourcePanelGrants = "Content.DataSourcePanelGrants";
+        public const string DataSourceColSubjectType = "Content.DataSourceColSubjectType";
+        public const string DataSourceColSubject = "Content.DataSourceColSubject";
+        public const string DataSourceColCreated = "Content.DataSourceColCreated";
+        public const string DataSourceColActions = "Content.DataSourceColActions";
+        public const string DataSourceRevoke = "Content.DataSourceRevoke";
+        public const string DataSourceTabRls = "Content.DataSourceTabRls";
+        public const string DataSourceLoadingPolicies = "Content.DataSourceLoadingPolicies";
+        public const string DataSourcePanelRls = "Content.DataSourcePanelRls";
+        public const string DataSourceEmptyRlsTitle = "Content.DataSourceEmptyRlsTitle";
+        public const string DataSourceEmptyRlsText = "Content.DataSourceEmptyRlsText";
+        public const string DataSourcePanelPolicies = "Content.DataSourcePanelPolicies";
+        public const string DataSourceLoadMetaFailed = "Content.DataSourceLoadMetaFailed";
+        public const string DataSourceScanFailed = "Content.DataSourceScanFailed";
+        public const string DataSourceScanDone = "Content.DataSourceScanDone";
+        public const string DataSourceSelectSubject = "Content.DataSourceSelectSubject";
+        public const string DataSourceGrantFailed = "Content.DataSourceGrantFailed";
+        public const string DataSourceGranted = "Content.DataSourceGranted";
+        public const string DataSourceRevokeFailed = "Content.DataSourceRevokeFailed";
+        public const string DataSourceRevoked = "Content.DataSourceRevoked";
+        public const string DataSourceLoadPolicyFailed = "Content.DataSourceLoadPolicyFailed";
+        public const string DataSourcePolicyDeleted = "Content.DataSourcePolicyDeleted";
+        public const string DataSourceDeleteFailed = "Content.DataSourceDeleteFailed";
+        public const string DataSourceLoadGrantsFailed = "Content.DataSourceLoadGrantsFailed";
+    }
+
     /// <summary>导航菜单文本（M3-04 增补，M3-05 扩展全量）。</summary>
     public static class Nav
     {
@@ -377,6 +506,121 @@ public static class ResourceKeys
 
         [Page.ThemeEditorPreview] = new("Page", Page: "ThemeEditor", DefaultValue: "Live Preview"),
         [Page.ThemeEditorPalette] = new("Page", Page: "ThemeEditor", DefaultValue: "Palette"),
+
+        // M3-05 重内容页正文批次：Content.* 键（en-US 基线）
+        [Content.BusinessModelDomains] = new("Content", Page: "BusinessModel", DefaultValue: "Domains"),
+        [Content.BusinessModelDomainsSub] = new("Content", Page: "BusinessModel", DefaultValue: "For categorization"),
+        [Content.BusinessModelEntities] = new("Content", Page: "BusinessModel", DefaultValue: "Entities"),
+        [Content.BusinessModelEntitiesSub] = new("Content", Page: "BusinessModel", DefaultValue: "Map to business tables"),
+        [Content.BusinessModelResolved] = new("Content", Page: "BusinessModel", DefaultValue: "Semantics Resolved"),
+        [Content.BusinessModelResolvedSub] = new("Content", Page: "BusinessModel", DefaultValue: "Queryable in Ask"),
+        [Content.BusinessModelSearchPlaceholder] = new("Content", Page: "BusinessModel", DefaultValue: "Search entities…"),
+        [Content.BusinessModelEmptyDomainsTitle] = new("Content", Page: "BusinessModel", DefaultValue: "No business domains yet"),
+        [Content.BusinessModelEmptyDomainsText] = new("Content", Page: "BusinessModel", DefaultValue: "Domains categorize entities, e.g. Sales, Inventory, Finance."),
+        [Content.BusinessModelEmptyEntitiesTitle] = new("Content", Page: "BusinessModel", DefaultValue: "No entities yet"),
+        [Content.BusinessModelEmptyEntitiesText] = new("Content", Page: "BusinessModel", DefaultValue: "An entity maps to a business table (e.g. Customer, Order); once resolved it can be queried by name in Ask."),
+        [Content.BusinessModelNoMatch] = new("Content", Page: "BusinessModel", DefaultValue: "No matching entities"),
+        [Content.BusinessModelDetail] = new("Content", Page: "BusinessModel", DefaultValue: "Details"),
+        [Content.BusinessModelEditorNotReady] = new("Content", Page: "BusinessModel", DefaultValue: "The entity editor will be wired in stage S2."),
+
+        [Content.BusinessModelEntityLoading] = new("Content", Page: "BusinessModelEntityDetail", DefaultValue: "Loading entity details…"),
+        [Content.BusinessModelEntityPanelDetail] = new("Content", Page: "BusinessModelEntityDetail", DefaultValue: "Details"),
+        [Content.BusinessModelEntityEmptyTitle] = new("Content", Page: "BusinessModelEntityDetail", DefaultValue: "Entity not found"),
+        [Content.BusinessModelEntityEmptyText] = new("Content", Page: "BusinessModelEntityDetail", DefaultValue: "The entity may have been deleted, or the backend detail endpoint is not yet connected."),
+        [Content.BusinessModelEntityPanelInfo] = new("Content", Page: "BusinessModelEntityDetail", DefaultValue: "Entity information"),
+        [Content.BusinessModelEntityBack] = new("Content", Page: "BusinessModelEntityDetail", DefaultValue: "Back to semantic model"),
+
+        [Content.DataSourcesNew] = new("Content", Page: "DataSources", DefaultValue: "Add data source"),
+        [Content.DataSourcesMetricTotal] = new("Content", Page: "DataSources", DefaultValue: "Total data sources"),
+        [Content.DataSourcesMetricOnline] = new("Content", Page: "DataSources", DefaultValue: "Online connections"),
+        [Content.DataSourcesMetricTables] = new("Content", Page: "DataSources", DefaultValue: "Metadata tables"),
+        [Content.DataSourcesMetricColumns] = new("Content", Page: "DataSources", DefaultValue: "Recognized fields"),
+        [Content.DataSourcesPanelAssets] = new("Content", Page: "DataSources", DefaultValue: "Connections"),
+        [Content.DataSourcesSearchPlaceholder] = new("Content", Page: "DataSources", DefaultValue: "Search by name or engine type…"),
+        [Content.DataSourcesLoading] = new("Content", Page: "DataSources", DefaultValue: "Loading data sources…"),
+        [Content.DataSourcesEmptyTitle] = new("Content", Page: "DataSources", DefaultValue: "No data sources yet"),
+        [Content.DataSourcesEmptyText] = new("Content", Page: "DataSources", DefaultValue: "Create your first data source below."),
+        [Content.DataSourcesColId] = new("Content", Page: "DataSources", DefaultValue: "ID"),
+        [Content.DataSourcesColName] = new("Content", Page: "DataSources", DefaultValue: "Name"),
+        [Content.DataSourcesColType] = new("Content", Page: "DataSources", DefaultValue: "Type"),
+        [Content.DataSourcesColStatus] = new("Content", Page: "DataSources", DefaultValue: "Status"),
+        [Content.DataSourcesColTables] = new("Content", Page: "DataSources", DefaultValue: "Tables"),
+        [Content.DataSourcesColColumns] = new("Content", Page: "DataSources", DefaultValue: "Fields"),
+        [Content.DataSourcesTenantScoped] = new("Content", Page: "DataSources", DefaultValue: "Tenant-scoped connection"),
+        [Content.DataSourcesStatusOnline] = new("Content", Page: "DataSources", DefaultValue: "Running"),
+        [Content.DataSourcesStatusOffline] = new("Content", Page: "DataSources", DefaultValue: "Disabled"),
+        [Content.DataSourcesManage] = new("Content", Page: "DataSources", DefaultValue: "Manage connection →"),
+        [Content.DataSourcesModalTitle] = new("Content", Page: "DataSources", DefaultValue: "Connect a new data source"),
+        [Content.DataSourcesConnSqlServer] = new("Content", Page: "DataSources", DefaultValue: "Mainstream enterprise RDBMS"),
+        [Content.DataSourcesConnMysql] = new("Content", Page: "DataSources", DefaultValue: "Common for WMS and similar"),
+        [Content.DataSourcesConnPostgres] = new("Content", Page: "DataSources", DefaultValue: "Open-source RDBMS"),
+        [Content.DataSourcesConnOracle] = new("Content", Page: "DataSources", DefaultValue: "Large-scale OLTP systems"),
+        [Content.DataSourcesConnClickhouse] = new("Content", Page: "DataSources", DefaultValue: "Columnar analytics database"),
+        [Content.DataSourcesConnMongodb] = new("Content", Page: "DataSources", DefaultValue: "Document NoSQL"),
+        [Content.DataSourcesFieldName] = new("Content", Page: "DataSources", DefaultValue: "Data source name"),
+        [Content.DataSourcesFieldNameHint] = new("Content", Page: "DataSources", DefaultValue: "A recognizable name for your team"),
+        [Content.DataSourcesFieldNamePlaceholder] = new("Content", Page: "DataSources", DefaultValue: "e.g. WMS Production"),
+        [Content.DataSourcesFieldType] = new("Content", Page: "DataSources", DefaultValue: "Connector type"),
+        [Content.DataSourcesFieldConnStr] = new("Content", Page: "DataSources", DefaultValue: "Connection string"),
+        [Content.DataSourcesFieldConnStrPlaceholder] = new("Content", Page: "DataSources", DefaultValue: "Server=host;Database=db;User=...;"),
+        [Content.DataSourcesTestConn] = new("Content", Page: "DataSources", DefaultValue: "Test connection"),
+        [Content.DataSourcesSaveAndConnect] = new("Content", Page: "DataSources", DefaultValue: "Save & connect"),
+        [Content.DataSourcesLoadFailed] = new("Content", Page: "DataSources", DefaultValue: "Failed to load data sources."),
+        [Content.DataSourcesConnectorSelected] = new("Content", Page: "DataSources", DefaultValue: "Connector selected: {0}"),
+        [Content.DataSourcesTestSubmitted] = new("Content", Page: "DataSources", DefaultValue: "Connectivity test submitted (Multi-DB Connector backend planned for P12)."),
+        [Content.DataSourcesRequiredError] = new("Content", Page: "DataSources", DefaultValue: "Data source name and connection string are required."),
+        [Content.DataSourcesSaveFailed] = new("Content", Page: "DataSources", DefaultValue: "Failed to save data source."),
+        [Content.DataSourcesSavedToast] = new("Content", Page: "DataSources", DefaultValue: "Data source saved and authorized for the current admin. It is now selectable on the Ask page."),
+        [Content.DataSourcesSaving] = new("Content", Page: "DataSources", DefaultValue: "Saving…"),
+
+        [Content.DataSourceBackList] = new("Content", Page: "DataSource", DefaultValue: "Back to list"),
+        [Content.DataSourceTabMeta] = new("Content", Page: "DataSource", DefaultValue: "Metadata"),
+        [Content.DataSourceRescan] = new("Content", Page: "DataSource", DefaultValue: "Re-scan"),
+        [Content.DataSourceScanning] = new("Content", Page: "DataSource", DefaultValue: "Scanning…"),
+        [Content.DataSourceLoadingMeta] = new("Content", Page: "DataSource", DefaultValue: "Loading metadata…"),
+        [Content.DataSourceEmptyMetaTitle] = new("Content", Page: "DataSource", DefaultValue: "No metadata scanned yet"),
+        [Content.DataSourceEmptyMetaText] = new("Content", Page: "DataSource", DefaultValue: "Click re-scan to read table and column structures from the business database."),
+        [Content.DataSourceFieldsBadge] = new("Content", Page: "DataSource", DefaultValue: "{0} fields"),
+        [Content.DataSourceColFieldRel] = new("Content", Page: "DataSource", DefaultValue: "Field / Relation"),
+        [Content.DataSourceColType] = new("Content", Page: "DataSource", DefaultValue: "Type"),
+        [Content.DataSourceColNullable] = new("Content", Page: "DataSource", DefaultValue: "Nullable"),
+        [Content.DataSourceColSemantic] = new("Content", Page: "DataSource", DefaultValue: "Semantic"),
+        [Content.DataSourceColVector] = new("Content", Page: "DataSource", DefaultValue: "Vector"),
+        [Content.DataSourceColBusinessKey] = new("Content", Page: "DataSource", DefaultValue: "Business key"),
+        [Content.DataSourceNotVectorized] = new("Content", Page: "DataSource", DefaultValue: "Not vectorized"),
+        [Content.DataSourceTabGrants] = new("Content", Page: "DataSource", DefaultValue: "Access grants"),
+        [Content.DataSourceGrantUser] = new("Content", Page: "DataSource", DefaultValue: "User"),
+        [Content.DataSourceGrantRole] = new("Content", Page: "DataSource", DefaultValue: "Role"),
+        [Content.DataSourceGrantSubjectPlaceholder] = new("Content", Page: "DataSource", DefaultValue: "Select a subject…"),
+        [Content.DataSourceGrantAccess] = new("Content", Page: "DataSource", DefaultValue: "Grant access"),
+        [Content.DataSourceRefreshGrants] = new("Content", Page: "DataSource", DefaultValue: "Refresh grants"),
+        [Content.DataSourceLoadingGrants] = new("Content", Page: "DataSource", DefaultValue: "Loading grants…"),
+        [Content.DataSourceEmptyGrantsTitle] = new("Content", Page: "DataSource", DefaultValue: "No explicit grants"),
+        [Content.DataSourceEmptyGrantsText] = new("Content", Page: "DataSource", DefaultValue: "Select a user or role and grant access to this data source."),
+        [Content.DataSourcePanelGrants] = new("Content", Page: "DataSource", DefaultValue: "Grant list"),
+        [Content.DataSourceColSubjectType] = new("Content", Page: "DataSource", DefaultValue: "Subject type"),
+        [Content.DataSourceColSubject] = new("Content", Page: "DataSource", DefaultValue: "Subject"),
+        [Content.DataSourceColCreated] = new("Content", Page: "DataSource", DefaultValue: "Granted at"),
+        [Content.DataSourceColActions] = new("Content", Page: "DataSource", DefaultValue: "Actions"),
+        [Content.DataSourceRevoke] = new("Content", Page: "DataSource", DefaultValue: "Revoke"),
+        [Content.DataSourceTabRls] = new("Content", Page: "DataSource", DefaultValue: "Row-level security"),
+        [Content.DataSourceLoadingPolicies] = new("Content", Page: "DataSource", DefaultValue: "Loading policies…"),
+        [Content.DataSourcePanelRls] = new("Content", Page: "DataSource", DefaultValue: "Row-level security policy"),
+        [Content.DataSourceEmptyRlsTitle] = new("Content", Page: "DataSource", DefaultValue: "No row-level security policy"),
+        [Content.DataSourceEmptyRlsText] = new("Content", Page: "DataSource", DefaultValue: "Once configured, visible rows are restricted by user/role, mitigating unauthorized data access."),
+        [Content.DataSourcePanelPolicies] = new("Content", Page: "DataSource", DefaultValue: "Policy list"),
+        [Content.DataSourceLoadMetaFailed] = new("Content", Page: "DataSource", DefaultValue: "Failed to load metadata ({0})."),
+        [Content.DataSourceScanFailed] = new("Content", Page: "DataSource", DefaultValue: "Metadata scan failed."),
+        [Content.DataSourceScanDone] = new("Content", Page: "DataSource", DefaultValue: "Metadata scan complete."),
+        [Content.DataSourceSelectSubject] = new("Content", Page: "DataSource", DefaultValue: "Please select a user or role."),
+        [Content.DataSourceGrantFailed] = new("Content", Page: "DataSource", DefaultValue: "Authorization failed."),
+        [Content.DataSourceGranted] = new("Content", Page: "DataSource", DefaultValue: "Data source access granted."),
+        [Content.DataSourceRevokeFailed] = new("Content", Page: "DataSource", DefaultValue: "Revoke failed."),
+        [Content.DataSourceRevoked] = new("Content", Page: "DataSource", DefaultValue: "Access revoked."),
+        [Content.DataSourceLoadPolicyFailed] = new("Content", Page: "DataSource", DefaultValue: "Failed to load policies ({0})."),
+        [Content.DataSourcePolicyDeleted] = new("Content", Page: "DataSource", DefaultValue: "Policy deleted."),
+        [Content.DataSourceDeleteFailed] = new("Content", Page: "DataSource", DefaultValue: "Delete failed ({0})."),
+        [Content.DataSourceLoadGrantsFailed] = new("Content", Page: "DataSource", DefaultValue: "Failed to load grants ({0})."),
 
         [Nav.Home] = new("Nav", Page: "Home", DefaultValue: "Home"),
         [Nav.Ask] = new("Nav", Page: "Ask", DefaultValue: "Ask BI"),

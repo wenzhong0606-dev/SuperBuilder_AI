@@ -9,24 +9,24 @@
 <AuthGuard>
     <PageHead Icon="sb-ico-model" Key="BusinessModel" Title="语义模型" Desc="把物理表结构映射为业务语言：实体、业务域与字段同义词，让自然语言问数更精准。">
         <button class="btn btn-primary btn-sm" @onclick="Create">
-            <svg class="btn-ico"><use href="#sb-ico-plus" /></svg> @L10n.T(Keys.Action.New, "新建") 实体
+            <svg class="btn-ico"><use href="#sb-ico-plus" /></svg> @L10n.T(Keys.Action.New, "新建") @L10n.T(Keys.Content.BusinessModelEntities, "实体")
         </button>
     </PageHead>
 
     <div class="stat-grid">
-        <SbStatTile Label="业务域" Value="@_domains.Count" Sub="用于分类" />
-        <SbStatTile Label="实体" Value="@_entities.Count" Sub="对应业务表" Accent="info" />
-        <SbStatTile Label="已解析语义" Value="@_entities.Count(IsResolved)" Sub="可在 Ask 提问" Accent="success" />
+        <SbStatTile Label="@L10n.T(Keys.Content.BusinessModelDomains, "业务域")" Value="@_domains.Count" Sub="@L10n.T(Keys.Content.BusinessModelDomainsSub, "用于分类")" />
+        <SbStatTile Label="@L10n.T(Keys.Content.BusinessModelEntities, "实体")" Value="@_entities.Count" Sub="@L10n.T(Keys.Content.BusinessModelEntitiesSub, "对应业务表")" Accent="info" />
+        <SbStatTile Label="@L10n.T(Keys.Content.BusinessModelResolved, "已解析语义")" Value="@_entities.Count(IsResolved)" Sub="@L10n.T(Keys.Content.BusinessModelResolvedSub, "可在 Ask 提问")" Accent="success" />
     </div>
 
     <SbTabs>
-        <SbTab Title="业务域" Badge="@_domains.Count.ToString()">
-            <SbPanel Icon="sb-ico-model" Title="业务域" Flush="true">
+        <SbTab Title="@L10n.T(Keys.Content.BusinessModelDomains, "业务域")" Badge="@_domains.Count.ToString()">
+            <SbPanel Icon="sb-ico-model" Title="@L10n.T(Keys.Content.BusinessModelDomains, "业务域")" Flush="true">
                 <Body>
                     @if (_domains.Count == 0)
                     {
-                        <SbEmptyState Icon="sb-ico-model" Title="暂无业务域"
-                                      Text="业务域用于组织对实体的分类，例如「销售」「库存」「财务」。" />
+                        <SbEmptyState Icon="sb-ico-model" Title="@L10n.T(Keys.Content.BusinessModelEmptyDomainsTitle, "暂无业务域")"
+                                      Text="@L10n.T(Keys.Content.BusinessModelEmptyDomainsText, "业务域用于组织对实体的分类，例如「销售」「库存」「财务」。")" />
                     }
                     else
                     {
@@ -47,23 +47,23 @@
             </SbPanel>
         </SbTab>
 
-        <SbTab Title="实体" Badge="@_entities.Count.ToString()">
+        <SbTab Title="@L10n.T(Keys.Content.BusinessModelEntities, "实体")" Badge="@_entities.Count.ToString()">
             <SbToolbar>
                 <Left>
-                    <SbSearch Value="@_query" ValueChanged="OnQueryChanged" Placeholder="搜索实体…" />
+                    <SbSearch Value="@_query" ValueChanged="OnQueryChanged" Placeholder="@L10n.T(Keys.Content.BusinessModelSearchPlaceholder, "搜索实体…")" />
                 </Left>
             </SbToolbar>
-            <SbPanel Icon="sb-ico-db" Title="实体" Flush="true">
+            <SbPanel Icon="sb-ico-db" Title="@L10n.T(Keys.Content.BusinessModelEntities, "实体")" Flush="true">
                 <Body>
                     @if (_entities.Count == 0)
                     {
-                        <SbEmptyState Icon="sb-ico-db" Title="暂无实体"
-                                      Text="实体对应一张业务表（如「客户」「订单」），解析后可在 Ask 中直接以业务名提问。" />
+                        <SbEmptyState Icon="sb-ico-db" Title="@L10n.T(Keys.Content.BusinessModelEmptyEntitiesTitle, "暂无实体")"
+                                      Text="@L10n.T(Keys.Content.BusinessModelEmptyEntitiesText, "实体对应一张业务表（如「客户」「订单」），解析后可在 Ask 中直接以业务名提问。")" />
                     }
                     else
                     {
                         <SbDataTable Items="@_entityFiltered" Columns="@EntityColumns" PageSize="20"
-                                     EmptyTitle="无匹配实体" RowActions="EntityActions" />
+                                     EmptyTitle="@L10n.T(Keys.Content.BusinessModelNoMatch, "无匹配实体")" RowActions="EntityActions" />
                     }
                 </Body>
             </SbPanel>
@@ -119,11 +119,11 @@
             var id = TablePresenter.Cell(row, "id");
             if (!string.IsNullOrWhiteSpace(id))
             {
-                <button class="btn btn-sm btn-outline-secondary" @onclick='() => Nav.NavigateTo($"business-model/entities/{id}")'>详情</button>
+                <button class="btn btn-sm btn-outline-secondary" @onclick='() => Nav.NavigateTo($"business-model/entities/{id}")'>@L10n.T(Keys.Content.BusinessModelDetail, "详情")</button>
             }
         };
 
-    private void Create() => Toast.Info("实体编辑器将在 S2 阶段接入。");
+    private void Create() => Toast.Info(L10n.T(Keys.Content.BusinessModelEditorNotReady, "实体编辑器将在 S2 阶段接入。"));
 
     private static bool IsResolved(JsonElement row)
     {

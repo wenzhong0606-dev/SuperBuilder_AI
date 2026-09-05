@@ -213,6 +213,131 @@ public static class Keys
         public const string ThemeEditorPalette = "Page.ThemeEditor.Palette";
     }
 
+    /// <summary>
+    /// 重型内容页正文资源键镜像（M3-05 重内容页正文批次），与后端 <c>ResourceKeys.Content</c> 字符串值一一对应。
+    /// 采用单级扁平常量（键名含页面前缀），与后端保持一致，避免二级嵌套被后端 <c>All()</c> 漏枚举。
+    /// </summary>
+    public static class Content
+    {
+        // BusinessModel（语义模型列表）
+        public const string BusinessModelDomains = "Content.BusinessModelDomains";
+        public const string BusinessModelDomainsSub = "Content.BusinessModelDomainsSub";
+        public const string BusinessModelEntities = "Content.BusinessModelEntities";
+        public const string BusinessModelEntitiesSub = "Content.BusinessModelEntitiesSub";
+        public const string BusinessModelResolved = "Content.BusinessModelResolved";
+        public const string BusinessModelResolvedSub = "Content.BusinessModelResolvedSub";
+        public const string BusinessModelSearchPlaceholder = "Content.BusinessModelSearchPlaceholder";
+        public const string BusinessModelEmptyDomainsTitle = "Content.BusinessModelEmptyDomainsTitle";
+        public const string BusinessModelEmptyDomainsText = "Content.BusinessModelEmptyDomainsText";
+        public const string BusinessModelEmptyEntitiesTitle = "Content.BusinessModelEmptyEntitiesTitle";
+        public const string BusinessModelEmptyEntitiesText = "Content.BusinessModelEmptyEntitiesText";
+        public const string BusinessModelNoMatch = "Content.BusinessModelNoMatch";
+        public const string BusinessModelDetail = "Content.BusinessModelDetail";
+        public const string BusinessModelEditorNotReady = "Content.BusinessModelEditorNotReady";
+
+        // BusinessModelEntityDetail（实体详情）
+        public const string BusinessModelEntityLoading = "Content.BusinessModelEntityLoading";
+        public const string BusinessModelEntityPanelDetail = "Content.BusinessModelEntityPanelDetail";
+        public const string BusinessModelEntityEmptyTitle = "Content.BusinessModelEntityEmptyTitle";
+        public const string BusinessModelEntityEmptyText = "Content.BusinessModelEntityEmptyText";
+        public const string BusinessModelEntityPanelInfo = "Content.BusinessModelEntityPanelInfo";
+        public const string BusinessModelEntityBack = "Content.BusinessModelEntityBack";
+
+        // DataSources（数据源列表）
+        public const string DataSourcesNew = "Content.DataSourcesNew";
+        public const string DataSourcesMetricTotal = "Content.DataSourcesMetricTotal";
+        public const string DataSourcesMetricOnline = "Content.DataSourcesMetricOnline";
+        public const string DataSourcesMetricTables = "Content.DataSourcesMetricTables";
+        public const string DataSourcesMetricColumns = "Content.DataSourcesMetricColumns";
+        public const string DataSourcesPanelAssets = "Content.DataSourcesPanelAssets";
+        public const string DataSourcesSearchPlaceholder = "Content.DataSourcesSearchPlaceholder";
+        public const string DataSourcesLoading = "Content.DataSourcesLoading";
+        public const string DataSourcesEmptyTitle = "Content.DataSourcesEmptyTitle";
+        public const string DataSourcesEmptyText = "Content.DataSourcesEmptyText";
+        public const string DataSourcesColId = "Content.DataSourcesColId";
+        public const string DataSourcesColName = "Content.DataSourcesColName";
+        public const string DataSourcesColType = "Content.DataSourcesColType";
+        public const string DataSourcesColStatus = "Content.DataSourcesColStatus";
+        public const string DataSourcesColTables = "Content.DataSourcesColTables";
+        public const string DataSourcesColColumns = "Content.DataSourcesColColumns";
+        public const string DataSourcesTenantScoped = "Content.DataSourcesTenantScoped";
+        public const string DataSourcesStatusOnline = "Content.DataSourcesStatusOnline";
+        public const string DataSourcesStatusOffline = "Content.DataSourcesStatusOffline";
+        public const string DataSourcesManage = "Content.DataSourcesManage";
+        public const string DataSourcesModalTitle = "Content.DataSourcesModalTitle";
+        public const string DataSourcesConnSqlServer = "Content.DataSourcesConnSqlServer";
+        public const string DataSourcesConnMysql = "Content.DataSourcesConnMysql";
+        public const string DataSourcesConnPostgres = "Content.DataSourcesConnPostgres";
+        public const string DataSourcesConnOracle = "Content.DataSourcesConnOracle";
+        public const string DataSourcesConnClickhouse = "Content.DataSourcesConnClickhouse";
+        public const string DataSourcesConnMongodb = "Content.DataSourcesConnMongodb";
+        public const string DataSourcesFieldName = "Content.DataSourcesFieldName";
+        public const string DataSourcesFieldNameHint = "Content.DataSourcesFieldNameHint";
+        public const string DataSourcesFieldNamePlaceholder = "Content.DataSourcesFieldNamePlaceholder";
+        public const string DataSourcesFieldType = "Content.DataSourcesFieldType";
+        public const string DataSourcesFieldConnStr = "Content.DataSourcesFieldConnStr";
+        public const string DataSourcesFieldConnStrPlaceholder = "Content.DataSourcesFieldConnStrPlaceholder";
+        public const string DataSourcesTestConn = "Content.DataSourcesTestConn";
+        public const string DataSourcesSaveAndConnect = "Content.DataSourcesSaveAndConnect";
+        public const string DataSourcesLoadFailed = "Content.DataSourcesLoadFailed";
+        public const string DataSourcesConnectorSelected = "Content.DataSourcesConnectorSelected";
+        public const string DataSourcesTestSubmitted = "Content.DataSourcesTestSubmitted";
+        public const string DataSourcesRequiredError = "Content.DataSourcesRequiredError";
+        public const string DataSourcesSaveFailed = "Content.DataSourcesSaveFailed";
+        public const string DataSourcesSavedToast = "Content.DataSourcesSavedToast";
+        public const string DataSourcesSaving = "Content.DataSourcesSaving";
+
+        // DataSourceDetail（数据源详情）
+        public const string DataSourceBackList = "Content.DataSourceBackList";
+        public const string DataSourceTabMeta = "Content.DataSourceTabMeta";
+        public const string DataSourceRescan = "Content.DataSourceRescan";
+        public const string DataSourceScanning = "Content.DataSourceScanning";
+        public const string DataSourceLoadingMeta = "Content.DataSourceLoadingMeta";
+        public const string DataSourceEmptyMetaTitle = "Content.DataSourceEmptyMetaTitle";
+        public const string DataSourceEmptyMetaText = "Content.DataSourceEmptyMetaText";
+        public const string DataSourceFieldsBadge = "Content.DataSourceFieldsBadge";
+        public const string DataSourceColFieldRel = "Content.DataSourceColFieldRel";
+        public const string DataSourceColType = "Content.DataSourceColType";
+        public const string DataSourceColNullable = "Content.DataSourceColNullable";
+        public const string DataSourceColSemantic = "Content.DataSourceColSemantic";
+        public const string DataSourceColVector = "Content.DataSourceColVector";
+        public const string DataSourceColBusinessKey = "Content.DataSourceColBusinessKey";
+        public const string DataSourceNotVectorized = "Content.DataSourceNotVectorized";
+        public const string DataSourceTabGrants = "Content.DataSourceTabGrants";
+        public const string DataSourceGrantUser = "Content.DataSourceGrantUser";
+        public const string DataSourceGrantRole = "Content.DataSourceGrantRole";
+        public const string DataSourceGrantSubjectPlaceholder = "Content.DataSourceGrantSubjectPlaceholder";
+        public const string DataSourceGrantAccess = "Content.DataSourceGrantAccess";
+        public const string DataSourceRefreshGrants = "Content.DataSourceRefreshGrants";
+        public const string DataSourceLoadingGrants = "Content.DataSourceLoadingGrants";
+        public const string DataSourceEmptyGrantsTitle = "Content.DataSourceEmptyGrantsTitle";
+        public const string DataSourceEmptyGrantsText = "Content.DataSourceEmptyGrantsText";
+        public const string DataSourcePanelGrants = "Content.DataSourcePanelGrants";
+        public const string DataSourceColSubjectType = "Content.DataSourceColSubjectType";
+        public const string DataSourceColSubject = "Content.DataSourceColSubject";
+        public const string DataSourceColCreated = "Content.DataSourceColCreated";
+        public const string DataSourceColActions = "Content.DataSourceColActions";
+        public const string DataSourceRevoke = "Content.DataSourceRevoke";
+        public const string DataSourceTabRls = "Content.DataSourceTabRls";
+        public const string DataSourceLoadingPolicies = "Content.DataSourceLoadingPolicies";
+        public const string DataSourcePanelRls = "Content.DataSourcePanelRls";
+        public const string DataSourceEmptyRlsTitle = "Content.DataSourceEmptyRlsTitle";
+        public const string DataSourceEmptyRlsText = "Content.DataSourceEmptyRlsText";
+        public const string DataSourcePanelPolicies = "Content.DataSourcePanelPolicies";
+        public const string DataSourceLoadMetaFailed = "Content.DataSourceLoadMetaFailed";
+        public const string DataSourceScanFailed = "Content.DataSourceScanFailed";
+        public const string DataSourceScanDone = "Content.DataSourceScanDone";
+        public const string DataSourceSelectSubject = "Content.DataSourceSelectSubject";
+        public const string DataSourceGrantFailed = "Content.DataSourceGrantFailed";
+        public const string DataSourceGranted = "Content.DataSourceGranted";
+        public const string DataSourceRevokeFailed = "Content.DataSourceRevokeFailed";
+        public const string DataSourceRevoked = "Content.DataSourceRevoked";
+        public const string DataSourceLoadPolicyFailed = "Content.DataSourceLoadPolicyFailed";
+        public const string DataSourcePolicyDeleted = "Content.DataSourcePolicyDeleted";
+        public const string DataSourceDeleteFailed = "Content.DataSourceDeleteFailed";
+        public const string DataSourceLoadGrantsFailed = "Content.DataSourceLoadGrantsFailed";
+    }
+
     /// <summary>无障碍文本。</summary>
     public static class Accessibility
     {
@@ -390,5 +515,120 @@ public static class Keys
 
         [Page.ThemeEditorPreview] = new("实时预览", "Live Preview"),
         [Page.ThemeEditorPalette] = new("调色板", "Palette"),
+
+        // M3-05 重内容页正文批次：Content.* 镜像默认值（ZhCn / EnUs）
+        [Content.BusinessModelDomains] = new("业务域", "Domains"),
+        [Content.BusinessModelDomainsSub] = new("用于分类", "For categorization"),
+        [Content.BusinessModelEntities] = new("实体", "Entities"),
+        [Content.BusinessModelEntitiesSub] = new("对应业务表", "Map to business tables"),
+        [Content.BusinessModelResolved] = new("已解析语义", "Semantics Resolved"),
+        [Content.BusinessModelResolvedSub] = new("可在 Ask 提问", "Queryable in Ask"),
+        [Content.BusinessModelSearchPlaceholder] = new("搜索实体…", "Search entities…"),
+        [Content.BusinessModelEmptyDomainsTitle] = new("暂无业务域", "No business domains yet"),
+        [Content.BusinessModelEmptyDomainsText] = new("业务域用于组织对实体的分类，例如「销售」「库存」「财务」。", "Domains categorize entities, e.g. Sales, Inventory, Finance."),
+        [Content.BusinessModelEmptyEntitiesTitle] = new("暂无实体", "No entities yet"),
+        [Content.BusinessModelEmptyEntitiesText] = new("实体对应一张业务表（如「客户」「订单」），解析后可在 Ask 中直接以业务名提问。", "An entity maps to a business table (e.g. Customer, Order); once resolved it can be queried by name in Ask."),
+        [Content.BusinessModelNoMatch] = new("无匹配实体", "No matching entities"),
+        [Content.BusinessModelDetail] = new("详情", "Details"),
+        [Content.BusinessModelEditorNotReady] = new("实体编辑器将在 S2 阶段接入。", "The entity editor will be wired in stage S2."),
+
+        [Content.BusinessModelEntityLoading] = new("正在加载实体详情…", "Loading entity details…"),
+        [Content.BusinessModelEntityPanelDetail] = new("详情", "Details"),
+        [Content.BusinessModelEntityEmptyTitle] = new("未找到该实体", "Entity not found"),
+        [Content.BusinessModelEntityEmptyText] = new("实体可能已被删除，或后端详情端点尚未接入。", "The entity may have been deleted, or the backend detail endpoint is not yet connected."),
+        [Content.BusinessModelEntityPanelInfo] = new("实体信息", "Entity information"),
+        [Content.BusinessModelEntityBack] = new("返回语义模型", "Back to semantic model"),
+
+        [Content.DataSourcesNew] = new("新增数据源", "Add data source"),
+        [Content.DataSourcesMetricTotal] = new("数据源总数", "Total data sources"),
+        [Content.DataSourcesMetricOnline] = new("在线连接", "Online connections"),
+        [Content.DataSourcesMetricTables] = new("元数据表", "Metadata tables"),
+        [Content.DataSourcesMetricColumns] = new("已识别字段", "Recognized fields"),
+        [Content.DataSourcesPanelAssets] = new("连接资产", "Connections"),
+        [Content.DataSourcesSearchPlaceholder] = new("搜索名称或数据库类型…", "Search by name or engine type…"),
+        [Content.DataSourcesLoading] = new("正在加载数据源…", "Loading data sources…"),
+        [Content.DataSourcesEmptyTitle] = new("暂无数据源", "No data sources yet"),
+        [Content.DataSourcesEmptyText] = new("请在下方创建第一个数据源。", "Create your first data source below."),
+        [Content.DataSourcesColId] = new("ID", "ID"),
+        [Content.DataSourcesColName] = new("名称", "Name"),
+        [Content.DataSourcesColType] = new("类型", "Type"),
+        [Content.DataSourcesColStatus] = new("状态", "Status"),
+        [Content.DataSourcesColTables] = new("元数据表", "Tables"),
+        [Content.DataSourcesColColumns] = new("字段", "Fields"),
+        [Content.DataSourcesTenantScoped] = new("租户专属连接", "Tenant-scoped connection"),
+        [Content.DataSourcesStatusOnline] = new("运行中", "Running"),
+        [Content.DataSourcesStatusOffline] = new("已停用", "Disabled"),
+        [Content.DataSourcesManage] = new("管理连接 →", "Manage connection →"),
+        [Content.DataSourcesModalTitle] = new("接入新的数据源", "Connect a new data source"),
+        [Content.DataSourcesConnSqlServer] = new("企业主流关系型数据库", "Mainstream enterprise RDBMS"),
+        [Content.DataSourcesConnMysql] = new("WMS 等业务常用", "Common for WMS and similar"),
+        [Content.DataSourcesConnPostgres] = new("开源关系型数据库", "Open-source RDBMS"),
+        [Content.DataSourcesConnOracle] = new("大型事务系统", "Large-scale OLTP systems"),
+        [Content.DataSourcesConnClickhouse] = new("列式分析型数据库", "Columnar analytics database"),
+        [Content.DataSourcesConnMongodb] = new("文档型 NoSQL", "Document NoSQL"),
+        [Content.DataSourcesFieldName] = new("数据源名称", "Data source name"),
+        [Content.DataSourcesFieldNameHint] = new("给团队一个易识别的名称", "A recognizable name for your team"),
+        [Content.DataSourcesFieldNamePlaceholder] = new("如：WMS 生产库", "e.g. WMS Production"),
+        [Content.DataSourcesFieldType] = new("连接器类型", "Connector type"),
+        [Content.DataSourcesFieldConnStr] = new("连接串", "Connection string"),
+        [Content.DataSourcesFieldConnStrPlaceholder] = new("Server=host;Database=db;User=...;", "Server=host;Database=db;User=...;"),
+        [Content.DataSourcesTestConn] = new("测试连接", "Test connection"),
+        [Content.DataSourcesSaveAndConnect] = new("保存并接入", "Save & connect"),
+        [Content.DataSourcesLoadFailed] = new("加载数据源失败。", "Failed to load data sources."),
+        [Content.DataSourcesConnectorSelected] = new("已选择连接器：{0}", "Connector selected: {0}"),
+        [Content.DataSourcesTestSubmitted] = new("连通性测试已提交（Multi-DB Connector 后端计划于 P12 实现）。", "Connectivity test submitted (Multi-DB Connector backend planned for P12)."),
+        [Content.DataSourcesRequiredError] = new("数据源名称和连接串必填。", "Data source name and connection string are required."),
+        [Content.DataSourcesSaveFailed] = new("保存数据源失败。", "Failed to save data source."),
+        [Content.DataSourcesSavedToast] = new("数据源已保存，并已授权给当前管理员。Ask 页面现在可以选择它。", "Data source saved and authorized for the current admin. It is now selectable on the Ask page."),
+        [Content.DataSourcesSaving] = new("正在保存…", "Saving…"),
+
+        [Content.DataSourceBackList] = new("返回列表", "Back to list"),
+        [Content.DataSourceTabMeta] = new("元数据", "Metadata"),
+        [Content.DataSourceRescan] = new("重新扫描", "Re-scan"),
+        [Content.DataSourceScanning] = new("扫描中…", "Scanning…"),
+        [Content.DataSourceLoadingMeta] = new("正在加载元数据…", "Loading metadata…"),
+        [Content.DataSourceEmptyMetaTitle] = new("尚未扫描到元数据", "No metadata scanned yet"),
+        [Content.DataSourceEmptyMetaText] = new("点击重新扫描，从业务数据库读取表和字段结构。", "Click re-scan to read table and column structures from the business database."),
+        [Content.DataSourceFieldsBadge] = new("{0} 字段", "{0} fields"),
+        [Content.DataSourceColFieldRel] = new("字段 / 关系", "Field / Relation"),
+        [Content.DataSourceColType] = new("类型", "Type"),
+        [Content.DataSourceColNullable] = new("可空", "Nullable"),
+        [Content.DataSourceColSemantic] = new("Semantic", "Semantic"),
+        [Content.DataSourceColVector] = new("Vector", "Vector"),
+        [Content.DataSourceColBusinessKey] = new("业务键", "Business key"),
+        [Content.DataSourceNotVectorized] = new("未向量化", "Not vectorized"),
+        [Content.DataSourceTabGrants] = new("访问授权", "Access grants"),
+        [Content.DataSourceGrantUser] = new("用户", "User"),
+        [Content.DataSourceGrantRole] = new("角色", "Role"),
+        [Content.DataSourceGrantSubjectPlaceholder] = new("选择授权主体…", "Select a subject…"),
+        [Content.DataSourceGrantAccess] = new("授予访问", "Grant access"),
+        [Content.DataSourceRefreshGrants] = new("刷新授权", "Refresh grants"),
+        [Content.DataSourceLoadingGrants] = new("正在加载授权…", "Loading grants…"),
+        [Content.DataSourceEmptyGrantsTitle] = new("暂无显式授权", "No explicit grants"),
+        [Content.DataSourceEmptyGrantsText] = new("选择用户或角色并授予该数据源访问权限。", "Select a user or role and grant access to this data source."),
+        [Content.DataSourcePanelGrants] = new("授权清单", "Grant list"),
+        [Content.DataSourceColSubjectType] = new("主体类型", "Subject type"),
+        [Content.DataSourceColSubject] = new("主体", "Subject"),
+        [Content.DataSourceColCreated] = new("授权时间", "Granted at"),
+        [Content.DataSourceColActions] = new("操作", "Actions"),
+        [Content.DataSourceRevoke] = new("撤销", "Revoke"),
+        [Content.DataSourceTabRls] = new("行级安全", "Row-level security"),
+        [Content.DataSourceLoadingPolicies] = new("正在加载策略…", "Loading policies…"),
+        [Content.DataSourcePanelRls] = new("行级安全策略", "Row-level security policy"),
+        [Content.DataSourceEmptyRlsTitle] = new("未配置行级安全策略", "No row-level security policy"),
+        [Content.DataSourceEmptyRlsText] = new("配置后可按用户/角色限制可见数据行，控制越权取数风险。", "Once configured, visible rows are restricted by user/role, mitigating unauthorized data access."),
+        [Content.DataSourcePanelPolicies] = new("策略清单", "Policy list"),
+        [Content.DataSourceLoadMetaFailed] = new("加载元数据失败（{0}）。", "Failed to load metadata ({0})."),
+        [Content.DataSourceScanFailed] = new("元数据扫描失败。", "Metadata scan failed."),
+        [Content.DataSourceScanDone] = new("元数据扫描完成。", "Metadata scan complete."),
+        [Content.DataSourceSelectSubject] = new("请选择用户或角色。", "Please select a user or role."),
+        [Content.DataSourceGrantFailed] = new("授权失败。", "Authorization failed."),
+        [Content.DataSourceGranted] = new("数据源访问权限已授予。", "Data source access granted."),
+        [Content.DataSourceRevokeFailed] = new("撤销失败。", "Revoke failed."),
+        [Content.DataSourceRevoked] = new("授权已撤销。", "Access revoked."),
+        [Content.DataSourceLoadPolicyFailed] = new("加载策略失败（{0}）。", "Failed to load policies ({0})."),
+        [Content.DataSourcePolicyDeleted] = new("策略已删除。", "Policy deleted."),
+        [Content.DataSourceDeleteFailed] = new("删除失败（{0}）。", "Delete failed ({0})."),
+        [Content.DataSourceLoadGrantsFailed] = new("加载授权失败（{0}）。", "Failed to load grants ({0})."),
     };
 }

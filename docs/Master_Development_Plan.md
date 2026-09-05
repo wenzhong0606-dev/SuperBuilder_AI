@@ -434,8 +434,9 @@ M3-G0 是 M4/M7/M8 的最小前置，不等同于完成全部 i18n。它只包�
 - M3-05-G 页头稳定键：`PageHead` 新增稳定 `Key` 参数解析 `Page.Title.{Key}`（旧 `Page.Title.{中文标题}` 约定会退化成中文键、必然查不到，作为未迁移页回退）；登记 `Page.Title.*` 13 个键（五处同步：后端常量 + `Catalog`、zh-CN `ZhCnDefaults`、RCL `Keys`/`Defaults`），并迁移工作台/管理后台 13 个页面 `<PageHead Key=...>`。
 - M3-05-H 递延内容页页头接入：登记 `Page.Title.*` + `Page.Desc.*` 共 18 个键（BusinessModel/BusinessModelEntityDetail/SemanticLabelDetail/ComponentGallery/ThemeEditor/DataSources/ModelAccounts/MetadataEntityDetail/DataSource），五处同步；迁移 8 个静态标题内容页 `<PageHead Key=...>`（动态标题详情页 DataSourceDetail/AgentPlanDetail/AppDetail/DashboardDetail 本批不迁）。
 - M3-05-I 共享动词与样例页内文案：`_Imports.razor` 全局注入 `LocalizationService L10n`（后续页面批次免逐页注入）；新增 `Action.*`（New/Create/Save/Cancel/Refresh/Delete/Edit/Search/Close/Reset）与 `Page.ThemeEditor.*` 键集（五处同步）；接入 ThemeEditor（浅色/深色/重置/保存主题/实时预览/调色板）、BusinessModel（新建实体）、DataSources（刷新/取消/保存并接入）。
+- M3-05-J 重内容页正文批次（BusinessModel / DataSources 家族）：新增后端 `ResourceKeys.Content` 扁平常量类（约 101 键）并在 `Catalog`/`ZhCnDefaults` 与 RCL `Keys.Content`/`Keys.Defaults` 五处严格同步；将以下四个页面的**静态正文、表格列、状态标签、空状态、模态框字段与主要 Toast** 全部改为 `L10n.T(Keys.Content.X, fallback)`：`BusinessModel`（统计块/页签/搜索框/空状态/无匹配/详情按钮/编辑器未就绪提示）、`BusinessModelEntityDetail`（加载/面板/空状态/返回）、`DataSources`（指标卡/连接资产面板/搜索/加载/空状态/**表格列 ID·名称·类型·状态·元数据表·字段**/**状态标签 运行中·已停用**/租户专属/管理连接/接入模态框/连接器描述/字段/保存并接入/各 Toast）、`DataSourceDetail`（元数据·访问授权·行级安全三页签全部标签、表头、状态文案、授权/RLS 空状态与增删改 Toast）。`ResourceKeyRegistryTests` 六例护栏全绿，验证新增键在五处零漂移。
 
-批次范围说明（仍递延）：Ask/Dashboards/Apps 详情页、BusinessModel/DataSources 等重型内容页的**页内正文/表格/状态标签**全量 L10n（目前仅接入页头与少数独立动词），以及前端按 `L10n.T("Error."+code, serverMessage)` 消费 `ApiError` 的友好提示层，仍列为后续批次。框架与页头/共享外壳已全量本地化，剩余为内容密集页正文，建议作为 M3-05 续批或并入 M3-06 收尾。
+批次范围说明（仍递延）：ModelAccounts / SemanticLabelDetail / ComponentGallery / ThemeEditor / MetadataEntityDetail 的页内正文与表格列、Ask/Dashboards/Apps 详情页正文，以及前端按 `L10n.T("Error."+code, serverMessage)` 消费 `ApiError` 的友好提示层，仍列为后续批次。BusinessModel/DataSources 家族正文已全量本地化，剩余为其余内容密集页，建议作为 M3-05 续批或并入 M3-06 收尾。
 
 ### M3-06 用户语言偏好
 
