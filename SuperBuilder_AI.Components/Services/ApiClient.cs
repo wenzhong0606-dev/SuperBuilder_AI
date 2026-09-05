@@ -301,6 +301,24 @@ public sealed class ApiClient : IApiClient
         => SendAsync(HttpMethod.Delete, relativeUrl, null, ct);
 
     /// <summary>
+    /// M2-05 租户切换：校验当前用户是否为目标租户成员，校验通过则后端重签令牌（tid=目标，htid=主租户）并返回新令牌。
+    /// 非成员将收到 403（调用方转为错误提示，不抛异常）。
+    /// </summary>
+    public async Task<(TenantSwitchResult? Result, string? Error)> SwitchTenantAsync(long tenantId, CancellationToken ct = default)
+    {
+        var client = CreateClient();
+        var resp = await client.PostAsJsonAsync("api/tenant-membership/switch", new { tenantId }, ct);
+        if (!resp.IsSuccessStatusCode)
+        {
+            var (_, msg, _) = ParseApiError(await resp.Content.ReadAsStringAsync(ct));
+            if (resp.StatusCode == HttpStatusCode.Unauthorized) OnUnauthorized();
+            return (null, msg ?? $"切换失败（{(int)resp.StatusCode}）。");
+        }
+        var r = await resp.Content.ReadFromJsonAsync<TenantSwitchResult>(ct);
+        return (r, null);
+    }
+
+    /// <summary>
     /// 读取任意 JSON 端点为 <see cref="JsonElement"/>，失败时返回错误信息且不抛异常。
     /// 用于在不确定后端 DTO 精确结构时安全渲染列表/详情。
     /// </summary>
@@ -370,8 +388,24 @@ public sealed class AuthResult
     public string? Token { get; set; }
     public int ExpiresInSeconds { get; set; }
     public long TenantId { get; set; }
+    /// <summary>M2-05：归属主租户（切换后 TenantId=生效租户、HomeTenantId=主租户）。</summary>
+    public long HomeTenantId { get; set; }
     public long UserId { get; set; }
     public string Username { get; set; } = "";
+    public System.Collections.Generic.List<string>? Permissions { get; set; }
+    public System.Collections.Generic.List<string>? AvailableCultures { get; set; }
+    public string? DefaultCulture { get; set; }
+}
+
+/// <summary>M2-05 切换租户成功响应（含重签令牌与切换后端租户上下文）。</summary>
+public sealed class TenantSwitchResult
+{
+    public string? Token { get; set; }
+    public int ExpiresInSeconds { get; set; }
+    public long TenantId { get; set; }
+    public long HomeTenantId { get; set; }
+    public long UserId { get; set; }
+    public string? Username { get; set; }
     public System.Collections.Generic.List<string>? Permissions { get; set; }
     public System.Collections.Generic.List<string>? AvailableCultures { get; set; }
     public string? DefaultCulture { get; set; }

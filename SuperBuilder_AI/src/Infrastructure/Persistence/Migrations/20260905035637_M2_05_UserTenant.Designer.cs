@@ -3,17 +3,20 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using SuperBuilder_AI.Data;
 
 #nullable disable
 
-namespace SuperBuilder_AI.Migrations
+namespace SuperBuilder_AI.src.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(SuperBIContext))]
-    partial class SuperBIContextModelSnapshot : ModelSnapshot
+    [Migration("20260905035637_M2_05_UserTenant")]
+    partial class M2_05_UserTenant
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

@@ -84,6 +84,7 @@ public static class NavMenuItems
             Items = new[]
             {
                 new NavItem { Href = "admin/tenants", Title = "租户", Icon = "sb-ico-tenant", Permission = PermissionCodes.PlatformTenantView },
+                new NavItem { Href = "admin/tenant-members", Title = "租户成员", Icon = "sb-ico-users", Permission = PermissionCodes.PlatformTenantManage },
                 new NavItem { Href = "admin/platform-admins", Title = "平台管理员", Icon = "sb-ico-user", Permission = PermissionCodes.PlatformAdminManage },
                 new NavItem { Href = "admin/platform-admin-scopes", Title = "管理员租户范围", Icon = "sb-ico-scope", Permission = PermissionCodes.PlatformAdminManage },
                 new NavItem { Href = "admin/identity", Title = "身份权限", Icon = "sb-ico-shield", Permission = PermissionCodes.IdentityManage },

@@ -138,6 +138,7 @@ public class SuperBIContext : DbContext
         public DbSet<DataSourceAccessGrant> DataSourceAccessGrants { get; set; }
         public DbSet<RowLevelSecurityPolicy> RowLevelSecurityPolicies { get; set; }
         public DbSet<PlatformAdminTenantScope> PlatformAdminTenantScopes { get; set; }
+        public DbSet<UserTenant> UserTenants { get; set; }
         #endregion
 
         #region P10.3 Audit
@@ -495,6 +496,17 @@ public class SuperBIContext : DbContext
 		builder.Entity<PlatformAdminTenantScope>().Property(x => x.GrantedAt).HasComment("授权时间(UTC)");
 		builder.Entity<PlatformAdminTenantScope>().HasOne<User>().WithMany().HasForeignKey(x => x.AdminUserId).OnDelete(DeleteBehavior.Cascade);
 		builder.Entity<PlatformAdminTenantScope>().HasOne<Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Cascade);
+		#endregion
+
+		#region M2-05 UserTenant（多租户成员关系 / SB-P1-16）
+		// 用户在主租户之外的可切换成员租户；唯一(UserId, TenantId)；级联删除保证引用完整性。
+		builder.Entity<UserTenant>().ToTable(tb => tb.HasComment("用户—租户成员关系（多租户切换）"));
+		builder.Entity<UserTenant>().HasIndex(x => x.UserId);
+		builder.Entity<UserTenant>().HasIndex(x => x.TenantId);
+		builder.Entity<UserTenant>().HasIndex(x => new { x.UserId, x.TenantId }).IsUnique();
+		builder.Entity<UserTenant>().Property(x => x.CreatedByUserId).HasComment("操作者用户 Id（管理员代加成员）");
+		builder.Entity<UserTenant>().HasOne<User>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+		builder.Entity<UserTenant>().HasOne<Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Cascade);
 		#endregion
 
 		#region PhysicalBinding (M1-06)

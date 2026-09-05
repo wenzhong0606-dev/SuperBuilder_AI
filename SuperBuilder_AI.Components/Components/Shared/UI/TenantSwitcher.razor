@@ -1,0 +1,96 @@
+@inject IApiClient Api
+@inject AppState State
+@inject AuthStore Session
+@inject NavigationManager Nav
+@inject ToastService Toast
+@using System.Text.Json
+
+@if (State.IsAuthenticated && _tenants.Count > 1)
+{
+    <div class="tenant-switcher" title="@_switcherTitle">
+        <svg class="btn-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 9h.01M15 9h.01M9 13h.01M15 13h.01"/></svg>
+        <select class="tenant-switcher-select" value="@State.TenantId.ToString()" @onchange="Switch" aria-label="切换租户">
+            @foreach (var t in _selectable)
+            {
+                <option value="@t.Id">@(string.IsNullOrEmpty(t.Name) ? t.Code : t.Name)@(t.Id == State.HomeTenantId ? " ·" : "")</option>
+            }
+        </select>
+    </div>
+}
+
+@code {
+    private sealed class TenantOption
+    {
+        public long Id { get; set; }
+        public string? Code { get; set; }
+        public string? Name { get; set; }
+        public bool IsDefault { get; set; }
+        public bool Enabled { get; set; }
+    }
+
+    private List<TenantOption> _tenants = new();
+    private List<TenantOption> _selectable => _tenants.Where(t => t.Enabled).ToList();
+    private string _switcherTitle => State.HomeTenantId > 0 && State.HomeTenantId != State.TenantId
+        ? $"当前：租户 {State.TenantId}（主租户 {State.HomeTenantId}）"
+        : "切换租户";
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        if (!State.IsAuthenticated) return;
+        // M2-05：拉取当前用户可切换的租户列表（含主租户）。
+        var (data, _, _) = await Api.GetJsonAsync("api/tenant-membership");
+        if (data is null) return;
+        try
+        {
+            if (data.Value.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var item in data.Value.EnumerateArray())
+                {
+                    var id = item.TryGetProperty("tenantId", out var idEl) && idEl.ValueKind == JsonValueKind.Number ? idEl.GetInt64() : 0;
+                    if (id <= 0) continue;
+                    _tenants.Add(new TenantOption
+                    {
+                        Id = id,
+                        Code = item.TryGetProperty("tenantCode", out var c) ? c.GetString() : null,
+                        Name = item.TryGetProperty("tenantName", out var n) ? n.GetString() : null,
+                        IsDefault = item.TryGetProperty("isDefault", out var d) && d.ValueKind == JsonValueKind.True,
+                        Enabled = !item.TryGetProperty("enabled", out var en) || en.ValueKind != JsonValueKind.False,
+                    });
+                }
+                if (_tenants.Count > 1) await InvokeAsync(StateHasChanged);
+            }
+        }
+        catch
+        {
+            // 解析失败静默降级：不显示切换器
+        }
+    }
+
+    private async Task Switch(ChangeEventArgs e)
+    {
+        var raw = e.Value?.ToString();
+        if (!long.TryParse(raw, out var target) || target <= 0) return;
+        if (target == State.TenantId) return;
+
+        var (result, error) = await Api.SwitchTenantAsync(target);
+        if (result is null)
+        {
+            Toast.Error(error ?? "切换失败");
+            await InvokeAsync(StateHasChanged);
+            return;
+        }
+
+        // 以新令牌刷新会话态并持久化，随后整体重载使所有组件按新租户重绑。
+        State.Token = result.Token;
+        State.TenantId = result.TenantId;
+        State.HomeTenantId = result.HomeTenantId;
+        State.UserId = result.UserId;
+        State.Username = result.Username ?? State.Username;
+        State.Permissions = result.Permissions ?? new List<string>();
+        State.AvailableCultures = result.AvailableCultures ?? new List<string> { "zh-CN" };
+        State.DefaultCulture = result.DefaultCulture ?? "zh-CN";
+        await Session.SaveAsync();
+        Nav.NavigateTo(Nav.Uri, forceLoad: true);
+    }
+}

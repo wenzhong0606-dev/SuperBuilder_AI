@@ -5,6 +5,8 @@ public sealed class AppState
 {
     public string? Token { get; set; }
     public long TenantId { get; set; }
+    /// <summary>M2-05：用户归属的主租户（令牌 htid）。切换后 TenantId=生效租户、HomeTenantId=主租户。</summary>
+    public long HomeTenantId { get; set; }
     public long UserId { get; set; }
     public string Username { get; set; } = "";
     public System.Collections.Generic.IReadOnlyList<string> Permissions { get; set; }
@@ -38,6 +40,7 @@ public sealed class AppState
     {
         Token = null;
         TenantId = 0;
+        HomeTenantId = 0;
         UserId = 0;
         Username = "";
         Permissions = System.Array.Empty<string>();

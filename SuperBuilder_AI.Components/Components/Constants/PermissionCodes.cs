@@ -14,6 +14,7 @@ public static class PermissionCodes
 {
     // —— 平台治理面（platform-admin 角色持有）——
     public const string PlatformTenantView = "platform:tenant:view";
+    public const string PlatformTenantManage = "platform:tenant:manage";
     public const string PlatformDiagnosticsView = "platform:diagnostics:view";
     public const string PlatformQuotaManage = "platform:quota:manage";
     public const string PlatformAdminManage = "platform:admin:manage";

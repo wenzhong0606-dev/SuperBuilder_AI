@@ -199,6 +199,7 @@ builder.Services.AddScoped<IAgentPlanner, AgentPlanner>();
 
 // P10.1 Identity / RBAC（确定性，不调 LLM）
 builder.Services.AddScoped<IIdentityService, IdentityService>();
+builder.Services.AddScoped<ITenantMembershipService, TenantMembershipService>();
 builder.Services.AddScoped<IPlatformAdminService, PlatformAdminService>();
 builder.Services.AddScoped<IPlatformAdminScopeService, PlatformAdminScopeService>();
 builder.Services.AddScoped<IDataSourceAuthorizationService, DataSourceAuthorizationService>();

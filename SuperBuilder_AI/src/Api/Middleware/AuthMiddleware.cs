@@ -75,13 +75,15 @@ public sealed class AuthMiddleware
 		// P0-04B：令牌吊销校验。令牌携带安全戳时，与当前用户库中的安全戳比对；
 		// 不一致（口令/角色变更已轮换，或用户已删除）即视为已吊销，返回 401。
 		// 遗留令牌（未携带安全戳）不做此校验，避免阻断既有会话（迁移窗口内自然随 60min 过期）。
+		// M2-05：切换后 tid=生效租户，用户行归属主租户(home)；须以主租户定位用户，否则切换态会误判已吊销。
+		var homeTenantId = principal.HomeTenantId > 0 ? principal.HomeTenantId : principal.TenantId;
 		if (principal.SecurityStamp is not null)
 		{
 			var db = context.RequestServices.GetService<SuperBIContext>();
 			if (db is not null)
 			{
 				var currentStamp = await db.Users.AsNoTracking()
-					.Where(u => u.Id == principal.UserId && u.TenantId == principal.TenantId)
+					.Where(u => u.Id == principal.UserId && u.TenantId == homeTenantId)
 					.Select(u => u.SecurityStamp)
 					.FirstOrDefaultAsync();
 				if (currentStamp != principal.SecurityStamp)
@@ -96,12 +98,12 @@ public sealed class AuthMiddleware
 					return;
 				}
 
-				// M1-02：停用治理——租户停用后禁止刷新（每次请求的令牌校验即刷新会话）。
-				var tenantEnabled = await db.Tenants.AsNoTracking()
-					.Where(t => t.Id == principal.TenantId)
+				// M1-02：停用治理——主租户停用后禁止刷新（每次请求的令牌校验即刷新会话）。
+				var homeEnabled = await db.Tenants.AsNoTracking()
+					.Where(t => t.Id == homeTenantId)
 					.Select(t => t.Enabled)
 					.FirstOrDefaultAsync();
-				if (!tenantEnabled)
+				if (!homeEnabled)
 				{
 					SecurityAuditContext.Reject(context, ErrorCodes.Unauthorized, "tenant-disabled", principal.TenantId, principal.UserId);
 					context.Response.StatusCode = StatusCodes.Status401Unauthorized;
@@ -112,6 +114,26 @@ public sealed class AuthMiddleware
 					});
 					return;
 				}
+
+				// M2-05：生效租户（切换目标）若与主租户不同且已停用，同样禁止以该租户操作。
+				if (principal.TenantId != homeTenantId)
+				{
+					var effectiveEnabled = await db.Tenants.AsNoTracking()
+						.Where(t => t.Id == principal.TenantId)
+						.Select(t => t.Enabled)
+						.FirstOrDefaultAsync();
+					if (!effectiveEnabled)
+					{
+						SecurityAuditContext.Reject(context, ErrorCodes.Unauthorized, "effective-tenant-disabled", principal.TenantId, principal.UserId);
+						context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+						await WriteJsonAsync(context, new ApiError
+						{
+							Code = ErrorCodes.Unauthorized,
+							Message = "未授权：当前生效租户已停用。"
+						});
+						return;
+					}
+				}
 			}
 		}
 
@@ -120,6 +142,8 @@ public sealed class AuthMiddleware
 			new(ClaimTypes.NameIdentifier, principal.UserId.ToString()),
 			new(ClaimTypes.Name, principal.Username),
 			new("tid", principal.TenantId.ToString()),
+			// M2-05：归属主租户声明（切换后 tid=生效租户、htid=主租户），供审计与前端区分。
+			new("htid", homeTenantId.ToString()),
 		};
 		foreach (var perm in principal.Permissions)
 			claims.Add(new Claim("perm", perm));

@@ -17,6 +17,14 @@ public sealed record TokenPrincipal(
 {
 	/// <summary>安全戳（P0-04B 令牌吊销）。令牌签发时的用户安全戳；为空表示遗留令牌（无吊销校验）。</summary>
 	public string? SecurityStamp { get; init; }
+
+	/// <summary>
+	/// 主租户（home tenant，M2-05）。用户归属的主租户（= User.TenantId）。
+	/// 切换后 <see cref="TenantId"/> 为生效租户、<see cref="HomeTenantId"/> 仍为归属主租户，
+	/// 供 AuthMiddleware 以主租户定位用户行（安全戳/启用校验）与审计。
+	/// 未携带该声明（旧令牌/未切换）时退化为与 <see cref="TenantId"/> 一致。
+	/// </summary>
+	public long HomeTenantId { get; init; }
 }
 
 /// <summary>
@@ -25,7 +33,7 @@ public sealed record TokenPrincipal(
 public interface ITokenService
 {
 	/// <summary>为指定主体签发一个 HMAC 签名令牌。</summary>
-	string Issue(long tenantId, long userId, string username, IEnumerable<string> permissions, string? securityStamp = null);
+	string Issue(long tenantId, long userId, string username, IEnumerable<string> permissions, string? securityStamp = null, long? homeTenantId = null);
 
 	/// <summary>校验令牌；无效或过期返回 null。</summary>
 	TokenPrincipal? Validate(string? token);
@@ -62,7 +70,7 @@ public sealed class TokenService : ITokenService
 		_key = Encoding.UTF8.GetBytes(key);
 	}
 
-	public string Issue(long tenantId, long userId, string username, IEnumerable<string> permissions, string? securityStamp = null)
+	public string Issue(long tenantId, long userId, string username, IEnumerable<string> permissions, string? securityStamp = null, long? homeTenantId = null)
 	{
 		var now = DateTimeOffset.UtcNow;
 		var payload = new TokenPayload
@@ -72,6 +80,8 @@ public sealed class TokenService : ITokenService
 			Name = username,
 			Perms = permissions as List<string> ?? new List<string>(permissions),
 			Sec = securityStamp,
+			// M2-05：切换后 tid=生效租户；htid=归属主租户（缺省与 tid 一致，旧调用方无感）。
+			Htid = homeTenantId ?? tenantId,
 			Iat = now.ToUnixTimeSeconds(),
 			Exp = now.Add(_lifetime).ToUnixTimeSeconds(),
 		};
@@ -117,6 +127,7 @@ public sealed class TokenService : ITokenService
 			payload.Perms ?? new List<string>())
 		{
 			SecurityStamp = payload.Sec,
+			HomeTenantId = payload.Htid ?? payload.Tid,
 		};
 	}
 
@@ -146,6 +157,8 @@ public sealed class TokenService : ITokenService
 		public string? Name { get; set; }
 		public List<string>? Perms { get; set; }
 		public string? Sec { get; set; }
+		// M2-05：归属主租户（home tenant）。缺失时退化为与 Tid 一致。
+		public long? Htid { get; set; }
 		public long Iat { get; set; }
 		public long Exp { get; set; }
 	}

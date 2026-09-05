@@ -311,11 +311,13 @@ M1 退出：Migration 可在历史副本执行；无孤儿；跨租户组合均�
 
 **实现要点（M2-04 ✅）**：`TenantManagementController.Create` 已在单一 `BeginTransactionAsync` 内依次落库 Tenant → 两个锁定 `TenantSetting`（localization:availableCultures / defaultCulture）→ `IIdentityService.CreateUserAsync`（首位 TenantAdmin + 安全戳）→ `SetPasswordAsync`（口令哈希 + 安全戳轮换）；任意一步失败即 `RollbackAsync` 并回冲突/BadRequest，且依赖同一注入 `SuperBIContext` 的 `IdentityService` 参与该环境事务，保证「全有或全无」。页面 `Tenants.razor` 已完整：统计（总数/已启用/已停用）、`SbListPage` 编码/名称搜索、创建/编辑弹窗（含语言授权与默认语言）、启停 `SbConfirm` 影响提示、设置弹窗。`TenantManagementControllerTests` 新增 2 例事务证据：`Create_WhenAdminCreationFails_RollsBackEntireTenantCreation`（FailingIdentityService 桩：管理员创建失败 → 返回 Conflict 且 Tenants/TenantSettings 均为 0 行，证明原子回滚）；`Create_Success_CreatesTenantAdminUserAndSettingsAtomically`（真实 IdentityService 经 SeedAsync 注入全局角色目录后：提交后租户 + 2 条默认设置 + 管理员 User（TenantAdmin 角色、pbkdf2 口令、非空安全戳）均落库，证明原子提交）。全量回归 643/643 通过、四端构建 0 error。
 
-### M2-05 多租户成员关系（SB-P1-16）
+### M2-05 多租户成员关系（SB-P1-16） ✅
 
 - 建立 UserTenant、切换授权、EffectiveTenantId 和前端租户切换。
 - 合法成员可切换，非成员 403，全程审计。
 - 用户租户切换与平台管理员代管必须是两套独立机制。
+
+**实现要点（M2-05 ✅）**：用户—租户成员关系以 `UserTenant` 实体（含 `UserId/TenantId/IsDefault/CreatedAtUtc/CreatedByUserId`）承载，主租户（`User.TenantId`）恒为隐式成员、不落 `UserTenant`；可切换租户 = { 主租户 } ∪ { `UserTenant.TenantId` }。`ITenantMembershipService`/`TenantMembershipService` 提供 `AddMemberAsync`（幂等、主租户免记录）、`RemoveMemberAsync`（主租户不可移除）、`SetDefaultAsync`、`IsMemberAsync`、`GetMembershipsAsync`、`GetSwitchableTenantIdsAsync`、`ListAllAsync`（治理面：跨租户汇总全部显式成员关系，刻意 `IgnoreQueryFilters` 以绕过租户作用域过滤器）。切换采用「重签 JWT」机制（用户确认项）：`TenantMembershipController.Switch` 校验 `IsMemberAsync` → 加载主租户下用户行（安全戳）→ 以 `tid=目标、htid=主租户` 重签令牌并解析目标租户语言；`AuthMiddleware` 改为依 `htid`（主租户）做用户/安全戳查找，并新增 `htid` 声明与「生效租户是否启用」守卫，规避切换后误判 token 失效。`TokenService` 新增 `HomeTenantId`/`Htid` 贯通链路。前端：RCL 新增 `TenantSwitcher`（顶栏切换、主租户标记 `·`、切换后刷新会话态并 `Nav.NavigateTo(forceLoad)`），并完整实现 `TenantMembers.razor` 治理页（PlatformTenantManage 守卫，列出/添加/移除成员关系，camelCase 解析与默认/启用徽章）。新增 3 例测试（`TenantMembershipTests`：ListAllAsync 仅含显式成员、无权限 403、有权限 200），全量回归 **646/646** 通过、四端构建 0 error。
 
 ### M2-06 租户自注册（待裁决）
 
@@ -682,7 +684,7 @@ A5/A3 在功能和数据约束稳定后分步执行，不得在同一提交中�
 | SB-P1-09 | M6-04 |
 | SB-P1-12 | M9-15 |
 | SB-P1-13~15 | M7-01~03 |
-| SB-P1-16 | M2-05 |
+| SB-P1-16 | M2-05 ✅ |
 | SB-P2-01~10 | M9-01~10 |
 | S6-1 | M0-03 |
 | S6-2 | M0-04 |

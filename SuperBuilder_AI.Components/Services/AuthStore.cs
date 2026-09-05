@@ -35,6 +35,7 @@ public sealed class AuthStore
             {
                 Token = _state.Token,
                 TenantId = _state.TenantId,
+                HomeTenantId = _state.HomeTenantId,
                 UserId = _state.UserId,
                 Username = _state.Username,
                 Permissions = _state.Permissions as System.Collections.Generic.List<string>
@@ -62,6 +63,7 @@ public sealed class AuthStore
 
             _state.Token = snap.Token;
             _state.TenantId = snap.TenantId;
+            _state.HomeTenantId = snap.HomeTenantId;
             _state.UserId = snap.UserId;
             _state.Username = snap.Username ?? "";
             _state.Permissions = snap.Permissions ?? new System.Collections.Generic.List<string>();
@@ -117,6 +119,7 @@ public sealed class AuthStore
     {
         _state.Token = r.Token;
         _state.TenantId = r.TenantId;
+        _state.HomeTenantId = r.HomeTenantId;
         _state.UserId = r.UserId;
         _state.Username = r.Username;
         _state.Permissions = r.Permissions ?? new System.Collections.Generic.List<string>();
@@ -129,6 +132,7 @@ public sealed class AuthStore
     {
         public string? Token { get; set; }
         public long TenantId { get; set; }
+        public long HomeTenantId { get; set; }
         public long UserId { get; set; }
         public string? Username { get; set; }
         public System.Collections.Generic.List<string>? Permissions { get; set; }

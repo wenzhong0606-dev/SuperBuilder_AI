@@ -1,0 +1,184 @@
+@page "/admin/tenant-members"
+@inject IApiClient Api
+@inject ToastService Toast
+@using System.Text.Json
+
+<AuthGuard>
+    <PermissionGuard Require="@(new[]{ PermissionCodes.PlatformTenantManage })">
+    <PageHead Icon="sb-ico-users" Title="租户成员" Desc="管理用户与额外可切换租户之间的成员关系：为用户授予跨租户切换资格，或撤销其成员资格。" />
+
+    <SbListPage TItem="MembershipRow" Icon="sb-ico-users" Title="成员关系"
+                Items="@_rows" Columns="@Columns" Loading="@_loading" Error="@_error"
+                OnReload="Reload" SearchPlaceholder="搜索用户名 / 租户…"
+                EmptyTitle="暂无租户成员关系"
+                EmptyText="使用「添加成员」为用户授予额外的可切换租户（主租户为隐式成员，不在本表列出）。"
+                LoadingText="正在加载成员关系…">
+
+        <Actions>
+            <button class="btn btn-primary btn-sm" @onclick="() => _adding = true">
+                <svg class="btn-ico"><use href="#sb-ico-plus" /></svg> 添加成员
+            </button>
+        </Actions>
+
+        <Stats>
+            <SbStatTile Label="成员关系" Value="@_rows.Count" Sub="显式" />
+            <SbStatTile Label="默认切换" Value="@_rows.Count(r => r.IsDefault)" Sub="标记默认" Accent="success" />
+            <SbStatTile Label="指向停用租户" Value="@_rows.Count(r => !r.TenantEnabled)" Sub="需注意" Accent="warning" />
+        </Stats>
+
+        <RowActions>
+            <button class="btn btn-sm btn-outline-danger" @onclick="() => AskRemove(context)">移除</button>
+        </RowActions>
+    </SbListPage>
+
+    <SbModal Visible="@_adding" VisibleChanged="v => _adding = v" Title="添加租户成员">
+        <Body>
+            <SbField Label="用户 ID" Full="true" Required="true" Error="@_addUserIdErr"><input type="number" @bind="_addUserId" placeholder="目标用户的 Id" /></SbField>
+            <SbField Label="目标租户 ID" Full="true" Required="true" Error="@_addTenantIdErr"><input type="number" @bind="_addTenantId" placeholder="用户将可切换到的租户 Id" /></SbField>
+            <SbField Label="默认切换" Full="true" Hint="勾选后该租户成为此用户的默认切换目标（主租户始终为默认）。">
+                <label class="switch-row"><input type="checkbox" @bind="_addIsDefault" /><span>设为默认切换租户</span></label>
+            </SbField>
+            @if (!string.IsNullOrWhiteSpace(_addErr)) { <div class="alert alert-danger tiny" style="padding:8px 12px">@_addErr</div> }
+        </Body>
+        <Footer>
+            <button class="btn btn-outline-secondary btn-sm" @onclick="() => _adding = false">取消</button>
+            <button class="btn btn-primary btn-sm" @onclick="SaveAdd" disabled="@_savingAdd">添加</button>
+        </Footer>
+    </SbModal>
+
+    <SbConfirm Visible="@_confirmRemove" VisibleChanged="v => _confirmRemove = v"
+               Title="移除租户成员"
+               Message='@($"确认移除用户「{_pending?.UserName} (#{_pending?.UserId})」与租户 (#{_pending?.TenantId}) 的成员关系？该用户将不再能切换到此租户（主租户不可移除）。")'
+               ConfirmText="移除" Tone="danger"
+               OnConfirm="() => Remove(_pending!)" />
+    </PermissionGuard>
+</AuthGuard>
+
+@code {
+    private sealed class MembershipRow
+    {
+        public long UserId { get; set; }
+        public string? UserName { get; set; }
+        public long TenantId { get; set; }
+        public string? TenantCode { get; set; }
+        public string? TenantName { get; set; }
+        public bool TenantEnabled { get; set; }
+        public bool IsDefault { get; set; }
+        public DateTime CreatedAtUtc { get; set; }
+        public long? CreatedByUserId { get; set; }
+    }
+
+    private List<MembershipRow> _rows = new();
+    private string _error = "";
+    private bool _loading = true;
+
+    private bool _adding = false;
+    private bool _savingAdd = false;
+    private long? _addUserId;
+    private long? _addTenantId;
+    private bool _addIsDefault;
+    private string _addUserIdErr = "";
+    private string _addTenantIdErr = "";
+    private string _addErr = "";
+
+    private bool _confirmRemove = false;
+    private MembershipRow? _pending;
+
+    private List<SbColumn<MembershipRow>> Columns => new()
+    {
+        SbCol.Of<MembershipRow>("用户", r => $"{r.UserName} (#{r.UserId})", width: "220px"),
+        SbCol.Of<MembershipRow>("租户", r => $"{(string.IsNullOrEmpty(r.TenantName) ? r.TenantCode : r.TenantName)} (#{r.TenantId})", width: "260px"),
+        SbCol.Of<MembershipRow>("默认", r => r.IsDefault ? "默认" : "—", width: "100px", isStatus: true,
+            cell: r => @<span class="@(r.IsDefault ? "badge badge-success" : "badge badge-muted")">@(r.IsDefault ? "默认" : "—")</span>),
+        SbCol.Of<MembershipRow>("租户启用", r => r.TenantEnabled ? "启用" : "停用", width: "110px", isStatus: true,
+            cell: r => @<span class="@(r.TenantEnabled ? "badge badge-success" : "badge badge-danger")">@(r.TenantEnabled ? "启用" : "停用")</span>),
+        SbCol.Of<MembershipRow>("创建时间", r => FormatDate(r.CreatedAtUtc), width: "180px"),
+    };
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender) await Reload();
+    }
+
+    private async Task Reload()
+    {
+        _loading = true;
+        var (data, _, err) = await Api.GetJsonAsync("api/tenant-membership/admin");
+        _error = err ?? "";
+        _rows = new();
+        if (data is { ValueKind: JsonValueKind.Array })
+        {
+            foreach (var item in data.Value.EnumerateArray())
+            {
+                _rows.Add(ToRow(item));
+            }
+        }
+        _loading = false;
+        StateHasChanged();
+    }
+
+    private static MembershipRow ToRow(JsonElement item)
+    {
+        var row = new MembershipRow
+        {
+            UserId = Long(item, "userId"),
+            UserName = Str(item, "userName"),
+            TenantId = Long(item, "tenantId"),
+            TenantCode = Str(item, "tenantCode"),
+            TenantName = Str(item, "tenantName"),
+            TenantEnabled = Bool(item, "tenantEnabled"),
+            IsDefault = Bool(item, "isDefault"),
+            CreatedByUserId = LongN(item, "createdByUserId"),
+        };
+        if (item.TryGetProperty("createdAtUtc", out var d) && d.ValueKind == JsonValueKind.String && d.TryGetDateTime(out var dt))
+            row.CreatedAtUtc = dt;
+        return row;
+    }
+
+    private static string FormatDate(DateTime dt) => dt == default ? "—" : dt.ToString("yyyy-MM-dd HH:mm");
+
+    private async Task SaveAdd()
+    {
+        _addUserIdErr = ""; _addTenantIdErr = ""; _addErr = "";
+        if (!_addUserId.HasValue || _addUserId <= 0) { _addUserIdErr = "用户 ID 必填且须大于 0。"; return; }
+        if (!_addTenantId.HasValue || _addTenantId <= 0) { _addTenantIdErr = "目标租户 ID 必填且须大于 0。"; return; }
+
+        _savingAdd = true;
+        var (ok, status, err) = await Api.PostAsync("api/tenant-membership", new
+        {
+            userId = _addUserId.Value,
+            tenantId = _addTenantId.Value,
+            isDefault = _addIsDefault,
+        });
+        _savingAdd = false;
+        if (!ok)
+        {
+            _addErr = status == 400 ? (err ?? "添加失败：用户或租户不存在，或已是成员。") : (err ?? "添加失败。");
+            return;
+        }
+        _adding = false;
+        _addUserId = null; _addTenantId = null; _addIsDefault = false;
+        Toast.Success("已添加租户成员关系。");
+        await Reload();
+    }
+
+    private void AskRemove(MembershipRow row)
+    {
+        _pending = row;
+        _confirmRemove = true;
+    }
+
+    private async Task Remove(MembershipRow row)
+    {
+        var (ok, _, err) = await Api.DeleteAsync($"api/tenant-membership?userId={row.UserId}&tenantId={row.TenantId}");
+        if (!ok) { Toast.Error(err ?? "移除失败。"); return; }
+        Toast.Success("已移除该租户成员关系。");
+        await Reload();
+    }
+
+    // —— JSON 读取助手（camelCase，匹配后端 Web 默认序列化）——
+    private static string Str(JsonElement e, string k) => e.TryGetProperty(k, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() ?? "" : "";
+    private static bool Bool(JsonElement e, string k) => e.TryGetProperty(k, out var v) && v.ValueKind == JsonValueKind.True;
+    private static long Long(JsonElement e, string k) => e.TryGetProperty(k, out var v) && v.ValueKind == JsonValueKind.Number ? v.GetInt64() : 0;
+    private static long? LongN(JsonElement e, string k) => e.TryGetProperty(k, out var v) && v.ValueKind == JsonValueKind.Number ? v.GetInt64() : null;
+}
