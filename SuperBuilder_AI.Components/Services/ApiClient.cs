@@ -461,6 +461,70 @@ public sealed class ApiClient : IApiClient
         }
     }
 
+    /// <summary>M3-02 平台管理员查看全部语言目录（含已停用与翻译进度）。</summary>
+    public async Task<(IReadOnlyList<AdminLanguageView>? Result, string? Error)> GetAdminLanguagesAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            var list = await GetAsync<List<AdminLanguageView>>("api/localization/admin/languages", ct);
+            if (list is null) return (null, null);
+            return (list, null);
+        }
+        catch (System.Net.Http.HttpRequestException ex)
+        {
+            return (null, "无法连接服务，请确认 API 已启动且地址配置正确。" +
+                (string.IsNullOrWhiteSpace(ex.Message) ? "" : $"（{ex.Message}）"));
+        }
+    }
+
+    /// <summary>M3-02 平台管理员新建语言（BCP 47 归一化 + 必填名 + 复制键集合待翻译）。</summary>
+    public async Task<(bool Ok, string? Error)> CreateLanguageAsync(AdminLanguageCreate model, CancellationToken ct = default)
+    {
+        var (ok, status, error) = await PostAsync("api/localization/languages", model, ct);
+        if (!ok && status == 401) OnUnauthorized();
+        return (ok, error);
+    }
+
+    /// <summary>M3-02 平台管理员更新语言显示名/本地名/排序。</summary>
+    public async Task<(bool Ok, string? Error)> UpdateLanguageAsync(long id, AdminLanguageUpdate model, CancellationToken ct = default)
+    {
+        var (ok, status, error) = await PutAsync($"api/localization/languages/{id}", model, ct);
+        if (!ok && status == 401) OnUnauthorized();
+        return (ok, error);
+    }
+
+    /// <summary>M3-02 平台管理员启用/停用语言（停用委托租户关系迁移）。</summary>
+    public async Task<(bool Ok, string? Error)> SetLanguageEnabledAsync(long id, bool enabled, CancellationToken ct = default)
+    {
+        var (ok, status, error) = await PostAsync($"api/localization/languages/{id}/enabled", new { enabled }, ct);
+        if (!ok && status == 401) OnUnauthorized();
+        return (ok, error);
+    }
+
+    /// <summary>M3-02 平台管理员按 Id 顺序重排语言目录。</summary>
+    public async Task<(bool Ok, string? Error)> ReorderLanguagesAsync(IReadOnlyList<long> orderedIds, CancellationToken ct = default)
+    {
+        var (ok, status, error) = await PostAsync("api/localization/languages/reorder", new { orderedIds }, ct);
+        if (!ok && status == 401) OnUnauthorized();
+        return (ok, error);
+    }
+
+    /// <summary>读取平台公开语言目录（含本地名称），供语言切换器展示 NativeName。</summary>
+    public async Task<(IReadOnlyList<PublicLanguageView>? Result, string? Error)> GetPublicLanguagesAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            var list = await GetAsync<List<PublicLanguageView>>("api/localization/public/languages", ct);
+            if (list is null) return (null, null);
+            return (list, null);
+        }
+        catch (System.Net.Http.HttpRequestException ex)
+        {
+            return (null, "无法连接服务，请确认 API 已启动且地址配置正确。" +
+                (string.IsNullOrWhiteSpace(ex.Message) ? "" : $"（{ex.Message}）"));
+        }
+    }
+
     /// <summary>
     /// 读取任意 JSON 端点为 <see cref="JsonElement"/>，失败时返回错误信息且不抛异常。
     /// 用于在不确定后端 DTO 精确结构时安全渲染列表/详情。

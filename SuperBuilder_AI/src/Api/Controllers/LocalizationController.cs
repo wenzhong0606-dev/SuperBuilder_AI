@@ -15,7 +15,8 @@ namespace SuperBuilder_AI.Controllers;
 /// <summary>
 /// 本地化 API（P5 Multi-Language Runtime 生产端点）。
 ///
-/// 暴露平台支持的语言区域、文化名解析与标签回退链。
+/// 暴露平台支持的语言区域、文化名解析与标签回退链；平台语言目录（M3-02 平台语言维护）的
+/// 查看/添加/启停/排序走 <see cref="IPlatformLanguageService"/>，仅平台管理员（localization:manage）可写。
 /// 本控制器纯内存计算、不访问数据库、不触碰任何查询链路与 Golden 契约数据；
 /// 属平台级管理面，不影响 Golden 18/18 行为契约。
 /// </summary>
@@ -27,13 +28,15 @@ public sealed class LocalizationController : ControllerBase
 	private readonly SuperBIContext _db;
 	private readonly ILocalizationSeedService _seed;
 	private readonly ITenantLanguageService _tenantLanguage;
+	private readonly IPlatformLanguageService _platformLanguage;
 
-	public LocalizationController(ILocalizationService localization, SuperBIContext db, ILocalizationSeedService seed, ITenantLanguageService tenantLanguage)
+	public LocalizationController(ILocalizationService localization, SuperBIContext db, ILocalizationSeedService seed, ITenantLanguageService tenantLanguage, IPlatformLanguageService platformLanguage)
 	{
 		_localization = localization;
 		_db = db;
 		_seed = seed;
 		_tenantLanguage = tenantLanguage;
+		_platformLanguage = platformLanguage;
 	}
 
 	/// <summary>列举平台支持的语言区域。</summary>
@@ -99,22 +102,82 @@ public sealed class LocalizationController : ControllerBase
 		await EnsureSeedAsync(ct);
 		// M0-08：匿名公共端点只返回平台基线（TenantId==0），禁止按任意 tenantId 枚举租户专属文案
 		var rows = await _db.UiTextResources.AsNoTracking().Where(x => x.Culture == culture && x.TenantId == 0).ToListAsync(ct);
-		return Ok(rows.OrderBy(x => x.ResourceKey).Select(x => new { x.ResourceKey, PlatformValue = x.Value, Value = x.Value, IsOverridden = false, x.Description }));
+		return Ok(rows.OrderBy(x => x.ResourceKey).Select(x => new { x.ResourceKey, PlatformValue = x.Value, Value = x.Value, IsOverridden = false, IsTranslated = x.IsTranslated, x.Description }));
 	}
 
+	/// <summary>
+	/// 平台管理员新建语言：BCP 47 归一化 + 唯一性校验 + DisplayName/NativeName 必填；
+	/// 可选从已有语言复制平台基线键集合并标记“待翻译”。
+	/// </summary>
 	[HttpPost("languages")]
-	public async Task<IActionResult> CreateLanguage([FromBody] SaveUiLanguageRequest request, CancellationToken ct)
+	public async Task<IActionResult> CreateLanguage([FromBody] CreateUiLanguageRequest request, CancellationToken ct)
 	{
 		if (!User.HasClaim("perm", IdentityPermissions.LocalizationManage)) return Forbid();
 		await EnsureSeedAsync(ct);
-		var culture = (request.Culture ?? string.Empty).Trim();
-		if (culture.Length < 2 || await _db.UiLanguages.AnyAsync(x => x.Culture == culture, ct)) return Conflict("语言代码为空或已存在。");
-		var language = new UiLanguage { Culture = culture, DisplayName = request.DisplayName?.Trim() ?? culture, NativeName = request.NativeName?.Trim() ?? culture, Enabled = true, SortOrder = await _db.UiLanguages.CountAsync(ct) };
-		_db.UiLanguages.Add(language);
-		var sourceCulture = string.IsNullOrWhiteSpace(request.CopyFromCulture) ? "en-US" : request.CopyFromCulture;
-		var source = await _db.UiTextResources.AsNoTracking().Where(x => x.TenantId == 0 && x.Culture == sourceCulture).ToListAsync(ct);
-		_db.UiTextResources.AddRange(source.Select(x => new UiTextResource { TenantId=0, Culture=culture, ResourceKey=x.ResourceKey, Value=x.Value, Description=x.Description }));
-		await _db.SaveChangesAsync(ct); return Ok(new { language.Id, language.Culture, language.DisplayName, language.NativeName });
+		try
+		{
+			var created = await _platformLanguage.CreateLanguageAsync(request, CurrentUserId(), ct);
+			return Ok(created);
+		}
+		catch (PlatformLanguageException ex) { return BadRequest(ex.Message); }
+	}
+
+	/// <summary>平台管理员查看全部语言目录（含已停用），用于管理视图。</summary>
+	[HttpGet("admin/languages")]
+	public async Task<IActionResult> AdminLanguages(CancellationToken ct)
+	{
+		if (!User.HasClaim("perm", IdentityPermissions.LocalizationManage)) return Forbid();
+		await EnsureSeedAsync(ct);
+		var result = await _platformLanguage.ListLanguagesAsync(true, ct);
+		return Ok(result.Languages);
+	}
+
+	/// <summary>平台管理员按 Id 查看语言摘要（含翻译进度）。</summary>
+	[HttpGet("admin/languages/{id:long}")]
+	public async Task<IActionResult> AdminLanguage(long id, CancellationToken ct)
+	{
+		if (!User.HasClaim("perm", IdentityPermissions.LocalizationManage)) return Forbid();
+		var lang = await _platformLanguage.GetLanguageAsync(id, ct);
+		return lang is null ? NotFound() : Ok(lang);
+	}
+
+	/// <summary>平台管理员更新语言显示名/本地名/排序。</summary>
+	[HttpPut("languages/{id:long}")]
+	public async Task<IActionResult> UpdateLanguage(long id, [FromBody] UpdateUiLanguageRequest request, CancellationToken ct)
+	{
+		if (!User.HasClaim("perm", IdentityPermissions.LocalizationManage)) return Forbid();
+		try
+		{
+			var updated = await _platformLanguage.UpdateLanguageAsync(id, request, CurrentUserId(), ct);
+			return Ok(updated);
+		}
+		catch (PlatformLanguageException ex) { return BadRequest(ex.Message); }
+	}
+
+	/// <summary>平台管理员启用/停用语言；停用委托租户关系迁移（避免孤立租户默认语言）。</summary>
+	[HttpPost("languages/{id:long}/enabled")]
+	public async Task<IActionResult> SetLanguageEnabled(long id, [FromBody] LanguageEnabledRequest request, CancellationToken ct)
+	{
+		if (!User.HasClaim("perm", IdentityPermissions.LocalizationManage)) return Forbid();
+		try
+		{
+			await _platformLanguage.SetEnabledAsync(id, request.Enabled, CurrentUserId(), ct);
+			return NoContent();
+		}
+		catch (PlatformLanguageException ex) { return BadRequest(ex.Message); }
+	}
+
+	/// <summary>平台管理员按给定 Id 顺序重排语言目录。</summary>
+	[HttpPost("languages/reorder")]
+	public async Task<IActionResult> ReorderLanguages([FromBody] ReorderLanguagesRequest request, CancellationToken ct)
+	{
+		if (!User.HasClaim("perm", IdentityPermissions.LocalizationManage)) return Forbid();
+		try
+		{
+			await _platformLanguage.ReorderLanguagesAsync(request.OrderedIds ?? Array.Empty<long>(), CurrentUserId(), ct);
+			return NoContent();
+		}
+		catch (PlatformLanguageException ex) { return BadRequest(ex.Message); }
 	}
 
 	/// <summary>读取平台基线以及当前租户覆盖后的文本。</summary>
@@ -132,7 +195,7 @@ public sealed class LocalizationController : ControllerBase
 		{
 			x.ResourceKey, PlatformValue = x.Value,
 			Value = overrides.TryGetValue(x.ResourceKey, out var own) ? own.Value : x.Value,
-			IsOverridden = overrides.ContainsKey(x.ResourceKey), x.Description
+			IsOverridden = overrides.ContainsKey(x.ResourceKey), IsTranslated = x.IsTranslated, x.Description
 		}));
 	}
 
@@ -147,6 +210,7 @@ public sealed class LocalizationController : ControllerBase
 		var row = await _db.UiTextResources.FirstOrDefaultAsync(x => x.TenantId == targetTenant && x.Culture == culture && x.ResourceKey == key, ct);
 		if (row is null) { row = new UiTextResource { TenantId = targetTenant, Culture = culture, ResourceKey = key }; _db.UiTextResources.Add(row); }
 		row.Value = value;
+		row.IsTranslated = true;
 		row.Description = request.Description ?? row.Description;
 		await _db.SaveChangesAsync(ct);
 		return Ok();
@@ -169,6 +233,10 @@ public sealed class LocalizationController : ControllerBase
 		return CurrentTenantId();
 	}
 
+	private long CurrentTenantId() => long.TryParse(User.FindFirst("tid")?.Value, out var id) ? id : 0;
+
+	private long CurrentUserId() => long.TryParse(User.FindFirst("uid")?.Value, out var id) ? id : 0;
+
 	private async Task<List<string>> AllowedCulturesAsync(CancellationToken ct)
 	{
 		if (User.HasClaim("perm", IdentityPermissions.PlatformTenantView))
@@ -177,13 +245,12 @@ public sealed class LocalizationController : ControllerBase
 		return await _tenantLanguage.GetAvailableCulturesAsync(tenantId, ct);
 	}
 
-	private long CurrentTenantId() => long.TryParse(User.FindFirst("tid")?.Value, out var id) ? id : 0;
-
 	private async Task EnsureSeedAsync(CancellationToken ct) => await _seed.EnsureSeedAsync(ct);
 }
 
 public sealed record SaveUiTextRequest(string? Value, string? Description = null);
-public sealed record SaveUiLanguageRequest(string? Culture, string? DisplayName, string? NativeName, string? CopyFromCulture = null);
+public sealed record LanguageEnabledRequest(bool Enabled);
+public sealed record ReorderLanguagesRequest(IReadOnlyList<long>? OrderedIds);
 
 /// <summary>语言区域摘要 DTO。</summary>
 public sealed record LocaleSummary(

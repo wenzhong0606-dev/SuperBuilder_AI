@@ -65,6 +65,24 @@ public interface IApiClient
 
     /// <summary>M3-G0 持久化当前用户语言偏好到服务端（强制校验租户可用语言范围，越界回退默认）。</summary>
     Task<(string? Culture, string? Error)> SetUserLanguageAsync(string culture, CancellationToken ct = default);
+
+    /// <summary>M3-02 平台管理员查看全部语言目录（含已停用与翻译进度）。</summary>
+    Task<(IReadOnlyList<AdminLanguageView>? Result, string? Error)> GetAdminLanguagesAsync(CancellationToken ct = default);
+
+    /// <summary>M3-02 平台管理员新建语言（BCP 47 归一化 + 必填名 + 复制键集合待翻译）。</summary>
+    Task<(bool Ok, string? Error)> CreateLanguageAsync(AdminLanguageCreate model, CancellationToken ct = default);
+
+    /// <summary>M3-02 平台管理员更新语言显示名/本地名。</summary>
+    Task<(bool Ok, string? Error)> UpdateLanguageAsync(long id, AdminLanguageUpdate model, CancellationToken ct = default);
+
+    /// <summary>M3-02 平台管理员启用/停用语言（停用委托租户关系迁移）。</summary>
+    Task<(bool Ok, string? Error)> SetLanguageEnabledAsync(long id, bool enabled, CancellationToken ct = default);
+
+    /// <summary>M3-02 平台管理员按 Id 顺序重排语言目录。</summary>
+    Task<(bool Ok, string? Error)> ReorderLanguagesAsync(IReadOnlyList<long> orderedIds, CancellationToken ct = default);
+
+    /// <summary>读取平台公开语言目录（含本地名称），供语言切换器展示 NativeName。</summary>
+    Task<(IReadOnlyList<PublicLanguageView>? Result, string? Error)> GetPublicLanguagesAsync(CancellationToken ct = default);
     /// <summary>
     /// 松类型读取：GET 任意端点并以 <see cref="JsonElement"/> 返回（数组或对象皆可）。
     /// 不抛异常——HTTP 非 2xx 与网络/解析错误一律通过 err 返回，便于页面优雅降级。

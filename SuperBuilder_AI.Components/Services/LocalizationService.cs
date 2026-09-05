@@ -1,5 +1,6 @@
 using Microsoft.JSInterop;
 using System.Text.Json;
+using SuperBuilder_AI.Components.Models;
 
 namespace SuperBuilder_AI.Components.Services;
 
@@ -18,9 +19,16 @@ public sealed class LocalizationService
 
     public string CurrentCulture { get; private set; } = "zh-CN";
     public IReadOnlyList<string> AvailableCultures { get; private set; } = new[] { "zh-CN" };
+    /// <summary>M3-02 平台公开语言目录（culture→显示名/本地名），用于切换器动态展示 NativeName，替代硬编码映射。</summary>
+    public IReadOnlyDictionary<string, PublicLanguageView> PublicLanguages { get; private set; }
+        = new Dictionary<string, PublicLanguageView>(StringComparer.OrdinalIgnoreCase);
     public event Action? Changed;
 
     public LocalizationService(IJSRuntime js, IApiClient api) { _js = js; _api = api; }
+
+    /// <summary>M3-02 取语言的本地展示名；缺失时回退文化码。</summary>
+    public string NativeName(string culture)
+        => PublicLanguages.TryGetValue(culture, out var v) && !string.IsNullOrWhiteSpace(v.NativeName) ? v.NativeName : culture;
 
     public string T(string key)
     {
@@ -55,8 +63,24 @@ public sealed class LocalizationService
                 chosen = local!;
         }
         CurrentCulture = chosen;
+        await LoadPublicLanguagesAsync();
         await LoadRuntimeTextsAsync();
         Changed?.Invoke();
+    }
+
+    /// <summary>M3-02 拉取平台公开语言目录（含本地名），填充 <see cref="PublicLanguages"/>；失败不影响主流程。</summary>
+    private async Task LoadPublicLanguagesAsync()
+    {
+        try
+        {
+            var (list, err) = await _api.GetPublicLanguagesAsync();
+            if (err is null && list is { Count: > 0 })
+                PublicLanguages = list.ToDictionary(x => x.Culture, x => x, StringComparer.OrdinalIgnoreCase);
+        }
+        catch
+        {
+            // 公开目录取失败则保留空映射，切换器回退展示文化码。
+        }
     }
 
     public async Task SetCultureAsync(long tenantId, long userId, string culture)

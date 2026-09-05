@@ -29,7 +29,12 @@ public sealed class LocalizationControllerPublicTextsTests
     }
 
     private static LocalizationController Build(SuperBIContext db)
-        => new LocalizationController(new LocalizationService(), db, new LocalizationSeedService(db, new LocalizationService()), new TenantLanguageService(db, new NoopAuditService()));
+        => new LocalizationController(
+            new LocalizationService(),
+            db,
+            new LocalizationSeedService(db, new LocalizationService()),
+            new TenantLanguageService(db, new NoopAuditService()),
+            new PlatformLanguageService(db, new TenantLanguageService(db, new NoopAuditService()), new NoopAuditService()));
 
     [Fact]
     public async Task PublicTexts_Returns_Only_Platform_Baseline_TenantZero()

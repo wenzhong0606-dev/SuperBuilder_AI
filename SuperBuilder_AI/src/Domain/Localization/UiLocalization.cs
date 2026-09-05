@@ -20,4 +20,10 @@ public sealed class UiTextResource : BaseEntity
     public string ResourceKey { get; set; } = string.Empty;
     public string Value { get; set; } = string.Empty;
     public string? Description { get; set; }
+
+    /// <summary>
+    /// 是否已翻译。平台基线种子与人工保存的译文置 true；
+    /// 新建语言从其它语言复制键集合时置 false（标记“待翻译”），便于平台管理员识别待补译项。
+    /// </summary>
+    public bool IsTranslated { get; set; } = true;
 }

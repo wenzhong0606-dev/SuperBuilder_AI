@@ -4,7 +4,7 @@
     <select class="culture-switcher" value="@L10n.CurrentCulture" @onchange="OnChange" aria-label="@L10n.T("Common.Settings", "设置")">
         @foreach (var culture in L10n.AvailableCultures)
         {
-            <option value="@culture">@Label(culture)</option>
+            <option value="@culture">@L10n.NativeName(culture)</option>
         }
     </select>
 }
@@ -12,14 +12,6 @@
 @code {
     /// <summary>语言变更回调：返回选中的文化代码（如 zh-CN）。</summary>
     [Parameter] public EventCallback<string> OnCultureChanged { get; set; }
-
-    private static readonly Dictionary<string, string> NativeNames = new(StringComparer.OrdinalIgnoreCase)
-    {
-        ["zh-CN"] = "简体中文", ["zh-TW"] = "繁體中文", ["en-US"] = "English",
-        ["ja-JP"] = "日本語", ["ko-KR"] = "한국어",
-    };
-
-    private static string Label(string code) => NativeNames.TryGetValue(code, out var name) ? name : code;
 
     private async Task OnChange(ChangeEventArgs e)
     {

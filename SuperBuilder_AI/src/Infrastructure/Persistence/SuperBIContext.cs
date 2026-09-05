@@ -353,6 +353,7 @@ public class SuperBIContext : DbContext
         builder.Entity<UiTextResource>().Property(x => x.ResourceKey).IsRequired().HasMaxLength(160);
         builder.Entity<UiTextResource>().Property(x => x.Value).IsRequired().HasMaxLength(2048);
         builder.Entity<UiTextResource>().Property(x => x.Description).HasMaxLength(256);
+        builder.Entity<UiTextResource>().Property(x => x.IsTranslated).IsRequired().HasDefaultValue(true).HasComment("是否已翻译（新建语言从其它语言复制键集合时标记待翻译）");
         builder.Entity<UserLanguagePreference>().ToTable(tb => tb.HasComment("用户界面语言偏好"));
         builder.Entity<UserLanguagePreference>().HasIndex(x => new { x.TenantId, x.UserId }).IsUnique();
         builder.Entity<UserLanguagePreference>().Property(x => x.Culture).IsRequired().HasMaxLength(16);

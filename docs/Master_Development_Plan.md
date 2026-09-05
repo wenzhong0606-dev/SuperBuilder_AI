@@ -376,12 +376,21 @@ M3-G0 是 M4/M7/M8 的最小前置，不等同于完成全部 i18n。它只包�
 - ✅ **M3-01-C 启动播种迁移**：`Program.cs` 启动序列在主题种子之后调用 `EnsureAllTenantsLanguagesAsync`（幂等，按 JSON 或平台默认 zh-CN 迁移）。
 - ✅ **M3-01-D 消费者改走服务**：`AuthController`(登录/LoginOptions)、`TenantMembershipController`、`TenantManagementController`(List/Create/Update)、`LocalizationController.AllowedCultures`、`UserLanguagePreferenceService`、`SelfRegistrationService`、`DemoDataInstaller` 全部改经 `ITenantLanguageService`；`TenantSettingPolicy` 锁定键（含 `localization:*`）保持不变以兼容既有治理测试。
 
-### M3-02 平台语言维护
+### M3-02 平台语言维护 ✅（2026-09-05 收尾，本地提交待推送）
 
 - 平台管理员查看、添加、启停、排序语言；Culture 按 BCP 47 归一化并唯一。
 - DisplayName、NativeName 必填；语言切换器优先显示 NativeName。
 - 新语言可复制已有键集合，复制项标记“待翻译”。
 - 平台视图只维护 TenantId=0 的目录和基线，不显示租户覆盖。
+
+> **状态（2026-09-05）**：M3-02 全部交付并验证；测试 691/691 全绿（新增 `PlatformLanguageServiceTests` 13 项 + `LocalizationControllerAdminTests` 4 项）、后端与三端（Components/Web/Maui）构建 0 error。本地提交待推送 `origin/master`。
+
+**交付清单（M3-02-A ~ M3-02-E）：**
+- ✅ **M3-02-A 基础与迁移**：`LocaleContext.NormalizeCulture` 公开 BCP 47 归一化；`UiTextResource.IsTranslated` 列 + 迁移 `20260905072839_M3_02_UiTextResource_IsTranslated` + 种子置 `IsTranslated=true`。
+- ✅ **M3-02-B 平台语言服务**：`IPlatformLanguageService`/`PlatformLanguageService`/`PlatformLanguageException`；列表（含停用与翻译进度统计）、按 Id 查看、新建（归一化+唯一性+必填名+复制键集合标记待翻译）、改名/排序、启用/停用（停用委托 `DisablePlatformLanguageAsync` 完成租户默认语言迁移）。
+- ✅ **M3-02-C 控制器与 DI**：`LocalizationController` 新增 `admin/languages`、`admin/languages/{id}`、`languages/{id}`(PUT)、`languages/{id}/enabled`、`languages/reorder` 五个受 `localization:manage` 守卫端点；`Program.cs` 注册 `IPlatformLanguageService`；`PublicTexts`/`Texts` 投影 `IsTranslated`。
+- ✅ **M3-02-D 前端接入**：`IApiClient`/`ApiClient` 新增 6 个方法 + DTO（`AdminLanguageView`/`AdminLanguageCreate`/`AdminLanguageUpdate`/`PublicLanguageView`）；`Localization.razor` 改用强类型目录（启停/排序/改名/待翻译展示）；`LanguageSwitcher` + `LocalizationService` 从 `public/languages` 动态获取 `NativeName`，移除硬编码 5 语言映射。
+- ✅ **M3-02-E 测试与验证**：`PlatformLanguageServiceTests`（13 项：归一化、唯一性、必填、复制待翻译、列表/查看统计、启停委派、排序）、`LocalizationControllerAdminTests`（4 项：声明守卫、包含停用、复制待翻译、非法 Culture 400）；全量回归 691/691 通过。
 
 ### M3-03 租户文本覆盖
 

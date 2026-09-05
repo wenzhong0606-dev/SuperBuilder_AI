@@ -4,6 +4,7 @@
 @inject AppState State
 @using System.Text.Json
 @using SuperBuilder_AI.Components.Shared
+@using SuperBuilder_AI.Components.Models
 
 <AuthGuard>
     <PageHead Icon="sb-ico-lang" Title="多语言中心" Desc="平台维护语言与标准文本；租户自动继承，并只覆盖自己的差异文案。" />
@@ -12,11 +13,36 @@
             <div class="locale-rail-title">语言目录 <span>@_languages.Count</span></div>
             @foreach (var language in _languages)
             {
-                var culture = Cell(language, "culture");
-                <button class="locale-item @(culture == _culture ? "active" : "")" @onclick="() => SelectCulture(culture)">
-                    <span class="locale-orb">@culture.Split('-')[0].ToUpperInvariant()</span>
-                    <span><b>@Cell(language, "nativeName")</b><small>@culture · @Cell(language, "displayName")</small></span><i></i>
-                </button>
+                <div class="locale-item @(language.Culture == _culture ? "active" : "") @(!language.Enabled ? "disabled" : "")">
+                    <button class="locale-item-btn" @onclick="() => SelectCulture(language.Culture)">
+                        <span class="locale-orb">@language.Culture.Split('-')[0].ToUpperInvariant()</span>
+                        <span><b>@language.NativeName</b><small>@language.Culture · @language.DisplayName</small></span>
+                    </button>
+                    @if (language.TotalKeys > 0 && language.PendingCount > 0)
+                    {
+                        <span class="pending-chip" title="尚未翻译的键数">待翻译 @language.PendingCount</span>
+                    }
+                    @if (!language.Enabled)
+                    {
+                        <span class="disabled-chip">已停用</span>
+                    }
+                    @if (_isPlatform)
+                    {
+                        <span class="locale-item-ops">
+                            <button class="icon-btn" title="上移" @onclick="() => MoveLanguage(language, -1)">▲</button>
+                            <button class="icon-btn" title="下移" @onclick="() => MoveLanguage(language, 1)">▼</button>
+                            <button class="icon-btn" title="编辑名称" @onclick="() => OpenEdit(language)">✎</button>
+                            @if (language.Enabled)
+                            {
+                                <button class="icon-btn danger" title="停用" @onclick='() => ToggleEnabled(language, false)'>⏻</button>
+                            }
+                            else
+                            {
+                                <button class="icon-btn ok" title="启用" @onclick='() => ToggleEnabled(language, true)'>⏻</button>
+                            }
+                        </span>
+                    }
+                </div>
             }
             @if (_isPlatform)
             {
@@ -55,9 +81,17 @@
             <SbField Label="Culture 代码" Full="true" Required="true"><input @bind="_newCulture" placeholder="如：fr-FR" /></SbField>
             <SbField Label="显示名称" Full="true"><input @bind="_newDisplayName" placeholder="如：法语（法国）" /></SbField>
             <SbField Label="本地名称" Full="true"><input @bind="_newNativeName" placeholder="如：Français" /></SbField>
-            <SbField Label="初始文本复制自" Full="true"><select @bind="_copyFrom">@foreach(var language in _languages){<option value="@Cell(language,"culture")">@Cell(language,"nativeName")</option>}</select></SbField>
+            <SbField Label="初始文本复制自" Full="true"><select @bind="_copyFrom">@foreach(var language in _languages){<option value="@language.Culture">@language.NativeName</option>}</select></SbField>
         </Body>
         <Footer><button class="btn btn-outline-secondary btn-sm" @onclick="() => _addingLanguage=false">取消</button><button class="btn btn-primary btn-sm" @onclick="AddLanguage">创建语言</button></Footer>
+    </SbModal>
+    <SbModal Visible="@_editingLanguage" VisibleChanged="v => _editingLanguage = v" Title="编辑语言名称">
+        <Body>
+            <SbField Label="Culture 代码" Full="true"><input value="@_editCulture" disabled="disabled" /></SbField>
+            <SbField Label="显示名称" Full="true"><input @bind="_editDisplayName" placeholder="如：法语（法国）" /></SbField>
+            <SbField Label="本地名称" Full="true"><input @bind="_editNativeName" placeholder="如：Français" /></SbField>
+        </Body>
+        <Footer><button class="btn btn-outline-secondary btn-sm" @onclick="() => _editingLanguage=false">取消</button><button class="btn btn-primary btn-sm" @onclick="SaveEdit">保存</button></Footer>
     </SbModal>
     <SbModal Visible="@_addingText" VisibleChanged="v => _addingText=v" Title="新增系统文本键">
         <Body><SbField Label="资源键" Full="true" Required="true"><input @bind="_newTextKey" placeholder="如：Page.Title.订单" /></SbField><SbField Label="当前语言文本" Full="true" Required="true"><input @bind="_newTextValue" /></SbField></Body>
@@ -66,18 +100,59 @@
 </AuthGuard>
 
 @code {
-    private List<JsonElement> _languages = new(); private List<JsonElement> _texts = new();
+    private List<AdminLanguageView> _languages = new();
+    private List<JsonElement> _texts = new();
     private string _culture = "zh-CN", _error = ""; private bool _loading = true;
     private bool _addingLanguage; private string _newCulture="", _newDisplayName="", _newNativeName="", _copyFrom="en-US";
+    private bool _editingLanguage; private long _editId; private string _editCulture="", _editDisplayName="", _editNativeName="";
     private bool _addingText; private string _newTextKey="", _newTextValue="";
     private bool _isPlatform => State.Permissions?.Contains(PermissionCodes.PlatformTenantView) == true;
     protected override async Task OnAfterRenderAsync(bool firstRender) { if (firstRender) await Load(); }
-    private async Task Load() { var (data, _, err) = await Api.GetJsonAsync("api/localization/languages"); _languages = data is { ValueKind: JsonValueKind.Array } ? data.Value.EnumerateArray().ToList() : new(); _error = err ?? ""; if (_languages.Count > 0 && !_languages.Any(x => Cell(x, "culture") == _culture)) _culture = Cell(_languages[0], "culture"); await LoadTexts(); }
+    private async Task Load() { await LoadLanguages(); await LoadTexts(); }
+    private async Task LoadLanguages()
+    {
+        var (result, err) = await Api.GetAdminLanguagesAsync();
+        if (err != null) { _error = err; _languages = new(); }
+        else { _languages = (result ?? new List<AdminLanguageView>()).OrderBy(x => x.SortOrder).ToList(); _error = ""; }
+        if (_languages.Count > 0 && !_languages.Any(x => x.Culture == _culture)) _culture = _languages[0].Culture;
+    }
     private async Task SelectCulture(string culture) { _culture = culture; await LoadTexts(); }
     private async Task LoadTexts() { _loading = true; StateHasChanged(); var (data, _, err) = await Api.GetJsonAsync($"api/localization/texts?culture={Uri.EscapeDataString(_culture)}"); _texts = data is { ValueKind: JsonValueKind.Array } ? data.Value.EnumerateArray().ToList() : new(); _error = err ?? ""; _loading = false; StateHasChanged(); }
     private async Task Save(string key, string value) { var (ok, _, err) = await Api.PutAsync($"api/localization/texts/{Uri.EscapeDataString(_culture)}/{Uri.EscapeDataString(key)}", new { value }); if (!ok) Toast.Error(err ?? "保存失败。"); else { Toast.Success(_isPlatform ? "平台文本已更新。" : "租户专属文本已保存。"); await LoadTexts(); } }
     private async Task Reset(string key) { var (ok, _, err) = await Api.DeleteAsync($"api/localization/texts/{Uri.EscapeDataString(_culture)}/{Uri.EscapeDataString(key)}/override"); if (!ok) Toast.Error(err ?? "恢复失败。"); else { Toast.Success("已恢复继承平台文本。"); await LoadTexts(); } }
-    private async Task AddLanguage() { var (ok, _, err)=await Api.PostAsync("api/localization/languages",new { culture=_newCulture,displayName=_newDisplayName,nativeName=_newNativeName,copyFromCulture=_copyFrom }); if(!ok){Toast.Error(err??"创建失败。");return;} _addingLanguage=false; _culture=_newCulture; _newCulture=_newDisplayName=_newNativeName=""; Toast.Success("语言已创建，可开始维护对应文本。"); await Load(); }
+    private async Task AddLanguage()
+    {
+        var model = new AdminLanguageCreate { Culture = _newCulture, DisplayName = _newDisplayName, NativeName = _newNativeName, CopyFromCulture = _copyFrom };
+        var (ok, err) = await Api.CreateLanguageAsync(model);
+        if (!ok) { Toast.Error(err ?? "创建失败。"); return; }
+        _addingLanguage = false; _culture = (_newCulture ?? "").Trim(); _newCulture = _newDisplayName = _newNativeName = "";
+        Toast.Success("语言已创建，可开始维护对应文本。"); await LoadLanguages(); await LoadTexts();
+    }
+    private void OpenEdit(AdminLanguageView lang) { _editId = lang.Id; _editCulture = lang.Culture; _editDisplayName = lang.DisplayName; _editNativeName = lang.NativeName; _editingLanguage = true; }
+    private async Task SaveEdit()
+    {
+        var model = new AdminLanguageUpdate { DisplayName = _editDisplayName, NativeName = _editNativeName };
+        var (ok, err) = await Api.UpdateLanguageAsync(_editId, model);
+        if (!ok) { Toast.Error(err ?? "保存失败。"); return; }
+        _editingLanguage = false; Toast.Success("语言名称已更新。"); await LoadLanguages();
+    }
+    private async Task ToggleEnabled(AdminLanguageView lang, bool enabled)
+    {
+        var (ok, err) = await Api.SetLanguageEnabledAsync(lang.Id, enabled);
+        if (!ok) { Toast.Error(err ?? "操作失败。"); return; }
+        Toast.Success(enabled ? "语言已启用。" : "语言已停用，相关租户默认语言已迁移。"); await LoadLanguages();
+    }
+    private async Task MoveLanguage(AdminLanguageView lang, int dir)
+    {
+        var index = _languages.FindIndex(x => x.Id == lang.Id);
+        if (index < 0 || index + dir < 0 || index + dir >= _languages.Count) return;
+        var list = _languages.ToList();
+        (list[index], list[index + dir]) = (list[index + dir], list[index]);
+        var orderedIds = list.Select(x => x.Id).ToList();
+        var (ok, err) = await Api.ReorderLanguagesAsync(orderedIds);
+        if (!ok) { Toast.Error(err ?? "排序失败。"); return; }
+        await LoadLanguages();
+    }
     private async Task AddText() { if(string.IsNullOrWhiteSpace(_newTextKey)||string.IsNullOrWhiteSpace(_newTextValue))return; await Save(_newTextKey.Trim(),_newTextValue); _addingText=false; _newTextKey=_newTextValue=""; }
     private static string Cell(JsonElement row, string key) => TablePresenter.Cell(row, key);
     private static bool Flag(JsonElement row, string key) => Cell(row, key).Equals("True", StringComparison.OrdinalIgnoreCase);

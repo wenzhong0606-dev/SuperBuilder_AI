@@ -75,5 +75,11 @@ public sealed class AuthStoreTests
 		public Task<(DemoInstallResult? Result, string? Error)> InstallDemoDataAsync(CancellationToken ct = default) => throw new NotSupportedException();
 		public Task<(string? Culture, string? Error)> GetUserLanguageAsync(CancellationToken ct = default) => throw new NotSupportedException();
 		public Task<(string? Culture, string? Error)> SetUserLanguageAsync(string culture, CancellationToken ct = default) => throw new NotSupportedException();
+		public Task<(IReadOnlyList<AdminLanguageView>? Result, string? Error)> GetAdminLanguagesAsync(CancellationToken ct = default) => throw new NotSupportedException();
+		public Task<(bool Ok, string? Error)> CreateLanguageAsync(AdminLanguageCreate model, CancellationToken ct = default) => throw new NotSupportedException();
+		public Task<(bool Ok, string? Error)> UpdateLanguageAsync(long id, AdminLanguageUpdate model, CancellationToken ct = default) => throw new NotSupportedException();
+		public Task<(bool Ok, string? Error)> SetLanguageEnabledAsync(long id, bool enabled, CancellationToken ct = default) => throw new NotSupportedException();
+		public Task<(bool Ok, string? Error)> ReorderLanguagesAsync(IReadOnlyList<long> orderedIds, CancellationToken ct = default) => throw new NotSupportedException();
+		public Task<(IReadOnlyList<PublicLanguageView>? Result, string? Error)> GetPublicLanguagesAsync(CancellationToken ct = default) => throw new NotSupportedException();
 	}
 }

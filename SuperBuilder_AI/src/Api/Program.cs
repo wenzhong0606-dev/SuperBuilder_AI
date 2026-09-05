@@ -285,6 +285,7 @@ builder.Services.AddScoped<IThemeSeedService, ThemeSeedService>();
 builder.Services.AddScoped<IUserLanguagePreferenceService, UserLanguagePreferenceService>();
 // M3-01：租户界面语言关系服务（替代 localization JSON，约束在事务内强制）
 builder.Services.AddScoped<ITenantLanguageService, TenantLanguageService>();
+builder.Services.AddScoped<IPlatformLanguageService, PlatformLanguageService>();
 // M0-08：限流阈值（绑定配置节 "RateLimit"，缺省使用安全默认值）
 builder.Services.Configure<RateLimitOptions>(builder.Configuration.GetSection("RateLimit"));
 // RL-1/RL-2：限流存储。

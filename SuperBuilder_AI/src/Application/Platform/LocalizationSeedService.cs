@@ -122,6 +122,7 @@ public sealed class LocalizationSeedService : ILocalizationSeedService
                     ResourceKey = x.Key,
                     Value = x.Value,
                     Description = x.Key.StartsWith("Common.") ? "系统通用文本" : "系统界面文本",
+                    IsTranslated = true,
                 }));
         }
 

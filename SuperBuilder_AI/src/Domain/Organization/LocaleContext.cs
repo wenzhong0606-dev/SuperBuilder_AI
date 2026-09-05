@@ -87,6 +87,12 @@ public sealed record LocaleContext
 			false);
 	}
 
+	/// <summary>
+	/// 归一化文化字符串为 IETF BCP 47 形式（语言段小写、地区段大写，如 <c>zh_CN</c> → <c>zh-CN</c>）；
+	/// 输入无效（null/空白/格式非法）时返回 null。供外部（如平台语言目录维护）复用同一归一化规则。
+	/// </summary>
+	public static string? NormalizeCulture(string? culture) => Normalize(culture);
+
 	/// <summary>平台默认语言区域（<c>zh-CN</c>）。所有未显式指定语言的路径都落到此实例。</summary>
 	public static LocaleContext Default { get; } = new(
 		"zh-CN", "zh", "CN", "简体中文", "Asia/Shanghai", "ltr", true);
