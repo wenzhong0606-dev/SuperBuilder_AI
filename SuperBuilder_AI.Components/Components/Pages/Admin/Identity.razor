@@ -7,15 +7,15 @@
 
 <AuthGuard>
     <PermissionGuard Require="@(new[]{ PermissionCodes.IdentityManage })">
-    <PageHead Icon="sb-ico-shield" Key="Identity" Title="身份与权限" Desc="管理用户、角色与权限分配，基于租户作用域的 RBAC。">
-        <button class="btn btn-primary btn-sm" @onclick="OpenCreateUser">新建用户</button>
-        <button class="btn btn-outline-secondary btn-sm" @onclick="OpenCreateRole">新建角色</button>
-        <button class="btn btn-outline-secondary btn-sm" @onclick="Reload">刷新</button>
+    <PageHead Icon="sb-ico-shield" Key="Identity" Title="身份与权限" Desc="@L10n.T(Keys.Content.AdminIdentityDesc, "管理用户、角色与权限分配，基于租户作用域的 RBAC。")">
+        <button class="btn btn-primary btn-sm" @onclick="OpenCreateUser">@L10n.T(Keys.Content.AdminIdentityCreateUser, "新建用户")</button>
+        <button class="btn btn-outline-secondary btn-sm" @onclick="OpenCreateRole">@L10n.T(Keys.Content.AdminIdentityCreateRole, "新建角色")</button>
+        <button class="btn btn-outline-secondary btn-sm" @onclick="Reload">@L10n.T(Keys.Content.CommonRefresh, "刷新")</button>
     </PageHead>
 
     @if (_loading)
     {
-        <LoadingState Text="正在加载身份与权限…" />
+        <LoadingState Text="@L10n.T(Keys.Content.AdminIdentityLoading, "正在加载身份与权限…")" />
     }
     else if (!string.IsNullOrWhiteSpace(_error))
     {
@@ -24,39 +24,39 @@
     else
     {
         <div class="stat-grid">
-            <SbStatTile Label="用户" Value="@_users.Count" Sub="当前租户" />
-            <SbStatTile Label="角色" Value="@_roles.Count" Sub="RBAC" Accent="info" />
-            <SbStatTile Label="权限点" Value="@_permissions.Count" Sub="可授予" Accent="warning" />
+            <SbStatTile Label="@L10n.T(Keys.Content.AdminIdentityStatUsers, "用户")" Value="@_users.Count" Sub="@L10n.T(Keys.Content.AdminIdentityStatUsersSub, "当前租户")" />
+            <SbStatTile Label="@L10n.T(Keys.Content.AdminIdentityStatRoles, "角色")" Value="@_roles.Count" Sub="@L10n.T(Keys.Content.AdminIdentityStatRolesSub, "RBAC")" Accent="info" />
+            <SbStatTile Label="@L10n.T(Keys.Content.AdminIdentityStatPerms, "权限点")" Value="@_permissions.Count" Sub="@L10n.T(Keys.Content.AdminIdentityStatPermsSub, "可授予")" Accent="warning" />
         </div>
 
-        <SbPanel Icon="sb-ico-shield" Title="用户" Flush="true">
+        <SbPanel Icon="sb-ico-shield" Title="@L10n.T(Keys.Content.AdminIdentityPanelUsers, "用户")" Flush="true">
             <Body>
                 @if (_users.Count == 0)
                 {
-                    <SbEmptyState Icon="sb-ico-shield" Title="暂无用户" Text="用户是租户内可登录与操作的账号主体。" />
+                    <SbEmptyState Icon="sb-ico-shield" Title="@L10n.T(Keys.Content.AdminIdentityEmptyUsers, "暂无用户")" Text="@L10n.T(Keys.Content.AdminIdentityEmptyUsersText, "用户是租户内可登录与操作的账号主体。")" />
                 }
                 else
                 {
-                    <SbDataTable Items="@_users" Columns="@UserColumns" PageSize="20" EmptyTitle="无匹配用户">
+                    <SbDataTable Items="@_users" Columns="@UserColumns" PageSize="20" EmptyTitle="@L10n.T(Keys.Content.AdminIdentityNoMatchUsers, "无匹配用户")">
                         <RowActions>
-                            <button class="btn btn-sm btn-outline-secondary" @onclick='() => OpenAssign(context)'>分配角色</button>
+                            <button class="btn btn-sm btn-outline-secondary" @onclick='() => OpenAssign(context)'>@L10n.T(Keys.Content.AdminIdentityAssignRole, "分配角色")</button>
                         </RowActions>
                     </SbDataTable>
                 }
             </Body>
         </SbPanel>
 
-        <SbPanel Icon="sb-ico-key" Title="角色" Flush="true">
+        <SbPanel Icon="sb-ico-key" Title="@L10n.T(Keys.Content.AdminIdentityPanelRoles, "角色")" Flush="true">
             <Body>
                 @if (_roles.Count == 0)
                 {
-                    <SbEmptyState Icon="sb-ico-key" Title="暂无角色" Text="角色聚合一组权限，可批量授予用户。" />
+                    <SbEmptyState Icon="sb-ico-key" Title="@L10n.T(Keys.Content.AdminIdentityEmptyRoles, "暂无角色")" Text="@L10n.T(Keys.Content.AdminIdentityEmptyRolesText, "角色聚合一组权限，可批量授予用户。")" />
                 }
                 else
                 {
-                    <SbDataTable Items="@_roles" Columns="@RoleColumns" PageSize="20" EmptyTitle="无匹配角色">
+                    <SbDataTable Items="@_roles" Columns="@RoleColumns" PageSize="20" EmptyTitle="@L10n.T(Keys.Content.AdminIdentityNoMatchRoles, "无匹配角色")">
                         <RowActions>
-                            <button class="btn btn-sm btn-outline-secondary" @onclick='() => OpenPerms(context)'>编辑权限</button>
+                            <button class="btn btn-sm btn-outline-secondary" @onclick='() => OpenPerms(context)'>@L10n.T(Keys.Content.AdminIdentityEditPerms, "编辑权限")</button>
                         </RowActions>
                     </SbDataTable>
                 }
@@ -66,19 +66,19 @@
     </PermissionGuard>
 </AuthGuard>
 
-<SbModal Visible="@_userModal" VisibleChanged="v => _userModal = v" Title="新建用户" Size="md">
+<SbModal Visible="@_userModal" VisibleChanged="v => _userModal = v" Title="@L10n.T(Keys.Content.AdminIdentityCreateUser, "新建用户")" Size="md">
     <Body>
         <div class="form-stack">
-            <SbField Label="用户名" Required="true" Error="@_userErr">
-                <input class="form-control" @bind="_newUser" placeholder="登录账号" />
+            <SbField Label="@L10n.T(Keys.Content.CommonUsername, "用户名")" Required="true" Error="@_userErr">
+                <input class="form-control" @bind="_newUser" placeholder="@L10n.T(Keys.Content.AdminIdentityUsernamePh, "登录账号")" />
             </SbField>
-            <SbField Label="显示名">
-                <input class="form-control" @bind="_newName" placeholder="可选" />
+            <SbField Label="@L10n.T(Keys.Content.CommonDisplayName, "显示名")">
+                <input class="form-control" @bind="_newName" placeholder="@L10n.T(Keys.Content.CommonOptional, "可选")" />
             </SbField>
-            <SbField Label="邮箱">
-                <input class="form-control" @bind="_newEmail" placeholder="可选" />
+            <SbField Label="@L10n.T(Keys.Content.CommonEmail, "邮箱")">
+                <input class="form-control" @bind="_newEmail" placeholder="@L10n.T(Keys.Content.CommonOptional, "可选")" />
             </SbField>
-            <SbField Label="初始角色">
+            <SbField Label="@L10n.T(Keys.Content.AdminIdentityInitialRole, "初始角色")">
                 <div class="chk-grid">
                     @foreach (var role in _roles)
                     {
@@ -87,31 +87,31 @@
                     }
                     @if (_roles.Count == 0)
                     {
-                        <span class="muted">暂无可选角色</span>
+                        <span class="muted">@L10n.T(Keys.Content.AdminIdentityNoRoles, "暂无可选角色")</span>
                     }
                 </div>
             </SbField>
         </div>
     </Body>
     <Footer>
-        <button class="btn btn-outline-secondary btn-sm" @onclick="() => _userModal = false">取消</button>
-        <button class="btn btn-primary btn-sm" @onclick="CreateUser">创建</button>
+        <button class="btn btn-outline-secondary btn-sm" @onclick="() => _userModal = false">@L10n.T(Keys.Content.CommonCancel, "取消")</button>
+        <button class="btn btn-primary btn-sm" @onclick="CreateUser">@L10n.T(Keys.Content.CommonCreate, "创建")</button>
     </Footer>
 </SbModal>
 
-<SbModal Visible="@_roleModal" VisibleChanged="v => _roleModal = v" Title="新建角色" Size="md">
+<SbModal Visible="@_roleModal" VisibleChanged="v => _roleModal = v" Title="@L10n.T(Keys.Content.AdminIdentityCreateRole, "新建角色")" Size="md">
     <Body>
         <div class="form-stack">
-            <SbField Label="角色编码" Required="true" Error="@_roleErr">
-                <input class="form-control" @bind="_newRoleCode" placeholder="如 order.manager" />
+            <SbField Label="@L10n.T(Keys.Content.CommonRoleCode, "角色编码")" Required="true" Error="@_roleErr">
+                <input class="form-control" @bind="_newRoleCode" placeholder="@L10n.T(Keys.Content.AdminIdentityRoleCodePh, "如 order.manager")" />
             </SbField>
-            <SbField Label="名称">
-                <input class="form-control" @bind="_newRoleName" placeholder="可选" />
+            <SbField Label="@L10n.T(Keys.Content.CommonName, "名称")">
+                <input class="form-control" @bind="_newRoleName" placeholder="@L10n.T(Keys.Content.CommonOptional, "可选")" />
             </SbField>
-            <SbField Label="描述">
-                <input class="form-control" @bind="_newRoleDesc" placeholder="可选" />
+            <SbField Label="@L10n.T(Keys.Content.CommonDescription, "描述")">
+                <input class="form-control" @bind="_newRoleDesc" placeholder="@L10n.T(Keys.Content.CommonOptional, "可选")" />
             </SbField>
-            <SbField Label="权限点">
+            <SbField Label="@L10n.T(Keys.Content.CommonPermissions, "权限点")">
                 <div class="chk-grid">
                     @foreach (var perm in _permissions)
                     {
@@ -120,24 +120,24 @@
                     }
                     @if (_permissions.Count == 0)
                     {
-                        <span class="muted">暂无可选权限</span>
+                        <span class="muted">@L10n.T(Keys.Content.AdminIdentityNoPerms, "暂无可选权限")</span>
                     }
                 </div>
             </SbField>
         </div>
     </Body>
     <Footer>
-        <button class="btn btn-outline-secondary btn-sm" @onclick="() => _roleModal = false">取消</button>
-        <button class="btn btn-primary btn-sm" @onclick="CreateRole">创建</button>
+        <button class="btn btn-outline-secondary btn-sm" @onclick="() => _roleModal = false">@L10n.T(Keys.Content.CommonCancel, "取消")</button>
+        <button class="btn btn-primary btn-sm" @onclick="CreateRole">@L10n.T(Keys.Content.CommonCreate, "创建")</button>
     </Footer>
 </SbModal>
 
-<SbModal Visible="@_assignModal" VisibleChanged="v => _assignModal = v" Title="分配角色" Size="sm">
+<SbModal Visible="@_assignModal" VisibleChanged="v => _assignModal = v" Title="@L10n.T(Keys.Content.AdminIdentityAssignRole, "分配角色")" Size="sm">
     <Body>
-        <p class="muted">为用户 <strong>@_assignUserName</strong> 指派角色（角色可为全局或本租户）。</p>
-        <SbField Label="角色" Required="true">
+        <p class="muted">@string.Format(L10n.T(Keys.Content.AdminIdentityAssignHint, "为用户 {0} 指派角色（角色可为全局或本租户）。"), _assignUserName)</p>
+        <SbField Label="@L10n.T(Keys.Content.CommonRole, "角色")" Required="true">
             <select class="form-select" @bind="_assignRoleCode">
-                <option value="">— 选择角色 —</option>
+                <option value="">@L10n.T(Keys.Content.AdminIdentitySelectRole, "— 选择角色 —")</option>
                 @foreach (var role in _roles)
                 {
                     <option value="@TablePresenter.Cell(role, "code")">@TablePresenter.Cell(role, "name")</option>
@@ -150,14 +150,14 @@
         }
     </Body>
     <Footer>
-        <button class="btn btn-outline-secondary btn-sm" @onclick="() => _assignModal = false">取消</button>
-        <button class="btn btn-primary btn-sm" @onclick="AskAssign">添加</button>
+        <button class="btn btn-outline-secondary btn-sm" @onclick="() => _assignModal = false">@L10n.T(Keys.Content.CommonCancel, "取消")</button>
+        <button class="btn btn-primary btn-sm" @onclick="AskAssign">@L10n.T(Keys.Content.CommonAdd, "添加")</button>
     </Footer>
 </SbModal>
 
-<SbModal Visible="@_permModal" VisibleChanged="v => _permModal = v" Title="编辑角色权限" Size="md">
+<SbModal Visible="@_permModal" VisibleChanged="v => _permModal = v" Title="@L10n.T(Keys.Content.AdminIdentityModalEditPerms, "编辑角色权限")" Size="md">
     <Body>
-        <p class="muted">角色 <strong>@_permRoleName</strong>（@_permRoleCode）的权限集（全量替换）。</p>
+        <p class="muted">@string.Format(L10n.T(Keys.Content.AdminIdentityPermHint, "角色 {0}（{1}）的权限集（全量替换）。"), _permRoleName, _permRoleCode)</p>
         <div class="chk-grid">
             @foreach (var perm in _permissions)
             {
@@ -166,23 +166,23 @@
             }
             @if (_permissions.Count == 0)
             {
-                <span class="muted">暂无可选权限</span>
+                <span class="muted">@L10n.T(Keys.Content.AdminIdentityNoPerms, "暂无可选权限")</span>
             }
         </div>
     </Body>
     <Footer>
-        <button class="btn btn-outline-secondary btn-sm" @onclick="() => _permModal = false">取消</button>
-        <button class="btn btn-primary btn-sm" @onclick="AskSavePerms">保存</button>
+        <button class="btn btn-outline-secondary btn-sm" @onclick="() => _permModal = false">@L10n.T(Keys.Content.CommonCancel, "取消")</button>
+        <button class="btn btn-primary btn-sm" @onclick="AskSavePerms">@L10n.T(Keys.Content.CommonSave, "保存")</button>
     </Footer>
 </SbModal>
 
     <SbConfirm Visible="@_confirmPerms" VisibleChanged="v => _confirmPerms = v"
-               Title="保存角色权限" Message="确认覆盖该角色的权限集？变更对拥有此角色的用户立即生效，且需重新登录后在前端生效。"
-               ConfirmText="保存" Tone="danger" OnConfirm="SavePerms" />
+               Title="@L10n.T(Keys.Content.AdminIdentityConfirmSavePermsTitle, "保存角色权限")" Message="@L10n.T(Keys.Content.AdminIdentityConfirmSavePermsMsg, "确认覆盖该角色的权限集？变更对拥有此角色的用户立即生效，且需重新登录后在前端生效。")"
+               ConfirmText="@L10n.T(Keys.Content.CommonSave, "保存")" Tone="danger" OnConfirm="SavePerms" />
 
     <SbConfirm Visible="@_confirmAssign" VisibleChanged="v => _confirmAssign = v"
-               Title="指派角色" Message='@($"确认为用户「{_assignUserName}」指派角色「{_assignRoleCode}」？")'
-               ConfirmText="指派" Tone="danger" OnConfirm="AssignRole" />
+               Title="@L10n.T(Keys.Content.AdminIdentityConfirmAssignTitle, "指派角色")" Message='@string.Format(L10n.T(Keys.Content.AdminIdentityConfirmAssignMsg, "确认为用户「{0}」指派角色「{1}」？"), _assignUserName, _assignRoleCode)'
+               ConfirmText="@L10n.T(Keys.Content.AdminIdentityAssignRole, "指派")" Tone="danger" OnConfirm="AssignRole" />
 
 @code {
     private List<JsonElement> _users = new();
@@ -272,7 +272,7 @@
     {
         if (string.IsNullOrWhiteSpace(_newUser))
         {
-            _userErr = "用户名必填。";
+            _userErr = L10n.T(Keys.Content.AdminIdentityUsernameRequired, "用户名必填。");
             return;
         }
         var (_, status, err, _) = await Api.PostAsync("api/identity/users", new
@@ -285,13 +285,13 @@
         });
         if (status is >= 200 and < 300)
         {
-            Toast.Success($"用户 {_newUser} 已创建。");
+            Toast.Success(string.Format(L10n.T(Keys.Content.AdminIdentityUserCreated, "用户 {0} 已创建。"), _newUser));
             _userModal = false;
             await Reload();
         }
         else
         {
-            _userErr = err ?? $"创建失败（HTTP {status}）。";
+            _userErr = err ?? string.Format(L10n.T(Keys.Content.AdminIdentityCreateFailed, "创建失败（HTTP {0}）。"), status);
         }
     }
 
@@ -306,7 +306,7 @@
     {
         if (string.IsNullOrWhiteSpace(_newRoleCode))
         {
-            _roleErr = "角色编码必填。";
+            _roleErr = L10n.T(Keys.Content.AdminIdentityRoleCodeRequired, "角色编码必填。");
             return;
         }
         var (_, status, err, _) = await Api.PostAsync("api/identity/roles", new
@@ -319,13 +319,13 @@
         });
         if (status is >= 200 and < 300)
         {
-            Toast.Success($"角色 {_newRoleCode} 已创建。");
+            Toast.Success(string.Format(L10n.T(Keys.Content.AdminIdentityRoleCreated, "角色 {0} 已创建。"), _newRoleCode));
             _roleModal = false;
             await Reload();
         }
         else
         {
-            _roleErr = err ?? $"创建失败（HTTP {status}）。";
+            _roleErr = err ?? string.Format(L10n.T(Keys.Content.AdminIdentityCreateFailed, "创建失败（HTTP {0}）。"), status);
         }
     }
 
@@ -349,18 +349,18 @@
     {
         if (string.IsNullOrWhiteSpace(_assignRoleCode))
         {
-            _assignErr = "请选择角色。";
+            _assignErr = L10n.T(Keys.Content.AdminIdentitySelectRoleRequired, "请选择角色。");
             return;
         }
         var (_, status, err, _) = await Api.PostAsync($"api/identity/users/{_assignUserId}/roles", new { roleCode = _assignRoleCode });
         if (status is >= 200 and < 300)
         {
-            Toast.Success($"已为 {_assignUserName} 指派角色 {_assignRoleCode}。");
+            Toast.Success(string.Format(L10n.T(Keys.Content.AdminIdentityAssigned, "已为 {0} 指派角色 {1}。"), _assignUserName, _assignRoleCode));
             _assignModal = false;
         }
         else
         {
-            _assignErr = err ?? $"指派失败（HTTP {status}）。";
+            _assignErr = err ?? string.Format(L10n.T(Keys.Content.AdminIdentityAssignFailed, "指派失败（HTTP {0}）。"), status);
         }
     }
 
@@ -383,13 +383,13 @@
         var (_, status, err, _) = await Api.PutAsync($"api/identity/roles/{_permRoleCode}/permissions", new { permissions = _permSelected.ToArray() });
         if (status is >= 200 and < 300)
         {
-            Toast.Success($"角色 {_permRoleCode} 权限已更新。");
+            Toast.Success(string.Format(L10n.T(Keys.Content.AdminIdentityPermsUpdated, "角色 {0} 权限已更新。"), _permRoleCode));
             _permModal = false;
             await Reload();
         }
         else
         {
-            Toast.Error(err ?? $"保存失败（HTTP {status}）。");
+            Toast.Error(err ?? string.Format(L10n.T(Keys.Content.AdminIdentitySaveFailed, "保存失败（HTTP {0}）。"), status));
         }
     }
 }
