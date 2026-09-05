@@ -4,12 +4,12 @@
 
 <AuthGuard>
     <PermissionGuard Require="@(new[]{ PermissionCodes.PlatformAdminManage })">
-    <PageHead Icon="sb-ico-db" Key="DemoData" Title="演示数据" Desc="安装独立的演示租户与示例业务数据（数据源/元数据/语义/仪表盘）。生产默认不安装，可重复安装受保护。" />
+    <PageHead Icon="sb-ico-db" Key="DemoData" Title="演示数据" Desc="@L10n.T(Keys.Content.DemoDataDesc, "安装独立的演示租户与示例业务数据（数据源/元数据/语义/仪表盘）。生产默认不安装，可重复安装受保护。")" />
 
     <div class="sb-page-body">
         @if (_loading)
         {
-            <LoadingState Text="加载中…" />
+            <LoadingState Text="@L10n.T(Keys.Content.CommonLoading, "加载中…")" />
         }
         else if (_error != null)
         {
@@ -18,20 +18,20 @@
         else
         {
             <div class="card mb-3">
-                <h3 class="card-title">安装状态</h3>
+                <h3 class="card-title">@L10n.T(Keys.Content.DemoDataInstallStatus, "安装状态")</h3>
                 <table class="table">
                     <tbody>
-                        <tr><th>是否已安装</th><td>@StatusBadge(_plan?.AlreadyInstalled ?? false)</td></tr>
-                        <tr><th>演示租户</th><td>@(_plan?.DemoTenantName) <span class="muted">(@(_plan?.DemoTenantCode))</span></td></tr>
-                        <tr><th>管理员账号</th><td>@(_plan?.AdminUsername)</td></tr>
+                        <tr><th>@L10n.T(Keys.Content.DemoDataColInstalled, "是否已安装")</th><td>@StatusBadge(_plan?.AlreadyInstalled ?? false)</td></tr>
+                        <tr><th>@L10n.T(Keys.Content.DemoDataColTenant, "演示租户")</th><td>@(_plan?.DemoTenantName) <span class="muted">(@(_plan?.DemoTenantCode))</span></td></tr>
+                        <tr><th>@L10n.T(Keys.Content.DemoDataColAdmin, "管理员账号")</th><td>@(_plan?.AdminUsername)</td></tr>
                     </tbody>
                 </table>
             </div>
 
             <div class="card mb-3">
-                <h3 class="card-title">将创建的内容</h3>
+                <h3 class="card-title">@L10n.T(Keys.Content.DemoDataContentTitle, "将创建的内容")</h3>
                 <table class="table">
-                    <thead><tr><th>类型</th><th>数量</th><th>说明</th></tr></thead>
+                    <thead><tr><th>@L10n.T(Keys.Content.DemoDataColType, "类型")</th><th>@L10n.T(Keys.Content.DemoDataColCount, "数量")</th><th>@L10n.T(Keys.Content.DemoDataColDesc, "说明")</th></tr></thead>
                     <tbody>
                     @foreach (var it in _plan?.Items ?? new System.Collections.Generic.List<DemoPlanItem>())
                     {
@@ -43,23 +43,23 @@
 
             @if (_plan?.AlreadyInstalled ?? false)
             {
-                <div class="alert alert-info">演示数据已安装，再次安装将被跳过（仅返回已有租户）。如需重建，请先删除演示租户。</div>
+                <div class="alert alert-info">@L10n.T(Keys.Content.DemoDataInstalledNote, "演示数据已安装，再次安装将被跳过（仅返回已有租户）。如需重建，请先删除演示租户。")</div>
             }
             else if (_installing)
             {
-                <LoadingState Text="正在安装演示数据…" />
+                <LoadingState Text="@L10n.T(Keys.Content.DemoDataInstalling, "正在安装演示数据…")" />
             }
             else if (_confirming)
             {
                 <div class="alert alert-warning">
-                    <p class="mb-2">确认安装演示数据？将创建演示租户、管理员、数据源、元数据、业务语义与仪表盘，并写入多张业务表。</p>
-                    <button class="btn btn-primary" @onclick="DoInstall">确认安装</button>
-                    <button class="btn btn-secondary" @onclick='() => _confirming = false'>取消</button>
+                    <p class="mb-2">@L10n.T(Keys.Content.DemoDataConfirmText, "确认安装演示数据？将创建演示租户、管理员、数据源、元数据、业务语义与仪表盘，并写入多张业务表。")</p>
+                    <button class="btn btn-primary" @onclick="DoInstall">@L10n.T(Keys.Content.DemoDataConfirmBtn, "确认安装")</button>
+                    <button class="btn btn-secondary" @onclick='() => _confirming = false'>@L10n.T(Keys.Content.CommonCancel, "取消")</button>
                 </div>
             }
             else
             {
-                <button class="btn btn-primary" @onclick='() => _confirming = true'>安装演示数据</button>
+                <button class="btn btn-primary" @onclick='() => _confirming = true'>@L10n.T(Keys.Content.DemoDataInstallBtn, "安装演示数据")</button>
             }
 
             @if (_result != null)
@@ -67,20 +67,20 @@
                 @if (_result!.Success)
                 {
                     <div class="alert alert-success mt-3">
-                        <p>演示数据安装完成。</p>
+                        <p>@L10n.T(Keys.Content.DemoDataDone, "演示数据安装完成。")</p>
                         <ul class="mb-0">
-                            <li>租户：@_plan?.DemoTenantName（@_plan?.DemoTenantCode）</li>
-                            <li>管理员：@_result.Username</li>
+                            <li>@L10n.T(Keys.Content.DemoDataLiTenant, "租户：")@_plan?.DemoTenantName（@_plan?.DemoTenantCode）</li>
+                            <li>@L10n.T(Keys.Content.DemoDataLiAdmin, "管理员：")@_result.Username</li>
                             @if (!string.IsNullOrEmpty(_result.AdminPassword))
                             {
-                                <li>初始口令：<code>@_result.AdminPassword</code>（请妥善保存，首次登录后建议修改）</li>
+                                <li>@L10n.T(Keys.Content.DemoDataLiPwd, "初始口令：")<code>@_result.AdminPassword</code>@L10n.T(Keys.Content.DemoDataLiPwdNote, "（请妥善保存，首次登录后建议修改）")</li>
                             }
                         </ul>
                     </div>
                 }
                 else
                 {
-                    <div class="alert alert-danger mt-3">安装失败：@_result.Error</div>
+                    <div class="alert alert-danger mt-3">@L10n.T(Keys.Content.DemoDataFailPrefix, "安装失败：")@_result.Error</div>
                 }
             }
         }
@@ -108,7 +108,7 @@
         StateHasChanged();
         var (plan, err) = await Api.GetDemoDataPlanAsync();
         if (plan is null)
-            _error = err ?? "无法加载演示数据计划。";
+            _error = err ?? L10n.T(Keys.Content.DemoDataLoadFailed, "无法加载演示数据计划。");
         else
             _plan = plan;
         _loading = false;
@@ -125,7 +125,7 @@
         var (res, err) = await Api.InstallDemoDataAsync();
         if (res is null)
         {
-            _error = err ?? "安装失败。";
+            _error = err ?? L10n.T(Keys.Content.DemoDataInstallError, "安装失败。");
             _installing = false;
             StateHasChanged();
             return;
@@ -141,6 +141,6 @@
 
     private MarkupString StatusBadge(bool on) =>
         (MarkupString)(on
-            ? "<span class=\"badge bg-success\">已安装</span>"
-            : "<span class=\"badge bg-secondary\">未安装</span>");
+            ? "<span class=\"badge bg-success\">" + L10n.T(Keys.Content.DemoDataInstalledBadge, "已安装") + "</span>"
+            : "<span class=\"badge bg-secondary\">" + L10n.T(Keys.Content.DemoDataNotInstalledBadge, "未安装") + "</span>");
 }

@@ -4,27 +4,27 @@
 
 <AuthGuard>
     <PermissionGuard>
-        <PageHead Icon="sb-ico-activity" Key="SystemStatus" Title="系统状态" Desc="后端健康检查与运行时指标（只读）。">
+        <PageHead Icon="sb-ico-activity" Key="SystemStatus" Title="系统状态" Desc="@L10n.T(Keys.Content.SystemStatusDesc, "后端健康检查与运行时指标（只读）。")">
             <button class="btn btn-outline-secondary btn-sm" @onclick="() => Load()" disabled="@_loading">
-                @(_loading ? "刷新中…" : "刷新")
+                @(_loading ? L10n.T(Keys.Content.SystemStatusRefreshing, "刷新中…") : L10n.T(Keys.Content.CommonRefresh, "刷新"))
             </button>
         </PageHead>
 
         <div class="stat-grid">
-            <SbStatTile Label="健康状态" Value="@(string.IsNullOrWhiteSpace(_status) ? "—" : _status)"
+            <SbStatTile Label="@L10n.T(Keys.Content.SystemStatusHealthLabel, "健康状态")" Value="@(string.IsNullOrWhiteSpace(_status) ? "—" : _status)"
                         Sub="@($"HTTP {_healthStatus}")"
                         Accent="@(_healthy ? "success" : "warning")" />
-            <SbStatTile Label="响应耗时" Value="@($"{_elapsed} ms")" Sub="本页刷新耗时" />
-            <SbStatTile Label="指标行数" Value="@_metricLines" Sub="/metrics 文本行数" />
+            <SbStatTile Label="@L10n.T(Keys.Content.SystemStatusRespLabel, "响应耗时")" Value="@($"{_elapsed} ms")" Sub="@L10n.T(Keys.Content.SystemStatusRespSub, "本页刷新耗时")" />
+            <SbStatTile Label="@L10n.T(Keys.Content.SystemStatusMetricLabel, "指标行数")" Value="@_metricLines" Sub="@L10n.T(Keys.Content.SystemStatusMetricSub, "/metrics 文本行数")" />
         </div>
 
         <SbTabs>
-            <SbTab Title="健康检查">
+            <SbTab Title="@L10n.T(Keys.Content.SystemStatusTabHealth, "健康检查")">
                 <SbPanel Icon="sb-ico-activity" Title="/health">
                     <Body><pre class="sb-pre">@_healthText</pre></Body>
                 </SbPanel>
             </SbTab>
-            <SbTab Title="运行时指标">
+            <SbTab Title="@L10n.T(Keys.Content.SystemStatusTabMetrics, "运行时指标")">
                 <SbPanel Icon="sb-ico-quota" Title="/metrics">
                     <Body><pre class="sb-pre">@_metricsText</pre></Body>
                 </SbPanel>
@@ -56,12 +56,12 @@
 
         var (health, hStatus, hErr, _) = await Api.GetJsonAsync("health");
         _healthStatus = hStatus;
-        _healthText = health is not null ? health.Value.ToString() : (hErr ?? "无响应");
+        _healthText = health is not null ? health.Value.ToString() : (hErr ?? L10n.T(Keys.Content.SystemStatusNoResponse, "无响应"));
         _status = health is not null && health.Value.TryGetProperty("status", out var s) ? (s.GetString() ?? "") : (hStatus == 200 ? "UP" : "DOWN");
         _healthy = hStatus == 200;
 
         var (metrics, _, mErr) = await Api.GetTextAsync("metrics");
-        _metricsText = metrics ?? (mErr ?? "无响应");
+        _metricsText = metrics ?? (mErr ?? L10n.T(Keys.Content.SystemStatusNoResponse, "无响应"));
         _metricLines = string.IsNullOrEmpty(_metricsText)
             ? 0
             : _metricsText.Split('\n', StringSplitOptions.RemoveEmptyEntries).Length;
