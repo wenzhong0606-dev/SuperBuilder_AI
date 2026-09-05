@@ -10,9 +10,9 @@ else if (Fallback is not null)
 }
 else
 {
-    <SbEmptyState Icon="sb-ico-shield" Title="无访问权限" Text="@DenyText">
+    <SbEmptyState Icon="sb-ico-shield" Title="@L10n.T(Keys.Content.SharedPermDeniedTitle, "无访问权限")" Text="@(DenyText ?? L10n.T(Keys.Content.SharedPermDeniedText, "当前账号缺少访问该页面所需的权限，请联系管理员。"))">
         <Actions>
-            <button class="btn btn-outline-secondary btn-sm" @onclick='() => Nav.NavigateTo("")'>返回首页</button>
+            <button class="btn btn-outline-secondary btn-sm" @onclick='() => Nav.NavigateTo("")'>@L10n.T(Keys.Content.SharedBackHome, "返回首页")</button>
         </Actions>
     </SbEmptyState>
 }
@@ -22,7 +22,7 @@ else
 
     [Parameter] public IReadOnlyList<string> Require { get; set; } = Array.Empty<string>();
     [Parameter] public string Mode { get; set; } = "Any";
-    [Parameter] public string DenyText { get; set; } = "当前账号缺少访问该页面所需的权限，请联系管理员。";
+    [Parameter] public string? DenyText { get; set; }
     [Parameter] public RenderFragment? ChildContent { get; set; }
     [Parameter] public RenderFragment? Fallback { get; set; }
 

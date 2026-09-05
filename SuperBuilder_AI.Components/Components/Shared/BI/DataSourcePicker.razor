@@ -2,7 +2,7 @@
 <div class="sb-ds-picker">
     @if (!string.IsNullOrWhiteSpace(Label))
     {
-        <span class="sb-field-label">@Label</span>
+        <span class="sb-field-label">@(Label ?? L10n.T(Keys.Content.SharedDataSource, "数据源"))</span>
     }
     <select class="form-control" value="@DataSourceId" @onchange="OnChange" style="max-width:240px">
         @foreach (var ds in Items)
@@ -27,7 +27,7 @@
     [Parameter] public IReadOnlyList<Option> Items { get; set; } = Array.Empty<Option>();
     [Parameter] public long DataSourceId { get; set; }
     [Parameter] public EventCallback<long> DataSourceIdChanged { get; set; }
-    [Parameter] public string? Label { get; set; } = "数据源";
+    [Parameter] public string? Label { get; set; }
     [Parameter] public string? SubText { get; set; }
 
     private async Task OnChange(ChangeEventArgs e)

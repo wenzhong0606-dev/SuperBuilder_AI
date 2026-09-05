@@ -867,6 +867,37 @@ public static class ResourceKeys
         public const string AdminTenantMembersAdded = "Content.AdminTenantMembersAdded";
         public const string AdminTenantMembersRemoveFailed = "Content.AdminTenantMembersRemoveFailed";
         public const string AdminTenantMembersRemoved = "Content.AdminTenantMembersRemoved";
+        public const string SharedConfirmTitle = "Content.SharedConfirmTitle";
+        public const string SharedConfirm = "Content.SharedConfirm";
+        public const string SharedLoading = "Content.SharedLoading";
+        public const string SharedColActions = "Content.SharedColActions";
+        public const string SharedEmptyTitle = "Content.SharedEmptyTitle";
+        public const string SharedRefresh = "Content.SharedRefresh";
+        public const string SharedSearchPlaceholder = "Content.SharedSearchPlaceholder";
+        public const string SharedClose = "Content.SharedClose";
+        public const string SharedPrevPage = "Content.SharedPrevPage";
+        public const string SharedNextPage = "Content.SharedNextPage";
+        public const string SharedPageSummary = "Content.SharedPageSummary";
+        public const string SharedSearch = "Content.SharedSearch";
+        public const string SharedClear = "Content.SharedClear";
+        public const string SharedTenantSwitch = "Content.SharedTenantSwitch";
+        public const string SharedTenantCurrent = "Content.SharedTenantCurrent";
+        public const string SharedTenantSwitchFailed = "Content.SharedTenantSwitchFailed";
+        public const string SharedAuthChecking = "Content.SharedAuthChecking";
+        public const string SharedAuthRequiredTitle = "Content.SharedAuthRequiredTitle";
+        public const string SharedAuthRequiredText = "Content.SharedAuthRequiredText";
+        public const string SharedAuthGoLogin = "Content.SharedAuthGoLogin";
+        public const string SharedPermDeniedTitle = "Content.SharedPermDeniedTitle";
+        public const string SharedPermDeniedText = "Content.SharedPermDeniedText";
+        public const string SharedBackHome = "Content.SharedBackHome";
+        public const string SharedDataSource = "Content.SharedDataSource";
+        public const string SharedNoDataTitle = "Content.SharedNoDataTitle";
+        public const string SharedNoDataText = "Content.SharedNoDataText";
+        public const string SharedViewSql = "Content.SharedViewSql";
+        public const string SharedCopySql = "Content.SharedCopySql";
+        public const string SharedCopied = "Content.SharedCopied";
+        public const string SharedCopyFailed = "Content.SharedCopyFailed";
+        public const string SharedBreadcrumb = "Content.SharedBreadcrumb";
 
     }
 
@@ -1775,6 +1806,37 @@ public static class ResourceKeys
         [Content.AdminTenantMembersAdded] = new("Content", Page: "TenantMembers", DefaultValue: "Tenant membership added."),
         [Content.AdminTenantMembersRemoveFailed] = new("Content", Page: "TenantMembers", DefaultValue: "Failed to remove."),
         [Content.AdminTenantMembersRemoved] = new("Content", Page: "TenantMembers", DefaultValue: "Tenant membership removed."),
+        [Content.SharedConfirmTitle] = new("Content", Page: "Shared", DefaultValue: "Confirm action"),
+        [Content.SharedConfirm] = new("Content", Page: "Shared", DefaultValue: "Confirm"),
+        [Content.SharedLoading] = new("Content", Page: "Shared", DefaultValue: "Loading…"),
+        [Content.SharedColActions] = new("Content", Page: "Shared", DefaultValue: "Actions"),
+        [Content.SharedEmptyTitle] = new("Content", Page: "Shared", DefaultValue: "No data"),
+        [Content.SharedRefresh] = new("Content", Page: "Shared", DefaultValue: "Refresh"),
+        [Content.SharedSearchPlaceholder] = new("Content", Page: "Shared", DefaultValue: "Search…"),
+        [Content.SharedClose] = new("Content", Page: "Shared", DefaultValue: "Close"),
+        [Content.SharedPrevPage] = new("Content", Page: "Shared", DefaultValue: "Previous"),
+        [Content.SharedNextPage] = new("Content", Page: "Shared", DefaultValue: "Next"),
+        [Content.SharedPageSummary] = new("Content", Page: "Shared", DefaultValue: "Page {0} of {1} · {2} items"),
+        [Content.SharedSearch] = new("Content", Page: "Shared", DefaultValue: "Search"),
+        [Content.SharedClear] = new("Content", Page: "Shared", DefaultValue: "Clear"),
+        [Content.SharedTenantSwitch] = new("Content", Page: "Shared", DefaultValue: "Switch tenant"),
+        [Content.SharedTenantCurrent] = new("Content", Page: "Shared", DefaultValue: "Current: tenant {0} (home {1})"),
+        [Content.SharedTenantSwitchFailed] = new("Content", Page: "Shared", DefaultValue: "Failed to switch tenant"),
+        [Content.SharedAuthChecking] = new("Content", Page: "Shared", DefaultValue: "Verifying session…"),
+        [Content.SharedAuthRequiredTitle] = new("Content", Page: "Shared", DefaultValue: "Sign-in required"),
+        [Content.SharedAuthRequiredText] = new("Content", Page: "Shared", DefaultValue: "This page requires sign-in. Please log in first."),
+        [Content.SharedAuthGoLogin] = new("Content", Page: "Shared", DefaultValue: "Go to sign in"),
+        [Content.SharedPermDeniedTitle] = new("Content", Page: "Shared", DefaultValue: "Access denied"),
+        [Content.SharedPermDeniedText] = new("Content", Page: "Shared", DefaultValue: "Your account lacks the permissions required for this page. Please contact an administrator."),
+        [Content.SharedBackHome] = new("Content", Page: "Shared", DefaultValue: "Back to home"),
+        [Content.SharedDataSource] = new("Content", Page: "Shared", DefaultValue: "Data source"),
+        [Content.SharedNoDataTitle] = new("Content", Page: "Shared", DefaultValue: "No data returned"),
+        [Content.SharedNoDataText] = new("Content", Page: "Shared", DefaultValue: "This query returned no rows."),
+        [Content.SharedViewSql] = new("Content", Page: "Shared", DefaultValue: "View generated SQL"),
+        [Content.SharedCopySql] = new("Content", Page: "Shared", DefaultValue: "Copy SQL"),
+        [Content.SharedCopied] = new("Content", Page: "Shared", DefaultValue: "Copied"),
+        [Content.SharedCopyFailed] = new("Content", Page: "Shared", DefaultValue: "Copy failed, please select manually"),
+        [Content.SharedBreadcrumb] = new("Content", Page: "Shared", DefaultValue: "Breadcrumb"),
 
     };
 

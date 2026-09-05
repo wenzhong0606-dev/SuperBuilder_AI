@@ -6,7 +6,7 @@
     {
         <div class="sb-toast sb-toast-@t.Tone" @key="t.Id">
             <span class="sb-toast-text">@t.Text</span>
-            <button type="button" class="sb-toast-close" @onclick="() => Toasts.Dismiss(t.Id)" aria-label="关闭">×</button>
+            <button type="button" class="sb-toast-close" @onclick="() => Toasts.Dismiss(t.Id)" aria-label="@L10n.T(Keys.Content.SharedClose, "关闭")">×</button>
         </div>
     }
 </div>

@@ -9,7 +9,7 @@
 {
     <div class="tenant-switcher" title="@_switcherTitle">
         <svg class="btn-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 9h.01M15 9h.01M9 13h.01M15 13h.01"/></svg>
-        <select class="tenant-switcher-select" value="@State.TenantId.ToString()" @onchange="Switch" aria-label="切换租户">
+        <select class="tenant-switcher-select" value="@State.TenantId.ToString()" @onchange="Switch" aria-label="@L10n.T(Keys.Content.SharedTenantSwitch, "切换租户")">
             @foreach (var t in _selectable)
             {
                 <option value="@t.Id">@(string.IsNullOrEmpty(t.Name) ? t.Code : t.Name)@(t.Id == State.HomeTenantId ? " ·" : "")</option>
@@ -31,8 +31,8 @@
     private List<TenantOption> _tenants = new();
     private List<TenantOption> _selectable => _tenants.Where(t => t.Enabled).ToList();
     private string _switcherTitle => State.HomeTenantId > 0 && State.HomeTenantId != State.TenantId
-        ? $"当前：租户 {State.TenantId}（主租户 {State.HomeTenantId}）"
-        : "切换租户";
+        ? string.Format(L10n.T(Keys.Content.SharedTenantCurrent, "当前：租户 {0}（主租户 {1}）"), State.TenantId, State.HomeTenantId)
+        : L10n.T(Keys.Content.SharedTenantSwitch, "切换租户");
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -76,7 +76,7 @@
         var (result, error) = await Api.SwitchTenantAsync(target);
         if (result is null)
         {
-            Toast.Error(error ?? "切换失败");
+            Toast.Error(error ?? L10n.T(Keys.Content.SharedTenantSwitchFailed, "切换失败"));
             await InvokeAsync(StateHasChanged);
             return;
         }

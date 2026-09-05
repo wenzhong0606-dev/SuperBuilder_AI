@@ -2,9 +2,9 @@
 @if (TotalPages > 1)
 {
     <div class="sb-pager">
-        <button class="btn btn-sm btn-outline-secondary" disabled="@(Page <= 1)" @onclick="() => Go(Page - 1)">上一页</button>
-        <span class="muted tiny">第 @Page / @TotalPages 页 · 共 @TotalCount 条</span>
-        <button class="btn btn-sm btn-outline-secondary" disabled="@(Page >= TotalPages)" @onclick="() => Go(Page + 1)">下一页</button>
+        <button class="btn btn-sm btn-outline-secondary" disabled="@(Page <= 1)" @onclick="() => Go(Page - 1)">@L10n.T(Keys.Content.SharedPrevPage, "上一页")</button>
+        <span class="muted tiny">@string.Format(L10n.T(Keys.Content.SharedPageSummary, "第 {0} / {1} 页 · 共 {2} 条"), Page, TotalPages, TotalCount)</span>
+        <button class="btn btn-sm btn-outline-secondary" disabled="@(Page >= TotalPages)" @onclick="() => Go(Page + 1)">@L10n.T(Keys.Content.SharedNextPage, "下一页")</button>
     </div>
 }
 

@@ -3,10 +3,10 @@
 @if (!string.IsNullOrWhiteSpace(Sql))
 {
     <details class="sql-block">
-        <summary>@(string.IsNullOrWhiteSpace(Title) ? "查看生成的 SQL" : Title)</summary>
+        <summary>@(string.IsNullOrWhiteSpace(Title) ? L10n.T(Keys.Content.SharedViewSql, "查看生成的 SQL") : Title)</summary>
         <pre>@Sql</pre>
         <div class="mt-2">
-            <button class="btn btn-sm btn-outline-secondary" @onclick="Copy">复制 SQL</button>
+            <button class="btn btn-sm btn-outline-secondary" @onclick="Copy">@L10n.T(Keys.Content.SharedCopySql, "复制 SQL")</button>
             @if (!string.IsNullOrWhiteSpace(_msg))
             {
                 <span class="muted tiny">@_msg</span>
@@ -27,11 +27,11 @@
         try
         {
             await JS.InvokeVoidAsync("navigator.clipboard.writeText", Sql);
-            _msg = "已复制";
+            _msg = L10n.T(Keys.Content.SharedCopied, "已复制");
         }
         catch
         {
-            _msg = "复制失败，请手动选择";
+            _msg = L10n.T(Keys.Content.SharedCopyFailed, "复制失败，请手动选择");
         }
     }
 }

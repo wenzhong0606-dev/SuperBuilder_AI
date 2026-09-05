@@ -8,7 +8,7 @@
 }
 @if (current is not null)
 {
-    <nav class="sb-crumb" aria-label="面包屑">
+    <nav class="sb-crumb" aria-label="@L10n.T(Keys.Content.SharedBreadcrumb, "面包屑")">
         @if (group is not null)
         {
             <span class="sb-crumb-seg">@L10n.T($"Nav.Group.{group.Title}", group.Title)</span>

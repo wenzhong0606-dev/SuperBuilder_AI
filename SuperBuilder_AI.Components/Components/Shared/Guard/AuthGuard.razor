@@ -6,7 +6,7 @@
    否则预渲染/首帧会把已登录用户误判为未登录。 *@
 @if (!State.SessionRestored)
 {
-    <LoadingState Text="正在校验会话…" />
+    <LoadingState Text="@L10n.T(Keys.Content.SharedAuthChecking, "正在校验会话…")" />
 }
 else if (State.IsAuthenticated)
 {
@@ -14,9 +14,9 @@ else if (State.IsAuthenticated)
 }
 else
 {
-    <SbEmptyState Icon="sb-ico-shield" Title="需要登录" Text="该页面需要登录后访问，请先登录你的账号。">
+    <SbEmptyState Icon="sb-ico-shield" Title="@L10n.T(Keys.Content.SharedAuthRequiredTitle, "需要登录")" Text="@L10n.T(Keys.Content.SharedAuthRequiredText, "该页面需要登录后访问，请先登录你的账号。")">
         <Actions>
-            <button class="btn btn-primary btn-sm" @onclick="GoLogin">前往登录</button>
+            <button class="btn btn-primary btn-sm" @onclick="GoLogin">@L10n.T(Keys.Content.SharedAuthGoLogin, "前往登录")</button>
         </Actions>
     </SbEmptyState>
 }

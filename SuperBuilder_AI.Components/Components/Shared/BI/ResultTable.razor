@@ -35,7 +35,7 @@
 }
 else
 {
-    <SbEmptyState Icon="sb-ico-db" Title="没有返回数据" Text="@(string.IsNullOrWhiteSpace(EmptyText) ? "本次查询未返回任何行。" : EmptyText)" />
+    <SbEmptyState Icon="sb-ico-db" Title="@L10n.T(Keys.Content.SharedNoDataTitle, "没有返回数据")" Text="@(string.IsNullOrWhiteSpace(EmptyText) ? L10n.T(Keys.Content.SharedNoDataText, "本次查询未返回任何行。") : EmptyText)" />
 }
 
 @code {

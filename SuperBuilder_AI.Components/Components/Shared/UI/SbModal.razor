@@ -5,7 +5,7 @@
         <div class="sb-modal sb-modal-@Size" role="dialog" aria-modal="true" @onclick:stopPropagation="true">
             <div class="sb-modal-head">
                 <h3>@Title</h3>
-                <button type="button" class="sb-modal-close" @onclick="Close" aria-label="关闭">×</button>
+                <button type="button" class="sb-modal-close" @onclick="Close" aria-label="@L10n.T(Keys.Content.SharedClose, "关闭")">×</button>
             </div>
             <div class="sb-modal-body">@Body</div>
             @if (Footer is not null)

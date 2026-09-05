@@ -899,6 +899,37 @@ public static class Keys
         public const string AdminTenantMembersAdded = "Content.AdminTenantMembersAdded";
         public const string AdminTenantMembersRemoveFailed = "Content.AdminTenantMembersRemoveFailed";
         public const string AdminTenantMembersRemoved = "Content.AdminTenantMembersRemoved";
+        public const string SharedConfirmTitle = "Content.SharedConfirmTitle";
+        public const string SharedConfirm = "Content.SharedConfirm";
+        public const string SharedLoading = "Content.SharedLoading";
+        public const string SharedColActions = "Content.SharedColActions";
+        public const string SharedEmptyTitle = "Content.SharedEmptyTitle";
+        public const string SharedRefresh = "Content.SharedRefresh";
+        public const string SharedSearchPlaceholder = "Content.SharedSearchPlaceholder";
+        public const string SharedClose = "Content.SharedClose";
+        public const string SharedPrevPage = "Content.SharedPrevPage";
+        public const string SharedNextPage = "Content.SharedNextPage";
+        public const string SharedPageSummary = "Content.SharedPageSummary";
+        public const string SharedSearch = "Content.SharedSearch";
+        public const string SharedClear = "Content.SharedClear";
+        public const string SharedTenantSwitch = "Content.SharedTenantSwitch";
+        public const string SharedTenantCurrent = "Content.SharedTenantCurrent";
+        public const string SharedTenantSwitchFailed = "Content.SharedTenantSwitchFailed";
+        public const string SharedAuthChecking = "Content.SharedAuthChecking";
+        public const string SharedAuthRequiredTitle = "Content.SharedAuthRequiredTitle";
+        public const string SharedAuthRequiredText = "Content.SharedAuthRequiredText";
+        public const string SharedAuthGoLogin = "Content.SharedAuthGoLogin";
+        public const string SharedPermDeniedTitle = "Content.SharedPermDeniedTitle";
+        public const string SharedPermDeniedText = "Content.SharedPermDeniedText";
+        public const string SharedBackHome = "Content.SharedBackHome";
+        public const string SharedDataSource = "Content.SharedDataSource";
+        public const string SharedNoDataTitle = "Content.SharedNoDataTitle";
+        public const string SharedNoDataText = "Content.SharedNoDataText";
+        public const string SharedViewSql = "Content.SharedViewSql";
+        public const string SharedCopySql = "Content.SharedCopySql";
+        public const string SharedCopied = "Content.SharedCopied";
+        public const string SharedCopyFailed = "Content.SharedCopyFailed";
+        public const string SharedBreadcrumb = "Content.SharedBreadcrumb";
 
     }
 
@@ -1753,6 +1784,37 @@ public static class Keys
         [Content.AdminTenantMembersAdded] = new("已添加租户成员关系。", "Tenant membership added."),
         [Content.AdminTenantMembersRemoveFailed] = new("移除失败。", "Failed to remove."),
         [Content.AdminTenantMembersRemoved] = new("已移除该租户成员关系。", "Tenant membership removed."),
+        [Content.SharedConfirmTitle] = new("确认操作", "Confirm action"),
+        [Content.SharedConfirm] = new("确认", "Confirm"),
+        [Content.SharedLoading] = new("加载中…", "Loading…"),
+        [Content.SharedColActions] = new("操作", "Actions"),
+        [Content.SharedEmptyTitle] = new("暂无数据", "No data"),
+        [Content.SharedRefresh] = new("刷新", "Refresh"),
+        [Content.SharedSearchPlaceholder] = new("搜索…", "Search…"),
+        [Content.SharedClose] = new("关闭", "Close"),
+        [Content.SharedPrevPage] = new("上一页", "Previous"),
+        [Content.SharedNextPage] = new("下一页", "Next"),
+        [Content.SharedPageSummary] = new("第 {0} / {1} 页 · 共 {2} 条", "Page {0} of {1} · {2} items"),
+        [Content.SharedSearch] = new("搜索", "Search"),
+        [Content.SharedClear] = new("清空", "Clear"),
+        [Content.SharedTenantSwitch] = new("切换租户", "Switch tenant"),
+        [Content.SharedTenantCurrent] = new("当前：租户 {0}（主租户 {1}）", "Current: tenant {0} (home {1})"),
+        [Content.SharedTenantSwitchFailed] = new("切换失败", "Failed to switch tenant"),
+        [Content.SharedAuthChecking] = new("正在校验会话…", "Verifying session…"),
+        [Content.SharedAuthRequiredTitle] = new("需要登录", "Sign-in required"),
+        [Content.SharedAuthRequiredText] = new("该页面需要登录后访问，请先登录你的账号。", "This page requires sign-in. Please log in first."),
+        [Content.SharedAuthGoLogin] = new("前往登录", "Go to sign in"),
+        [Content.SharedPermDeniedTitle] = new("无访问权限", "Access denied"),
+        [Content.SharedPermDeniedText] = new("当前账号缺少访问该页面所需的权限，请联系管理员。", "Your account lacks the permissions required for this page. Please contact an administrator."),
+        [Content.SharedBackHome] = new("返回首页", "Back to home"),
+        [Content.SharedDataSource] = new("数据源", "Data source"),
+        [Content.SharedNoDataTitle] = new("没有返回数据", "No data returned"),
+        [Content.SharedNoDataText] = new("本次查询未返回任何行。", "This query returned no rows."),
+        [Content.SharedViewSql] = new("查看生成的 SQL", "View generated SQL"),
+        [Content.SharedCopySql] = new("复制 SQL", "Copy SQL"),
+        [Content.SharedCopied] = new("已复制", "Copied"),
+        [Content.SharedCopyFailed] = new("复制失败，请手动选择", "Copy failed, please select manually"),
+        [Content.SharedBreadcrumb] = new("面包屑", "Breadcrumb"),
 
     };
 }
