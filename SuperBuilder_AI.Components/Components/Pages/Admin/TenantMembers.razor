@@ -5,51 +5,51 @@
 
 <AuthGuard>
     <PermissionGuard Require="@(new[]{ PermissionCodes.PlatformTenantManage })">
-    <PageHead Icon="sb-ico-users" Key="TenantMembers" Title="租户成员" Desc="管理用户与额外可切换租户之间的成员关系：为用户授予跨租户切换资格，或撤销其成员资格。" />
+    <PageHead Icon="sb-ico-users" Key="TenantMembers" Title="租户成员" Desc="@L10n.T(Keys.Content.AdminTenantMembersDesc, "管理用户与额外可切换租户之间的成员关系：为用户授予跨租户切换资格，或撤销其成员资格。")" />
 
-    <SbListPage TItem="MembershipRow" Icon="sb-ico-users" Title="成员关系"
+    <SbListPage TItem="MembershipRow" Icon="sb-ico-users" Title="@L10n.T(Keys.Content.AdminTenantMembersListTitle, "成员关系")"
                 Items="@_rows" Columns="@Columns" Loading="@_loading" Error="@_error"
-                OnReload="Reload" SearchPlaceholder="搜索用户名 / 租户…"
-                EmptyTitle="暂无租户成员关系"
-                EmptyText="使用「添加成员」为用户授予额外的可切换租户（主租户为隐式成员，不在本表列出）。"
-                LoadingText="正在加载成员关系…">
+                OnReload="Reload" SearchPlaceholder="@L10n.T(Keys.Content.AdminTenantMembersSearchPlaceholder, "搜索用户名 / 租户…")"
+                EmptyTitle="@L10n.T(Keys.Content.AdminTenantMembersEmptyTitle, "暂无租户成员关系")"
+                EmptyText="@L10n.T(Keys.Content.AdminTenantMembersEmptyText, "使用「添加成员」为用户授予额外的可切换租户（主租户为隐式成员，不在本表列出）。")"
+                LoadingText="@L10n.T(Keys.Content.AdminTenantMembersLoadingText, "正在加载成员关系…")">
 
         <Actions>
             <button class="btn btn-primary btn-sm" @onclick="() => _adding = true">
-                <svg class="btn-ico"><use href="#sb-ico-plus" /></svg> 添加成员
+                <svg class="btn-ico"><use href="#sb-ico-plus" /></svg> @L10n.T(Keys.Content.AdminTenantMembersAddBtn, "添加成员")
             </button>
         </Actions>
 
         <Stats>
-            <SbStatTile Label="成员关系" Value="@_rows.Count" Sub="显式" />
-            <SbStatTile Label="默认切换" Value="@_rows.Count(r => r.IsDefault)" Sub="标记默认" Accent="success" />
-            <SbStatTile Label="指向停用租户" Value="@_rows.Count(r => !r.TenantEnabled)" Sub="需注意" Accent="warning" />
+            <SbStatTile Label="@L10n.T(Keys.Content.AdminTenantMembersStatMembers, "成员关系")" Value="@_rows.Count" Sub="@L10n.T(Keys.Content.AdminTenantMembersStatMembersSub, "显式")" />
+            <SbStatTile Label="@L10n.T(Keys.Content.AdminTenantMembersStatDefault, "默认切换")" Value="@_rows.Count(r => r.IsDefault)" Sub="@L10n.T(Keys.Content.AdminTenantMembersStatDefaultSub, "标记默认")" Accent="success" />
+            <SbStatTile Label="@L10n.T(Keys.Content.AdminTenantMembersStatDisabled, "指向停用租户")" Value="@_rows.Count(r => !r.TenantEnabled)" Sub="@L10n.T(Keys.Content.AdminTenantMembersStatDisabledSub, "需注意")" Accent="warning" />
         </Stats>
 
         <RowActions>
-            <button class="btn btn-sm btn-outline-danger" @onclick="() => AskRemove(context)">移除</button>
+            <button class="btn btn-sm btn-outline-danger" @onclick="() => AskRemove(context)">@L10n.T(Keys.Content.AdminTenantMembersRemoveBtn, "移除")</button>
         </RowActions>
     </SbListPage>
 
-    <SbModal Visible="@_adding" VisibleChanged="v => _adding = v" Title="添加租户成员">
+    <SbModal Visible="@_adding" VisibleChanged="v => _adding = v" Title="@L10n.T(Keys.Content.AdminTenantMembersModalTitle, "添加租户成员")">
         <Body>
-            <SbField Label="用户 ID" Full="true" Required="true" Error="@_addUserIdErr"><input type="number" @bind="_addUserId" placeholder="目标用户的 Id" /></SbField>
-            <SbField Label="目标租户 ID" Full="true" Required="true" Error="@_addTenantIdErr"><input type="number" @bind="_addTenantId" placeholder="用户将可切换到的租户 Id" /></SbField>
-            <SbField Label="默认切换" Full="true" Hint="勾选后该租户成为此用户的默认切换目标（主租户始终为默认）。">
-                <label class="switch-row"><input type="checkbox" @bind="_addIsDefault" /><span>设为默认切换租户</span></label>
+            <SbField Label="@L10n.T(Keys.Content.AdminTenantMembersUserIdLabel, "用户 ID")" Full="true" Required="true" Error="@_addUserIdErr"><input type="number" @bind="_addUserId" placeholder="@L10n.T(Keys.Content.AdminTenantMembersUserIdPlaceholder, "目标用户的 Id")" /></SbField>
+            <SbField Label="@L10n.T(Keys.Content.AdminTenantMembersTenantIdLabel, "目标租户 ID")" Full="true" Required="true" Error="@_addTenantIdErr"><input type="number" @bind="_addTenantId" placeholder="@L10n.T(Keys.Content.AdminTenantMembersTenantIdPlaceholder, "用户将可切换到的租户 Id")" /></SbField>
+            <SbField Label="@L10n.T(Keys.Content.AdminTenantMembersDefaultLabel, "默认切换")" Full="true" Hint="@L10n.T(Keys.Content.AdminTenantMembersDefaultHint, "勾选后该租户成为此用户的默认切换目标（主租户始终为默认）。")">
+                <label class="switch-row"><input type="checkbox" @bind="_addIsDefault" /><span>@L10n.T(Keys.Content.AdminTenantMembersSetDefault, "设为默认切换租户")</span></label>
             </SbField>
             @if (!string.IsNullOrWhiteSpace(_addErr)) { <div class="alert alert-danger tiny" style="padding:8px 12px">@_addErr</div> }
         </Body>
         <Footer>
-            <button class="btn btn-outline-secondary btn-sm" @onclick="() => _adding = false">取消</button>
-            <button class="btn btn-primary btn-sm" @onclick="SaveAdd" disabled="@_savingAdd">添加</button>
+            <button class="btn btn-outline-secondary btn-sm" @onclick="() => _adding = false">@L10n.T(Keys.Content.CommonCancel, "取消")</button>
+            <button class="btn btn-primary btn-sm" @onclick="SaveAdd" disabled="@_savingAdd">@L10n.T(Keys.Content.CommonAdd, "添加")</button>
         </Footer>
     </SbModal>
 
     <SbConfirm Visible="@_confirmRemove" VisibleChanged="v => _confirmRemove = v"
-               Title="移除租户成员"
-               Message='@($"确认移除用户「{_pending?.UserName} (#{_pending?.UserId})」与租户 (#{_pending?.TenantId}) 的成员关系？该用户将不再能切换到此租户（主租户不可移除）。")'
-               ConfirmText="移除" Tone="danger"
+               Title="@L10n.T(Keys.Content.AdminTenantMembersRemoveTitle, "移除租户成员")"
+               Message="@string.Format(L10n.T(Keys.Content.AdminTenantMembersRemoveMsg, "确认移除用户「{0} (#{1})」与租户 (#{2}) 的成员关系？该用户将不再能切换到此租户（主租户不可移除）。"), _pending?.UserName, _pending?.UserId, _pending?.TenantId)"
+               ConfirmText="@L10n.T(Keys.Content.AdminTenantMembersRemoveConfirm, "移除")" Tone="danger"
                OnConfirm="() => Remove(_pending!)" />
     </PermissionGuard>
 </AuthGuard>
@@ -86,13 +86,13 @@
 
     private List<SbColumn<MembershipRow>> Columns => new()
     {
-        SbCol.Of<MembershipRow>("用户", r => $"{r.UserName} (#{r.UserId})", width: "220px"),
-        SbCol.Of<MembershipRow>("租户", r => $"{(string.IsNullOrEmpty(r.TenantName) ? r.TenantCode : r.TenantName)} (#{r.TenantId})", width: "260px"),
-        SbCol.Of<MembershipRow>("默认", r => r.IsDefault ? "默认" : "—", width: "100px", isStatus: true,
-            cell: r => @<span class="@(r.IsDefault ? "badge badge-success" : "badge badge-muted")">@(r.IsDefault ? "默认" : "—")</span>),
-        SbCol.Of<MembershipRow>("租户启用", r => r.TenantEnabled ? "启用" : "停用", width: "110px", isStatus: true,
-            cell: r => @<span class="@(r.TenantEnabled ? "badge badge-success" : "badge badge-danger")">@(r.TenantEnabled ? "启用" : "停用")</span>),
-        SbCol.Of<MembershipRow>("创建时间", r => FormatDate(r.CreatedAtUtc), width: "180px"),
+        SbCol.Of<MembershipRow>(L10n.T(Keys.Content.AdminTenantMembersColUser, "用户"), r => $"{r.UserName} (#{r.UserId})", width: "220px"),
+        SbCol.Of<MembershipRow>(L10n.T(Keys.Content.AdminTenantMembersColTenant, "租户"), r => $"{(string.IsNullOrEmpty(r.TenantName) ? r.TenantCode : r.TenantName)} (#{r.TenantId})", width: "260px"),
+        SbCol.Of<MembershipRow>(L10n.T(Keys.Content.AdminTenantMembersColDefault, "默认"), r => r.IsDefault ? L10n.T(Keys.Content.AdminTenantMembersColDefault, "默认") : "—", width: "100px", isStatus: true,
+            cell: r => @<span class="@(r.IsDefault ? "badge badge-success" : "badge badge-muted")">@(r.IsDefault ? L10n.T(Keys.Content.AdminTenantMembersColDefault, "默认") : "—")</span>),
+        SbCol.Of<MembershipRow>(L10n.T(Keys.Content.AdminTenantMembersColTenantEnabled, "租户启用"), r => r.TenantEnabled ? L10n.T(Keys.Content.AdminTenantMembersEnabled, "启用") : L10n.T(Keys.Content.AdminTenantMembersDisabled, "停用"), width: "110px", isStatus: true,
+            cell: r => @<span class="@(r.TenantEnabled ? "badge badge-success" : "badge badge-danger")">@(r.TenantEnabled ? L10n.T(Keys.Content.AdminTenantMembersEnabled, "启用") : L10n.T(Keys.Content.AdminTenantMembersDisabled, "停用"))</span>),
+        SbCol.Of<MembershipRow>(L10n.T(Keys.Content.AdminTenantMembersColCreated, "创建时间"), r => FormatDate(r.CreatedAtUtc), width: "180px"),
     };
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -140,8 +140,8 @@
     private async Task SaveAdd()
     {
         _addUserIdErr = ""; _addTenantIdErr = ""; _addErr = "";
-        if (!_addUserId.HasValue || _addUserId <= 0) { _addUserIdErr = "用户 ID 必填且须大于 0。"; return; }
-        if (!_addTenantId.HasValue || _addTenantId <= 0) { _addTenantIdErr = "目标租户 ID 必填且须大于 0。"; return; }
+        if (!_addUserId.HasValue || _addUserId <= 0) { _addUserIdErr = L10n.T(Keys.Content.AdminTenantMembersUserIdRequired, "用户 ID 必填且须大于 0。"); return; }
+        if (!_addTenantId.HasValue || _addTenantId <= 0) { _addTenantIdErr = L10n.T(Keys.Content.AdminTenantMembersTenantIdRequired, "目标租户 ID 必填且须大于 0。"); return; }
 
         _savingAdd = true;
         var (ok, status, err, _) = await Api.PostAsync("api/tenant-membership", new
@@ -153,12 +153,12 @@
         _savingAdd = false;
         if (!ok)
         {
-            _addErr = status == 400 ? (err ?? "添加失败：用户或租户不存在，或已是成员。") : (err ?? "添加失败。");
+            _addErr = status == 400 ? (err ?? L10n.T(Keys.Content.AdminTenantMembersAddFailedExists, "添加失败：用户或租户不存在，或已是成员。")) : (err ?? L10n.T(Keys.Content.AdminTenantMembersAddFailed, "添加失败。"));
             return;
         }
         _adding = false;
         _addUserId = null; _addTenantId = null; _addIsDefault = false;
-        Toast.Success("已添加租户成员关系。");
+        Toast.Success(L10n.T(Keys.Content.AdminTenantMembersAdded, "已添加租户成员关系。"));
         await Reload();
     }
 
@@ -171,8 +171,8 @@
     private async Task Remove(MembershipRow row)
     {
         var (ok, _, err, _) = await Api.DeleteAsync($"api/tenant-membership?userId={row.UserId}&tenantId={row.TenantId}");
-        if (!ok) { Toast.Error(err ?? "移除失败。"); return; }
-        Toast.Success("已移除该租户成员关系。");
+        if (!ok) { Toast.Error(err ?? L10n.T(Keys.Content.AdminTenantMembersRemoveFailed, "移除失败。")); return; }
+        Toast.Success(L10n.T(Keys.Content.AdminTenantMembersRemoved, "已移除该租户成员关系。"));
         await Reload();
     }
 
