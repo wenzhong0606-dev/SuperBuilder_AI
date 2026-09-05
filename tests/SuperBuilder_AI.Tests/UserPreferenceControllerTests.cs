@@ -98,4 +98,24 @@ public sealed class UserPreferenceControllerTests
         var culture = result!.Value!.GetType().GetProperty("culture")!.GetValue(result.Value)!.ToString();
         Assert.Equal("zh-CN", culture);
     }
+
+    [Fact]
+    public async Task Get_ReturnsTenantDefault_WhenStoredLanguageDisabled()
+    {
+        var (db, conn) = await CreateContextAsync();
+        await using var _ = conn;
+        await using var __ = db;
+        var ctrl = Build(db, Principal(10, 42));
+        // 用户设置启用中的 en-US。
+        await ctrl.SetLanguage(new SetLanguageRequest("en-US"), CancellationToken.None);
+        // 租户停用 en-US（M3-06：原语言被停用）。
+        var rel = await db.TenantUiLanguages.FirstAsync(x => x.TenantId == 10 && x.UiLanguageId == 2, CancellationToken.None);
+        rel.Enabled = false;
+        await db.SaveChangesAsync();
+        // API 应返回有效（回退后的租户默认）文化，而非已停用的 en-US。
+        var getResult = await ctrl.GetLanguage(CancellationToken.None) as OkObjectResult;
+        Assert.NotNull(getResult);
+        var culture = getResult!.Value!.GetType().GetProperty("culture")!.GetValue(getResult.Value)!.ToString();
+        Assert.Equal("zh-CN", culture);
+    }
 }

@@ -91,6 +91,36 @@ public sealed class UserLanguagePreferenceServiceTests
         Assert.Equal(1, await db.UserLanguagePreferences.CountAsync(x => x.TenantId == 10 && x.UserId == 42));
         Assert.Equal("zh-CN", await svc.GetAsync(10, 42));
     }
+
+    [Fact]
+    public async Task Get_FallsBackToTenantDefault_WhenStoredLanguageDisabled()
+    {
+        var (db, conn) = await CreateContextAsync();
+        await using var _ = conn;
+        await using var __ = db;
+        var svc = new UserLanguagePreferenceService(db, new NoopAuditService(), new TenantLanguageService(db, new NoopAuditService()));
+        // 用户将偏好设为当前启用的 en-US。
+        await svc.SetAsync(10, 42, "en-US");
+        Assert.Equal("en-US", await svc.GetAsync(10, 42));
+        // 租户停用 en-US（M3-06：原语言被停用）。
+        var rel = await db.TenantUiLanguages.FirstAsync(x => x.TenantId == 10 && x.UiLanguageId == 2, CancellationToken.None);
+        rel.Enabled = false;
+        await db.SaveChangesAsync();
+        // 后端权威裁决：读取应回退租户默认语言 zh-CN，而非返回已停用的 en-US。
+        Assert.Equal("zh-CN", await svc.GetAsync(10, 42));
+    }
+
+    [Fact]
+    public async Task Get_ReturnsStoredCulture_WhenStillEnabled()
+    {
+        var (db, conn) = await CreateContextAsync();
+        await using var _ = conn;
+        await using var __ = db;
+        var svc = new UserLanguagePreferenceService(db, new NoopAuditService(), new TenantLanguageService(db, new NoopAuditService()));
+        await svc.SetAsync(10, 42, "en-US");
+        // 启用状态未变，读取应保持用户偏好（满足「下次登录优先用户偏好」）。
+        Assert.Equal("en-US", await svc.GetAsync(10, 42));
+    }
 }
 
 /// <summary>记录审计事件的测试桩。</summary>

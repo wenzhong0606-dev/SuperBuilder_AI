@@ -477,6 +477,11 @@ M3-G0 是 M4/M7/M8 的最小前置，不等同于完成全部 i18n。它只包�
 - 下次登录优先用户偏好；原语言被停用时回退租户默认。
 - 登录前先恢复上次租户，再加载语言；无历史时使用平台默认语言。
 
+- M3-06 用户语言偏好硬化 ✅ 完成（本地提交待推送 origin/master）。核量已在 M3-G0 落地（`UserLanguagePreference` 实体 + `UserLanguagePreferenceService` + `UserPreferenceController` + 前端 `LocalizationService.InitializeAsync/SetCultureAsync` 回退链 + `LanguageSwitcher`），本批补齐「语言停用回退」的**后端权威裁决**与发布门禁测试。
+  - **关键修正（M3-06 硬化）**：`UserLanguagePreferenceService.GetAsync` 原样返回存储文化、未重新校验其是否仍属租户可用语言，仅靠前端的 `AvailableCultures.Contains` 兜底，后端非权威。改为读取时按 `ITenantLanguageService.GetAvailableCulturesAsync` 复核；越界（原语言被停用/平台下线）回退 `GetDefaultCultureAsync`（租户默认）。无记录时仍返回 `null`，保留「无偏好→前端回退租户默认」契约（既有 `Get_ReturnsNull_WhenNotSet` 不破）。
+  - **测试补齐（发布门禁）**：`UserLanguagePreferenceServiceTests.Get_FallsBackToTenantDefault_WhenStoredLanguageDisabled`（设 en-US→停用 en-US→读回退 zh-CN）、`Get_ReturnsStoredCulture_WhenStillEnabled`（启用态保持用户偏好）、`UserPreferenceControllerTests.Get_ReturnsTenantDefault_WhenStoredLanguageDisabled`（同场景经 API 返回有效文化）；既有 `Set_OutOfRange`/RoundTrip/Idempotent 全绿。覆盖「刷新/换设备（服务端持久化读取）」「越界回退」「首次登录无偏好(null)」「语言停用回退」四项门禁。
+  - **验证**：后端构建 0 error（25 个既有 CS0618 告警）；`UserLanguagePreferenceServiceTests`(6) + `UserPreferenceControllerTests`(4) + `ResourceKeyRegistryTests`(6) 全绿；全量回归 708/708。`Login.razor` 已按「选租户→加载语言→登录→按 (TenantId,UserId) 服务端偏好」顺序解析（满足「登录前恢复租户再加载语言」），`LocalizationService.SetCultureAsync` 仅登录用户写服务端、localStorage 仅作快速恢复，满足 M3-06 全部边界。
+
 M3 退出：平台/租户视图严格分离；租户只能使用授权语言；核心及全部页面可切换；刷新、换设备、语言停用回退均通过测试。
 
 ---

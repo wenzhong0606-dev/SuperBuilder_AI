@@ -28,7 +28,13 @@ public sealed class UserLanguagePreferenceService : IUserLanguagePreferenceServi
         var row = await _db.UserLanguagePreferences
             .AsNoTracking()
             .FirstOrDefaultAsync(x => x.TenantId == tenantId && x.UserId == userId, ct);
-        return row?.Culture;
+        if (row is null) return null;
+        // M3-06 硬化：用户偏好可能在设置后被平台/租户停用，读取时按当前可用语言重新校验；
+        // 越界（原语言已停用）回退租户默认语言，使「语言停用回退」由后端权威裁决，而非仅依赖前端兜底。
+        var available = await GetAvailableCulturesAsync(tenantId, ct);
+        if (!available.Contains(row.Culture, StringComparer.OrdinalIgnoreCase))
+            return await _tenantLanguage.GetDefaultCultureAsync(tenantId, ct);
+        return row.Culture;
     }
 
     public async Task<string> SetAsync(long tenantId, long userId, string culture, CancellationToken ct = default)
