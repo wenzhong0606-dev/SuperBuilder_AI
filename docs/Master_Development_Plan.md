@@ -319,10 +319,14 @@ M1 退出：Migration 可在历史副本执行；无孤儿；跨租户组合均�
 
 **实现要点（M2-05 ✅）**：用户—租户成员关系以 `UserTenant` 实体（含 `UserId/TenantId/IsDefault/CreatedAtUtc/CreatedByUserId`）承载，主租户（`User.TenantId`）恒为隐式成员、不落 `UserTenant`；可切换租户 = { 主租户 } ∪ { `UserTenant.TenantId` }。`ITenantMembershipService`/`TenantMembershipService` 提供 `AddMemberAsync`（幂等、主租户免记录）、`RemoveMemberAsync`（主租户不可移除）、`SetDefaultAsync`、`IsMemberAsync`、`GetMembershipsAsync`、`GetSwitchableTenantIdsAsync`、`ListAllAsync`（治理面：跨租户汇总全部显式成员关系，刻意 `IgnoreQueryFilters` 以绕过租户作用域过滤器）。切换采用「重签 JWT」机制（用户确认项）：`TenantMembershipController.Switch` 校验 `IsMemberAsync` → 加载主租户下用户行（安全戳）→ 以 `tid=目标、htid=主租户` 重签令牌并解析目标租户语言；`AuthMiddleware` 改为依 `htid`（主租户）做用户/安全戳查找，并新增 `htid` 声明与「生效租户是否启用」守卫，规避切换后误判 token 失效。`TokenService` 新增 `HomeTenantId`/`Htid` 贯通链路。前端：RCL 新增 `TenantSwitcher`（顶栏切换、主租户标记 `·`、切换后刷新会话态并 `Nav.NavigateTo(forceLoad)`），并完整实现 `TenantMembers.razor` 治理页（PlatformTenantManage 守卫，列出/添加/移除成员关系，camelCase 解析与默认/启用徽章）。新增 3 例测试（`TenantMembershipTests`：ListAllAsync 仅含显式成员、无权限 403、有权限 200），全量回归 **646/646** 通过、四端构建 0 error。
 
-### M2-06 租户自注册（待裁决）
+### M2-06 租户自注册（默认关闭骨架 ✅）
 
 - 设计平台开关、审批、验证码/防滥用、编码占用、首位管理员设密和初始化事务。
-- 未经确认默认关闭公网自注册。
+- 未经确认默认关闭公网自注册（DEC-04：默认关闭，平台按环境开启）。
+- **裁定结论（M2-06 收尾）**：按用户确认以「默认关闭」形式落地骨架——平台开关 + 受控注册端点（默认 off，不对外暴露），待裁决子特性（审批 / 验证码）以配置开关占位、开启即拒绝，避免不经治理评估对外开放公网。
+
+**实现要点（M2-06 ✅）**：`SelfRegistrationOptions`（配置节 `SelfRegistration`，`Enabled` 默认 false；`ApprovalRequired`/`RequireCaptcha`/`AllowedEmailDomains`/`DefaultCulture`/`DefaultAvailableCultures`/`DefaultQuotaPolicyCode` 占位）由 `Program.cs` 经 `Configure<>` 绑定。`ISelfRegistrationService`/`SelfRegistrationService` 实现 `RegisterAsync`：开关关闭→`disabled`；待裁决特性开启→`feature_not_implemented`（拒绝，防不安全开放）；通过校验后以与 M2-04 一致的事务原子创建「租户 + 租户设置(localization) + 首位租户管理员(IdentityRoles.TenantAdmin) + 口令(pbkdf2)」，读取真实 `SecurityStamp` 后以 `tid=新租户、htid=新租户` 重签令牌（注册即登录），并写审计 `tenant.self-register`。`SelfRegistrationController` 暴露 `GET status`(匿名，仅回 `enabled`)、`POST register`(匿名，受开关守卫，映射 disabled→403 / feature_not_implemented→501 / conflict→409 / ok→200)、`GET config`(PlatformAdminManage 守卫，只读配置)。前端：RCL 新增 `SelfRegistration.razor` 公开注册页（BlankLayout，先查 status，关闭时显「未开放」，开放时表单校验后注册并自动登录跳转 `/ask`）、`SelfRegistrationAdmin.razor` 治理查看页（PlatformAdminManage 守卫，只读展示状态/域名白名单/语言，并说明开放方式与环境配置约束）；登录页新增「申请开通」入口，管理菜单新增「自助注册」项。新增 4 例测试（`SelfRegistrationTests`：关闭→disabled 无数据、审批开启→feature_not_implemented 无数据、开启→原子创建租户+管理员+设置且令牌非空、编码冲突→conflict），全量回归 **650/650** 通过、四端构建 0 error。
+
 
 ### M2-07 默认种子与演示数据
 

@@ -34,6 +34,7 @@ using SuperBuilder_AI.Interfaces.Quota;
 using SuperBuilder_AI.Services.Quota;
 using SuperBuilder_AI.Middleware;
 using SuperBuilder_AI.Api.Diagnostics;
+using SuperBuilder_AI.Application.Common.Options;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.Configuration;
 using System.Net;
@@ -62,6 +63,8 @@ builder.Services.AddDbContext<SuperBIContext>(options =>
 
 builder.Services.Configure<QdrantOptions>(builder.Configuration.GetSection("Qdrant"));
 builder.Services.Configure<EmbeddingOptions>(builder.Configuration.GetSection("Embedding"));
+// M2-06：自助注册配置（默认关闭，平台按环境开启；审批/验证码待裁决）。
+builder.Services.Configure<SelfRegistrationOptions>(builder.Configuration.GetSection(SelfRegistrationOptions.SectionName));
 builder.Services.AddScoped<IDataSourceMetadataReader, MySqlMetadataReader>();
 builder.Services.AddScoped<PlatformAdminBootstrapper>();
 builder.Services.AddScoped<MetadataScannerService>();
@@ -200,6 +203,7 @@ builder.Services.AddScoped<IAgentPlanner, AgentPlanner>();
 // P10.1 Identity / RBAC（确定性，不调 LLM）
 builder.Services.AddScoped<IIdentityService, IdentityService>();
 builder.Services.AddScoped<ITenantMembershipService, TenantMembershipService>();
+builder.Services.AddScoped<ISelfRegistrationService, SelfRegistrationService>();
 builder.Services.AddScoped<IPlatformAdminService, PlatformAdminService>();
 builder.Services.AddScoped<IPlatformAdminScopeService, PlatformAdminScopeService>();
 builder.Services.AddScoped<IDataSourceAuthorizationService, DataSourceAuthorizationService>();

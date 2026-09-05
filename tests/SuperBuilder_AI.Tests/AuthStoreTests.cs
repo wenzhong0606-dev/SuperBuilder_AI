@@ -58,6 +58,8 @@ public sealed class AuthStoreTests
 
 		public Task<(AuthResult? Result, string? Error)> LoginAsync(string username, long tenantId, string? password = null, CancellationToken ct = default) => throw new NotSupportedException();
 		public Task<(TenantSwitchResult? Result, string? Error)> SwitchTenantAsync(long tenantId, CancellationToken ct = default) => throw new NotSupportedException();
+		public Task<(SelfRegistrationResult? Result, string? Error)> RegisterSelfAsync(string tenantCode, string tenantName, string adminUsername, string adminEmail, string adminPassword, string? adminDisplayName = null, CancellationToken ct = default) => throw new NotSupportedException();
+		public Task<(SelfRegistrationConfigView? Result, string? Error)> GetSelfRegistrationConfigAsync(CancellationToken ct = default) => throw new NotSupportedException();
 		public Task<string?> AskRawAsync(string question, long? dataSourceId, CancellationToken ct = default) => throw new NotSupportedException();
 		public Task<AskOutcome> AskAsync(string question, long? dataSourceId, string? conversationId = null, CancellationToken ct = default) => throw new NotSupportedException();
 		public Task<AskOutcome> RefineAsync(string? question, string instruction, IEnumerable<RefineTurn>? history, long? dataSourceId, CancellationToken ct = default) => throw new NotSupportedException();

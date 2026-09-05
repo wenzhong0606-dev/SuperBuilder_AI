@@ -1,0 +1,144 @@
+@page "/register"
+@layout BlankLayout
+@inject IApiClient Api
+@inject AppState State
+@inject AuthStore Session
+@inject NavigationManager Nav
+@inject LocalizationService L10n
+@inject IJSRuntime JS
+
+<div class="login-wrap">
+    <section class="login-hero">
+        <h1>SuperBuilder AI</h1>
+        <p class="sub">@L10n.T("Login.Tagline")</p>
+        <div class="tags">
+            <span>AI Native BI</span>
+            <span>多租户</span>
+            <span>低代码</span>
+            <span>企业级 SaaS</span>
+        </div>
+    </section>
+
+    <section class="login-form">
+        @if (Checking)
+        {
+            <div class="card"><LoadingState Text="正在检查注册通道状态…" /></div>
+        }
+        else if (!Enabled)
+        {
+            <div class="card">
+                <h2 style="margin:0 0 4px;">注册通道未开放</h2>
+                <p class="muted tiny">当前平台未开放自助注册。如需开通租户，请联系平台管理员。</p>
+                <a class="btn btn-outline-secondary" href="/login">返回登录</a>
+            </div>
+        }
+        else if (State.IsAuthenticated)
+        {
+            <div class="card">
+                <p class="ok">当前已登录：@State.Username（租户 @State.TenantId）</p>
+                <a class="btn btn-outline-secondary" href="/ask">进入工作台</a>
+            </div>
+        }
+        else
+        {
+            <div class="card">
+                <h2 style="margin:0 0 4px;">申请开通新租户</h2>
+                <p class="muted tiny">填写以下信息创建您的专属租户与首位管理员账户。</p>
+                <label>租户编码（小写字母/数字，创建后不可变更）
+                    <input class="form-control" @bind="TenantCode" placeholder="例如 acme" />
+                </label>
+                <label>租户名称
+                    <input class="form-control" @bind="TenantName" placeholder="例如 Acme 科技" />
+                </label>
+                <label>管理员用户名
+                    <input class="form-control" @bind="AdminUsername" placeholder="例如 admin" />
+                </label>
+                <label>管理员邮箱
+                    <input class="form-control" @bind="AdminEmail" placeholder="admin@example.com" />
+                </label>
+                <label>管理员口令
+                    <input class="form-control" @bind="AdminPassword" type="password" placeholder="至少 8 位" />
+                </label>
+                <label>确认口令
+                    <input class="form-control" @bind="AdminPasswordConfirm" type="password" placeholder="再次输入口令" />
+                </label>
+                <button class="btn btn-primary" @onclick="DoRegister" disabled="@Busy">创建租户并登录</button>
+                @if (!string.IsNullOrEmpty(Error)) { <div class="alert alert-danger">@Error</div> }
+                <p class="muted tiny"><a href="/login">已有账户？返回登录</a></p>
+            </div>
+        }
+    </section>
+</div>
+
+@code {
+    private bool Checking = true;
+    private bool Enabled;
+    private bool Busy;
+    private string Error = "";
+
+    private string TenantCode = "";
+    private string TenantName = "";
+    private string AdminUsername = "";
+    private string AdminEmail = "";
+    private string AdminPassword = "";
+    private string AdminPasswordConfirm = "";
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        if (State.IsAuthenticated)
+        {
+            Checking = false;
+            StateHasChanged();
+            return;
+        }
+        var (data, _, _) = await Api.GetJsonAsync("api/self-registration/status");
+        Enabled = data is { ValueKind: System.Text.Json.JsonValueKind.Object }
+                  && data.Value.TryGetProperty("enabled", out var e) && e.GetBoolean();
+        Checking = false;
+        StateHasChanged();
+    }
+
+    private async Task DoRegister()
+    {
+        Error = "";
+        if (string.IsNullOrWhiteSpace(TenantCode) || string.IsNullOrWhiteSpace(TenantName))
+        { Error = "租户编码与名称均必填。"; return; }
+        if (string.IsNullOrWhiteSpace(AdminUsername) || string.IsNullOrWhiteSpace(AdminEmail) || !AdminEmail.Contains('@'))
+        { Error = "管理员用户名与合法邮箱均必填。"; return; }
+        if (AdminPassword.Length < 8)
+        { Error = "管理员口令至少 8 位。"; return; }
+        if (AdminPassword != AdminPasswordConfirm)
+        { Error = "两次输入的口令不一致。"; return; }
+
+        Busy = true;
+        var (r, err) = await Api.RegisterSelfAsync(TenantCode.Trim(), TenantName.Trim(), AdminUsername.Trim(), AdminEmail.Trim(), AdminPassword, AdminUsername.Trim());
+        Busy = false;
+
+        if (r is null || !r.Success || string.IsNullOrEmpty(r.Token))
+        {
+            // 开关被关闭或待裁决特性开启会返回明确错误；其余视为注册失败。
+            Error = err ?? r?.Error ?? "注册失败，请稍后重试。";
+            if (r?.Status == "disabled") Enabled = false;
+            StateHasChanged();
+            return;
+        }
+
+        // 注册即登录：构造 AuthResult 写入会话态（新租户即为主租户）。
+        var login = new AuthResult
+        {
+            Token = r.Token,
+            ExpiresInSeconds = r.ExpiresInSeconds,
+            TenantId = r.TenantId,
+            HomeTenantId = r.TenantId,
+            UserId = r.UserId,
+            Username = r.Username ?? AdminUsername,
+            Permissions = r.Permissions ?? new System.Collections.Generic.List<string>(),
+            AvailableCultures = r.AvailableCultures ?? new System.Collections.Generic.List<string> { "zh-CN" },
+            DefaultCulture = r.DefaultCulture ?? "zh-CN",
+        };
+        await Session.SetFromLoginAsync(login);
+        await L10n.InitializeAsync(r.TenantId, r.UserId, login.AvailableCultures, login.DefaultCulture);
+        Nav.NavigateTo("/ask");
+    }
+}

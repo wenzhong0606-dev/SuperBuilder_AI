@@ -318,6 +318,66 @@ public sealed class ApiClient : IApiClient
         return (r, null);
     }
 
+    /// <summary>M2-06 自助注册：匿名创建新租户与首位管理员，注册即登录（后端重签令牌）。</summary>
+    public async Task<(SelfRegistrationResult? Result, string? Error)> RegisterSelfAsync(
+        string tenantCode, string tenantName, string adminUsername, string adminEmail,
+        string adminPassword, string? adminDisplayName = null, CancellationToken ct = default)
+    {
+        var client = _factory.CreateClient("SuperBuilderApi");
+        try
+        {
+            var resp = await client.PostAsJsonAsync("api/self-registration/register", new
+            {
+                tenantCode,
+                tenantName,
+                adminUsername,
+                adminEmail,
+                adminPassword,
+                adminDisplayName,
+            }, ct);
+            if (!resp.IsSuccessStatusCode)
+            {
+                var (_, msg, _) = ParseApiError(await resp.Content.ReadAsStringAsync(ct));
+                return (null, msg ?? $"注册失败（{(int)resp.StatusCode}）。");
+            }
+            var r = await resp.Content.ReadFromJsonAsync<SelfRegistrationResult>(ct);
+            return (r, null);
+        }
+        catch (HttpRequestException ex)
+        {
+            return (null, "无法连接注册服务，请确认 API 服务已启动且地址配置正确。" +
+                (string.IsNullOrWhiteSpace(ex.Message) ? "" : $"（{ex.Message}）"));
+        }
+    }
+
+    /// <summary>M2-06 平台管理员查看自助注册配置（需 platform:admin:manage）。</summary>
+    public async Task<(SelfRegistrationConfigView? Result, string? Error)> GetSelfRegistrationConfigAsync(CancellationToken ct = default)
+    {
+        var (data, _, err) = await GetJsonAsync("api/self-registration/config", ct);
+        if (data is not { ValueKind: System.Text.Json.JsonValueKind.Object })
+            return (null, err ?? "无法读取自助注册配置。");
+        var v = data.Value;
+        var enabled = v.TryGetProperty("enabled", out var e) && e.GetBoolean();
+        var approval = v.TryGetProperty("approvalRequired", out var a) && a.GetBoolean();
+        var captcha = v.TryGetProperty("requireCaptcha", out var c) && c.GetBoolean();
+        var defaultCulture = v.TryGetProperty("defaultCulture", out var dc) ? dc.GetString() ?? "zh-CN" : "zh-CN";
+        var domains = v.TryGetProperty("allowedEmailDomains", out var d) && d.ValueKind == System.Text.Json.JsonValueKind.Array
+            ? d.EnumerateArray().Select(x => x.GetString() ?? "").Where(x => x.Length > 0).ToList()
+            : new System.Collections.Generic.List<string>();
+        var cultures = v.TryGetProperty("defaultAvailableCultures", out var cc) && cc.ValueKind == System.Text.Json.JsonValueKind.Array
+            ? cc.EnumerateArray().Select(x => x.GetString() ?? "").Where(x => x.Length > 0).ToList()
+            : new System.Collections.Generic.List<string> { "zh-CN" };
+        return (new SelfRegistrationConfigView
+        {
+            Enabled = enabled,
+            AllowedEmailDomains = domains,
+            DefaultCulture = defaultCulture,
+            DefaultAvailableCultures = cultures,
+            ApprovalRequired = approval,
+            RequireCaptcha = captcha,
+        }, null);
+    }
+
     /// <summary>
     /// 读取任意 JSON 端点为 <see cref="JsonElement"/>，失败时返回错误信息且不抛异常。
     /// 用于在不确定后端 DTO 精确结构时安全渲染列表/详情。
@@ -395,6 +455,33 @@ public sealed class AuthResult
     public System.Collections.Generic.List<string>? Permissions { get; set; }
     public System.Collections.Generic.List<string>? AvailableCultures { get; set; }
     public string? DefaultCulture { get; set; }
+}
+
+/// <summary>M2-06 自助注册响应（字段与后端 SelfRegistrationResult 对齐，camelCase 解析）。</summary>
+public sealed class SelfRegistrationResult
+{
+    public bool Success { get; set; }
+    public string? Status { get; set; }
+    public string? Token { get; set; }
+    public int ExpiresInSeconds { get; set; }
+    public long TenantId { get; set; }
+    public long UserId { get; set; }
+    public string? Username { get; set; }
+    public System.Collections.Generic.List<string>? Permissions { get; set; }
+    public System.Collections.Generic.List<string>? AvailableCultures { get; set; }
+    public string? DefaultCulture { get; set; }
+    public string? Error { get; set; }
+}
+
+/// <summary>M2-06 自助注册配置视图（平台管理员只读）。</summary>
+public sealed class SelfRegistrationConfigView
+{
+    public bool Enabled { get; set; }
+    public System.Collections.Generic.List<string>? AllowedEmailDomains { get; set; }
+    public string? DefaultCulture { get; set; }
+    public System.Collections.Generic.List<string>? DefaultAvailableCultures { get; set; }
+    public bool ApprovalRequired { get; set; }
+    public bool RequireCaptcha { get; set; }
 }
 
 /// <summary>M2-05 切换租户成功响应（含重签令牌与切换后端租户上下文）。</summary>
