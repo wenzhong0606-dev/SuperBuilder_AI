@@ -303,11 +303,13 @@ M1 退出：Migration 可在历史副本执行；无孤儿；跨租户组合均�
 
 **实现要点（M2-03 ✅）**：`PlatformBootstrapController.Create` 先查 `PlatformBootstrap:AllowAnonymous`（默认 true）——false 时匿名 `POST` 立即 403 并提示改用部署配置；随后校验 `Connection.RemoteIpAddress.IsLoopback`（依赖 `Program.cs` 受控 `ForwardedHeaders`：仅消费配置内 `KnownProxies/KnownNetworks` 的 `X-Forwarded-*`，默认不消费，规避伪造客户端 IP）。`PlatformAdminBootstrapper.CreateAsync` 校验 用户名非空、口令≥8；交互式（携带 confirmPassword）还需口令一致与邮箱含 '@' 格式；配置路径（不传 confirmPassword）邮箱允许为空。`Status` 新增 `anonymousAllowed` 标志。`EnsureAsync` 部署配置路径不受匿名开关影响。重复初始化由 `CreateAsync` 幂等守卫抛 `InvalidOperationException` → 控制器返回 409（入口即关闭）。前端 `Login.razor` 初始化表单补齐 Email 字段、前后端校验、失败保留输入，并按 `anonymousAllowed=false` 隐藏表单改提示部署配置。新增 15 例测试（bootstrapper 校验 4 + 控制器匿名开关/Loopback/一次性关闭/状态标志 5，扩展既有 bootstrapper 用例至 10）全部通过；四端构建 0 error。
 
-### M2-04 租户事务与生命周期
+### M2-04 租户事务与生命周期 ✅
 
 - 同一事务创建 Tenant、首位 TenantAdmin、密码、安全戳、默认设置、语言授权和默认语言；失败全回滚。
 - 页面显示总数/启用/停用，默认列表，支持编码/名称搜索。
 - 创建用弹窗/抽屉/步骤表单；支持编辑名称、语言、默认语言；启停二次确认并展示影响。
+
+**实现要点（M2-04 ✅）**：`TenantManagementController.Create` 已在单一 `BeginTransactionAsync` 内依次落库 Tenant → 两个锁定 `TenantSetting`（localization:availableCultures / defaultCulture）→ `IIdentityService.CreateUserAsync`（首位 TenantAdmin + 安全戳）→ `SetPasswordAsync`（口令哈希 + 安全戳轮换）；任意一步失败即 `RollbackAsync` 并回冲突/BadRequest，且依赖同一注入 `SuperBIContext` 的 `IdentityService` 参与该环境事务，保证「全有或全无」。页面 `Tenants.razor` 已完整：统计（总数/已启用/已停用）、`SbListPage` 编码/名称搜索、创建/编辑弹窗（含语言授权与默认语言）、启停 `SbConfirm` 影响提示、设置弹窗。`TenantManagementControllerTests` 新增 2 例事务证据：`Create_WhenAdminCreationFails_RollsBackEntireTenantCreation`（FailingIdentityService 桩：管理员创建失败 → 返回 Conflict 且 Tenants/TenantSettings 均为 0 行，证明原子回滚）；`Create_Success_CreatesTenantAdminUserAndSettingsAtomically`（真实 IdentityService 经 SeedAsync 注入全局角色目录后：提交后租户 + 2 条默认设置 + 管理员 User（TenantAdmin 角色、pbkdf2 口令、非空安全戳）均落库，证明原子提交）。全量回归 643/643 通过、四端构建 0 error。
 
 ### M2-05 多租户成员关系（SB-P1-16）
 

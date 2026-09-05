@@ -13,6 +13,7 @@ using SuperBuilder_AI.Data;
 using SuperBuilder_AI.Interfaces.Identity;
 using SuperBuilder_AI.Models.Identity;
 using SuperBuilder_AI.Services.Identity;
+using SuperBuilder_AI.Services.Auth;
 using SuperBuilder_AI.Models.Organization;
 using Xunit;
 
@@ -29,6 +30,28 @@ public sealed class TenantManagementControllerTests
 		public Task SeedAsync(CancellationToken ct = default) => Task.CompletedTask;
 		public Task<IdentityResult> CreateUserAsync(long tenantId, string username, string displayName, string email, string[]? roleCodes, CancellationToken ct = default)
 			=> Task.FromResult(IdentityResult.Ok(1L));
+		public Task<IdentityResult> AssignRoleAsync(long tenantId, long userId, string roleCode, CancellationToken ct = default)
+			=> Task.FromResult(IdentityResult.Ok(userId));
+		public Task<IdentityResult> RevokeRoleAsync(long tenantId, long userId, string roleCode, CancellationToken ct = default)
+			=> Task.FromResult(IdentityResult.Ok(userId));
+		public Task<IdentityResult> SetPasswordAsync(long tenantId, long userId, string password, CancellationToken ct = default)
+			=> Task.FromResult(IdentityResult.Ok(userId));
+		public Task<IdentityResult> SetUserStatusAsync(long tenantId, long userId, UserStatus newStatus, CancellationToken ct = default)
+			=> Task.FromResult(IdentityResult.Ok(userId));
+		public Task<IReadOnlyList<string>> GetPermissionsAsync(long tenantId, long userId, CancellationToken ct = default)
+			=> Task.FromResult<IReadOnlyList<string>>(Array.Empty<string>());
+	public Task<bool> HasPermissionAsync(long tenantId, long userId, string permissionCode, CancellationToken ct = default)
+		=> Task.FromResult(false);
+	}
+
+	/// <summary>
+	/// M2-04 回滚证据桩：CreateUserAsync 始终失败，用于验证控制器在管理员创建失败时整体回滚租户创建事务。
+	/// </summary>
+	private sealed class FailingIdentityService : IIdentityService
+	{
+		public Task SeedAsync(CancellationToken ct = default) => Task.CompletedTask;
+		public Task<IdentityResult> CreateUserAsync(long tenantId, string username, string displayName, string email, string[]? roleCodes, CancellationToken ct = default)
+			=> Task.FromResult(IdentityResult.Fail("simulated admin creation failure"));
 		public Task<IdentityResult> AssignRoleAsync(long tenantId, long userId, string roleCode, CancellationToken ct = default)
 			=> Task.FromResult(IdentityResult.Ok(userId));
 		public Task<IdentityResult> RevokeRoleAsync(long tenantId, long userId, string roleCode, CancellationToken ct = default)
@@ -56,6 +79,18 @@ public sealed class TenantManagementControllerTests
 	private static TenantManagementController Build(SuperBIContext db, ClaimsPrincipal? user = null, IPlatformAdminScopeService? scope = null)
 	{
 		var ctrl = new TenantManagementController(db, new SuccessIdentityService(), scope ?? new SuccessScopeService());
+		var principal = user ?? new ClaimsPrincipal(new ClaimsIdentity(new[]
+		{
+			new Claim("perm", IdentityPermissions.PlatformTenantManage),
+			new Claim(ClaimTypes.NameIdentifier, "99")
+		}, "test"));
+		ctrl.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext { User = principal } };
+		return ctrl;
+	}
+
+	private static TenantManagementController Build(SuperBIContext db, IIdentityService identity, ClaimsPrincipal? user = null, IPlatformAdminScopeService? scope = null)
+	{
+		var ctrl = new TenantManagementController(db, identity, scope ?? new SuccessScopeService());
 		var principal = user ?? new ClaimsPrincipal(new ClaimsIdentity(new[]
 		{
 			new Claim("perm", IdentityPermissions.PlatformTenantManage),
@@ -280,6 +315,53 @@ public sealed class TenantManagementControllerTests
 		var ok = Assert.IsType<OkObjectResult>(result);
 		var list = Assert.IsAssignableFrom<System.Collections.IEnumerable>(ok.Value!);
 		Assert.Equal(2, list.Cast<object>().Count());
+	}
+
+	// === M2-04 租户创建事务与生命周期原子性 ===
+	[Fact]
+	public async Task Create_WhenAdminCreationFails_RollsBackEntireTenantCreation()
+	{
+		var ctx = CreateContext(out var connection);
+		await using var _ = connection;
+		await using var __ = ctx;
+		var ctrl = Build(ctx, new FailingIdentityService());
+
+		var result = await ctrl.Create(
+			new CreateTenantRequest("acme", "Acme Inc", "admin", "password1"), CancellationToken.None);
+		// 管理员创建失败 → 返回冲突，且事务整体回滚。
+		Assert.IsType<ConflictObjectResult>(result);
+
+		// 回滚后：租户与其默认设置均未落库（事务原子性：tenant + settings 全有或全无）。
+		Assert.Equal(0, await ctx.Tenants.CountAsync());
+		Assert.Equal(0, await ctx.TenantSettings.CountAsync());
+	}
+
+	[Fact]
+	public async Task Create_Success_CreatesTenantAdminUserAndSettingsAtomically()
+	{
+		var ctx = CreateContext(out var connection);
+		await using var _ = connection;
+		await using var __ = ctx;
+		// 真实身份服务参与同一事务：管理员用户/角色/口令/安全戳一并写入。
+		var identity = new IdentityService(ctx, new PasswordHasher());
+		await identity.SeedAsync(); // 注入平台租户与全局角色目录（含 TenantAdmin）
+		var ctrl = Build(ctx, identity);
+
+		var result = await ctrl.Create(
+			new CreateTenantRequest("acme", "Acme Inc", "admin", "password1"), CancellationToken.None);
+		Assert.IsType<OkObjectResult>(result);
+
+		var tenant = await ctx.Tenants.SingleAsync(t => t.TenantCode == "acme");
+		// 两位默认本地化设置（availableCultures / defaultCulture）随租户一并提交。
+		Assert.Equal(2, await ctx.TenantSettings.CountAsync(s => s.TenantId == tenant.Id));
+		// 首位管理员用户已创建并赋 TenantAdmin 角色、已设置口令（安全戳已生成）。
+		var admin = await ctx.Users.SingleAsync(u => u.TenantId == tenant.Id);
+		Assert.Equal("admin", admin.Username);
+		Assert.False(string.IsNullOrEmpty(admin.PasswordHash));
+		Assert.StartsWith("pbkdf2:", admin.PasswordHash);
+		Assert.False(string.IsNullOrEmpty(admin.SecurityStamp));
+		var tenantAdminRoleId = (await ctx.Roles.SingleAsync(r => r.Code == IdentityRoles.TenantAdmin)).Id;
+		Assert.True(await ctx.UserRoles.AnyAsync(ur => ur.UserId == admin.Id && ur.RoleId == tenantAdminRoleId));
 	}
 }
 
