@@ -30,6 +30,8 @@ using SuperBuilder_AI.Interfaces.Identity;
 using SuperBuilder_AI.Services.Identity;
 using SuperBuilder_AI.Interfaces.Audit;
 using SuperBuilder_AI.Services.Audit;
+using SuperBuilder_AI.Interfaces.Localization;
+using SuperBuilder_AI.Services.Localization;
 using SuperBuilder_AI.Interfaces.Quota;
 using SuperBuilder_AI.Services.Quota;
 using SuperBuilder_AI.Middleware;
@@ -279,6 +281,8 @@ builder.Services.AddSingleton<StartupDiagnostics>();
 // M0-05：本地化目录种子服务，使 UiLanguage/Text 在启动序列中固定顺序执行
 builder.Services.AddScoped<ILocalizationSeedService, LocalizationSeedService>();
 builder.Services.AddScoped<IThemeSeedService, ThemeSeedService>();
+// M3-G0：用户级界面语言偏好服务（按租户维度持久化，写入校验可用语言范围）
+builder.Services.AddScoped<IUserLanguagePreferenceService, UserLanguagePreferenceService>();
 // M0-08：限流阈值（绑定配置节 "RateLimit"，缺省使用安全默认值）
 builder.Services.Configure<RateLimitOptions>(builder.Configuration.GetSection("RateLimit"));
 // RL-1/RL-2：限流存储。

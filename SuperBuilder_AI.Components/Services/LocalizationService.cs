@@ -39,12 +39,22 @@ public sealed class LocalizationService
         _tenantId = tenantId; _userId = userId;
         AvailableCultures = available is { Count: > 0 } ? available : new[] { "zh-CN" };
         var fallback = AvailableCultures.Contains(tenantDefault ?? "", StringComparer.OrdinalIgnoreCase) ? tenantDefault! : AvailableCultures[0];
-        try
+
+        // M3-G0「用户语言恢复」：已登录优先服务端持久化偏好；其次本机缓存；均缺失回退租户默认。
+        string chosen = fallback;
+        if (userId > 0)
         {
-            var saved = await _js.InvokeAsync<string?>("localStorage.getItem", $"sb_culture_{tenantId}_{userId}");
-            CurrentCulture = AvailableCultures.Contains(saved ?? "", StringComparer.OrdinalIgnoreCase) ? saved! : fallback;
+            var serverCulture = await SafeGetUserLanguageAsync();
+            if (!string.IsNullOrEmpty(serverCulture) && AvailableCultures.Contains(serverCulture, StringComparer.OrdinalIgnoreCase))
+                chosen = serverCulture!;
         }
-        catch { CurrentCulture = fallback; }
+        if (chosen == fallback)
+        {
+            var local = await SafeReadLocalAsync(tenantId, userId);
+            if (!string.IsNullOrEmpty(local) && AvailableCultures.Contains(local, StringComparer.OrdinalIgnoreCase))
+                chosen = local!;
+        }
+        CurrentCulture = chosen;
         await LoadRuntimeTextsAsync();
         Changed?.Invoke();
     }
@@ -55,7 +65,21 @@ public sealed class LocalizationService
         CurrentCulture = culture;
         await LoadRuntimeTextsAsync();
         try { await _js.InvokeVoidAsync("localStorage.setItem", $"sb_culture_{tenantId}_{userId}", culture); } catch { }
+        // M3-G0：已登录时同步持久化到服务端，跨设备/清缓存可恢复。
+        if (userId > 0) { try { await _api.SetUserLanguageAsync(culture); } catch { } }
         Changed?.Invoke();
+    }
+
+    private async Task<string?> SafeGetUserLanguageAsync()
+    {
+        try { return (await _api.GetUserLanguageAsync()).Culture; }
+        catch { return null; }
+    }
+
+    private async Task<string?> SafeReadLocalAsync(long tenantId, long userId)
+    {
+        try { return await _js.InvokeAsync<string?>("localStorage.getItem", $"sb_culture_{tenantId}_{userId}"); }
+        catch { return null; }
     }
 
     private async Task LoadRuntimeTextsAsync()

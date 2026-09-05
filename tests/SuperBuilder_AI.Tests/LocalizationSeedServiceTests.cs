@@ -38,4 +38,26 @@ public sealed class LocalizationSeedServiceTests
             .CountAsync(x => x.TenantId == 0 && x.Culture == "zh-CN" && x.ResourceKey == "Login.Title");
         Assert.Equal(1, count);
     }
+
+    [Fact]
+    public async Task EnsureSeedAsync_Covers_Registered_ResourceKeys()
+    {
+        using var connection = new SqliteConnection("DataSource=:memory:");
+        connection.Open();
+        var options = new DbContextOptionsBuilder<SuperBIContext>().UseSqlite(connection).Options;
+        await using var db = new SuperBIContext(options);
+        await db.Database.EnsureCreatedAsync();
+
+        var service = new LocalizationSeedService(db, new LocalizationService());
+        await service.EnsureSeedAsync();
+
+        var seededZhCn = await db.UiTextResources
+            .Where(x => x.TenantId == 0 && x.Culture == "zh-CN")
+            .Select(x => x.ResourceKey).ToListAsync();
+        var registered = ResourceKeys.All();
+
+        Assert.NotEmpty(registered);
+        foreach (var key in registered)
+            Assert.Contains(key, seededZhCn);
+    }
 }

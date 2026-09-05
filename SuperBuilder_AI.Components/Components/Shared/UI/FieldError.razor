@@ -1,0 +1,9 @@
+@if (!string.IsNullOrWhiteSpace(Message))
+{
+    <div class="field-error" role="alert">@Message</div>
+}
+
+@code {
+    /// <summary>字段级验证错误文本（建议来自 Validation.* 资源键对应的译文）。</summary>
+    [Parameter] public string? Message { get; set; }
+}

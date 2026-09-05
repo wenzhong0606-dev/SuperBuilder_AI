@@ -21,12 +21,7 @@
 
         @if (State.IsAuthenticated && L10n.AvailableCultures.Count > 1)
         {
-            <select class="culture-switcher" value="@L10n.CurrentCulture" @onchange="ChangeCulture" aria-label="Language">
-                @foreach (var culture in L10n.AvailableCultures)
-                {
-                    <option value="@culture">@culture</option>
-                }
-            </select>
+            <LanguageSwitcher OnCultureChanged="ChangeCulture" />
         }
 
         <button class="icon-btn theme-btn" @onclick="ToggleTheme" aria-label="@L10n.T("Theme.Switch", "切换主题")" title="@(IsDark ? L10n.T("theme.light") : L10n.T("theme.dark"))">
@@ -160,7 +155,7 @@
     private void ToggleUserMenu() => UserMenuOpen = !UserMenuOpen;
     private void CloseUserMenu() => UserMenuOpen = false;
     private void OnCultureChanged() => _ = InvokeAsync(StateHasChanged);
-    private async Task ChangeCulture(ChangeEventArgs e) => await L10n.SetCultureAsync(State.TenantId, State.UserId, e.Value?.ToString() ?? "zh-CN");
+    private async Task ChangeCulture(string culture) => await L10n.SetCultureAsync(State.TenantId, State.UserId, culture);
 
     private async Task Logout()
     {

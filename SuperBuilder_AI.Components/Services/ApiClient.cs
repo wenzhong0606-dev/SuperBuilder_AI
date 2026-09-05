@@ -425,6 +425,42 @@ public sealed class ApiClient : IApiClient
         }
     }
 
+    /// <summary>M3-G0 读取当前用户的服务端语言偏好。</summary>
+    public async Task<(string? Culture, string? Error)> GetUserLanguageAsync(CancellationToken ct = default)
+    {
+        var (data, status, error) = await GetJsonAsync("api/user/preferences/language", ct);
+        if (error != null) return (null, error);
+        if (data is not { ValueKind: JsonValueKind.Object }) return (null, null);
+        var culture = data.Value.TryGetProperty("culture", out var c) ? c.GetString() : null;
+        return (culture, null);
+    }
+
+    /// <summary>M3-G0 持久化当前用户语言偏好到服务端。</summary>
+    public async Task<(string? Culture, string? Error)> SetUserLanguageAsync(string culture, CancellationToken ct = default)
+    {
+        var client = CreateClient();
+        try
+        {
+            var resp = await client.PutAsJsonAsync("api/user/preferences/language", new { culture }, ct);
+            if (!resp.IsSuccessStatusCode)
+            {
+                var (_, msg, _) = ParseApiError(await resp.Content.ReadAsStringAsync(ct));
+                if (resp.StatusCode == System.Net.HttpStatusCode.Unauthorized) OnUnauthorized();
+                return (null, msg ?? $"保存语言偏好失败（{(int)resp.StatusCode}）。");
+            }
+            var (data, _, err) = await GetJsonAsync("api/user/preferences/language", ct);
+            var effective = (err == null && data is { ValueKind: JsonValueKind.Object } && data.Value.TryGetProperty("culture", out var c))
+                ? c.GetString()
+                : culture;
+            return (effective, null);
+        }
+        catch (System.Net.Http.HttpRequestException ex)
+        {
+            return (null, "无法连接服务，请确认 API 已启动且地址配置正确。" +
+                (string.IsNullOrWhiteSpace(ex.Message) ? "" : $"（{ex.Message}）"));
+        }
+    }
+
     /// <summary>
     /// 读取任意 JSON 端点为 <see cref="JsonElement"/>，失败时返回错误信息且不抛异常。
     /// 用于在不确定后端 DTO 精确结构时安全渲染列表/详情。

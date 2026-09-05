@@ -92,7 +92,7 @@ public static class NavMenuItems
                 new NavItem { Href = "admin/identity", Title = "身份权限", Icon = "sb-ico-shield", Permission = PermissionCodes.IdentityManage },
                 new NavItem { Href = "admin/audit", Title = "审计", Icon = "sb-ico-audit", Permission = PermissionCodes.AuditView },
                 new NavItem { Href = "admin/quota", Title = "配额", Icon = "sb-ico-quota" },
-                new NavItem { Href = "admin/localization", Title = "多语言", Icon = "sb-ico-lang" },
+                new NavItem { Href = "admin/localization", Title = "多语言", Icon = "sb-ico-lang", Permission = PermissionCodes.LocalizationView },
                 new NavItem { Href = "admin/themes", Title = "主题", Icon = "sb-ico-theme", Permission = PermissionCodes.ThemeView },
                 new NavItem { Href = "admin/system", Title = "系统状态", Icon = "sb-ico-activity" }
             }

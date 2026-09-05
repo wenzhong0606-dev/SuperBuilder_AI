@@ -45,7 +45,7 @@ public class IdentityServiceTests
 
         var permCount = await ctx.Permissions.CountAsync(p => p.TenantId == 0);
         var roleCount = await ctx.Roles.CountAsync(r => r.TenantId == 0);
-        Assert.Equal(32, permCount);
+        Assert.Equal(34, permCount);
         Assert.Equal(4, roleCount);
 		Assert.Single(await ctx.Tenants.Where(t => t.TenantCode == IdentityService.PlatformTenantCode).ToListAsync());
     }
@@ -299,7 +299,11 @@ public class IdentityServiceTests
 			where rp.RoleId == role.Id
 			select p.Code).ToListAsync();
 		Assert.NotEmpty(permissionCodes);
-		Assert.All(permissionCodes, code => Assert.StartsWith("platform:", code));
+		// PlatformAdmin 仅持有平台治理与多语言治理类权限，不得持有任何租户业务能力
+		// （dashboard/app/agent/theme/metadata/audit/billing/identity 等）。localization:* 属平台治理面。
+		Assert.All(permissionCodes, code => Assert.True(
+			code.StartsWith("platform:") || code.StartsWith("localization:"),
+			$"PlatformAdmin 不应持有租户业务能力权限: {code}"));
 
 		var user = await svc.CreateUserAsync(Tenant100, "tenant-governor", "Tenant", "", new[] { IdentityRoles.PlatformAdmin });
 		Assert.Empty(await svc.GetPermissionsAsync(Tenant100, user.Id!.Value));

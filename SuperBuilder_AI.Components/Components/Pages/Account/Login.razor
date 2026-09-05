@@ -21,7 +21,7 @@
     </section>
 
     <section class="login-form">
-        <div class="login-language"><select value="@L10n.CurrentCulture" @onchange="ChangeLoginCulture">@foreach (var culture in _loginCultures) { <option value="@culture">@culture</option> }</select></div>
+        <div class="login-language"><LanguageSwitcher OnCultureChanged="ChangeLoginCulture" /></div>
         @if (BootstrapChecking)
         {
             <div class="card"><LoadingState Text="正在检查平台初始化状态…" /></div>
@@ -136,9 +136,9 @@
     private static long TenantValue(System.Text.Json.JsonElement tenant) => tenant.TryGetProperty("id", out var id) ? id.GetInt64() : 0;
     private static string TenantLabel(System.Text.Json.JsonElement tenant) { var name=tenant.TryGetProperty("name",out var n)?n.GetString():""; var code=tenant.TryGetProperty("tenantCode",out var c)?c.GetString():""; return $"{name}（{code}）"; }
 
-    private async Task ChangeLoginCulture(ChangeEventArgs e)
+    private async Task ChangeLoginCulture(string culture)
     {
-        await L10n.SetCultureAsync(0, 0, e.Value?.ToString() ?? "zh-CN");
+        await L10n.SetCultureAsync(0, 0, culture);
         StateHasChanged();
     }
 

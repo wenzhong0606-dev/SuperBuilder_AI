@@ -1,0 +1,16 @@
+@if (Errors.Count > 0)
+{
+    <div class="validation-summary" role="alert">
+        <ul>
+            @foreach (var error in Errors)
+            {
+                <li>@error</li>
+            }
+        </ul>
+    </div>
+}
+
+@code {
+    /// <summary>表单级错误汇总（建议每条来自 Error.* / Validation.* 资源键译文）。</summary>
+    [Parameter] public IReadOnlyList<string> Errors { get; set; } = System.Array.Empty<string>();
+}

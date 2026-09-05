@@ -102,7 +102,7 @@ public sealed class LocalizationController : ControllerBase
 	[HttpPost("languages")]
 	public async Task<IActionResult> CreateLanguage([FromBody] SaveUiLanguageRequest request, CancellationToken ct)
 	{
-		if (!User.HasClaim("perm", IdentityPermissions.PlatformTenantManage)) return Forbid();
+		if (!User.HasClaim("perm", IdentityPermissions.LocalizationManage)) return Forbid();
 		await EnsureSeedAsync(ct);
 		var culture = (request.Culture ?? string.Empty).Trim();
 		if (culture.Length < 2 || await _db.UiLanguages.AnyAsync(x => x.Culture == culture, ct)) return Conflict("语言代码为空或已存在。");
@@ -137,8 +137,8 @@ public sealed class LocalizationController : ControllerBase
 	public async Task<IActionResult> SaveText(string culture, string key, [FromQuery] long? tenantId, [FromBody] SaveUiTextRequest request, CancellationToken ct)
 	{
 		var targetTenant = ResolveTargetTenant(tenantId);
-		if (targetTenant < 0 || (targetTenant == 0 && !User.HasClaim("perm", IdentityPermissions.PlatformTenantManage))) return Forbid();
-		if (targetTenant > 0 && !User.HasClaim("perm", IdentityPermissions.IdentityManage)) return Forbid();
+		if (targetTenant < 0 || (targetTenant == 0 && !User.HasClaim("perm", IdentityPermissions.LocalizationManage))) return Forbid();
+		if (targetTenant > 0 && !User.HasClaim("perm", IdentityPermissions.LocalizationView)) return Forbid();
 		var value = (request.Value ?? string.Empty).Trim();
 		if (value.Length == 0) return BadRequest("文本不能为空。");
 		var row = await _db.UiTextResources.FirstOrDefaultAsync(x => x.TenantId == targetTenant && x.Culture == culture && x.ResourceKey == key, ct);
@@ -154,7 +154,7 @@ public sealed class LocalizationController : ControllerBase
 	{
 		var tenantId = CurrentTenantId();
 		if (tenantId <= 0) return BadRequest("平台基线不能使用重置覆盖操作。");
-		if (!User.HasClaim("perm", IdentityPermissions.IdentityManage)) return Forbid();
+		if (!User.HasClaim("perm", IdentityPermissions.LocalizationView)) return Forbid();
 		var row = await _db.UiTextResources.FirstOrDefaultAsync(x => x.TenantId == tenantId && x.Culture == culture && x.ResourceKey == key, ct);
 		if (row is not null) { _db.UiTextResources.Remove(row); await _db.SaveChangesAsync(ct); }
 		return NoContent();

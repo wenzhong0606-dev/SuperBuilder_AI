@@ -39,6 +39,9 @@ public static class IdentityPermissions
 
     public const string AuditView = "audit:view";
 
+    public const string LocalizationView = "localization:view";
+    public const string LocalizationManage = "localization:manage";
+
     public const string BillingView = "billing:view";
     public const string BillingManage = "billing:manage";
 
@@ -92,6 +95,9 @@ public static class IdentityCatalog
 
         new(IdentityPermissions.AuditView, "查看审计", "audit", "查看审计日志"),
 
+        new(IdentityPermissions.LocalizationView, "查看多语言", "localization", "查看语言目录与界面文本"),
+        new(IdentityPermissions.LocalizationManage, "管理平台多语言", "localization", "管理平台语言目录与基线文本"),
+
         new(IdentityPermissions.BillingView, "查看账单", "billing", "查看账单与配额"),
         new(IdentityPermissions.BillingManage, "管理账单", "billing", "管理账单与配额"),
 
@@ -116,6 +122,7 @@ public static class IdentityCatalog
             IdentityPermissions.PlatformTenantSettingsManage,             IdentityPermissions.PlatformAuditView,
             IdentityPermissions.PlatformQuotaManage,
             IdentityPermissions.PlatformAdminManage,
+            IdentityPermissions.LocalizationView, IdentityPermissions.LocalizationManage,
         }),
         new(IdentityRoles.TenantAdmin, "租户管理员", "租户内管理权限（不含平台账单）", new[]
         {
@@ -127,6 +134,7 @@ public static class IdentityCatalog
             IdentityPermissions.ThemeView, IdentityPermissions.ThemeEdit, IdentityPermissions.ThemePublish,
             IdentityPermissions.MetadataView, IdentityPermissions.MetadataEdit, IdentityPermissions.MetadataScan,
             IdentityPermissions.AuditView, IdentityPermissions.IdentityManage,
+            IdentityPermissions.LocalizationView,
         }),
         new(IdentityRoles.Member, "成员", "创建与编辑权限", new[]
         {

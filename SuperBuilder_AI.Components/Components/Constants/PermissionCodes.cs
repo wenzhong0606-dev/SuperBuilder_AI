@@ -7,8 +7,6 @@ namespace SuperBuilder_AI.Components.Components.Constants;
 /// <remarks>
 /// 后端 <c>/api/auth/me</c> 返回的就是这些码；<c>NavMenuItems.EnforcePermissions=true</c> 后，
 /// 拥有对应码的账号才可见菜单项、可直连对应页面。
-/// 注意：<c>localization</c>（多语言）后端目录中暂无细粒度权限码（见 S2-7 同类后端缺口），
-/// 故其菜单项保持「仅登录即可」（Permission 留空），不在本表定义，待后端补齐码后接入。
 /// </remarks>
 public static class PermissionCodes
 {
@@ -18,6 +16,10 @@ public static class PermissionCodes
     public const string PlatformDiagnosticsView = "platform:diagnostics:view";
     public const string PlatformQuotaManage = "platform:quota:manage";
     public const string PlatformAdminManage = "platform:admin:manage";
+
+    // —— 多语言（localization）——
+    public const string LocalizationView = "localization:view";
+    public const string LocalizationManage = "localization:manage";
 
     // —— 租户内管理面 ——
     public const string IdentityManage = "identity:manage";

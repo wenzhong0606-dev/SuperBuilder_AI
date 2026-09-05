@@ -109,8 +109,9 @@ public class SuperBIContext : DbContext
 
     #region P5 Localization
     public DbSet<SemanticLabel> SemanticLabels { get; set; }
-    public DbSet<UiLanguage> UiLanguages { get; set; }
-    public DbSet<UiTextResource> UiTextResources { get; set; }
+        public DbSet<UiLanguage> UiLanguages { get; set; }
+        public DbSet<UiTextResource> UiTextResources { get; set; }
+        public DbSet<UserLanguagePreference> UserLanguagePreferences { get; set; }
     #endregion
 
     #region P6 Low-code BI
@@ -351,6 +352,9 @@ public class SuperBIContext : DbContext
         builder.Entity<UiTextResource>().Property(x => x.ResourceKey).IsRequired().HasMaxLength(160);
         builder.Entity<UiTextResource>().Property(x => x.Value).IsRequired().HasMaxLength(2048);
         builder.Entity<UiTextResource>().Property(x => x.Description).HasMaxLength(256);
+        builder.Entity<UserLanguagePreference>().ToTable(tb => tb.HasComment("用户界面语言偏好"));
+        builder.Entity<UserLanguagePreference>().HasIndex(x => new { x.TenantId, x.UserId }).IsUnique();
+        builder.Entity<UserLanguagePreference>().Property(x => x.Culture).IsRequired().HasMaxLength(16);
         #endregion
 
         #region P6.1 Dashboard

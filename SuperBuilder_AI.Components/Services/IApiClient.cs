@@ -59,6 +59,12 @@ public interface IApiClient
 
     /// <summary>M2-07 平台管理员触发演示数据安装（事务原子、重复执行保护，需 platform:admin:manage）。</summary>
     Task<(DemoInstallResult? Result, string? Error)> InstallDemoDataAsync(CancellationToken ct = default);
+
+    /// <summary>M3-G0 读取当前用户的服务端语言偏好（已认证；无记录时 Culture 为 null）。</summary>
+    Task<(string? Culture, string? Error)> GetUserLanguageAsync(CancellationToken ct = default);
+
+    /// <summary>M3-G0 持久化当前用户语言偏好到服务端（强制校验租户可用语言范围，越界回退默认）。</summary>
+    Task<(string? Culture, string? Error)> SetUserLanguageAsync(string culture, CancellationToken ct = default);
     /// <summary>
     /// 松类型读取：GET 任意端点并以 <see cref="JsonElement"/> 返回（数组或对象皆可）。
     /// 不抛异常——HTTP 非 2xx 与网络/解析错误一律通过 err 返回，便于页面优雅降级。

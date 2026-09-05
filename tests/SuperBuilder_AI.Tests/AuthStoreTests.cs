@@ -73,5 +73,7 @@ public sealed class AuthStoreTests
 		public Task<(string? Text, int Status, string? Error)> GetTextAsync(string relativeUrl, CancellationToken ct = default) => throw new NotSupportedException();
 		public Task<(DemoInstallPlan? Result, string? Error)> GetDemoDataPlanAsync(CancellationToken ct = default) => throw new NotSupportedException();
 		public Task<(DemoInstallResult? Result, string? Error)> InstallDemoDataAsync(CancellationToken ct = default) => throw new NotSupportedException();
+		public Task<(string? Culture, string? Error)> GetUserLanguageAsync(CancellationToken ct = default) => throw new NotSupportedException();
+		public Task<(string? Culture, string? Error)> SetUserLanguageAsync(string culture, CancellationToken ct = default) => throw new NotSupportedException();
 	}
 }

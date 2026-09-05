@@ -340,7 +340,7 @@ M1 退出：Migration 可在历史副本执行；无孤儿；跨租户组合均�
 
 ## 7. M3：多语言产品化
 
-### M3-G0 核心可用子集
+### M3-G0 核心可用子集 ✅（2026-09-05 收尾，本地提交待推送）
 
 M3-G0 是 M4/M7/M8 的最小前置，不等同于完成全部 i18n。它只包含：稳定资源键与加载机制、登录、Layout、NavMenu、共享按钮/验证/错误组件，以及租户语言范围和用户语言恢复。完成 M3-G0 后：
 
@@ -348,6 +348,18 @@ M3-G0 是 M4/M7/M8 的最小前置，不等同于完成全部 i18n。它只包�
 - M8 的布局、性能、无障碍和多端构建可并行。
 - 各业务页面在自身里程碑中不得新增硬编码，并同步迁移本页面文案。
 - 完整 M3-01~06 仍是最终发布门禁，但不再串行阻塞所有业务开发。
+
+> **状态（2026-09-05）**：M3-G0 全部交付并验证；测试 661/661 全绿、四端构建 0 error、PlatformAdmin 治理不变量保留（`localization:*` 视为平台治理面）。本地提交待推送 `origin/master`。
+
+**交付清单（G0-A ~ G0-H）：**
+- ✅ **G0-A 权限码**：新增 `localization:view`/`localization:manage`（`IdentityPermissions`），并入 `IdentityCatalog.Permissions`（全局权限 32→34），`PlatformAdmin` 与 `TenantAdmin` 角色种子已含；`LocalizationController` 守卫由 `PlatformTenantManage`/`IdentityManage` 切换为 `LocalizationManage`/`LocalizationView`；`PermissionCodes.cs`、`NavMenuItems.cs` 同步；`IdentityServiceTests` 权限数量断言 32→34。
+- ✅ **G0-B 用户语言偏好实体**：新增 `UserLanguagePreference(TenantId,UserId,Culture)`，唯一索引 `(TenantId,UserId)`，`Culture` 限长 16；迁移 `20260905060434_M3G0UserLangPref`。
+- ✅ **G0-C 偏好服务**：`IUserLanguagePreferenceService`/`UserLanguagePreferenceService` 按租户 `localization:availableCultures`/`defaultCulture` 校验请求文化（越界回退 available[0]），upsert 并写审计 `user.language.set`。
+- ✅ **G0-D 偏好控制器**：`UserPreferenceController`（`api/user/preferences/language` GET/PUT），匿名返回 401、越界文化回退但仍 200，返回服务端生效文化。
+- ✅ **G0-E 前端偏好集成**：`IApiClient`/`ApiClient` 新增 `GetUserLanguageAsync`/`SetUserLanguageAsync`；`LocalizationService.InitializeAsync` 改为「服务端偏好 → localStorage → 租户默认」回退链，`SetCultureAsync` 同步持久化（仅登录用户）。
+- ✅ **G0-F 共享语言切换器**：`LanguageSwitcher.razor`（仅当 `AvailableCultures>1` 显示，原生名）；登录与 `MainLayout` 内联 `<select>` 已替换为该组件。
+- ✅ **G0-G 共享校验/错误组件**：`FieldError.razor`、`ValidationSummary.razor`（role=alert / validation-summary）。
+- ✅ **G0-H 资源键注册表 + 五语言种子**：`ResourceKeys`（Common/Login/App/Document/Validation/Error/Empty 权威键集合，`All()` 反射枚举）；`LocalizationSeedService.defaults` 由 2 语言扩至 5（zh-CN/zh-TW/en-US/ja-JP/ko-KR），每语言 17 键；新增 `EnsureSeedAsync_Covers_Registered_ResourceKeys` 测试。
 
 ### M3-01 语言关系模型
 
