@@ -41,7 +41,7 @@ public sealed class PlatformAdminBootstrapper
         var password = _configuration["PlatformBootstrap:Password"] ?? string.Empty;
         var displayName = (_configuration["PlatformBootstrap:DisplayName"] ?? "平台系统管理员").Trim();
         if (username.Length == 0 || password.Length < 8) return false;
-        await CreateAsync(username, password, displayName, ct);
+        await CreateAsync(username, password, displayName, ct: ct);
         return true;
     }
 
@@ -75,13 +75,27 @@ public sealed class PlatformAdminBootstrapper
             .Select(t => (long?)t.Id).FirstOrDefaultAsync(ct);
 
     public async Task<(long TenantId, long UserId)> CreateAsync(
-        string username, string password, string? displayName, CancellationToken ct = default)
+        string username, string password, string? displayName,
+        string? email = "", string? confirmPassword = null, CancellationToken ct = default)
     {
         username = (username ?? string.Empty).Trim();
         password ??= string.Empty;
         displayName = (displayName ?? "平台系统管理员").Trim();
+        email = (email ?? string.Empty).Trim();
         if (username.Length == 0 || password.Length < 8)
             throw new ArgumentException("用户名必填，口令至少 8 位。");
+
+        // 交互式初始化（携带 confirmPassword）需校验口令一致与邮箱；
+        // 部署配置路径（PlatformBootstrap:Username/Password）不传 confirmPassword，邮箱允许为空。
+        if (confirmPassword is not null)
+        {
+            if (password != confirmPassword)
+                throw new ArgumentException("两次输入的口令不一致。");
+            if (email.Length == 0)
+                throw new ArgumentException("管理员邮箱必填。");
+            if (!email.Contains('@'))
+                throw new ArgumentException("邮箱格式不正确。");
+        }
 
         var platformTenant = await _db.Tenants.IgnoreQueryFilters()
             .SingleOrDefaultAsync(t => t.TenantCode == IdentityService.PlatformTenantCode, ct);
@@ -104,7 +118,7 @@ public sealed class PlatformAdminBootstrapper
             TenantId = platformTenant.Id,
             Username = username,
             DisplayName = displayName.Length == 0 ? username : displayName,
-            Email = string.Empty,
+            Email = email,
             PasswordHash = _hasher.Hash(password),
             SecurityStamp = Guid.NewGuid().ToString("N"),
             Status = UserStatus.Active,

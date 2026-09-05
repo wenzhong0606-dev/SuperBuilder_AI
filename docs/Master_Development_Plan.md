@@ -293,13 +293,15 @@ M1 退出：Migration 可在历史副本执行；无孤儿；跨租户组合均�
 - 前端：`Admin/PlatformAdminScopes.razor`（gated by `PlatformAdminManage`），列出管理员及其范围摘要，弹窗以多选租户设定范围；导航项「管理员租户范围」。
 - 测试：`TenantManagementControllerTests` 新增越权 403 / 范围内成功 / 全范围可见全部租户。
 
-### M2-03 首次初始化
+### M2-03 首次初始化 ✅
 
 - 表单包含 Username、DisplayName、Email、Password、ConfirmPassword；前后端均校验至少 8 位。
 - 初始化 API 必须在服务端检查实际连接来源：`Connection.RemoteIpAddress` 必须是 Loopback；不能只相信 Host、Origin、X-Forwarded-For 或“部署在内网”的假设。
 - 使用反向代理时只信任明确配置的 KnownProxies/KnownNetworks，并以可信转发链还原客户端地址；配置不完整时默认拒绝匿名初始化。
 - 仅允许受控本机/部署环境；首位管理员创建成功后服务端立即关闭入口，重复请求即使来自 Loopback 也必须拒绝。
 - 明确生产是否禁用匿名 Loopback Bootstrap；失败保留输入并返回结构化错误。
+
+**实现要点（M2-03 ✅）**：`PlatformBootstrapController.Create` 先查 `PlatformBootstrap:AllowAnonymous`（默认 true）——false 时匿名 `POST` 立即 403 并提示改用部署配置；随后校验 `Connection.RemoteIpAddress.IsLoopback`（依赖 `Program.cs` 受控 `ForwardedHeaders`：仅消费配置内 `KnownProxies/KnownNetworks` 的 `X-Forwarded-*`，默认不消费，规避伪造客户端 IP）。`PlatformAdminBootstrapper.CreateAsync` 校验 用户名非空、口令≥8；交互式（携带 confirmPassword）还需口令一致与邮箱含 '@' 格式；配置路径（不传 confirmPassword）邮箱允许为空。`Status` 新增 `anonymousAllowed` 标志。`EnsureAsync` 部署配置路径不受匿名开关影响。重复初始化由 `CreateAsync` 幂等守卫抛 `InvalidOperationException` → 控制器返回 409（入口即关闭）。前端 `Login.razor` 初始化表单补齐 Email 字段、前后端校验、失败保留输入，并按 `anonymousAllowed=false` 隐藏表单改提示部署配置。新增 15 例测试（bootstrapper 校验 4 + 控制器匿名开关/Loopback/一次性关闭/状态标志 5，扩展既有 bootstrapper 用例至 10）全部通过；四端构建 0 error。
 
 ### M2-04 租户事务与生命周期
 

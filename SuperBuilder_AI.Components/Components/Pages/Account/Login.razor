@@ -28,16 +28,27 @@
         }
         else if (BootstrapRequired)
         {
-            <div class="card">
-                <h2 style="margin:0 0 4px;">初始化平台系统管理员</h2>
-                <p class="muted tiny">这是一次性初始化入口。创建完成后将永久关闭，请妥善保管管理员口令。</p>
-                <label>管理员用户名<input class="form-control" @bind="BootstrapUsername" placeholder="例如 platform-admin" /></label>
-                <label>显示名<input class="form-control" @bind="BootstrapDisplayName" /></label>
-                <label>管理员口令<input class="form-control" @bind="BootstrapPassword" type="password" placeholder="至少 8 位" /></label>
-                <label>确认口令<input class="form-control" @bind="BootstrapPasswordConfirm" type="password" /></label>
-                <button class="btn btn-primary" @onclick="InitializePlatform" disabled="@Busy">创建平台管理员</button>
-                @if (!string.IsNullOrEmpty(Error)) { <div class="alert alert-danger">@Error</div> }
-            </div>
+            if (!BootstrapAnonymousAllowed)
+            {
+                <div class="card">
+                    <h2 style="margin:0 0 4px;">初始化入口已关闭</h2>
+                    <p class="muted tiny">当前环境已禁用匿名初始化。请由部署配置（PlatformBootstrap:Username/Password）完成首位平台管理员创建。</p>
+                </div>
+            }
+            else
+            {
+                <div class="card">
+                    <h2 style="margin:0 0 4px;">初始化平台系统管理员</h2>
+                    <p class="muted tiny">这是一次性初始化入口。创建完成后将永久关闭，请妥善保管管理员口令。</p>
+                    <label>管理员用户名<input class="form-control" @bind="BootstrapUsername" placeholder="例如 platform-admin" /></label>
+                    <label>显示名<input class="form-control" @bind="BootstrapDisplayName" /></label>
+                    <label>管理员邮箱<input class="form-control" @bind="BootstrapEmail" placeholder="admin@example.com" /></label>
+                    <label>管理员口令<input class="form-control" @bind="BootstrapPassword" type="password" placeholder="至少 8 位" /></label>
+                    <label>确认口令<input class="form-control" @bind="BootstrapPasswordConfirm" type="password" /></label>
+                    <button class="btn btn-primary" @onclick="InitializePlatform" disabled="@Busy">创建平台管理员</button>
+                    @if (!string.IsNullOrEmpty(Error)) { <div class="alert alert-danger">@Error</div> }
+                </div>
+            }
         }
         else if (State.IsAuthenticated)
         {
@@ -74,8 +85,10 @@
     private string Error = "";
     private bool BootstrapChecking = true;
     private bool BootstrapRequired;
+    private bool BootstrapAnonymousAllowed = true;
     private string BootstrapUsername = "platform-admin";
     private string BootstrapDisplayName = "平台系统管理员";
+    private string BootstrapEmail = "";
     private string BootstrapPassword = "";
     private string BootstrapPasswordConfirm = "";
     private List<string> _loginCultures = new() { "zh-CN", "en-US" };
@@ -137,6 +150,7 @@
             return;
         }
         BootstrapRequired = data.Value.TryGetProperty("required", out var required) && required.GetBoolean();
+        BootstrapAnonymousAllowed = !data.Value.TryGetProperty("anonymousAllowed", out var anon) || anon.GetBoolean();
         if (BootstrapRequired && data.Value.TryGetProperty("platformTenantId", out var tenant) && tenant.TryGetInt64(out var id))
             TenantId = id;
     }
@@ -145,6 +159,7 @@
     {
         Error = "";
         if (string.IsNullOrWhiteSpace(BootstrapUsername)) { Error = "管理员用户名必填。"; return; }
+        if (string.IsNullOrWhiteSpace(BootstrapEmail) || !BootstrapEmail.Contains('@')) { Error = "请输入有效的管理员邮箱。"; return; }
         if (BootstrapPassword.Length < 8) { Error = "管理员口令至少 8 位。"; return; }
         if (BootstrapPassword != BootstrapPasswordConfirm) { Error = "两次输入的口令不一致。"; return; }
         Busy = true;
@@ -153,8 +168,11 @@
             username = BootstrapUsername,
             password = BootstrapPassword,
             displayName = BootstrapDisplayName,
+            email = BootstrapEmail,
+            confirmPassword = BootstrapPasswordConfirm,
         });
         Busy = false;
+        // 失败时保留已输入内容，仅提示错误，便于用户修正。
         if (!ok) { Error = err ?? "平台管理员初始化失败。"; return; }
         Username = BootstrapUsername;
         Password = BootstrapPassword;
