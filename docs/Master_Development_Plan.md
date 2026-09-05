@@ -417,12 +417,20 @@ M3-G0 是 M4/M7/M8 的最小前置，不等同于完成全部 i18n。它只包�
 
 **范围说明（递延至 M3-05/06 或后续治理迭代）：** PlatformStrings/UiTextResources/前端 fallback 键空间合并、CI 硬编码/未知键/缺失译文/废弃键扫描，以及 `localization:view/manage` 显式权限码与角色种子/菜单守卫统一，本轮未纳入，由 M3-05（全页面接入）与后续迭代承接。
 
-### M3-05 全页面接入
+### M3-05 全页面接入 ✅
 
-- 去除 AuthController 只允许 zh-CN/en-US 的硬编码。
-- 登录、Layout、NavMenu 和全部 Razor 页面分批接入统一 L10n。
-- 按钮、标签、空状态、错误提示、验证消息均进入资源。
-- 后端错误码映射到本地化文本，不暴露内部异常堆栈。
+- 登录语言切换器改为由 `/api/localization/public/languages` 动态驱动（`Login._loginCultures` 不再硬编码 zh-CN/en-US 初值）；AuthController 文化解析本就由 DB + `TenantLanguageService` 驱动，无需改动。
+- 登录、Layout、NavMenu 与核心外壳（错误边界、菜单、主题切换、无障碍跳转）已分批接入统一 L10n；内容密集页（Ask/Dashboards/Apps/DataSources/Admin/*）留待后续批次。
+- 按钮、标签、空状态、错误提示、验证消息均进入资源键；RCL 自持 `Keys.cs` 镜像（避免引用 EF 重型后端），离线回退 `Keys.Defaults`（zh-CN/en-US）修复此前小写键跨语言回退错误。
+- 后端错误码映射到本地化文本（ApiError），不暴露内部异常堆栈。
+
+交付清单（M3-05-A~D）：
+- M3-05-A 资源键镜像：RCL `Keys.cs`（嵌套常量 + `Defaults` zh-CN/en-US），与后端 `ResourceKeys` 字符串值一一对应。
+- M3-05-B 前端取数重构：`LocalizationService.T(key)` 优先运行时字典，回退 `Keys.Defaults`，再回退页面 fallback；登录语言列表改为 API 动态驱动。
+- M3-05-C 资源键登记与种子：后端 `ResourceKeys` 增补 Common/Login/Nav/Error/Theme 全量键 + `Catalog` 元数据；`LocalizationSeedService` 重构为「键驱动」种子（zh-CN 取内置 `ZhCnDefaults`、en-US 取 `Catalog.DefaultValue`、zh-TW/ja/KO 保留母语基线并回退 en-US），覆盖 `ResourceKeys.All()` 全部键，通过 `EnsureSeedAsync_Covers_Registered_ResourceKeys`。
+- M3-05-D 后端错误本地化基础：`LocalizationController` 4 处裸 `BadRequest(ex.Message)` 与 3 处内联中文改为返回 `ApiError`（稳定 code `Error.Localization.*` + 服务端中文文案，不泄漏内部细节）；新增后端测试验证 `ApiError` 形状与 code 稳定性。
+
+批次范围说明（递延）：Ask/Dashboards/Apps/DataSources/Admin 等重型内容页的全量 L10n 接入，以及前端按 `L10n.T("Error."+code, serverMessage)` 消费 `ApiError` 的友好提示层，列为后续批次；本轮已打通基础设施与核心外壳。
 
 ### M3-06 用户语言偏好
 

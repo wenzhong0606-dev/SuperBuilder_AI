@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using SuperBuilder_AI.Api.Errors;
 using SuperBuilder_AI.Interfaces.Platform;
 using SuperBuilder_AI.Interfaces.Localization;
 using SuperBuilder_AI.Models.Organization;
@@ -120,7 +121,7 @@ public sealed class LocalizationController : ControllerBase
 			var created = await _platformLanguage.CreateLanguageAsync(request, CurrentUserId(), ct);
 			return Ok(created);
 		}
-		catch (PlatformLanguageException ex) { return BadRequest(ex.Message); }
+		catch (PlatformLanguageException) { return BadRequest(new ApiError { Code = ResourceKeys.Error.LocalizationCultureInvalid, Message = "语言目录操作失败（文化格式、显示名或唯一性校验未通过），请检查输入后重试。" }); }
 	}
 
 	/// <summary>平台管理员查看全部语言目录（含已停用），用于管理视图。</summary>
@@ -152,7 +153,7 @@ public sealed class LocalizationController : ControllerBase
 			var updated = await _platformLanguage.UpdateLanguageAsync(id, request, CurrentUserId(), ct);
 			return Ok(updated);
 		}
-		catch (PlatformLanguageException ex) { return BadRequest(ex.Message); }
+		catch (PlatformLanguageException) { return BadRequest(new ApiError { Code = ResourceKeys.Error.LocalizationCultureInvalid, Message = "语言目录操作失败（文化格式、显示名或唯一性校验未通过），请检查输入后重试。" }); }
 	}
 
 	/// <summary>平台管理员启用/停用语言；停用委托租户关系迁移（避免孤立租户默认语言）。</summary>
@@ -165,7 +166,7 @@ public sealed class LocalizationController : ControllerBase
 			await _platformLanguage.SetEnabledAsync(id, request.Enabled, CurrentUserId(), ct);
 			return NoContent();
 		}
-		catch (PlatformLanguageException ex) { return BadRequest(ex.Message); }
+		catch (PlatformLanguageException) { return BadRequest(new ApiError { Code = ResourceKeys.Error.LocalizationCultureInvalid, Message = "语言目录操作失败（文化格式、显示名或唯一性校验未通过），请检查输入后重试。" }); }
 	}
 
 	/// <summary>平台管理员按给定 Id 顺序重排语言目录。</summary>
@@ -178,7 +179,7 @@ public sealed class LocalizationController : ControllerBase
 			await _platformLanguage.ReorderLanguagesAsync(request.OrderedIds ?? Array.Empty<long>(), CurrentUserId(), ct);
 			return NoContent();
 		}
-		catch (PlatformLanguageException ex) { return BadRequest(ex.Message); }
+		catch (PlatformLanguageException) { return BadRequest(new ApiError { Code = ResourceKeys.Error.LocalizationCultureInvalid, Message = "语言目录操作失败（文化格式、显示名或唯一性校验未通过），请检查输入后重试。" }); }
 	}
 
 	/// <summary>读取平台基线以及当前租户覆盖后的文本。</summary>
@@ -209,7 +210,7 @@ public sealed class LocalizationController : ControllerBase
 		if (targetTenant < 0 || (targetTenant == 0 && !User.HasClaim("perm", IdentityPermissions.LocalizationManage))) return Forbid();
 		if (targetTenant > 0 && !User.HasClaim("perm", IdentityPermissions.LocalizationView)) return Forbid();
 		var value = (request.Value ?? string.Empty).Trim();
-		if (value.Length == 0) return BadRequest("文本不能为空。");
+		if (value.Length == 0) return BadRequest(new ApiError { Code = ResourceKeys.Error.LocalizationTextEmpty, Message = "文本不能为空。" });
 		// M3-04：租户覆盖译文须与平台基线占位符一致，避免 string.Format 参数不匹配运行时异常。
 		if (targetTenant > 0)
 		{
@@ -218,7 +219,7 @@ public sealed class LocalizationController : ControllerBase
 			{
 				var b = string.Join(",", LocalizationPlaceholderValidator.ExtractPlaceholders(baseline.Value));
 				var t = string.Join(",", LocalizationPlaceholderValidator.ExtractPlaceholders(value));
-				return BadRequest($"译文占位符与平台基线不一致：基线 {{{b}}}，译文 {{{t}}}。请保持格式占位符（{{0}}/{{1}}…）一致。");
+				return BadRequest(new ApiError { Code = ResourceKeys.Error.LocalizationPlaceholderMismatch, Message = "译文占位符与平台基线不一致，请保持格式占位符（{0}/{1}…）一致。" });
 			}
 		}
 		// M3-04：租户作用域过滤纵深防御。
@@ -236,7 +237,7 @@ public sealed class LocalizationController : ControllerBase
 	public async Task<IActionResult> ResetText(string culture, string key, CancellationToken ct)
 	{
 		var tenantId = CurrentTenantId();
-		if (tenantId <= 0) return BadRequest("平台基线不能使用重置覆盖操作。");
+		if (tenantId <= 0) return BadRequest(new ApiError { Code = ResourceKeys.Error.LocalizationBaselineReset, Message = "平台基线不能使用重置覆盖操作。" });
 		if (!User.HasClaim("perm", IdentityPermissions.LocalizationView)) return Forbid();
 		// M3-04：租户作用域过滤纵深防御。
 		_db.ApplyTenantScope(tenantId);

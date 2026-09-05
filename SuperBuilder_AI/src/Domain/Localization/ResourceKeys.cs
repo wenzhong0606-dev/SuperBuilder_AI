@@ -21,6 +21,13 @@ public static class ResourceKeys
         public const string Settings = "Common.Settings";
         public const string Logout = "Common.Logout";
         public const string Loading = "Common.Loading";
+        public const string Menu = "Common.Menu";
+        public const string Retry = "Common.Retry";
+        public const string BackToWorkspace = "Common.BackToWorkspace";
+        public const string CurrentUser = "Common.CurrentUser";
+        public const string Tenant = "Common.Tenant";
+        public const string User = "Common.User";
+        public const string AccountMenu = "Common.AccountMenu";
     }
 
     /// <summary>登录页相关文本。</summary>
@@ -31,6 +38,32 @@ public static class ResourceKeys
         public const string Password = "Login.Password";
         public const string TenantId = "Login.TenantId";
         public const string Tagline = "Login.Tagline";
+        public const string InitEntryClosed = "Login.InitEntryClosed";
+        public const string InitEntryClosedHint = "Login.InitEntryClosedHint";
+        public const string InitPlatformAdmin = "Login.InitPlatformAdmin";
+        public const string InitNotice = "Login.InitNotice";
+        public const string AdminUsername = "Login.AdminUsername";
+        public const string DisplayName = "Login.DisplayName";
+        public const string AdminEmail = "Login.AdminEmail";
+        public const string AdminPassword = "Login.AdminPassword";
+        public const string ConfirmPassword = "Login.ConfirmPassword";
+        public const string CreateAdmin = "Login.CreateAdmin";
+        public const string TenantPlaceholder = "Login.TenantPlaceholder";
+        public const string NoTenantRegister = "Login.NoTenantRegister";
+        public const string CheckingInit = "Login.CheckingInit";
+        public const string InitStatusError = "Login.InitStatusError";
+        public const string AdminUsernameRequired = "Login.AdminUsernameRequired";
+        public const string AdminEmailInvalid = "Login.AdminEmailInvalid";
+        public const string AdminPasswordTooShort = "Login.AdminPasswordTooShort";
+        public const string AdminPasswordMismatch = "Login.AdminPasswordMismatch";
+        public const string InitFailed = "Login.InitFailed";
+        public const string SelectTenantFirst = "Login.SelectTenantFirst";
+        public const string LoginFailed = "Login.LoginFailed";
+        public const string HeroAINativeBI = "Login.Hero.AINativeBI";
+        public const string HeroMultiTenant = "Login.Hero.MultiTenant";
+        public const string HeroMultilingual = "Login.Hero.Multilingual";
+        public const string HeroLowCode = "Login.Hero.LowCode";
+        public const string HeroEnterpriseSaaS = "Login.Hero.EnterpriseSaaS";
     }
 
     /// <summary>应用级标题/副标题。</summary>
@@ -58,6 +91,19 @@ public static class ResourceKeys
     {
         public const string Generic = "Error.Generic";
         public const string NotFound = "Error.NotFound";
+        public const string Unauthorized = "Error.Unauthorized";
+        public const string Forbidden = "Error.Forbidden";
+        public const string Validation = "Error.Validation";
+        public const string Conflict = "Error.Conflict";
+        public const string RateLimited = "Error.RateLimited";
+        public const string Maintenance = "Error.Maintenance";
+        public const string PageRender = "Error.PageRender";
+        public const string PageRenderDesc = "Error.PageRenderDesc";
+        public const string TechDetails = "Error.TechDetails";
+        public const string LocalizationCultureInvalid = "Error.Localization.CultureInvalid";
+        public const string LocalizationTextEmpty = "Error.Localization.TextEmpty";
+        public const string LocalizationPlaceholderMismatch = "Error.Localization.PlaceholderMismatch";
+        public const string LocalizationBaselineReset = "Error.Localization.BaselineReset";
     }
 
     /// <summary>空状态文案。</summary>
@@ -66,13 +112,39 @@ public static class ResourceKeys
         public const string NoData = "Empty.NoData";
     }
 
-    /// <summary>导航菜单文本（M3-04 增补）。</summary>
+    /// <summary>导航菜单文本（M3-04 增补，M3-05 扩展全量）。</summary>
     public static class Nav
     {
-        public const string Dashboard = "Nav.Dashboard";
+        public const string Home = "Nav.Home";
         public const string Ask = "Nav.Ask";
+        public const string Dashboards = "Nav.Dashboards";
+        public const string Apps = "Nav.Apps";
+        public const string Agent = "Nav.Agent";
+        public const string SemanticLabels = "Nav.SemanticLabels";
+        public const string BusinessModel = "Nav.BusinessModel";
+        public const string Components = "Nav.Components";
+        public const string ThemeEditor = "Nav.ThemeEditor";
         public const string DataSources = "Nav.DataSources";
+        public const string Dashboard = "Nav.Dashboard";
         public const string Admin = "Nav.Admin";
+        public const string ModelAccounts = "Nav.ModelAccounts";
+        public const string Tenants = "Nav.Tenants";
+        public const string TenantMembers = "Nav.TenantMembers";
+        public const string SelfRegistration = "Nav.SelfRegistration";
+        public const string DemoData = "Nav.DemoData";
+        public const string PlatformAdmins = "Nav.PlatformAdmins";
+        public const string PlatformAdminScopes = "Nav.PlatformAdminScopes";
+        public const string Identity = "Nav.Identity";
+        public const string Audit = "Nav.Audit";
+        public const string Quota = "Nav.Quota";
+        public const string Localization = "Nav.Localization";
+        public const string Themes = "Nav.Themes";
+        public const string System = "Nav.System";
+        public const string GroupFlagship = "Nav.Group.Flagship";
+        public const string GroupAnalysis = "Nav.Group.Analysis";
+        public const string GroupCustom = "Nav.Group.Custom";
+        public const string GroupPlatformExt = "Nav.Group.PlatformExt";
+        public const string GroupAdmin = "Nav.Group.Admin";
     }
 
     /// <summary>无障碍文本（M3-04 增补）。</summary>
@@ -86,6 +158,7 @@ public static class ResourceKeys
     {
         public const string Light = "Theme.Light";
         public const string Dark = "Theme.Dark";
+        public const string Switch = "Theme.Switch";
     }
 
     /// <summary>资源键元数据（M3-04）：归属模块、页面、平台默认（英文）值、是否已废弃。</summary>
@@ -126,10 +199,99 @@ public static class ResourceKeys
         [Nav.Dashboard] = new("Nav", Page: "Dashboard", DefaultValue: "Dashboard"),
         [Nav.Ask] = new("Nav", Page: "Ask", DefaultValue: "Ask"),
         [Nav.DataSources] = new("Nav", Page: "DataSources", DefaultValue: "Data Sources"),
+        [Nav.Dashboard] = new("Nav", Page: "Dashboard", DefaultValue: "Dashboard"),
+        [Nav.Admin] = new("Nav", Page: "Admin", DefaultValue: "Admin"),
         [Nav.Admin] = new("Nav", Page: "Admin", DefaultValue: "Admin"),
         [Accessibility.SkipToContent] = new("Accessibility", DefaultValue: "Skip to content"),
         [Theme.Light] = new("Theme", DefaultValue: "Light"),
         [Theme.Dark] = new("Theme", DefaultValue: "Dark"),
+        [Theme.Switch] = new("Theme", DefaultValue: "Toggle theme"),
+
+        [Common.Menu] = new("Common", DefaultValue: "Menu"),
+        [Common.Retry] = new("Common", DefaultValue: "Retry"),
+        [Common.BackToWorkspace] = new("Common", DefaultValue: "Back to workspace"),
+        [Common.CurrentUser] = new("Common", DefaultValue: "Current user"),
+        [Common.Tenant] = new("Common", DefaultValue: "Tenant"),
+        [Common.User] = new("Common", DefaultValue: "User"),
+        [Common.AccountMenu] = new("Common", DefaultValue: "Account menu"),
+
+        [Login.InitEntryClosed] = new("Login", Page: "Login", DefaultValue: "Initialization entry is closed"),
+        [Login.InitEntryClosedHint] = new("Login", Page: "Login", DefaultValue: "Anonymous initialization is disabled in this environment. Create the first platform admin via deployment configuration."),
+        [Login.InitPlatformAdmin] = new("Login", Page: "Login", DefaultValue: "Initialize platform administrator"),
+        [Login.InitNotice] = new("Login", Page: "Login", DefaultValue: "This is a one-time initialization. It will be permanently closed after creation; keep the admin password safe."),
+        [Login.AdminUsername] = new("Login", Page: "Login", DefaultValue: "Admin username"),
+        [Login.DisplayName] = new("Login", Page: "Login", DefaultValue: "Display name"),
+        [Login.AdminEmail] = new("Login", Page: "Login", DefaultValue: "Admin email"),
+        [Login.AdminPassword] = new("Login", Page: "Login", DefaultValue: "Admin password"),
+        [Login.ConfirmPassword] = new("Login", Page: "Login", DefaultValue: "Confirm password"),
+        [Login.CreateAdmin] = new("Login", Page: "Login", DefaultValue: "Create platform admin"),
+        [Login.TenantPlaceholder] = new("Login", Page: "Login", DefaultValue: "-- Select tenant --"),
+        [Login.NoTenantRegister] = new("Login", Page: "Login", DefaultValue: "No tenant yet? Request access"),
+        [Login.CheckingInit] = new("Login", Page: "Login", DefaultValue: "Checking platform initialization status…"),
+        [Login.InitStatusError] = new("Login", Page: "Login", DefaultValue: "Unable to read platform initialization status."),
+        [Login.AdminUsernameRequired] = new("Login", Page: "Login", DefaultValue: "Admin username is required."),
+        [Login.AdminEmailInvalid] = new("Login", Page: "Login", DefaultValue: "Please enter a valid admin email."),
+        [Login.AdminPasswordTooShort] = new("Login", Page: "Login", DefaultValue: "Admin password must be at least 8 characters."),
+        [Login.AdminPasswordMismatch] = new("Login", Page: "Login", DefaultValue: "The two passwords do not match."),
+        [Login.InitFailed] = new("Login", Page: "Login", DefaultValue: "Platform admin initialization failed."),
+        [Login.SelectTenantFirst] = new("Login", Page: "Login", DefaultValue: "Please select a tenant first."),
+        [Login.LoginFailed] = new("Login", Page: "Login", DefaultValue: "Sign-in failed: user does not exist or is disabled."),
+        [Login.HeroAINativeBI] = new("Login", Page: "Login", DefaultValue: "AI Native BI"),
+        [Login.HeroMultiTenant] = new("Login", Page: "Login", DefaultValue: "Multi-tenant"),
+        [Login.HeroMultilingual] = new("Login", Page: "Login", DefaultValue: "Multilingual"),
+        [Login.HeroLowCode] = new("Login", Page: "Login", DefaultValue: "Low-code"),
+        [Login.HeroEnterpriseSaaS] = new("Login", Page: "Login", DefaultValue: "Enterprise SaaS"),
+
+        [App.Subtitle] = new("App", DefaultValue: "AI Analytics Platform"),
+        [Document.OutboundOrder] = new("Document", DefaultValue: "Outbound order"),
+        [Validation.Required] = new("Validation", DefaultValue: "This field is required."),
+        [Validation.Email] = new("Validation", DefaultValue: "Please enter a valid email address."),
+        [Validation.Format] = new("Validation", DefaultValue: "Invalid format."),
+        [Empty.NoData] = new("Empty", DefaultValue: "No data available."),
+
+        [Error.Unauthorized] = new("Error", DefaultValue: "Unauthorized."),
+        [Error.Forbidden] = new("Error", DefaultValue: "You do not have access to this resource."),
+        [Error.Validation] = new("Error", DefaultValue: "Input validation failed."),
+        [Error.Conflict] = new("Error", DefaultValue: "Conflict detected. Please refresh and retry."),
+        [Error.RateLimited] = new("Error", DefaultValue: "Too many requests. Please try again later."),
+        [Error.Maintenance] = new("Error", DefaultValue: "Under maintenance. Please try again later."),
+        [Error.PageRender] = new("Error", Page: "Error", DefaultValue: "Page failed to render"),
+        [Error.PageRenderDesc] = new("Error", Page: "Error", DefaultValue: "The page encountered a rendering error and was safely isolated without affecting other features. Retry the page or return to the workspace."),
+        [Error.TechDetails] = new("Error", Page: "Error", DefaultValue: "Technical details"),
+        [Error.LocalizationCultureInvalid] = new("Error", Page: "Localization", DefaultValue: "Invalid culture format."),
+        [Error.LocalizationTextEmpty] = new("Error", Page: "Localization", DefaultValue: "Text cannot be empty."),
+        [Error.LocalizationPlaceholderMismatch] = new("Error", Page: "Localization", DefaultValue: "Translation placeholders do not match the platform baseline."),
+        [Error.LocalizationBaselineReset] = new("Error", Page: "Localization", DefaultValue: "The platform baseline cannot be reset via override."),
+
+        [Nav.Home] = new("Nav", Page: "Home", DefaultValue: "Home"),
+        [Nav.Ask] = new("Nav", Page: "Ask", DefaultValue: "Ask BI"),
+        [Nav.Dashboards] = new("Nav", Page: "Dashboards", DefaultValue: "Dashboards"),
+        [Nav.Apps] = new("Nav", Page: "Apps", DefaultValue: "App Factory"),
+        [Nav.Agent] = new("Nav", Page: "Agent", DefaultValue: "Agent / Copilot"),
+        [Nav.SemanticLabels] = new("Nav", Page: "SemanticLabels", DefaultValue: "Semantic Labels"),
+        [Nav.BusinessModel] = new("Nav", Page: "BusinessModel", DefaultValue: "Semantic Model"),
+        [Nav.Components] = new("Nav", Page: "Components", DefaultValue: "Component Library"),
+        [Nav.ThemeEditor] = new("Nav", Page: "ThemeEditor", DefaultValue: "Theme Editor"),
+        [Nav.ModelAccounts] = new("Nav", Page: "ModelAccounts", DefaultValue: "Models & Accounts"),
+        [Nav.Tenants] = new("Nav", Page: "Tenants", DefaultValue: "Tenants"),
+        [Nav.TenantMembers] = new("Nav", Page: "TenantMembers", DefaultValue: "Tenant Members"),
+        [Nav.SelfRegistration] = new("Nav", Page: "SelfRegistration", DefaultValue: "Self Registration"),
+        [Nav.DemoData] = new("Nav", Page: "DemoData", DefaultValue: "Demo Data"),
+        [Nav.PlatformAdmins] = new("Nav", Page: "PlatformAdmins", DefaultValue: "Platform Admins"),
+        [Nav.PlatformAdminScopes] = new("Nav", Page: "PlatformAdminScopes", DefaultValue: "Admin Tenant Scope"),
+        [Nav.Identity] = new("Nav", Page: "Identity", DefaultValue: "Identity & Permissions"),
+        [Nav.Audit] = new("Nav", Page: "Audit", DefaultValue: "Audit"),
+        [Nav.Quota] = new("Nav", Page: "Quota", DefaultValue: "Quota"),
+        [Nav.Localization] = new("Nav", Page: "Localization", DefaultValue: "Localization"),
+        [Nav.Themes] = new("Nav", Page: "Themes", DefaultValue: "Themes"),
+        [Nav.System] = new("Nav", Page: "System", DefaultValue: "System Status"),
+        [Nav.GroupFlagship] = new("Nav", Page: "Flagship", DefaultValue: "Flagship"),
+        [Nav.GroupAnalysis] = new("Nav", Page: "Analysis", DefaultValue: "Analysis"),
+        [Nav.GroupCustom] = new("Nav", Page: "Custom", DefaultValue: "Custom"),
+        [Nav.GroupPlatformExt] = new("Nav", Page: "PlatformExtensions", DefaultValue: "Platform Extensions"),
+        [Nav.GroupAdmin] = new("Nav", Page: "Admin", DefaultValue: "Admin"),
+
+        [Accessibility.SkipToContent] = new("Accessibility", DefaultValue: "Skip to content"),
     };
 
     /// <summary>返回全部已登记键（供种子覆盖校验与 CI 扫描使用）。</summary>

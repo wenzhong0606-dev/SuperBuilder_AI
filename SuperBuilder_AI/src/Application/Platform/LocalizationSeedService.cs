@@ -117,25 +117,99 @@ public sealed class LocalizationSeedService : ILocalizationSeedService
             },
         };
 
+        // M3-05：键驱动种子。以 ResourceKeys.All() 为权威键集，保证新增键即时覆盖：
+        // zh-CN 取内置 ZhCnDefaults（与 RCL Keys.Defaults 镜像一致），en-US 取 ResourceKeys.Catalog.DefaultValue；
+        // zh-TW/ja-JP/ko-KR 优先保留手维护母语基线（defaults），缺失键回退到 en-US，避免错译且保证全覆盖。
+        var enUs = ResourceKeys.Catalog.ToDictionary(kv => kv.Key, kv => kv.Value.DefaultValue ?? kv.Key);
+
         foreach (var locale in locales)
         {
-            var source = defaults.TryGetValue(locale.Culture, out var exact) ? exact : defaults["en-US"];
             var existingKeys = await _db.UiTextResources
                 .Where(x => x.TenantId == 0 && x.Culture == locale.Culture)
                 .Select(x => x.ResourceKey).ToListAsync(ct);
-            _db.UiTextResources.AddRange(source
-                .Where(x => !existingKeys.Contains(x.Key, StringComparer.OrdinalIgnoreCase))
-                .Select(x => new UiTextResource
+
+            var toAdd = new List<UiTextResource>();
+            foreach (var key in ResourceKeys.All())
+            {
+                if (existingKeys.Contains(key, StringComparer.OrdinalIgnoreCase)) continue;
+
+                // 解析值：① 该文化手维护母语基线；② zh-CN 内置简体；③ en-US 基线；④ 兜底键名。
+                string value;
+                if (defaults.TryGetValue(locale.Culture, out var hand) && hand.TryGetValue(key, out var hv))
+                    value = hv;
+                else if (locale.Culture == "zh-CN" && ZhCnDefaults.TryGetValue(key, out var zv))
+                    value = zv;
+                else if (enUs.TryGetValue(key, out var ev))
+                    value = ev;
+                else
+                    value = key;
+
+                toAdd.Add(new UiTextResource
                 {
                     TenantId = 0,
                     Culture = locale.Culture,
-                    ResourceKey = x.Key,
-                    Value = x.Value,
-                    Description = x.Key.StartsWith("Common.") ? "系统通用文本" : "系统界面文本",
+                    ResourceKey = key,
+                    Value = value,
+                    Description = key.StartsWith("Common.") ? "系统通用文本" : "系统界面文本",
                     IsTranslated = true,
-                }));
+                });
+            }
+
+            _db.UiTextResources.AddRange(toAdd);
         }
 
         await _db.SaveChangesAsync(ct);
     }
+
+    /// <summary>平台基线简体中文文案（zh-CN），与前端 RCL <c>Keys.Defaults</c> 的 ZhCn 镜像一致；后端单一事实来源。</summary>
+    private static readonly Dictionary<string, string> ZhCnDefaults = new()
+    {
+        ["Common.Login"] = "登录", ["Common.Confirm"] = "确认", ["Common.Cancel"] = "取消",
+        ["Common.Save"] = "保存", ["Common.Close"] = "关闭", ["Common.Settings"] = "个人设置",
+        ["Common.Logout"] = "退出登录", ["Common.Loading"] = "加载中…", ["Common.Menu"] = "菜单",
+        ["Common.Retry"] = "重试", ["Common.BackToWorkspace"] = "返回工作台", ["Common.CurrentUser"] = "当前用户",
+        ["Common.Tenant"] = "租户", ["Common.User"] = "用户", ["Common.AccountMenu"] = "账号菜单",
+
+        ["Login.Title"] = "登录 / 租户选择", ["Login.Username"] = "用户名", ["Login.Password"] = "口令",
+        ["Login.TenantId"] = "租户 ID", ["Login.Tagline"] = "自然语言驱动的智能问数平台 —— 对话即分析，所见即洞察。",
+        ["Login.InitEntryClosed"] = "初始化入口已关闭", ["Login.InitEntryClosedHint"] = "当前环境已禁用匿名初始化。请由部署配置完成首位平台管理员创建。",
+        ["Login.InitPlatformAdmin"] = "初始化平台系统管理员", ["Login.InitNotice"] = "这是一次性初始化入口。创建完成后将永久关闭，请妥善保管管理员口令。",
+        ["Login.AdminUsername"] = "管理员用户名", ["Login.DisplayName"] = "显示名", ["Login.AdminEmail"] = "管理员邮箱",
+        ["Login.AdminPassword"] = "管理员口令", ["Login.ConfirmPassword"] = "确认口令", ["Login.CreateAdmin"] = "创建平台管理员",
+        ["Login.TenantPlaceholder"] = "-- 请选择租户 --", ["Login.NoTenantRegister"] = "还没有租户？申请开通",
+        ["Login.CheckingInit"] = "正在检查平台初始化状态…", ["Login.InitStatusError"] = "无法读取平台初始化状态。",
+        ["Login.AdminUsernameRequired"] = "管理员用户名必填。", ["Login.AdminEmailInvalid"] = "请输入有效的管理员邮箱。",
+        ["Login.AdminPasswordTooShort"] = "管理员口令至少 8 位。", ["Login.AdminPasswordMismatch"] = "两次输入的口令不一致。",
+        ["Login.InitFailed"] = "平台管理员初始化失败。", ["Login.SelectTenantFirst"] = "请先选择租户。",
+        ["Login.LoginFailed"] = "登录失败：用户不存在或已禁用。",
+        ["Login.Hero.AINativeBI"] = "AI Native BI", ["Login.Hero.MultiTenant"] = "多租户", ["Login.Hero.Multilingual"] = "多语言",
+        ["Login.Hero.LowCode"] = "低代码", ["Login.Hero.EnterpriseSaaS"] = "企业级 SaaS",
+
+        ["App.Subtitle"] = "智能问数平台", ["Document.OutboundOrder"] = "出库单",
+
+        ["Validation.Required"] = "此项为必填。", ["Validation.Email"] = "请输入有效的邮箱地址。", ["Validation.Format"] = "格式不正确。",
+
+        ["Error.Generic"] = "发生错误，请稍后重试。", ["Error.NotFound"] = "未找到请求的资源。", ["Error.Unauthorized"] = "未授权。",
+        ["Error.Forbidden"] = "无权访问该资源。", ["Error.Validation"] = "输入校验未通过。", ["Error.Conflict"] = "操作冲突，请刷新后重试。",
+        ["Error.RateLimited"] = "请求过于频繁，请稍后再试。", ["Error.Maintenance"] = "系统维护中，请稍后访问。",
+        ["Error.PageRender"] = "页面渲染出错", ["Error.PageRenderDesc"] = "该页面在渲染时发生异常，已被安全隔离，未影响其它功能。可重试当前页面或返回工作台。",
+        ["Error.TechDetails"] = "技术详情",
+        ["Error.Localization.CultureInvalid"] = "文化格式无效。", ["Error.Localization.TextEmpty"] = "文本不能为空。",
+        ["Error.Localization.PlaceholderMismatch"] = "译文占位符与平台基线不一致。", ["Error.Localization.BaselineReset"] = "平台基线不能使用重置覆盖操作。",
+
+        ["Empty.NoData"] = "暂无数据。",
+
+        ["Nav.Home"] = "首页", ["Nav.Ask"] = "Ask BI 智能问数", ["Nav.Dashboards"] = "仪表盘", ["Nav.Apps"] = "应用工厂",
+        ["Nav.Agent"] = "智能体 / Copilot", ["Nav.SemanticLabels"] = "语义标签", ["Nav.BusinessModel"] = "语义模型",
+        ["Nav.Components"] = "组件库", ["Nav.ThemeEditor"] = "主题编辑器", ["Nav.DataSources"] = "数据源",
+        ["Nav.ModelAccounts"] = "模型与账号", ["Nav.Tenants"] = "租户", ["Nav.TenantMembers"] = "租户成员",
+        ["Nav.SelfRegistration"] = "自助注册", ["Nav.DemoData"] = "演示数据", ["Nav.PlatformAdmins"] = "平台管理员",
+        ["Nav.PlatformAdminScopes"] = "管理员租户范围", ["Nav.Identity"] = "身份权限", ["Nav.Audit"] = "审计",
+        ["Nav.Quota"] = "配额", ["Nav.Localization"] = "多语言", ["Nav.Themes"] = "主题", ["Nav.System"] = "系统状态",
+        ["Nav.Group.Flagship"] = "旗舰", ["Nav.Group.Analysis"] = "分析", ["Nav.Group.Custom"] = "自定义",
+        ["Nav.Group.PlatformExt"] = "平台扩展", ["Nav.Group.Admin"] = "管理后台",
+
+        ["Accessibility.SkipToContent"] = "跳到主内容",
+        ["Theme.Light"] = "浅色", ["Theme.Dark"] = "深色", ["Theme.Switch"] = "切换主题",
+    };
 }

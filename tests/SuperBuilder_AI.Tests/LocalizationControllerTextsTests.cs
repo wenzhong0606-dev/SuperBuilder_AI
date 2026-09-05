@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using SuperBuilder_AI.Controllers;
+using SuperBuilder_AI.Api.Errors;
 using SuperBuilder_AI.Data;
 using SuperBuilder_AI.Interfaces.Localization;
 using SuperBuilder_AI.Models.Identity;
@@ -102,5 +103,69 @@ public sealed class LocalizationControllerTextsTests
         var result = await ctrl.SaveText("en-US", "Common.Greeting", 0,
             new SaveUiTextRequest("Welcome {0} {1}"), CancellationToken.None);
         Assert.IsType<Microsoft.AspNetCore.Mvc.OkResult>(result);
+    }
+
+    [Fact]
+    public async Task SaveText_EmptyValue_ReturnsApiError_WithStableCode()
+    {
+        var (db, conn) = await CreateContextAsync();
+        await using var _ = conn; await using var __ = db;
+        await SeedBaselineAsync(db, "Common.Greeting", "Hello {0}");
+
+        var ctrl = Build(db, tenantId: 10, IdentityPermissions.LocalizationView);
+        var result = await ctrl.SaveText("en-US", "Common.Greeting", 10,
+            new SaveUiTextRequest("   "), CancellationToken.None);
+
+        var bad = Assert.IsType<Microsoft.AspNetCore.Mvc.BadRequestObjectResult>(result);
+        var err = Assert.IsType<ApiError>(bad.Value);
+        Assert.Equal(ResourceKeys.Error.LocalizationTextEmpty, err.Code);
+        Assert.Equal("文本不能为空。", err.Message);
+    }
+
+    [Fact]
+    public async Task SaveText_PlaceholderMismatch_ReturnsApiError_WithStableCode()
+    {
+        var (db, conn) = await CreateContextAsync();
+        await using var _ = conn; await using var __ = db;
+        await SeedBaselineAsync(db, "Common.Greeting", "Hello {0}");
+
+        var ctrl = Build(db, tenantId: 10, IdentityPermissions.LocalizationView);
+        var result = await ctrl.SaveText("en-US", "Common.Greeting", 10,
+            new SaveUiTextRequest("Hi there"), CancellationToken.None);
+
+        var bad = Assert.IsType<Microsoft.AspNetCore.Mvc.BadRequestObjectResult>(result);
+        var err = Assert.IsType<ApiError>(bad.Value);
+        Assert.Equal(ResourceKeys.Error.LocalizationPlaceholderMismatch, err.Code);
+    }
+
+    [Fact]
+    public async Task ResetText_PlatformBaseline_ReturnsApiError_WithStableCode()
+    {
+        var (db, conn) = await CreateContextAsync();
+        await using var _ = conn; await using var __ = db;
+
+        var ctrl = Build(db, tenantId: 0);
+        var result = await ctrl.ResetText("en-US", "Common.Greeting", CancellationToken.None);
+
+        var bad = Assert.IsType<Microsoft.AspNetCore.Mvc.BadRequestObjectResult>(result);
+        var err = Assert.IsType<ApiError>(bad.Value);
+        Assert.Equal(ResourceKeys.Error.LocalizationBaselineReset, err.Code);
+        Assert.Equal("平台基线不能使用重置覆盖操作。", err.Message);
+    }
+
+    [Fact]
+    public async Task CreateLanguage_InvalidCulture_ReturnsApiError_WithStableCode()
+    {
+        var (db, conn) = await CreateContextAsync();
+        await using var _ = conn; await using var __ = db;
+
+        var ctrl = Build(db, tenantId: 0, IdentityPermissions.LocalizationManage);
+        var result = await ctrl.CreateLanguage(
+            new CreateUiLanguageRequest(Culture: "!!!invalid", DisplayName: "X", NativeName: "X"),
+            CancellationToken.None);
+
+        var bad = Assert.IsType<Microsoft.AspNetCore.Mvc.BadRequestObjectResult>(result);
+        var err = Assert.IsType<ApiError>(bad.Value);
+        Assert.Equal(ResourceKeys.Error.LocalizationCultureInvalid, err.Code);
     }
 }

@@ -1,5 +1,6 @@
 using Microsoft.JSInterop;
 using System.Text.Json;
+using SuperBuilder_AI.Components.Localization;
 using SuperBuilder_AI.Components.Models;
 
 namespace SuperBuilder_AI.Components.Services;
@@ -11,11 +12,8 @@ public sealed class LocalizationService
     private readonly IApiClient _api;
     private long _tenantId;
     private long _userId;
-    private readonly Dictionary<string, Dictionary<string, string>> _strings = new(StringComparer.OrdinalIgnoreCase)
-    {
-        ["zh-CN"] = new() { ["app.subtitle"] = "智能问数平台", ["common.settings"] = "个人设置", ["common.logout"] = "退出登录", ["theme.light"] = "切换到浅色", ["theme.dark"] = "切换到深色" },
-        ["en-US"] = new() { ["app.subtitle"] = "AI Analytics Platform", ["common.settings"] = "Settings", ["common.logout"] = "Sign out", ["theme.light"] = "Switch to light", ["theme.dark"] = "Switch to dark" },
-    };
+    // 运行时由 /api/localization/(public/)texts 拉取并覆盖；离线时回退到 Keys.Defaults（见 T）。
+    private readonly Dictionary<string, Dictionary<string, string>> _strings = new(StringComparer.OrdinalIgnoreCase);
 
     public string CurrentCulture { get; private set; } = "zh-CN";
     public IReadOnlyList<string> AvailableCultures { get; private set; } = new[] { "zh-CN" };
@@ -32,9 +30,15 @@ public sealed class LocalizationService
 
     public string T(string key)
     {
+        // 1) 运行时按当前文化加载的译文（来自平台基线 + 租户覆盖）。
         if (_strings.TryGetValue(CurrentCulture, out var current) && current.TryGetValue(key, out var value)) return value;
-        return _strings["zh-CN"].TryGetValue(key, out value) ? value : key;
+        // 2) 离线回退：zh 系列用中文默认，其余用 en-US 国际默认。
+        if (Keys.Defaults.TryGetValue(key, out var d)) return IsZh(CurrentCulture) ? d.ZhCn : d.EnUs;
+        // 3) 兜底返回键本身（页面应始终提供 fallback 参数以免暴露原始键）。
+        return key;
     }
+
+    private static bool IsZh(string culture) => culture.StartsWith("zh", StringComparison.OrdinalIgnoreCase);
 
     public string T(string key, string fallback)
     {

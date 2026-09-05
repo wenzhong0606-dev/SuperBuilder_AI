@@ -4,11 +4,11 @@
 <nav class="nav">
     @foreach (var group in VisibleGroups)
     {
-        <div class="nav-group">@L10n.T($"Nav.Group.{group.Title}", group.Title)</div>
+        <div class="nav-group">@L10n.T(group.Key ?? $"Nav.Group.{group.Title}", group.Title)</div>
         @foreach (var item in group.Items.Where(Allowed))
         {
-            <NavLink href="@item.Href" Match="@(string.IsNullOrEmpty(item.Href) ? NavLinkMatch.All : NavLinkMatch.Prefix)" aria-label="@L10n.T($"Nav.{item.Href}", item.Title)">
-                <svg class="nav-ico" aria-hidden="true"><use href="#@item.Icon" /></svg>@L10n.T($"Nav.{item.Href}", item.Title)
+            <NavLink href="@item.Href" Match="@(string.IsNullOrEmpty(item.Href) ? NavLinkMatch.All : NavLinkMatch.Prefix)" aria-label="@L10n.T(item.Key ?? $"Nav.{item.Href}", item.Title)">
+                <svg class="nav-ico" aria-hidden="true"><use href="#@item.Icon" /></svg>@L10n.T(item.Key ?? $"Nav.{item.Href}", item.Title)
             </NavLink>
         }
     }
