@@ -85,6 +85,7 @@ public static class NavMenuItems
             {
                 new NavItem { Href = "admin/tenants", Title = "租户", Icon = "sb-ico-tenant", Permission = PermissionCodes.PlatformTenantView },
                 new NavItem { Href = "admin/platform-admins", Title = "平台管理员", Icon = "sb-ico-user", Permission = PermissionCodes.PlatformAdminManage },
+                new NavItem { Href = "admin/platform-admin-scopes", Title = "管理员租户范围", Icon = "sb-ico-scope", Permission = PermissionCodes.PlatformAdminManage },
                 new NavItem { Href = "admin/identity", Title = "身份权限", Icon = "sb-ico-shield", Permission = PermissionCodes.IdentityManage },
                 new NavItem { Href = "admin/audit", Title = "审计", Icon = "sb-ico-audit", Permission = PermissionCodes.AuditView },
                 new NavItem { Href = "admin/quota", Title = "配额", Icon = "sb-ico-quota" },

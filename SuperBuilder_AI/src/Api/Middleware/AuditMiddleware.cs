@@ -95,6 +95,9 @@ public sealed class AuditMiddleware
                         managementAction = tenantCtx.ManagementAction,
                         managementActionAuthorized = tenantCtx.ManagementActionAuthorized,
                     }),
+                    // M2-02：治理操作目标租户与请求关联 Id 提升为可查询专用列，便于审计检索与跨条目串联。
+                    ManagementTargetTenantId: tenantCtx.ManagementTargetTenantId,
+                    CorrelationId: traceId,
                     Result: statusCode < 400 ? "success" : "failure",
 					Message: reasonCode,
                     Timestamp: started));

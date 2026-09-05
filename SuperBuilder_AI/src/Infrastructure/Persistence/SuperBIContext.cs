@@ -137,6 +137,7 @@ public class SuperBIContext : DbContext
         public DbSet<RolePermission> RolePermissions { get; set; }
         public DbSet<DataSourceAccessGrant> DataSourceAccessGrants { get; set; }
         public DbSet<RowLevelSecurityPolicy> RowLevelSecurityPolicies { get; set; }
+        public DbSet<PlatformAdminTenantScope> PlatformAdminTenantScopes { get; set; }
         #endregion
 
         #region P10.3 Audit
@@ -481,6 +482,19 @@ public class SuperBIContext : DbContext
 		builder.Entity<RowLevelSecurityPolicy>().HasCheckConstraint("CK_RlsPolicies_Operator",
 			"[Operator] IN ('=', '!=', '>', '>=', '<', '<=', 'LIKE', 'IN', 'IS NULL', 'IS NOT NULL')");
 
+		#endregion
+
+		#region M2-02 PlatformAdminTenantScope
+		// 平台管理员租户范围白名单：无记录 = 默认管理全部租户；有记录 = 仅所列租户。
+		// 与 DataSourceAccessGrant / RowLevelSecurityPolicy 一致，级联删除保证引用完整性（管理员/租户删除时联动清理）。
+		builder.Entity<PlatformAdminTenantScope>().ToTable(tb => tb.HasComment("平台管理员租户范围绑定"));
+		builder.Entity<PlatformAdminTenantScope>().HasIndex(x => x.AdminUserId);
+		builder.Entity<PlatformAdminTenantScope>().HasIndex(x => x.TenantId);
+		builder.Entity<PlatformAdminTenantScope>().HasIndex(x => new { x.AdminUserId, x.TenantId }).IsUnique();
+		builder.Entity<PlatformAdminTenantScope>().Property(x => x.GrantedBy).HasMaxLength(128).HasComment("授权操作者");
+		builder.Entity<PlatformAdminTenantScope>().Property(x => x.GrantedAt).HasComment("授权时间(UTC)");
+		builder.Entity<PlatformAdminTenantScope>().HasOne<User>().WithMany().HasForeignKey(x => x.AdminUserId).OnDelete(DeleteBehavior.Cascade);
+		builder.Entity<PlatformAdminTenantScope>().HasOne<Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Cascade);
 		#endregion
 
 		#region PhysicalBinding (M1-06)

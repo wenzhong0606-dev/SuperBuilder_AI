@@ -12,6 +12,7 @@ using SuperBuilder_AI.Controllers;
 using SuperBuilder_AI.Data;
 using SuperBuilder_AI.Interfaces.Identity;
 using SuperBuilder_AI.Models.Identity;
+using SuperBuilder_AI.Services.Identity;
 using SuperBuilder_AI.Models.Organization;
 using Xunit;
 
@@ -52,9 +53,9 @@ public sealed class TenantManagementControllerTests
 		return ctx;
 	}
 
-	private static TenantManagementController Build(SuperBIContext db, ClaimsPrincipal? user = null)
+	private static TenantManagementController Build(SuperBIContext db, ClaimsPrincipal? user = null, IPlatformAdminScopeService? scope = null)
 	{
-		var ctrl = new TenantManagementController(db, new SuccessIdentityService());
+		var ctrl = new TenantManagementController(db, new SuccessIdentityService(), scope ?? new SuccessScopeService());
 		var principal = user ?? new ClaimsPrincipal(new ClaimsIdentity(new[]
 		{
 			new Claim("perm", IdentityPermissions.PlatformTenantManage),
@@ -222,4 +223,82 @@ public sealed class TenantManagementControllerTests
 			new UpsertTenantSettingRequest("workspace:limit", "abc", "int"), CancellationToken.None);
 		Assert.IsType<BadRequestObjectResult>(result);
 	}
+
+	// === M2-02 租户范围强制校验 ===
+	[Fact]
+	public async Task Disable_OutOfScopeTenant_Returns403()
+	{
+		var ctx = CreateContext(out var connection);
+		await using var _ = connection;
+		await using var __ = ctx;
+		ctx.Tenants.Add(new Tenant { Id = 1, TenantCode = "t1", TenantName = "T1", Enabled = true });
+		ctx.Tenants.Add(new Tenant { Id = 2, TenantCode = "t2", TenantName = "T2", Enabled = true });
+		await ctx.SaveChangesAsync();
+		// 管理员 99 仅被授权管理租户 1，租户 2 超出授权范围
+		var scope = new ScopedScopeService(new[] { 1L });
+		var ctrl = Build(ctx, scope: scope);
+
+		var result = await ctrl.Disable(2, new SetEnabledRequest("越权下线"), CancellationToken.None);
+		var obj = Assert.IsType<ObjectResult>(result);
+		Assert.Equal(StatusCodes.Status403Forbidden, obj.StatusCode);
+	}
+
+	[Fact]
+	public async Task Disable_InScopeTenant_Succeeds()
+	{
+		var ctx = CreateContext(out var connection);
+		await using var _ = connection;
+		await using var __ = ctx;
+		ctx.Tenants.Add(new Tenant { Id = 1, TenantCode = "t1", TenantName = "T1", Enabled = true });
+		await ctx.SaveChangesAsync();
+		var scope = new ScopedScopeService(new[] { 1L });
+		var ctrl = Build(ctx, scope: scope);
+
+		var result = await ctrl.Disable(1, new SetEnabledRequest("合规下线"), CancellationToken.None);
+		Assert.IsType<OkObjectResult>(result);
+	}
+
+	[Fact]
+	public async Task List_FullScopeAdmin_SeesAllTenants()
+	{
+		var ctx = CreateContext(out var connection);
+		await using var _ = connection;
+		await using var __ = ctx;
+		ctx.Tenants.Add(new Tenant { Id = 1, TenantCode = "t1", TenantName = "T1", Enabled = true });
+		ctx.Tenants.Add(new Tenant { Id = 2, TenantCode = "t2", TenantName = "T2", Enabled = true });
+		await ctx.SaveChangesAsync();
+		// 默认范围服务：无范围记录 = 全部租户
+		var user = new ClaimsPrincipal(new ClaimsIdentity(new[]
+		{
+			new Claim("perm", IdentityPermissions.PlatformTenantView),
+			new Claim("perm", IdentityPermissions.PlatformTenantManage),
+			new Claim(ClaimTypes.NameIdentifier, "99")
+		}, "test"));
+		var ctrl = Build(ctx, user: user);
+
+		var result = await ctrl.List(CancellationToken.None);
+		var ok = Assert.IsType<OkObjectResult>(result);
+		var list = Assert.IsAssignableFrom<System.Collections.IEnumerable>(ok.Value!);
+		Assert.Equal(2, list.Cast<object>().Count());
+	}
+}
+
+internal sealed class SuccessScopeService : IPlatformAdminScopeService
+{
+	public Task<bool> HasFullScopeAsync(long adminUserId, CancellationToken ct = default) => Task.FromResult(true);
+	public Task<bool> CanManageAsync(long adminUserId, long targetTenantId, CancellationToken ct = default) => Task.FromResult(true);
+	public Task<IReadOnlyList<long>> GetScopedTenantIdsAsync(long adminUserId, CancellationToken ct = default) => Task.FromResult<IReadOnlyList<long>>(Array.Empty<long>());
+	public Task<PlatformAdminScopeView> GetScopeAsync(long adminUserId, CancellationToken ct = default) => Task.FromResult(new PlatformAdminScopeView(true, Array.Empty<TenantScopeItem>()));
+	public Task<PlatformAdminScopeView> SetScopeAsync(long adminUserId, IReadOnlyList<long> tenantIds, string actor, CancellationToken ct = default) => Task.FromResult(new PlatformAdminScopeView(true, Array.Empty<TenantScopeItem>()));
+}
+
+internal sealed class ScopedScopeService : IPlatformAdminScopeService
+{
+	private readonly HashSet<long> _allowed;
+	public ScopedScopeService(IEnumerable<long> allowed) => _allowed = allowed.ToHashSet();
+	public Task<bool> HasFullScopeAsync(long adminUserId, CancellationToken ct = default) => Task.FromResult(_allowed.Count == 0);
+	public Task<bool> CanManageAsync(long adminUserId, long targetTenantId, CancellationToken ct = default) => Task.FromResult(_allowed.Contains(targetTenantId));
+	public Task<IReadOnlyList<long>> GetScopedTenantIdsAsync(long adminUserId, CancellationToken ct = default) => Task.FromResult<IReadOnlyList<long>>(_allowed.ToList());
+	public Task<PlatformAdminScopeView> GetScopeAsync(long adminUserId, CancellationToken ct = default) => Task.FromResult(new PlatformAdminScopeView(_allowed.Count == 0, _allowed.Select(x => new TenantScopeItem(x, "", "")).ToList()));
+	public Task<PlatformAdminScopeView> SetScopeAsync(long adminUserId, IReadOnlyList<long> tenantIds, string actor, CancellationToken ct = default) => Task.FromResult(new PlatformAdminScopeView(_allowed.Count == 0, _allowed.Select(x => new TenantScopeItem(x, "", "")).ToList()));
 }

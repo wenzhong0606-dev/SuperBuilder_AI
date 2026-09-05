@@ -31,7 +31,9 @@ public sealed record AuditLogEntry(
     string? AfterJson = null,
     string Result = "success",
     string? Message = null,
-    DateTime? Timestamp = null);
+    DateTime? Timestamp = null,
+    long? ManagementTargetTenantId = null,
+    string? CorrelationId = null);
 
 /// <summary>审计查询条件（按用户/动作/实体类型/时间窗过滤，时间倒序取前 Limit 条）。</summary>
 public sealed record AuditLogQuery(

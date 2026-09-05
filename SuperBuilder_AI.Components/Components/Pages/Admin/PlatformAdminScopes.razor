@@ -1,0 +1,238 @@
+@page "/admin/platform-admin-scopes"
+@inject IApiClient Api
+@inject AppState State
+@inject ToastService Toast
+@using System.Text.Json
+@using System.Collections.Generic
+@using SuperBuilder_AI.Components.Shared
+@using SuperBuilder_AI.Components.Components.Constants
+
+<AuthGuard>
+    <PermissionGuard Require="@(new[]{ PermissionCodes.PlatformAdminManage })">
+        <PageHead Icon="sb-ico-scope" Title="管理员租户范围"
+                  Desc="为平台管理员设定可管理的租户范围：默认管理全部租户，也可显式限定为特定租户。超出授权范围的租户操作将被拒绝。">
+            <button class="btn btn-outline-secondary btn-sm" @onclick="Reload">刷新</button>
+        </PageHead>
+
+        @if (!string.IsNullOrWhiteSpace(_error))
+        {
+            <ErrorState Message="@_error" OnRetry="Reload" />
+        }
+        else
+        {
+            <SbPanel Icon="sb-ico-user" Title="平台管理员与范围" Flush="true">
+                <Body>
+                    <SbDataTable Items="@_admins" Columns="@AdminColumns" RowActions="@AdminRowActions"
+                                 PageSize="20" Loading="@_loading"
+                                 EmptyTitle="暂无平台管理员"
+                                 EmptyText="请先在「平台管理员」中添加治理账号。" />
+                </Body>
+            </SbPanel>
+        }
+
+        @* 范围编辑弹窗 *@
+        <SbModal Visible="@_scopeModal" VisibleChanged="v => _scopeModal = v"
+                  Title="@(_editingUsername.Length > 0 ? $"设置 {_editingUsername} 的租户范围" : "设置租户范围")" Size="lg">
+            <Body>
+                @if (_scopeLoading)
+                {
+                    <div class="muted">加载范围…</div>
+                }
+                else if (!string.IsNullOrWhiteSpace(_scopeErr))
+                {
+                    <ErrorState Message="@_scopeErr" OnRetry="@(() => LoadScopeAsync())" />
+                }
+                else
+                {
+                    <div class="form-stack">
+                        <label class="form-check">
+                            <input type="checkbox" @bind="_allTenants" /> 管理全部租户（默认）
+                        </label>
+                        @if (!_allTenants)
+                        {
+                            <div class="muted small mb-2">仅以下被勾选的租户可被该管理员管理：</div>
+                            <div class="tenant-picker">
+                                @foreach (var t in _tenants)
+                                {
+                                    var tid = long.Parse(TablePresenter.Cell(t, "id"));
+                                    var code = TablePresenter.Cell(t, "tenantCode");
+                                    var name = TablePresenter.Cell(t, "tenantName");
+                                    <label class="tenant-item">
+                                        <input type="checkbox" checked="@_selected.Contains(tid)" @onchange="e => ToggleTenant(tid, e)" />
+                                        <span>@(code) — @name</span>
+                                    </label>
+                                }
+                            </div>
+                            @if (_tenants.Count == 0)
+                            {
+                                <div class="muted small">当前账号无权查看租户列表，无法细化范围（仅可设为「全部租户」）。</div>
+                            }
+                        }
+                        @if (!string.IsNullOrWhiteSpace(_saveErr))
+                        {
+                            <div class="text-danger small mt-2">@_saveErr</div>
+                        }
+                    </div>
+                }
+            </Body>
+            <Footer>
+                <button class="btn btn-outline-secondary btn-sm" @onclick="() => _scopeModal = false">取消</button>
+                <button class="btn btn-primary btn-sm" @onclick="SaveScope" disabled="@_scopeLoading">保存</button>
+            </Footer>
+        </SbModal>
+    </PermissionGuard>
+</AuthGuard>
+
+@code {
+    private List<JsonElement> _admins = new();
+    private List<JsonElement> _tenants = new();
+    private Dictionary<long, string> _scopeText = new();
+    private string _error = "";
+    private bool _loading = true;
+
+    // 编辑态
+    private bool _scopeModal;
+    private long _editingId;
+    private string _editingUsername = "";
+    private bool _scopeLoading;
+    private string _scopeErr = "";
+    private bool _allTenants = true;
+    private HashSet<long> _selected = new();
+    private string _saveErr = "";
+    private bool _saving;
+
+    private List<SbColumn<JsonElement>> AdminColumns => new()
+    {
+        SbCol.Of<JsonElement>("用户名", r => TablePresenter.Cell(r, "username"), width: "160px"),
+        SbCol.Of<JsonElement>("显示名", r => TablePresenter.Cell(r, "displayName"), width: "160px"),
+        SbCol.Of<JsonElement>("邮箱", r => TablePresenter.Cell(r, "email"), width: "220px"),
+        SbCol.Of<JsonElement>("管理范围", r => ScopeText(r), width: "160px"),
+    };
+
+    private RenderFragment AdminRowActions(JsonElement u) =>
+        @<text>
+            <button class="btn btn-sm btn-outline-primary" @onclick='() => OpenScope(u)'>设置范围</button>
+        </text>;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender) await Reload();
+    }
+
+    private async Task Reload()
+    {
+        _loading = true;
+        _error = "";
+
+        var (admins, _, aErr) = await Api.GetJsonAsync("api/platform-admin");
+        if (aErr != null)
+        {
+            _error = aErr;
+            _loading = false;
+            StateHasChanged();
+            return;
+        }
+        _admins = admins is { ValueKind: JsonValueKind.Array } ? admins.Value.EnumerateArray().ToList() : new();
+
+        var (tenants, _, _) = await Api.GetJsonAsync("api/tenant-management");
+        _tenants = tenants is { ValueKind: JsonValueKind.Array } ? tenants.Value.EnumerateArray().ToList() : new();
+
+        // 拉取每位管理员的范围摘要（管理员数量有限，N+1 可接受）
+        _scopeText.Clear();
+        foreach (var a in _admins)
+        {
+            var id = long.Parse(TablePresenter.Cell(a, "id"));
+            var (v, _, _) = await Api.GetJsonAsync($"api/platform-admin/{id}/scope");
+            if (v is { } jv)
+            {
+                var all = TablePresenter.Cell(jv, "allTenants") == "True";
+                if (all)
+                    _scopeText[id] = "全部租户";
+                else
+                {
+                    var n = jv.TryGetProperty("selected", out var sel) && sel.ValueKind == JsonValueKind.Array ? sel.GetArrayLength() : 0;
+                    _scopeText[id] = $"{n} 个租户";
+                }
+            }
+            else
+                _scopeText[id] = "…";
+        }
+
+        _loading = false;
+        StateHasChanged();
+    }
+
+    private string ScopeText(JsonElement r)
+    {
+        var id = long.Parse(TablePresenter.Cell(r, "id"));
+        return _scopeText.TryGetValue(id, out var s) ? s : "…";
+    }
+
+    private void OpenScope(JsonElement u) =>
+        OpenScopeById(long.Parse(TablePresenter.Cell(u, "id")), TablePresenter.Cell(u, "username"));
+
+    private void OpenScopeById(long id, string? username = null)
+    {
+        _editingId = id;
+        _editingUsername = username ?? "";
+        _scopeErr = "";
+        _scopeLoading = true;
+        _saveErr = "";
+        _scopeModal = true;
+        _ = LoadScopeAsync();
+    }
+
+    private async Task LoadScopeAsync()
+    {
+        var (v, _, err) = await Api.GetJsonAsync($"api/platform-admin/{_editingId}/scope");
+        if (err != null)
+        {
+            _scopeErr = err;
+            _scopeLoading = false;
+            StateHasChanged();
+            return;
+        }
+        if (v is { } jv)
+        {
+            _allTenants = TablePresenter.Cell(jv, "allTenants") == "True";
+            _selected.Clear();
+            if (!_allTenants && jv.TryGetProperty("selected", out var sel) && sel.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var s in sel.EnumerateArray())
+                    _selected.Add(long.Parse(TablePresenter.Cell(s, "tenantId")));
+            }
+        }
+        _scopeLoading = false;
+        StateHasChanged();
+    }
+
+    private void ToggleTenant(long tid, ChangeEventArgs e)
+    {
+        var isChecked = e.Value is bool b && b;
+        if (isChecked) _selected.Add(tid);
+        else _selected.Remove(tid);
+    }
+
+    private async Task SaveScope()
+    {
+        if (_saving) return;
+        _saving = true;
+        _saveErr = "";
+        var tenantIds = _allTenants ? Array.Empty<long>() : _selected.ToArray();
+        var (ok, status, err) = await Api.PutAsync($"api/platform-admin/{_editingId}/scope", new { tenantIds });
+        if (ok)
+        {
+            Toast.Success(_allTenants
+                ? $"{_editingUsername} 已设为管理全部租户。"
+                : $"{_editingUsername} 的管理范围已更新（{tenantIds.Length} 个租户）。");
+            _scopeModal = false;
+            await Reload();
+        }
+        else
+        {
+            _saveErr = err ?? $"保存失败（HTTP {status}）。";
+        }
+        _saving = false;
+        StateHasChanged();
+    }
+}

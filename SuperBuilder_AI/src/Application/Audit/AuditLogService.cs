@@ -40,6 +40,8 @@ public class AuditLogService : IAuditLogService
             AfterJson = entry.AfterJson,
             Result = entry.Result ?? "success",
             Message = entry.Message,
+            ManagementTargetTenantId = entry.ManagementTargetTenantId,
+            CorrelationId = entry.CorrelationId,
             Timestamp = now,
             CreatedTime = now,
         };

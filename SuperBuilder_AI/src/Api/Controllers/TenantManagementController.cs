@@ -8,6 +8,7 @@ using SuperBuilder_AI.Api.Security;
 using SuperBuilder_AI.Data;
 using SuperBuilder_AI.Models.Identity;
 using SuperBuilder_AI.Models.Organization;
+using SuperBuilder_AI.Services.Identity;
 
 namespace SuperBuilder_AI.Controllers;
 
@@ -20,36 +21,64 @@ namespace SuperBuilder_AI.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/tenant-management")]
-public sealed class TenantManagementController : ControllerBase
-{
-	private readonly SuperBIContext _db;
-	private readonly SuperBuilder_AI.Interfaces.Identity.IIdentityService _identity;
-
-	public TenantManagementController(SuperBIContext db, SuperBuilder_AI.Interfaces.Identity.IIdentityService identity)
+	public sealed class TenantManagementController : ControllerBase
 	{
-		_db = db;
-		_identity = identity;
-	}
+		private readonly SuperBIContext _db;
+		private readonly SuperBuilder_AI.Interfaces.Identity.IIdentityService _identity;
+		private readonly IPlatformAdminScopeService _scope;
 
-	/// <summary>
-	/// SB-P0-02A 平台治理面权限门禁：租户生命周期操作属平台级管理面，调用者令牌须携带
-	/// 对应的 <c>platform:tenant:*</c> 权限码（由 SB-P0-11 的治理角色授予），否则 403。
-	/// 本控制器只读写为 <c>Organization.Tenant</c> / <c>TenantSettings</c> 全局表，不触碰任何
-	/// 租户业务数据与 Golden 契约，不影响 Golden 18/18 行为契约。
-	/// </summary>
-	private IActionResult? RequirePlatformPermission(string permission)
-	{
-		if (!User.HasClaim("perm", permission))
-			return StatusCode(403, new ApiError { Code = ErrorCodes.Forbidden, Message = $"禁止：缺少 {permission} 权限。" });
-		return null;
-	}
+		public TenantManagementController(SuperBIContext db, SuperBuilder_AI.Interfaces.Identity.IIdentityService identity, IPlatformAdminScopeService scope)
+		{
+			_db = db;
+			_identity = identity;
+			_scope = scope;
+		}
+
+		/// <summary>
+		/// SB-P0-02A 平台治理面权限门禁：租户生命周期操作属平台级管理面，调用者令牌须携带
+		/// 对应的 <c>platform:tenant:*</c> 权限码（由 SB-P0-11 的治理角色授予），否则 403。
+		/// 本控制器只读写为 <c>Organization.Tenant</c> / <c>TenantSettings</c> 全局表，不触碰任何
+		/// 租户业务数据与 Golden 契约，不影响 Golden 18/18 行为契约。
+		/// </summary>
+		private IActionResult? RequirePlatformPermission(string permission)
+		{
+			if (!User.HasClaim("perm", permission))
+				return StatusCode(403, new ApiError { Code = ErrorCodes.Forbidden, Message = $"禁止：缺少 {permission} 权限。" });
+			return null;
+		}
+
+		/// <summary>从令牌解析当前治理管理员用户 Id（用于租户范围强制校验）。</summary>
+		private long CallerId()
+		{
+			var v = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+			return long.TryParse(v, out var id) ? id : 0;
+		}
+
+		/// <summary>
+		/// M2-02 租户范围强制校验：调用者必须是持有对应 platform:tenant:* 权限的治理主体，
+		/// 且其被授权的管理范围须包含目标租户。越权（范围外）返回 403，且不会产生任何管理动作。
+		/// 管理员在范围表中无记录 = 默认管理全部租户。
+		/// </summary>
+		private async Task<IActionResult?> RequireInScopeAsync(long targetTenantId, string permission, CancellationToken cancellationToken)
+		{
+			var denied = RequirePlatformPermission(permission);
+			if (denied is not null) return denied;
+			var callerId = CallerId();
+			if (callerId > 0 && !await _scope.CanManageAsync(callerId, targetTenantId, cancellationToken))
+				return StatusCode(403, new ApiError { Code = ErrorCodes.Forbidden, Message = $"禁止：目标租户 {targetTenantId} 不在您的授权管理范围内。" });
+			return null;
+		}
 
 	[HttpGet]
 	public async Task<IActionResult> List(CancellationToken cancellationToken = default)
 	{
 		if (RequirePlatformPermission(IdentityPermissions.PlatformTenantView) is { } denied) return denied;
-		var tenants = await _db.Tenants
-			.AsNoTracking()
+		// M2-02：限定范围的管理员仅见其授权租户；无范围记录（默认全部）不受限。
+		var scopedIds = await _scope.GetScopedTenantIdsAsync(CallerId(), cancellationToken);
+		var query = _db.Tenants.AsNoTracking();
+		if (scopedIds.Count > 0)
+			query = query.Where(t => scopedIds.Contains(t.Id));
+		var tenants = await query
 			.OrderBy(t => t.Id)
 			.Select(t => new TenantSummary(t.Id, t.TenantCode, t.TenantName, t.Enabled,
 				_db.TenantSettings.Where(s => s.TenantId == t.Id && s.Key == "localization:availableCultures").Select(s => s.Value).FirstOrDefault(),
@@ -61,7 +90,7 @@ public sealed class TenantManagementController : ControllerBase
 	[HttpGet("{id:long}")]
 	public async Task<IActionResult> Get(long id, CancellationToken cancellationToken = default)
 	{
-		if (RequirePlatformPermission(IdentityPermissions.PlatformTenantView) is { } denied) return denied;
+		if (await RequireInScopeAsync(id, IdentityPermissions.PlatformTenantView, cancellationToken) is { } denied) return denied;
 		// P0-02B：治理角色读取具体租户 B，记录管理目标（不记为 TenantSwitch）
 		TenantDataPlanePolicy.StoreManagementTarget(HttpContext, id, "tenant.read", true);
 		var t = await _db.Tenants
@@ -142,7 +171,7 @@ public sealed class TenantManagementController : ControllerBase
 	[HttpPut("{id:long}")]
 	public async Task<IActionResult> Update(long id, [FromBody] UpdateTenantRequest request, CancellationToken cancellationToken = default)
 	{
-		if (RequirePlatformPermission(IdentityPermissions.PlatformTenantManage) is { } denied) return denied;
+		if (await RequireInScopeAsync(id, IdentityPermissions.PlatformTenantManage, cancellationToken) is { } denied) return denied;
 		TenantDataPlanePolicy.StoreManagementTarget(HttpContext, id, "tenant.update", true);
 		var tenant = await _db.Tenants.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
 		if (tenant is null) return NotFound();
@@ -176,7 +205,7 @@ public sealed class TenantManagementController : ControllerBase
 
 	private async Task<IActionResult> SetEnabledAsync(long id, bool enabled, SetEnabledRequest? body, CancellationToken cancellationToken)
 	{
-		if (RequirePlatformPermission(IdentityPermissions.PlatformTenantManage) is { } denied) return denied;
+		if (await RequireInScopeAsync(id, IdentityPermissions.PlatformTenantManage, cancellationToken) is { } denied) return denied;
 		// P0-02B：治理角色启用/停用具体租户 B，记录管理目标与动作（不记为 TenantSwitch）
 		TenantDataPlanePolicy.StoreManagementTarget(
 			HttpContext, id, enabled ? "tenant.enable" : "tenant.disable", true);
@@ -204,7 +233,7 @@ public sealed class TenantManagementController : ControllerBase
 	[HttpGet("{id:long}/settings")]
 	public async Task<IActionResult> ListSettings(long id, CancellationToken cancellationToken = default)
 	{
-		if (RequirePlatformPermission(IdentityPermissions.PlatformTenantView) is { } denied) return denied;
+		if (await RequireInScopeAsync(id, IdentityPermissions.PlatformTenantView, cancellationToken) is { } denied) return denied;
 		// P0-02B：治理角色读取具体租户 B 的配置，记录管理目标（不记为 TenantSwitch）
 		TenantDataPlanePolicy.StoreManagementTarget(HttpContext, id, "tenant.settings.read", true);
 		if (!await _db.Tenants.AnyAsync(t => t.Id == id, cancellationToken))
@@ -225,7 +254,7 @@ public sealed class TenantManagementController : ControllerBase
 		[FromBody] UpsertTenantSettingRequest request,
 		CancellationToken cancellationToken = default)
 	{
-		if (RequirePlatformPermission(IdentityPermissions.PlatformTenantManage) is { } denied) return denied;
+		if (await RequireInScopeAsync(id, IdentityPermissions.PlatformTenantManage, cancellationToken) is { } denied) return denied;
 		// P0-02B：治理角色写入具体租户 B 的配置，记录管理目标与动作（不记为 TenantSwitch）
 		TenantDataPlanePolicy.StoreManagementTarget(HttpContext, id, "tenant.settings.upsert", true);
 		var key = (request.Key ?? string.Empty).Trim();

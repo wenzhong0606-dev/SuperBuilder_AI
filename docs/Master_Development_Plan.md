@@ -278,11 +278,20 @@ M1 退出：Migration 可在历史副本执行；无孤儿；跨租户组合均�
 - ✅ Blazor 管理页面 `Admin/PlatformAdmins.razor`（列表 / 新建 / 停用·启用 / 重置口令 + 操作审计页签），经 `PermissionGuard(PlatformAdminManage)` 守卫；`NavMenuItems` 已登记「平台管理员」入口；RCL+Web+Maui 三端构建 0 error，全量回归 629/629 通过。
 - 新增客户端权限码 `PermissionCodes.PlatformAdminManage = "platform:admin:manage"`，并补入 `IdentityCatalog`（PlatformAdmin 角色 + PermissionDef），种子幂等授予。
 
-### M2-02 管理员—租户范围
+### M2-02 管理员—租户范围 ✅
 
 - 默认管理员管理全部租户；增加 PlatformAdminTenantScope 支持限定范围。
 - 服务端强制校验并记录 Actor、ManagementTargetTenantId、Action、Result、CorrelationId。
 - 平台治理身份不得读取租户业务数据。
+
+**实现（2026-09-05）：**
+- 新增实体 `PlatformAdminTenantScope`（AdminUserId / TenantId / GrantedAt / GrantedBy），语义：表中无记录 = 默认管理全部租户；有记录 = 仅所列租户。迁移 `M2_02_PlatformAdminScopeAudit`（SQL Server）建表并对 `AuditLogs` 增加 `ManagementTargetTenantId`(bigint?)、`CorrelationId`(nvarchar(128)?) 两列。
+- 范围服务 `IPlatformAdminScopeService` + `PlatformAdminScopeService`：`CanManageAsync` / `GetScopeAsync` / `SetScopeAsync`（幂等替换；空列表=恢复默认全部）。
+- `TenantManagementController` 注入范围服务，对所有租户级操作（Get/Enable/Disable/Update/ListSettings/UpsertSetting）调用 `RequireInScopeAsync` 强制校验，越权返回 403；`List` 按范围过滤。
+- 审计：扩展 `AuditLog` / `AuditLogEntry` 的 `ManagementTargetTenantId` 与 `CorrelationId`；`AuditMiddleware` 将治理操作目标租户与请求关联 Id 写入这两列（可查询专用列）。
+- 平台治理身份不得读取租户业务数据：由 `AuthMiddleware` 既有 `GovernanceDataPlanePolicy.IsForbiddenDataPlane`（白名单 `tenant-management/localization/quota/audit/metadata-vector/auth/me`，其余 `/api` 路径对治理主体返回 403）结构性保证，本次仅确认并文档化，未改动其逻辑。
+- 前端：`Admin/PlatformAdminScopes.razor`（gated by `PlatformAdminManage`），列出管理员及其范围摘要，弹窗以多选租户设定范围；导航项「管理员租户范围」。
+- 测试：`TenantManagementControllerTests` 新增越权 403 / 范围内成功 / 全范围可见全部租户。
 
 ### M2-03 首次初始化
 

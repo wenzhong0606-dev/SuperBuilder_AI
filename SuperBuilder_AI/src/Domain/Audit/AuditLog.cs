@@ -41,6 +41,19 @@ public class AuditLog
     /// <summary>结果说明/错误信息（可选）。</summary>
     public string? Message { get; set; }
 
+    /// <summary>
+    /// 治理操作目标租户 Id（管理面，M2-02）。
+    /// 当平台治理主体操作具体租户 B（启用/停用/设置等）时记录该租户 Id；
+    /// 普通租户业务操作或平台级操作记为 null。独立于 EffectiveTenant，杜绝「管理目标」伪装成「生效租户」。
+    /// </summary>
+    public long? ManagementTargetTenantId { get; set; }
+
+    /// <summary>
+    /// 请求关联 Id（M2-02）：取自 <c>X-Correlation-Id</c> 或 <c>HttpContext.TraceIdentifier</c>，
+    /// 用于把一次请求内多条审计（访问日志 + 业务审计）串联检索。
+    /// </summary>
+    public string? CorrelationId { get; set; }
+
     /// <summary>事件发生时间（UTC）。</summary>
     public DateTime Timestamp { get; set; }
 
