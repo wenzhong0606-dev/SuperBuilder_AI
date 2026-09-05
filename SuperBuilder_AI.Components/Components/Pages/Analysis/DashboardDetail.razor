@@ -6,14 +6,14 @@
 @using SuperBuilder_AI.Components.Shared
 
 <AuthGuard>
-    <PageHead Icon="sb-ico-dash" Title="@(_title)" Desc="仪表盘详情：基本信息、组件构成与渲染结果。">
-        <button class="btn btn-outline-secondary btn-sm" @onclick='() => Nav.NavigateTo("dashboards")'>返回列表</button>
-        <button class="btn btn-outline-secondary btn-sm" @onclick="() => Load()">刷新</button>
+    <PageHead Icon="sb-ico-dash" Title="@(_title)" Desc="@L10n.T(Keys.Content.DashboardDetailDesc, "仪表盘详情：基本信息、组件构成与渲染结果。")">
+        <button class="btn btn-outline-secondary btn-sm" @onclick='() => Nav.NavigateTo("dashboards")'>@L10n.T(Keys.Content.DashboardDetailBack, "返回列表")</button>
+        <button class="btn btn-outline-secondary btn-sm" @onclick="() => Load()">@L10n.T(Keys.Content.CommonRefresh, "刷新")</button>
     </PageHead>
 
     @if (_loading)
     {
-        <LoadingState Text="正在加载仪表盘…" />
+        <LoadingState Text="@L10n.T(Keys.Content.DashboardDetailLoading, "正在加载仪表盘…")" />
     }
     else if (_error is not null)
     {
@@ -22,21 +22,21 @@
     else
     {
         <SbTabs>
-            <SbTab Title="概览">
-                <SbPanel Icon="sb-ico-dash" Title="基本信息">
+            <SbTab Title="@L10n.T(Keys.Content.DashboardDetailTabOverview, "概览")">
+                <SbPanel Icon="sb-ico-dash" Title="@L10n.T(Keys.Content.DashboardDetailInfoTitle, "基本信息")">
                     <Body>
                         <SbKeyValue Items="@JsonRows.Scalars(_detail)" />
                     </Body>
                 </SbPanel>
             </SbTab>
 
-            <SbTab Title="组件" Badge="@_components.Count.ToString()">
-                <SbPanel Icon="sb-ico-comp" Title="组件构成" Flush="true">
+            <SbTab Title="@L10n.T(Keys.Content.DashboardDetailTabComponents, "组件")" Badge="@_components.Count.ToString()">
+                <SbPanel Icon="sb-ico-comp" Title="@L10n.T(Keys.Content.DashboardDetailComponentsTitle, "组件构成")" Flush="true">
                     <Body>
                         @if (_components.Count == 0)
                         {
                             <div class="panel-body">
-                                <SbEmptyState Icon="sb-ico-comp" Title="未解析到组件" Text="该仪表盘尚未配置组件，或 DSL 结构暂不支持前端解析。" />
+                                <SbEmptyState Icon="sb-ico-comp" Title="@L10n.T(Keys.Content.DashboardDetailCompEmptyTitle, "未解析到组件")" Text="@L10n.T(Keys.Content.DashboardDetailCompEmptyText, "该仪表盘尚未配置组件，或 DSL 结构暂不支持前端解析。")" />
                             </div>
                         }
                         else
@@ -48,7 +48,7 @@
                                         <span class="ri-ico"><svg><use href="#sb-ico-comp" /></svg></span>
                                         <div class="ri-main">
                                             <div class="ri-title">@(string.IsNullOrWhiteSpace(c.Title) ? c.Type : c.Title)</div>
-                                            <div class="ri-sub">类型 @c.Type · 标识 @c.Id</div>
+                                            <div class="ri-sub">@string.Format(L10n.T(Keys.Content.DashboardDetailTypeAndId, "类型 {0} · 标识 {1}"), c.Type, c.Id)</div>
                                         </div>
                                         <div class="ri-actions"><SbBadge Tone="info">@c.Type</SbBadge></div>
                                     </div>
@@ -59,18 +59,18 @@
                 </SbPanel>
             </SbTab>
 
-            <SbTab Title="数据">
+            <SbTab Title="@L10n.T(Keys.Content.DashboardDetailTabData, "数据")">
                 @if (_rows.Count > 0)
                 {
-                    <ResultTable Rows="@_rows" Footer="@($"共 {_rows.Count} 行")" />
+                    <ResultTable Rows="@_rows" Footer="@string.Format(L10n.T(Keys.Content.DashboardDetailRowCount, "共 {0} 行"), _rows.Count)" />
                 }
                 else
                 {
-                    <SbEmptyState Icon="sb-ico-db" Title="暂无渲染数据" Text="点击渲染后端会执行一次取数，若仍无数据请检查仪表盘配置与数据源可用性。" />
+                    <SbEmptyState Icon="sb-ico-db" Title="@L10n.T(Keys.Content.DashboardDetailDataEmptyTitle, "暂无渲染数据")" Text="@L10n.T(Keys.Content.DashboardDetailDataEmptyText, "点击渲染后端会执行一次取数，若仍无数据请检查仪表盘配置与数据源可用性。")" />
                 }
                 <div class="mt-3">
                     <button class="btn btn-outline-secondary btn-sm" @onclick="Render" disabled="@_rendering">
-                        @(_rendering ? "渲染中…" : "执行渲染")
+                        @(_rendering ? L10n.T(Keys.Content.DashboardDetailRendering, "渲染中…") : L10n.T(Keys.Content.DashboardDetailRunRender, "执行渲染"))
                     </button>
                 </div>
                 <SqlViewer Sql="@_sql" />
@@ -82,7 +82,7 @@
 @code {
     [Parameter] public long Id { get; set; }
 
-    private string _title = "仪表盘详情";
+    private string _title = "";
     private JsonElement? _detail;
     private List<Dictionary<string, object?>> _rows = new();
     private List<Comp> _components = new();
@@ -90,6 +90,11 @@
     private string? _error;
     private bool _loading = true;
     private bool _rendering;
+
+    protected override void OnInitialized()
+    {
+        _title = L10n.T(Keys.Content.DashboardDetailDefaultTitle, "仪表盘详情");
+    }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -110,7 +115,7 @@
         {
             _detail = data;
             _title = JsonRows.Scalar(data, "name", "title", "code");
-            if (string.IsNullOrWhiteSpace(_title)) _title = "仪表盘详情";
+            if (string.IsNullOrWhiteSpace(_title)) _title = L10n.T(Keys.Content.DashboardDetailDefaultTitle, "仪表盘详情");
             _components = ExtractComponents(data);
         }
         _loading = false;

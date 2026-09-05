@@ -7,43 +7,43 @@
 @using SuperBuilder_AI.Components.Shared
 
 <AuthGuard>
-    <SbListPage TItem="JsonElement" Icon="sb-ico-agent" Title="智能体 / Copilot"
-                Desc="编排多步分析任务的智能体：规划、调用工具链、异常归因，并与 Ask 协同。"
+    <SbListPage TItem="JsonElement" Icon="sb-ico-agent" Title="@L10n.T(Keys.Content.AgentTitle, "智能体 / Copilot")"
+                Desc="@L10n.T(Keys.Content.AgentDesc, "编排多步分析任务的智能体：规划、调用工具链、异常归因，并与 Ask 协同。")"
                 Items="@_agents" Columns="@AgentColumns" Loading="@_loading" Error="@_error"
-                OnReload="Reload" SearchPlaceholder="搜索智能体…"
-                EmptyTitle="暂无智能体"
-                EmptyText="智能体把「取数 → 清洗 → 归因 → 成稿」串成可复用的工作流，适合周期性经营分析。"
-                LoadingText="正在加载智能体…">
+                OnReload="Reload" SearchPlaceholder="@L10n.T(Keys.Content.AgentSearchPlaceholder, "搜索智能体…")"
+                EmptyTitle="@L10n.T(Keys.Content.AgentEmptyTitle, "暂无智能体")"
+                EmptyText="@L10n.T(Keys.Content.AgentEmptyText, "智能体把「取数 → 清洗 → 归因 → 成稿」串成可复用的工作流，适合周期性经营分析。")"
+                LoadingText="@L10n.T(Keys.Content.AgentLoadingText, "正在加载智能体…")">
 
         <Actions>
             <button class="btn btn-primary btn-sm" @onclick="Create">
-                <svg class="btn-ico"><use href="#sb-ico-plus" /></svg> 新建智能体
+                <svg class="btn-ico"><use href="#sb-ico-plus" /></svg> @L10n.T(Keys.Content.AgentCreate, "新建智能体")
             </button>
         </Actions>
 
         <Stats>
-            <SbStatTile Label="智能体" Value="@_agents.Count" Sub="本租户" />
-            <SbStatTile Label="可用工具" Value="@_tools.Count" Sub="工具链注册数" Accent="info" />
+            <SbStatTile Label="@L10n.T(Keys.Content.AgentTileAgents, "智能体")" Value="@_agents.Count" Sub="本租户" />
+            <SbStatTile Label="@L10n.T(Keys.Content.AgentTileTools, "可用工具")" Value="@_tools.Count" Sub="工具链注册数" Accent="info" />
         </Stats>
 
         <RowActions>
-            <button class="btn btn-sm btn-outline-secondary" @onclick="() => Open(context)">详情</button>
-            <button class="btn btn-sm btn-outline-secondary" @onclick="() => Run(context)">运行</button>
-            <button class="btn btn-sm btn-outline-danger" @onclick="() => AskDelete(context)">删除</button>
+            <button class="btn btn-sm btn-outline-secondary" @onclick="() => Open(context)">@L10n.T(Keys.Content.AgentRowDetail, "详情")</button>
+            <button class="btn btn-sm btn-outline-secondary" @onclick="() => Run(context)">@L10n.T(Keys.Content.AgentRowRun, "运行")</button>
+            <button class="btn btn-sm btn-outline-danger" @onclick="() => AskDelete(context)">@L10n.T(Keys.Content.AgentRowDelete, "删除")</button>
         </RowActions>
     </SbListPage>
 
-    <SbConfirm Visible="@_confirm" VisibleChanged="v => _confirm = v" Title="删除智能体计划"
-               Message="删除后不可恢复，确认要删除该计划吗？" ConfirmText="删除"
+    <SbConfirm Visible="@_confirm" VisibleChanged="v => _confirm = v" Title="@L10n.T(Keys.Content.AgentDeleteTitle, "删除智能体计划")"
+               Message="@L10n.T(Keys.Content.AgentDeleteMsg, "删除后不可恢复，确认要删除该计划吗？")" ConfirmText="@L10n.T(Keys.Content.AgentDeleteConfirm, "删除")"
                Tone="danger" OnConfirm="DoDelete" />
 
     @if (!_loading)
     {
-        <SbPanel Icon="sb-ico-comp" Title="可用工具">
+        <SbPanel Icon="sb-ico-comp" Title="@L10n.T(Keys.Content.AgentToolsPanelTitle, "可用工具")">
             <Body>
                 @if (_tools.Count == 0)
                 {
-                    <SbEmptyState Icon="sb-ico-comp" Title="暂无工具" Text="后端未注册可用的智能体工具。" />
+                    <SbEmptyState Icon="sb-ico-comp" Title="@L10n.T(Keys.Content.AgentToolsEmptyTitle, "暂无工具")" Text="@L10n.T(Keys.Content.AgentToolsEmptyText, "后端未注册可用的智能体工具。")" />
                 }
                 else
                 {
@@ -69,14 +69,14 @@
     private string _error = "";
     private bool _loading = true;
 
-    private static List<SbColumn<JsonElement>> AgentColumns => new()
+    private List<SbColumn<JsonElement>> AgentColumns => new()
     {
-        SbCol.Of<JsonElement>("名称", r => TablePresenter.Cell(r, "name")),
-        SbCol.Of<JsonElement>("描述", r => TablePresenter.Cell(r, "description")),
-        SbCol.Of<JsonElement>("状态", r =>
+        SbCol.Of<JsonElement>(L10n.T(Keys.Content.AgentColName, "名称"), r => TablePresenter.Cell(r, "name")),
+        SbCol.Of<JsonElement>(L10n.T(Keys.Content.AgentColDescription, "描述"), r => TablePresenter.Cell(r, "description")),
+        SbCol.Of<JsonElement>(L10n.T(Keys.Content.AgentColStatus, "状态"), r =>
         {
             var s = TablePresenter.Cell(r, "status");
-            return string.IsNullOrWhiteSpace(s) ? "草稿" : s;
+            return string.IsNullOrWhiteSpace(s) ? L10n.T(Keys.Content.AgentStatusDraft, "草稿") : s;
         }, isStatus: true)
     };
 
@@ -105,7 +105,7 @@
         var code = TablePresenter.Cell(row, "code");
         if (string.IsNullOrWhiteSpace(code))
         {
-            Toast.Warning("该记录缺少 code，无法打开计划详情。");
+            Toast.Warning(L10n.T(Keys.Content.AgentOpenMissingCode, "该记录缺少 code，无法打开计划详情。"));
             return;
         }
         Nav.NavigateTo($"agent/plans/{Uri.EscapeDataString(code)}");
@@ -114,10 +114,10 @@
     private void Run(JsonElement row)
     {
         var name = TablePresenter.Cell(row, "name");
-        Toast.Info(string.IsNullOrWhiteSpace(name) ? "运行已排队。" : $"已触发运行：{name}");
+        Toast.Info(string.IsNullOrWhiteSpace(name) ? L10n.T(Keys.Content.AgentRunQueued, "运行已排队。") : string.Format(L10n.T(Keys.Content.AgentRunTriggered, "已触发运行：{0}"), name));
     }
 
-    private void Create() => Toast.Info("智能体编排器将在 S2 阶段接入。");
+    private void Create() => Toast.Info(L10n.T(Keys.Content.AgentComposerPending, "智能体编排器将在 S2 阶段接入。"));
 
     private bool _confirm = false;
     private string? _confirmCode;
@@ -125,7 +125,7 @@
     private void AskDelete(JsonElement row)
     {
         var code = TablePresenter.Cell(row, "code");
-        if (string.IsNullOrWhiteSpace(code)) { Toast.Warning("该记录缺少 code，无法删除。"); return; }
+        if (string.IsNullOrWhiteSpace(code)) { Toast.Warning(L10n.T(Keys.Content.AgentDeleteMissingCode, "该记录缺少 code，无法删除。")); return; }
         _confirmCode = code;
         _confirm = true;
     }
@@ -135,8 +135,8 @@
         _confirm = false;
         if (string.IsNullOrWhiteSpace(_confirmCode)) return;
         var (ok, _, err, _) = await Api.DeleteAsync($"api/agent/plans/{Uri.EscapeDataString(_confirmCode)}");
-        if (!ok) { Toast.Error(err ?? "删除失败。"); return; }
-        Toast.Success("智能体计划已删除。");
+        if (!ok) { Toast.Error(err ?? L10n.T(Keys.Content.AgentDeleteFailed, "删除失败。")); return; }
+        Toast.Success(L10n.T(Keys.Content.AgentDeleted, "智能体计划已删除。"));
         await Reload();
     }
 }
