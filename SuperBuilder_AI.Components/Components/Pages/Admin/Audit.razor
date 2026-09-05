@@ -8,33 +8,33 @@
 
 <AuthGuard>
     <PermissionGuard Require="@(new[]{ PermissionCodes.AuditView })">
-        <SbListPage TItem="JsonElement" Icon="sb-ico-audit" Title="审计日志"
-                    Desc="记录关键操作与访问轨迹，支持按操作 / 资源 / 操作人 / 时间检索，满足合规要求。"
+        <SbListPage TItem="JsonElement" Icon="sb-ico-audit" Title="@L10n.T(Keys.Content.AuditTitle, "审计日志")"
+                    Desc="@L10n.T(Keys.Content.AuditDesc, "记录关键操作与访问轨迹，支持按操作 / 资源 / 操作人 / 时间检索，满足合规要求。")"
                     Items="@_rows" Columns="@Columns" Loading="@_loading" Error="@_error"
-                    OnReload="Reload" SearchPlaceholder="搜索操作 / 用户 / 资源…"
-                    EmptyTitle="暂无审计记录"
-                    EmptyText="关键写操作与登录事件会被记录到这里，便于追溯与合规审查。"
-                    LoadingText="正在加载审计日志…">
+                    OnReload="Reload" SearchPlaceholder="@L10n.T(Keys.Content.AuditSearchPlaceholder, "搜索操作 / 用户 / 资源…")"
+                    EmptyTitle="@L10n.T(Keys.Content.AuditEmptyTitle, "暂无审计记录")"
+                    EmptyText="@L10n.T(Keys.Content.AuditEmptyText, "关键写操作与登录事件会被记录到这里，便于追溯与合规审查。")"
+                    LoadingText="@L10n.T(Keys.Content.AuditLoadingText, "正在加载审计日志…")">
 
             <Actions>
                 <button class="btn btn-outline-secondary btn-sm" @onclick="ExportCsv" disabled="@(_rows.Count == 0)">
-                    <svg class="btn-ico"><use href="#sb-ico-export" /></svg> 导出 CSV
+                    <svg class="btn-ico"><use href="#sb-ico-export" /></svg> @L10n.T(Keys.Content.AuditExportCsv, "导出 CSV")
                 </button>
             </Actions>
 
             <ToolbarRight>
-                <input class="form-control form-control-sm sb-filter" placeholder="操作 action" @bind-value="_fAction" @bind-value:after="ApplyFilters" />
-                <input class="form-control form-control-sm sb-filter" placeholder="资源 entityType" @bind-value="_fEntity" @bind-value:after="ApplyFilters" />
-                <input class="form-control form-control-sm sb-filter" placeholder="操作人 actor" @bind-value="_fActor" @bind-value:after="ApplyFilters" />
+                <input class="form-control form-control-sm sb-filter" placeholder="@L10n.T(Keys.Content.AuditFilterAction, "操作 action")" @bind-value="_fAction" @bind-value:after="ApplyFilters" />
+                <input class="form-control form-control-sm sb-filter" placeholder="@L10n.T(Keys.Content.AuditFilterEntity, "资源 entityType")" @bind-value="_fEntity" @bind-value:after="ApplyFilters" />
+                <input class="form-control form-control-sm sb-filter" placeholder="@L10n.T(Keys.Content.AuditFilterActor, "操作人 actor")" @bind-value="_fActor" @bind-value:after="ApplyFilters" />
                 <input type="date" class="form-control form-control-sm sb-filter" @bind-value="_fFrom" @bind-value:after="ApplyFilters" />
                 <input type="date" class="form-control form-control-sm sb-filter" @bind-value="_fTo" @bind-value:after="ApplyFilters" />
-                <button class="btn btn-outline-secondary btn-sm" @onclick="ClearFilters">重置</button>
+                <button class="btn btn-outline-secondary btn-sm" @onclick="ClearFilters">@L10n.T(Keys.Content.AuditReset, "重置")</button>
             </ToolbarRight>
 
             <Stats>
-                <SbStatTile Label="日志总数" Value="@_all.Count" Sub="本租户" />
-                <SbStatTile Label="筛选命中" Value="@_rows.Count" Sub="当前条件" Accent="info" />
-                <SbStatTile Label="今日" Value="@_all.Count(IsToday)" Sub="当天事件" Accent="success" />
+                <SbStatTile Label="@L10n.T(Keys.Content.AuditStatTotal, "日志总数")" Value="@_all.Count" Sub="@L10n.T(Keys.Content.AuditStatTotalSub, "本租户")" />
+                <SbStatTile Label="@L10n.T(Keys.Content.AuditStatFiltered, "筛选命中")" Value="@_rows.Count" Sub="@L10n.T(Keys.Content.AuditStatFilteredSub, "当前条件")" Accent="info" />
+                <SbStatTile Label="@L10n.T(Keys.Content.AuditStatToday, "今日")" Value="@_all.Count(IsToday)" Sub="@L10n.T(Keys.Content.AuditStatTodaySub, "当天事件")" Accent="success" />
             </Stats>
         </SbListPage>
     </PermissionGuard>
@@ -119,7 +119,7 @@
 
     private async Task ExportCsv()
     {
-        if (_rows.Count == 0) { Toast.Warning("没有可导出的记录。"); return; }
+        if (_rows.Count == 0) { Toast.Warning(L10n.T(Keys.Content.AuditNoExport, "没有可导出的记录。")); return; }
         var sb = new System.Text.StringBuilder();
         sb.Append('\uFEFF'); // BOM，防中文乱码
         sb.AppendLine(string.Join(",", _cols.Select(TablePresenter.Friendly)));
@@ -130,6 +130,6 @@
                 return v.Contains(',') || v.Contains('"') || v.Contains('\n') ? $"\"{v}\"" : v;
             })));
         await File.DownloadTextAsync($"audit_{DateTime.Now:yyyyMMdd}.csv", "text/csv;charset=utf-8", sb.ToString());
-        Toast.Success($"已导出 {_rows.Count} 条审计记录。");
+        Toast.Success(string.Format(L10n.T(Keys.Content.AuditExported, "已导出 {0} 条审计记录。"), _rows.Count));
     }
 }

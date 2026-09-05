@@ -10,8 +10,8 @@
 <AuthGuard>
     <PermissionGuard Require="@(new[]{ PermissionCodes.PlatformAdminManage })">
         <PageHead Icon="sb-ico-scope" Key="PlatformAdminScopes" Title="管理员租户范围"
-                  Desc="为平台管理员设定可管理的租户范围：默认管理全部租户，也可显式限定为特定租户。超出授权范围的租户操作将被拒绝。">
-            <button class="btn btn-outline-secondary btn-sm" @onclick="Reload">刷新</button>
+                  Desc="@L10n.T(Keys.Content.PlatformAdminScopesDesc, "为平台管理员设定可管理的租户范围：默认管理全部租户，也可显式限定为特定租户。超出授权范围的租户操作将被拒绝。")">
+            <button class="btn btn-outline-secondary btn-sm" @onclick="Reload">@L10n.T(Keys.Content.CommonRefresh, "刷新")</button>
         </PageHead>
 
         @if (!string.IsNullOrWhiteSpace(_error))
@@ -20,23 +20,23 @@
         }
         else
         {
-            <SbPanel Icon="sb-ico-user" Title="平台管理员与范围" Flush="true">
+            <SbPanel Icon="sb-ico-user" Title="@L10n.T(Keys.Content.PlatformAdminScopesPanelTitle, "平台管理员与范围")" Flush="true">
                 <Body>
                     <SbDataTable Items="@_admins" Columns="@AdminColumns" RowActions="@AdminRowActions"
                                  PageSize="20" Loading="@_loading"
-                                 EmptyTitle="暂无平台管理员"
-                                 EmptyText="请先在「平台管理员」中添加治理账号。" />
+                                 EmptyTitle="@L10n.T(Keys.Content.PlatformAdminScopesEmptyTitle, "暂无平台管理员")"
+                                 EmptyText="@L10n.T(Keys.Content.PlatformAdminScopesEmptyText, "请先在「平台管理员」中添加治理账号。")" />
                 </Body>
             </SbPanel>
         }
 
         @* 范围编辑弹窗 *@
         <SbModal Visible="@_scopeModal" VisibleChanged="v => _scopeModal = v"
-                  Title="@(_editingUsername.Length > 0 ? $"设置 {_editingUsername} 的租户范围" : "设置租户范围")" Size="lg">
+                  Title="@(_editingUsername.Length > 0 ? string.Format(L10n.T(Keys.Content.PlatformAdminScopesModalTitleUser, "设置 {0} 的租户范围"), _editingUsername) : L10n.T(Keys.Content.PlatformAdminScopesModalTitle, "设置租户范围"))" Size="lg">
             <Body>
                 @if (_scopeLoading)
                 {
-                    <div class="muted">加载范围…</div>
+                    <div class="muted">@L10n.T(Keys.Content.PlatformAdminScopesLoadingScope, "加载范围…")</div>
                 }
                 else if (!string.IsNullOrWhiteSpace(_scopeErr))
                 {
@@ -46,11 +46,11 @@
                 {
                     <div class="form-stack">
                         <label class="form-check">
-                            <input type="checkbox" @bind="_allTenants" /> 管理全部租户（默认）
+                            <input type="checkbox" @bind="_allTenants" /> @L10n.T(Keys.Content.PlatformAdminScopesAllTenants, "管理全部租户（默认）")
                         </label>
                         @if (!_allTenants)
                         {
-                            <div class="muted small mb-2">仅以下被勾选的租户可被该管理员管理：</div>
+                            <div class="muted small mb-2">@L10n.T(Keys.Content.PlatformAdminScopesOnlySelected, "仅以下被勾选的租户可被该管理员管理：")</div>
                             <div class="tenant-picker">
                                 @foreach (var t in _tenants)
                                 {
@@ -65,7 +65,7 @@
                             </div>
                             @if (_tenants.Count == 0)
                             {
-                                <div class="muted small">当前账号无权查看租户列表，无法细化范围（仅可设为「全部租户」）。</div>
+                                <div class="muted small">@L10n.T(Keys.Content.PlatformAdminScopesNoTenantAccess, "当前账号无权查看租户列表，无法细化范围（仅可设为「全部租户」）。")</div>
                             }
                         }
                         @if (!string.IsNullOrWhiteSpace(_saveErr))
@@ -76,8 +76,8 @@
                 }
             </Body>
             <Footer>
-                <button class="btn btn-outline-secondary btn-sm" @onclick="() => _scopeModal = false">取消</button>
-                <button class="btn btn-primary btn-sm" @onclick="SaveScope" disabled="@_scopeLoading">保存</button>
+                <button class="btn btn-outline-secondary btn-sm" @onclick="() => _scopeModal = false">@L10n.T(Keys.Content.CommonCancel, "取消")</button>
+                <button class="btn btn-primary btn-sm" @onclick="SaveScope" disabled="@_scopeLoading">@L10n.T(Keys.Content.CommonSave, "保存")</button>
             </Footer>
         </SbModal>
     </PermissionGuard>
@@ -103,15 +103,15 @@
 
     private List<SbColumn<JsonElement>> AdminColumns => new()
     {
-        SbCol.Of<JsonElement>("用户名", r => TablePresenter.Cell(r, "username"), width: "160px"),
-        SbCol.Of<JsonElement>("显示名", r => TablePresenter.Cell(r, "displayName"), width: "160px"),
-        SbCol.Of<JsonElement>("邮箱", r => TablePresenter.Cell(r, "email"), width: "220px"),
-        SbCol.Of<JsonElement>("管理范围", r => ScopeText(r), width: "160px"),
+        SbCol.Of<JsonElement>(L10n.T(Keys.Content.CommonUsername, "用户名"), r => TablePresenter.Cell(r, "username"), width: "160px"),
+        SbCol.Of<JsonElement>(L10n.T(Keys.Content.CommonDisplayName, "显示名"), r => TablePresenter.Cell(r, "displayName"), width: "160px"),
+        SbCol.Of<JsonElement>(L10n.T(Keys.Content.CommonEmail, "邮箱"), r => TablePresenter.Cell(r, "email"), width: "220px"),
+        SbCol.Of<JsonElement>(L10n.T(Keys.Content.PlatformAdminScopesColScope, "管理范围"), r => ScopeText(r), width: "160px"),
     };
 
     private RenderFragment AdminRowActions(JsonElement u) =>
         @<text>
-            <button class="btn btn-sm btn-outline-primary" @onclick='() => OpenScope(u)'>设置范围</button>
+            <button class="btn btn-sm btn-outline-primary" @onclick='() => OpenScope(u)'>@L10n.T(Keys.Content.PlatformAdminScopesSetScope, "设置范围")</button>
         </text>;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -147,11 +147,11 @@
             {
                 var all = TablePresenter.Cell(jv, "allTenants") == "True";
                 if (all)
-                    _scopeText[id] = "全部租户";
+                    _scopeText[id] = L10n.T(Keys.Content.PlatformAdminScopesAllTenantsText, "全部租户");
                 else
                 {
                     var n = jv.TryGetProperty("selected", out var sel) && sel.ValueKind == JsonValueKind.Array ? sel.GetArrayLength() : 0;
-                    _scopeText[id] = $"{n} 个租户";
+                    _scopeText[id] = string.Format(L10n.T(Keys.Content.PlatformAdminScopesNTenants, "{0} 个租户"), n);
                 }
             }
             else
@@ -223,14 +223,14 @@
         if (ok)
         {
             Toast.Success(_allTenants
-                ? $"{_editingUsername} 已设为管理全部租户。"
-                : $"{_editingUsername} 的管理范围已更新（{tenantIds.Length} 个租户）。");
+                ? string.Format(L10n.T(Keys.Content.PlatformAdminScopesToastAll, "{0} 已设为管理全部租户。"), _editingUsername)
+                : string.Format(L10n.T(Keys.Content.PlatformAdminScopesToastUpdated, "{0} 的管理范围已更新（{1} 个租户）。"), _editingUsername, tenantIds.Length));
             _scopeModal = false;
             await Reload();
         }
         else
         {
-            _saveErr = err ?? $"保存失败（HTTP {status}）。";
+            _saveErr = err ?? string.Format(L10n.T(Keys.Content.PlatformAdminScopesSaveFailed, "保存失败（HTTP {0}）。"), status);
         }
         _saving = false;
         StateHasChanged();

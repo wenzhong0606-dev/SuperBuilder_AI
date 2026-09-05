@@ -5,12 +5,12 @@
 
 <AuthGuard>
     <PermissionGuard Require="@(new[]{ PermissionCodes.PlatformAdminManage })">
-    <PageHead Icon="sb-ico-tenant" Key="SelfRegistrationAdmin" Title="自助注册" Desc="查看自助注册开放状态与配置。默认关闭，由平台按环境配置开启。" />
+    <PageHead Icon="sb-ico-tenant" Key="SelfRegistrationAdmin" Title="自助注册" Desc="@L10n.T(Keys.Content.SelfRegistrationAdminDesc, "查看自助注册开放状态与配置。默认关闭，由平台按环境配置开启。")" />
 
     <div class="sb-page-body">
         @if (_loading)
         {
-            <LoadingState Text="加载中…" />
+            <LoadingState Text="@L10n.T(Keys.Content.CommonLoading, "加载中…")" />
         }
         else if (_error != null)
         {
@@ -19,26 +19,24 @@
         else
         {
             <div class="card mb-3">
-                <h3 class="card-title">当前状态</h3>
+                <h3 class="card-title">@L10n.T(Keys.Content.SelfRegistrationAdminCurrentStatus, "当前状态")</h3>
                 <table class="table">
                     <tbody>
-                        <tr><th>是否开放</th><td>@StatusBadge(_config?.Enabled ?? false)</td></tr>
-                        <tr><th>需管理员审批</th><td>@YesNo(_config?.ApprovalRequired ?? false)</td></tr>
-                        <tr><th>需验证码</th><td>@YesNo(_config?.RequireCaptcha ?? false)</td></tr>
-                        <tr><th>允许邮箱域名</th><td>@(_config?.AllowedEmailDomains?.Count > 0 ? string.Join("、", _config.AllowedEmailDomains) : "不限制")</td></tr>
-                        <tr><th>默认语言</th><td>@(_config?.DefaultCulture ?? "zh-CN")</td></tr>
-                        <tr><th>可用语言</th><td>@(_config?.DefaultAvailableCultures != null ? string.Join("、", _config.DefaultAvailableCultures) : "zh-CN")</td></tr>
+                        <tr><th>@L10n.T(Keys.Content.SelfRegistrationAdminColEnabled, "是否开放")</th><td>@StatusBadge(_config?.Enabled ?? false)</td></tr>
+                        <tr><th>@L10n.T(Keys.Content.SelfRegistrationAdminColApproval, "需管理员审批")</th><td>@YesNo(_config?.ApprovalRequired ?? false)</td></tr>
+                        <tr><th>@L10n.T(Keys.Content.SelfRegistrationAdminColCaptcha, "需验证码")</th><td>@YesNo(_config?.RequireCaptcha ?? false)</td></tr>
+                        <tr><th>@L10n.T(Keys.Content.SelfRegistrationAdminColDomains, "允许邮箱域名")</th><td>@(_config?.AllowedEmailDomains?.Count > 0 ? string.Join("、", _config.AllowedEmailDomains) : "不限制")</td></tr>
+                        <tr><th>@L10n.T(Keys.Content.SelfRegistrationAdminColDefaultLang, "默认语言")</th><td>@(_config?.DefaultCulture ?? "zh-CN")</td></tr>
+                        <tr><th>@L10n.T(Keys.Content.SelfRegistrationAdminColAvailLang, "可用语言")</th><td>@(_config?.DefaultAvailableCultures != null ? string.Join("、", _config.DefaultAvailableCultures) : "zh-CN")</td></tr>
                     </tbody>
                 </table>
             </div>
 
             <div class="alert alert-info">
-                <strong>配置说明</strong>
+                <strong>@L10n.T(Keys.Content.SelfRegistrationAdminConfigNoteTitle, "配置说明")</strong>
                 <p class="mb-0">
-                    自助注册默认关闭（DEC-04：默认关闭，平台按环境开启）。开放方式：在部署配置中将
-                    <code>SelfRegistration:Enabled</code> 设为 <code>true</code> 并重启服务。
-                    审批 / 验证码为待裁决特性，尚未实现——开启相关开关会导致注册被拒绝；运行期不可在此页直接切换，
-                    须经治理评估后实施。
+                    @L10n.T(Keys.Content.SelfRegistrationAdminConfigNote1, "自助注册默认关闭（DEC-04：默认关闭，平台按环境开启）。开放方式：在部署配置中将 ")
+                    <code>SelfRegistration:Enabled</code>@L10n.T(Keys.Content.SelfRegistrationAdminConfigNote2, " 设为 ")<code>true</code>@L10n.T(Keys.Content.SelfRegistrationAdminConfigNote3, " 并重启服务。审批 / 验证码为待裁决特性，尚未实现——开启相关开关会导致注册被拒绝；运行期不可在此页直接切换，须经治理评估后实施。")
                 </p>
             </div>
         }
@@ -56,7 +54,7 @@
         if (!firstRender) return;
         var (cfg, err) = await Api.GetSelfRegistrationConfigAsync();
         if (cfg is null)
-            _error = err ?? "无法加载自助注册配置。";
+            _error = err ?? L10n.T(Keys.Content.SelfRegistrationAdminLoadFailed, "无法加载自助注册配置。");
         else
             _config = cfg;
         _loading = false;
@@ -65,11 +63,11 @@
 
     private MarkupString StatusBadge(bool on) =>
         (MarkupString)(on
-            ? "<span class=\"badge bg-success\">已开放</span>"
-            : "<span class=\"badge bg-secondary\">未开放</span>");
+            ? "<span class=\"badge bg-success\">" + L10n.T(Keys.Content.SelfRegistrationAdminBadgeOpen, "已开放") + "</span>"
+            : "<span class=\"badge bg-secondary\">" + L10n.T(Keys.Content.SelfRegistrationAdminBadgeClosed, "未开放") + "</span>");
 
     private MarkupString YesNo(bool v) =>
         (MarkupString)(v
-            ? "<span class=\"badge bg-warning\">是</span>"
-            : "<span class=\"badge bg-light text-dark\">否</span>");
+            ? "<span class=\"badge bg-warning\">" + L10n.T(Keys.Content.CommonYes, "是") + "</span>"
+            : "<span class=\"badge bg-light text-dark\">" + L10n.T(Keys.Content.CommonNo, "否") + "</span>");
 }
