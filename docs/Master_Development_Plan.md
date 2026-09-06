@@ -649,7 +649,14 @@ M3 退出：✅ 已达成当前跟踪页面范围。平台/租户视图严格分
 > - 可追踪回滚：新增 `DashboardVersion` 快照表（受控迁移 `20260906131855_M7_01_DashboardVersion`）；`Publish` 固化版本快照、自增 `PublishedVersion`；`Rollback(id,version)` 把历史版本恢复为发布态并再固化为新版本（`RolledBackFromVersion` 记录来源），版本链单调递增、全程可审计。
 > - 端点：`POST api/dashboards/{id}/publish`、`POST api/dashboards/{id}/rollback/{version}`、`GET api/dashboards/{id}/versions`；`DashboardSummary` 暴露 `PublishedVersion`/`PublishedAt`。
 > - 验证：`DashboardControllerVersioningTests`(7) 覆盖发布快照/草稿隔离/回滚恢复/版本列表/空草稿拒绝/未知版本 404/租户隔离。
-> - ⏳ 后续：前端编辑器蓝图占位（`editor/blueprint`）接真实编辑器；M7-02~M7-11 待办。
+> - ⏳ 后续：前端编辑器蓝图占位（`editor/blueprint`）接真实编辑器；M7-03~M7-11 待办。
+
+> **进度 M7-02**：🟡 代码完成、待 shell 恢复后构建/测试/提交（本会话 Bash/PowerShell 工具不可用，无法运行 dotnet ef / dotnet test / git）。
+> - 草稿/发布隔离（验收「不直接覆盖线上版本」）：新增 `AppVersion` 快照实体（Domain/AppBuilder）+ `AppVersions` 表；`AppPlan` 加 `PublishedDslJson`/`PublishedVersion`/`PublishedAt`/`PublishedBy`；`Update` 仅改草稿 `DslJson`，发布态物理隔离。
+> - 可追踪回滚：端点 `POST api/apps/{code}/publish`、`POST api/apps/{code}/rollback/{version}`、`GET api/apps/{code}/versions`（镜像 M7-01）；回滚固化为新版本（`RolledBackFromVersion` 记录来源），版本链单调递增。
+> - `AppSummary`/`AppDetail` 暴露 `PublishedVersion`/`PublishedAt`；`Actor()` 取发布者（无认证回退 system）。
+> - 迁移：`20260906214300_M7_02_AppVersion`（Up/Down 手写）+ `SuperBIContextModelSnapshot` 已加 AppVersion；Designer 因 shell 不可用未生成，待 `dotnet ef migrations remove && dotnet ef migrations add M7_02_AppVersion` 重建（模型配置已正确，重生一致）。
+> - 验证（设计，未执行）：`AppBuilderControllerVersioningTests`(7) 镜像 M7-01 七例。
 
 无后端能力的按钮必须禁用并显示原因，不得提示虚假的“已保存/已运行”。
 

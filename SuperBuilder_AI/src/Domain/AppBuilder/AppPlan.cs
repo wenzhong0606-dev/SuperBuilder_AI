@@ -72,4 +72,19 @@ public class AppPlan : BaseEntity
 
 	/// <summary>主题键（冗余自 DSL，P7 主题消费）。</summary>
 	public string? ThemeKey { get; set; }
+
+	/// <summary>
+	/// 发布态 DSL 快照（M7-02）：<c>Publish</c> 时从草稿 <see cref="DslJson"/> 固化而来，
+	/// 只读。草稿与发布态物理隔离，编辑草稿（<see cref="DslJson"/>）不会直接覆盖线上版本。
+	/// </summary>
+	public string? PublishedDslJson { get; set; }
+
+	/// <summary>当前发布态对应的版本号（<see cref="AppVersion.Version"/>）；未发布为 0。</summary>
+	public int PublishedVersion { get; set; }
+
+	/// <summary>最近一次发布时间（UTC）；未发布为 null。</summary>
+	public DateTime? PublishedAt { get; set; }
+
+	/// <summary>最近一次发布者标识；未发布为 null。</summary>
+	public string? PublishedBy { get; set; }
 }

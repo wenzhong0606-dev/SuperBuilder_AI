@@ -168,6 +168,23 @@ namespace SuperBuilder_AI.Migrations
                         .HasColumnType("nvarchar(64)")
                         .HasComment("主题键");
 
+                    b.Property<string>("PublishedDslJson")
+                        .HasColumnType("nvarchar(max)")
+                        .HasComment("已发布DSL快照（null=未发布）");
+
+                    b.Property<int>("PublishedVersion")
+                        .HasColumnType("int")
+                        .HasComment("当前发布版本号（0=未发布）");
+
+                    b.Property<DateTime?>("PublishedAt")
+                        .HasColumnType("datetime2")
+                        .HasComment("最近发布时间(UTC)");
+
+                    b.Property<string>("PublishedBy")
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)")
+                        .HasComment("最近发布者");
+
                     b.Property<string>("UpdatedBy")
                         .HasColumnType("nvarchar(max)");
 
@@ -184,6 +201,105 @@ namespace SuperBuilder_AI.Migrations
                     b.ToTable("AppPlans", t =>
                         {
                             t.HasComment("应用");
+                        });
+                });
+
+            modelBuilder.Entity("SuperBuilder_AI.Models.AppBuilder.AppVersion", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasComment("主键");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("AppId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)")
+                        .HasComment("业务编码快照");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("CreatedTime")
+                        .HasColumnType("datetime2")
+                        .HasComment("创建时间");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1024)
+                        .HasColumnType("nvarchar(1024)")
+                        .HasComment("描述快照");
+
+                    b.Property<string>("DslJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)")
+                        .HasComment("发布时刻固化的DSL文档（只读快照）");
+
+                    b.Property<string>("DslVersion")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)")
+                        .HasComment("DSL版本快照");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)")
+                        .HasComment("名称快照");
+
+                    b.Property<DateTime>("PublishedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("PublishedBy")
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)")
+                        .HasComment("发布者");
+
+                    b.Property<int?>("RolledBackFromVersion")
+                        .HasColumnType("int")
+                        .HasComment("回滚来源版本号（非回滚为null）");
+
+                    b.Property<long>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasDefaultValue(1L)
+                        .HasComment("乐观并发版本(ETag)，每次更新自增");
+
+                    b.Property<long>("TenantId")
+                        .HasColumnType("bigint")
+                        .HasComment("作用域租户（0=全局模板）");
+
+                    b.Property<string>("ThemeKey")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)")
+                        .HasComment("主题键快照");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("UpdatedTime")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AppId", "Version")
+                        .IsUnique()
+                        .HasDatabaseName("IX_AppVersions_AppId_Version");
+
+                    b.HasIndex("TenantId", "AppId")
+                        .HasDatabaseName("IX_AppVersions_TenantId_AppId");
+
+                    b.ToTable("AppVersions", t =>
+                        {
+                            t.HasComment("应用发布版本快照");
                         });
                 });
 

@@ -232,6 +232,126 @@ public sealed class AppBuilderController : ControllerBase
 	}
 
 	/// <summary>
+	/// 发布应用（M7-02）：把当前草稿 <see cref="AppPlan.DslJson"/> 固化为发布快照，
+	/// 写入 <see cref="AppPlan.PublishedDslJson"/> 并自增 <see cref="AppPlan.PublishedVersion"/>，
+	/// 同时在 <c>AppVersions</c> 落一条不可变版本记录（可追溯回滚）。
+	/// 仅当草稿非空时允许发布；草稿与发布态物理隔离，编辑草稿不会直接覆盖线上版本（M7-02 验收）。
+	/// </summary>
+	[HttpPost("{code}/publish")]
+	public async Task<IActionResult> Publish(
+		string code,
+		[FromQuery] long tenantId = 0,
+		CancellationToken cancellationToken = default)
+	{
+		var tid = ScopeTo(tenantId);
+		var entity = await _db.AppPlans.FirstOrDefaultAsync(p => p.Code == code, cancellationToken);
+		if (entity is null) return NotFound();
+		if (string.IsNullOrWhiteSpace(entity.DslJson))
+			return BadRequest(new { errors = new[] { "草稿 DSL 为空，无法发布。" } });
+
+		entity.PublishedDslJson = entity.DslJson;
+		entity.PublishedVersion += 1;
+		entity.Status = AppStatuses.Published;
+		entity.PublishedAt = DateTime.UtcNow;
+		entity.PublishedBy = Actor();
+
+		_db.AppVersions.Add(new AppVersion
+		{
+			AppId = entity.Id,
+			TenantId = tid,
+			Version = entity.PublishedVersion,
+			Code = entity.Code,
+			Name = entity.Name,
+			Description = entity.Description,
+			ThemeKey = entity.ThemeKey,
+			DslVersion = entity.DslVersion,
+			DslJson = entity.DslJson,
+			PublishedAt = entity.PublishedAt.Value,
+			PublishedBy = entity.PublishedBy,
+			RolledBackFromVersion = null,
+		});
+
+		await _db.SaveChangesAsync(cancellationToken);
+		return Ok(new PublishResult(entity.Id, tid, entity.PublishedVersion, entity.PublishedAt, entity.PublishedBy));
+	}
+
+	/// <summary>
+	/// 回滚应用（M7-02）：把指定历史版本恢复为「当前发布态」。
+	/// 历史快照只读，不会改写；回滚会再固化为一条<em>新</em>版本
+	/// （<see cref="AppVersion.RolledBackFromVersion"/> 指向被恢复的来源版本），
+	/// 保证版本链单调递增、全程可追溯。
+	/// </summary>
+	[HttpPost("{code}/rollback/{version:int}")]
+	public async Task<IActionResult> Rollback(
+		string code,
+		int version,
+		[FromQuery] long tenantId = 0,
+		CancellationToken cancellationToken = default)
+	{
+		var tid = ScopeTo(tenantId);
+		var entity = await _db.AppPlans.FirstOrDefaultAsync(p => p.Code == code, cancellationToken);
+		if (entity is null) return NotFound();
+
+		var target = await _db.AppVersions.AsNoTracking()
+			.FirstOrDefaultAsync(v => v.AppId == entity.Id && v.Version == version, cancellationToken);
+		if (target is null)
+			return NotFound(new { errors = new[] { $"版本 {version} 不存在。" } });
+
+		entity.PublishedDslJson = target.DslJson;
+		entity.PublishedVersion += 1;
+		entity.Status = AppStatuses.Published;
+		entity.PublishedAt = DateTime.UtcNow;
+		entity.PublishedBy = Actor();
+
+		_db.AppVersions.Add(new AppVersion
+		{
+			AppId = entity.Id,
+			TenantId = tid,
+			Version = entity.PublishedVersion,
+			Code = target.Code,
+			Name = target.Name,
+			Description = target.Description,
+			ThemeKey = target.ThemeKey,
+			DslVersion = target.DslVersion,
+			DslJson = target.DslJson,
+			PublishedAt = entity.PublishedAt.Value,
+			PublishedBy = entity.PublishedBy,
+			RolledBackFromVersion = target.Version,
+		});
+
+		await _db.SaveChangesAsync(cancellationToken);
+		return Ok(new PublishResult(entity.Id, tid, entity.PublishedVersion, entity.PublishedAt, entity.PublishedBy, target.Version));
+	}
+
+	/// <summary>
+	/// 列出应用的全部发布版本（M7-02，按版本号倒序；含是否当前发布态标记）。
+	/// 仅元数据与版本链，不含 DSL 正文（避免大负载；如需恢复用 <see cref="Rollback"/>）。
+	/// </summary>
+	[HttpGet("{code}/versions")]
+	public async Task<IActionResult> Versions(
+		string code,
+		[FromQuery] long tenantId = 0,
+		CancellationToken cancellationToken = default)
+	{
+		ScopeTo(tenantId);
+		var entity = await _db.AppPlans.AsNoTracking()
+			.FirstOrDefaultAsync(p => p.Code == code, cancellationToken);
+		if (entity is null) return NotFound();
+
+		var list = await _db.AppVersions.AsNoTracking()
+			.Where(v => v.AppId == entity.Id)
+			.OrderByDescending(v => v.Version)
+			.Select(v => new AppVersionSummary(
+				v.Id, v.Version, v.Name, v.Code, v.DslVersion, v.PublishedAt, v.PublishedBy,
+				v.RolledBackFromVersion, v.Version == entity.PublishedVersion))
+			.ToListAsync(cancellationToken);
+		return Ok(list);
+	}
+
+	/// <summary>当前操作者标识（用于发布/回滚审计）。无认证身份时回退 "system"。</summary>
+	private string Actor() => User.Identity?.Name ?? "system";
+
+	/// <summary>
 	/// 编辑器蓝图：返回 AppDsl 骨架与可用枚举清单（组件类型/聚合/操作符/布局），供编辑器初始化。
 	/// 仅结构化 JSON，绝不承载 HTML。
 	/// </summary>
@@ -287,10 +407,10 @@ public sealed class AppBuilderController : ControllerBase
 	}
 
 	private static AppSummary ToSummary(AppPlan p) =>
-		new(p.Id, p.TenantId, p.Code, p.Name, p.Description, p.Status, p.DslVersion, p.ThemeKey);
+		new(p.Id, p.TenantId, p.Code, p.Name, p.Description, p.Status, p.DslVersion, p.ThemeKey, p.PublishedVersion, p.PublishedAt);
 
 	private static AppDetail ToDetail(AppPlan p) =>
-		new(p.Id, p.TenantId, p.Code, p.Name, p.Description, p.Status, p.DslVersion, p.ThemeKey, p.DslJson);
+		new(p.Id, p.TenantId, p.Code, p.Name, p.Description, p.Status, p.DslVersion, p.ThemeKey, p.DslJson, p.PublishedVersion, p.PublishedAt);
 
 	#region Request / Response DTOs
 	/// <summary>创建应用请求体（从结构化 DSL）。</summary>
@@ -318,7 +438,9 @@ public sealed class AppBuilderController : ControllerBase
 		string? Description,
 		string Status,
 		string DslVersion,
-		string? ThemeKey);
+		string? ThemeKey,
+		int PublishedVersion,
+		DateTime? PublishedAt);
 
 	/// <summary>应用详情 DTO（含完整 DSL）。</summary>
 	public sealed record AppDetail(
@@ -330,7 +452,30 @@ public sealed class AppBuilderController : ControllerBase
 		string Status,
 		string DslVersion,
 		string? ThemeKey,
-		string DslJson);
+		string DslJson,
+		int PublishedVersion,
+		DateTime? PublishedAt);
+
+	/// <summary>发布/回滚结果 DTO（M7-02）。</summary>
+	public sealed record PublishResult(
+		long AppId,
+		long TenantId,
+		int Version,
+		DateTime? PublishedAt,
+		string? PublishedBy,
+		int? RolledBackFromVersion = null);
+
+	/// <summary>应用版本摘要 DTO（M7-02，列表不含 DSL 正文）。</summary>
+	public sealed record AppVersionSummary(
+		long Id,
+		int Version,
+		string Name,
+		string Code,
+		string DslVersion,
+		DateTime PublishedAt,
+		string? PublishedBy,
+		int? RolledBackFromVersion,
+		bool IsCurrent);
 
 	/// <summary>编辑器蓝图 DTO（结构化，无 HTML）。</summary>
 	public sealed record AppEditorBlueprint(

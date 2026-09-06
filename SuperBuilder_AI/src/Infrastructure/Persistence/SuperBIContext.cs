@@ -127,6 +127,7 @@ public class SuperBIContext : DbContext
 
     #region P8 AI App Builder
     public DbSet<AppPlan> AppPlans { get; set; }
+    public DbSet<AppVersion> AppVersions { get; set; }
     #endregion
 
         #region P9 AI Agent / Copilot
@@ -466,6 +467,31 @@ public class SuperBIContext : DbContext
         builder.Entity<AppPlan>().Property(x => x.DslVersion).IsRequired().HasMaxLength(16).HasComment("DSL版本");
         builder.Entity<AppPlan>().Property(x => x.DslJson).IsRequired().HasComment("DSL文档（结构化，非裸HTML）");
         builder.Entity<AppPlan>().Property(x => x.ThemeKey).HasMaxLength(64).HasComment("主题键");
+        builder.Entity<AppPlan>().Property(x => x.PublishedDslJson).HasComment("已发布DSL快照（null=未发布）");
+        builder.Entity<AppPlan>().Property(x => x.PublishedVersion).HasComment("当前发布版本号（0=未发布）");
+        builder.Entity<AppPlan>().Property(x => x.PublishedAt).HasComment("最近发布时间(UTC)");
+        builder.Entity<AppPlan>().Property(x => x.PublishedBy).HasMaxLength(128).HasComment("最近发布者");
+        #endregion
+
+        #region P8.2 AppVersion（M7-02 版本快照）
+        // 与 AppPlan 一致：TenantId=0 表示全局模板，不建指向 Tenant 的外键。
+        builder.Entity<AppVersion>().ToTable(tb => tb.HasComment("应用发布版本快照"));
+        builder.Entity<AppVersion>().HasIndex(x => new { x.AppId, x.Version }).IsUnique()
+            .HasDatabaseName("IX_AppVersions_AppId_Version");
+        builder.Entity<AppVersion>().HasIndex(x => new { x.TenantId, x.AppId })
+            .HasDatabaseName("IX_AppVersions_TenantId_AppId");
+        builder.Entity<AppVersion>().Property(x => x.TenantId).HasComment("作用域租户（0=全局模板）");
+        builder.Entity<AppVersion>().Property(x => x.Code).IsRequired().HasMaxLength(128).HasComment("业务编码快照");
+        builder.Entity<AppVersion>().Property(x => x.Name).IsRequired().HasMaxLength(256).HasComment("名称快照");
+        builder.Entity<AppVersion>().Property(x => x.Description).HasMaxLength(1024).HasComment("描述快照");
+        builder.Entity<AppVersion>().Property(x => x.ThemeKey).HasMaxLength(64).HasComment("主题键快照");
+        builder.Entity<AppVersion>().Property(x => x.DslVersion).IsRequired().HasMaxLength(16).HasComment("DSL版本快照");
+        builder.Entity<AppVersion>().Property(x => x.DslJson).IsRequired().HasComment("发布时刻固化的DSL文档（只读快照）");
+        builder.Entity<AppVersion>().Property(x => x.PublishedBy).HasMaxLength(128).HasComment("发布者");
+        builder.Entity<AppVersion>().Property(x => x.RolledBackFromVersion).HasComment("回滚来源版本号（非回滚为null）");
+        builder.Entity<AppVersion>()
+            .HasOne<AppPlan>().WithMany().HasForeignKey(x => x.AppId)
+            .OnDelete(DeleteBehavior.Cascade);
         #endregion
 
         #region P9.1 AgentPlan
