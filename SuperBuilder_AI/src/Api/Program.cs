@@ -71,6 +71,7 @@ builder.Services.Configure<QdrantOptions>(builder.Configuration.GetSection("Qdra
 builder.Services.Configure<EmbeddingOptions>(builder.Configuration.GetSection("Embedding"));
 // M2-06：自助注册配置（默认关闭，平台按环境开启；审批/验证码待裁决）。
 builder.Services.Configure<SelfRegistrationOptions>(builder.Configuration.GetSection(SelfRegistrationOptions.SectionName));
+builder.Services.Configure<CostGovernanceOptions>(builder.Configuration.GetSection(CostGovernanceOptions.SectionName));
 builder.Services.AddScoped<IDataSourceMetadataReader, MySqlMetadataReader>();
 builder.Services.AddScoped<PlatformAdminBootstrapper>();
 builder.Services.AddScoped<MetadataScannerService>();
@@ -156,7 +157,7 @@ builder.Services.AddScoped<IQueryPlanPipeline>(sp => sp.GetRequiredService<Query
 
 // 阶段按执行顺序注册；MS DI 解析 IEnumerable<IQueryPlanStage> 时保持注册顺序：
 // Build → Context → ColumnSecurity → MetadataIntegrity → DetailProjection →
-// SemanticValidation → Confidence → DecisionGate → Explainability
+// SemanticValidation → Confidence → DecisionGate → CostGovernance → Explainability
 builder.Services.AddScoped<IQueryPlanStage, QueryPlanBuildStage>();
 builder.Services.AddScoped<IQueryPlanStage, QueryPlanContextStage>();
 // M5-05：列级安全净化（Context 之后、MetadataIntegrity 之前）
@@ -169,6 +170,11 @@ builder.Services.AddScoped<IQueryPlanStage, QueryPlanDetailProjectionStage>();
 builder.Services.AddScoped<IQueryPlanStage, QueryPlanSemanticValidationStage>();
 builder.Services.AddScoped<IQueryPlanStage, QueryPlanConfidenceStage>();
 builder.Services.AddScoped<IQueryPlanStage, QueryPlanDecisionGateStage>();
+// M5-06：查询成本治理（DecisionGate 之后、Explainability 之前）
+builder.Services.AddScoped<IQueryCostClassifier, StructuralQueryCostClassifier>();
+builder.Services.AddScoped<ICostGovernancePolicy, ThresholdCostGovernancePolicy>();
+builder.Services.AddScoped<ICostGovernanceContextResolver, DefaultCostGovernanceContextResolver>();
+builder.Services.AddScoped<IQueryPlanStage, QueryPlanCostGovernanceStage>();
 builder.Services.AddScoped<IQueryPlanStage, QueryPlanExplainabilityStage>();
 builder.Services.AddScoped<QuerySemanticValidator>();
 builder.Services.AddScoped<IQueryPlanRepairService, QueryPlanRepairService>();

@@ -39,6 +39,7 @@ public static class ErrorCodes
     public const string DataSourceForbidden = "SB_AUTHZ_001";
     public const string RowPolicyForbidden = "SB_AUTHZ_002";
     public const string QueryPlanSecurityRejected = "SB_SECURITY_001";
+    public const string QueryPlanCostGoverned = "SB_COST_001";
 
     /// <summary>友好提示文案（无匹配时回退到通用提示）。</summary>
     private static readonly Dictionary<string, string> Friendly = new()
@@ -65,6 +66,7 @@ public static class ErrorCodes
         [DataSourceForbidden] = "当前账号无权访问所选数据源。",
         [RowPolicyForbidden] = "当前账号没有满足行级数据策略的访问范围。",
         [QueryPlanSecurityRejected] = "查询计划未通过最终安全校验，已在执行前阻断。",
+        [QueryPlanCostGoverned] = "查询成本超过治理阈值，已在执行前拒绝或降级执行。",
     };
 
     /// <summary>取错误码对应的友好中文提示；缺省回退到通用内部错误提示。</summary>
