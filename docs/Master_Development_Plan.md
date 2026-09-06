@@ -613,6 +613,13 @@ M3 退出：✅ 已达成当前跟踪页面范围。平台/租户视图严格分
 
 ### M6-05 审计、指标与真实 E2E
 
+> **进度**：✅ 核心已交付（提交 1a1198e，14 文件 +727/−25；完整套件 887/887 零回归、含 Golden）。
+> - Ask 审计三件套（镜像 M5-09）：`IAskAuditSink`/`NoOpAskAuditSink`/`LogAskAuditSink`/`ConfigurableAskAuditSink` + `AskAuditOptions(Mode=None)`；默认 None=NoOp，零默认行为变更、对 Golden 免疫；`AskController` 注入后于 `Ask`/`Refine` 的 try/finally 旁路记录（审计失败绝不破坏主响应）。
+> - 脱敏：`AskPiiRedactor` 复用 `BuiltInPiiCatalog`（M5-08 内置 PII 列名集）+ 可选受限列，对原问题/SQL/结果样本落库前脱敏；`AskAuditRecordBuilder.Build` 统一脱敏入口。
+> - 分段指标：`BIResponse` 加 `DurationMs`/`SegmentTimings`；`BIConversationService.ExecuteAsync` 用 `Stopwatch` 填充 MetadataUnderstand/Plan/SqlBuild/DbExec/ResultUnderstand 5 段（早期返回也填充）；粗粒度不改 `QueryPlanPipeline`，天然对 Golden 免疫。
+> - 标记 E2E 范围：旗舰同义词回归（`最近的十张入库凭证` 按日期倒序最多十条真实凭证）已由 M6-03-A 的 `Resolve_AliasConfirmation_Returns_Confirmation_With_CandidateEntity` 与 M5-11 `QueryPlanAiBiE2ETests` 全链覆盖，M6-05 不重复新增（避免冗余）；M6-05 以 8 例单测覆盖审计落库/脱敏/失败路径（`AskPiiRedactorTests` 5 + `AskControllerTests` 3）。
+> - ⏳ 后续增量：审计持久化 Sink（落库/外部日志）、分段指标接 Prometheus/OTel、真实 E2E 矩阵（澄清/确认/纠正/取消/撤权/跨租户/401-403/LLM·DB 失败）扩展为集成测试。
+
 - 记录会话、轮次、原/重写问题、授权数据源、Decision、SQL 摘要、模型、耗时、成本和状态。
 - 敏感问题、参数和结果样本脱敏；增加 LLM/Metadata/Plan/DB/Repair 分段指标。
 - E2E 覆盖首问、澄清、确认、纠正、取消、过期、零/单/多源、撤权、跨租户、多实例、断网、超时、401/403、LLM/DB 失败。
