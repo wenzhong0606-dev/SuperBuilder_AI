@@ -552,7 +552,7 @@ M3 退出：平台/租户视图严格分离；租户只能使用授权语言；�
 | M5-07 | SB-P1-07 | Decision Gate 状态化 | ALLOW/REJECT/ASK_CLARIFICATION/REQUIRE_APPROVAL/LIMITED_EXECUTION（✅ 2026-09-06，cf6e5db：枚举规范为 5 态 + Decision 派生单一事实来源，33 例决策/状态/管线测试全绿，对 Golden 免疫） |
 | M5-08 | SB-P1-12 | Governance Policy Enablement | 真实 `IColumnSensitivityClassifier`（基于 M5-01 规范化语义模型驱动敏感度分类，替换 `DenyNothingColumnClassifier`）+ `CostGovernanceOptions` 按真实数据量/`ModelCostTier` 调校 + 模型成本遥测 + 逐租户策略配置与灰度开关；将 M5-05/06 由安全默认提升为生产可用（✅ 2026-09-06，146f738：`ColumnSecurityOptions` 可配置分类器 `ConfigurableColumnClassifier` 在 `DenyNothing`↔`PolicyDriven` 间切换、`BuiltInPiiCatalog`+`PolicyDrivenColumnClassifier`+`ColumnSecurityModeResolver`+`TenantOverrides` 逐租户灰度；`CostGovernanceOptions` 增 `Mode`(Off/Threshold)/`TelemetryMode`(None/Log) 主开关与遥测；`IModelCostTelemetry`+`NoOp`/`Log`/`Configurable`；13 例启用测试 + 15 例 M5-06 回归全绿，完整套件 821/821 零回归，默认 DenyNothing/Off/None 零行为变更、对 Golden 免疫） |
 | M5-09 | SB-P1-08 | AI Decision Audit | 可追踪问题、意图、计划、修复、置信度、决策、SQL、模型（✅ 2026-09-06，afd1135：`QueryPlanDecisionAuditRecord` 八维审计模型 + `IDecisionAuditSink`(`NoOp`/`Log`/`Configurable` 三件套，默认 None 零行为) + `DecisionAuditRecordBuilder` 静态提取 + `DecisionAuditOptions` 配置节；`QueryPlanPipeline` 在 finally 旁路采集且故障隔离，EarlyResponse/Decision Gate 阻断/成功三路径均审计；4 例测试全绿，完整套件 825/825 零回归，对 Golden 免疫） |
-| M5-10 | SB-P1-10 | Production Feedback | Feedback→Candidate→Review→Baseline→Regression |
+| M5-10 | SB-P1-10 | Production Feedback | Feedback→Candidate→Review→Baseline→Regression ✅ 2026-09-06（af88953） |
 | M5-11 | SB-P1-11 | AI BI E2E | NL→API→Plan→SQL→Test DB→Result 全链覆盖 |
 | M5-12 | GQ-006 | 物料等缺独立主表导致 NotResolved | 不修改 Ranking Contract 绕过，真实解析通过 |
 | M5-13 | Phase 3.1.12.10 | 完成 Phase 2.7 Regression | 证据完整后才宣布 Phase 3.1 Frozen |
