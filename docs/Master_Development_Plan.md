@@ -554,7 +554,7 @@ M3 退出：平台/租户视图严格分离；租户只能使用授权语言；�
 | M5-09 | SB-P1-08 | AI Decision Audit | 可追踪问题、意图、计划、修复、置信度、决策、SQL、模型（✅ 2026-09-06，afd1135：`QueryPlanDecisionAuditRecord` 八维审计模型 + `IDecisionAuditSink`(`NoOp`/`Log`/`Configurable` 三件套，默认 None 零行为) + `DecisionAuditRecordBuilder` 静态提取 + `DecisionAuditOptions` 配置节；`QueryPlanPipeline` 在 finally 旁路采集且故障隔离，EarlyResponse/Decision Gate 阻断/成功三路径均审计；4 例测试全绿，完整套件 825/825 零回归，对 Golden 免疫） |
 | M5-10 | SB-P1-10 | Production Feedback | Feedback→Candidate→Review→Baseline→Regression ✅ 2026-09-06（af88953） |
 | M5-11 | SB-P1-11 | AI BI E2E | NL→API→Plan→SQL→Test DB→Result 全链覆盖（✅ 2026-09-06，0d81281：确定性桩隔离 LLM/metadata，真实 SqlQueryBuilder+QueryExecutionService+ResultUnderstandingService+BIConversationService 贯通；文件型 SQLite 临时库离线可还原、PostgreSQL 方言 SQL 在 SQLite 兼容执行；3 例 E2E 全绿，完整套件 837/837 零回归、对 Golden 免疫） |
-| M5-12 | GQ-006 | 物料等缺独立主表导致 NotResolved | 不修改 Ranking Contract 绕过，真实解析通过 |
+| M5-12 | GQ-006 | 物料等缺独立主表导致 NotResolved | 真实解析为 DirectKey（✅ 2026-09-06，be6ac70：DimensionResolutionEvidenceService 命名根对齐发现稳定 FK 关联键 material_id，配合 display 列 material_name 存在性证明建立 DirectKey；符合 D03 契约第 4 条；零默认行为变更、不碰 Ranking Contract；3 例测试全绿，完整套件 840/840 零回归、对 Golden 免疫） |
 | M5-13 | Phase 3.1.12.10 | 完成 Phase 2.7 Regression | 证据完整后才宣布 Phase 3.1 Frozen |
 | M5-14 | Ask 首用例 | 明细排序语义：实体 + Limit + Order 可构成有效计划，不强制 Metric/Dimension（具体旗舰回归已提前至 M0-09 早期批次） | "最近十张入库凭证"进入 SQL Builder；SB_BI_002 只用于确实无法形成可查询字段的请求 |
 
