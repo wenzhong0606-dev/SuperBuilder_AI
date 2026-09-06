@@ -265,6 +265,29 @@ public sealed class DimensionResolutionEvidenceService : IDimensionResolutionEvi
                 };
             }
         }
+        else
+        {
+            // M5-12 (GQ-006)：无主表且事实表无"含维度词"的稳定关联键时，
+            // 用命名根对齐从事实表全列中发现稳定 FK/PK Association ID，
+            // 配合 display 列的存在性证明建立 DirectKey（D03 契约第 4 条：
+            // 不存在关联主表时不得直接 NotResolved，须检查事实表 Dimension Key）。
+            var alignedKey = DiscoverAlignedDimensionKey(fact, displayCandidates);
+            if (alignedKey is not null)
+            {
+                return new DimensionResolutionEvidence
+                {
+                    ResolutionType = "DirectKey",
+                    ExecutionCapability = "Executable",
+                    FactTableId = fact.Id,
+                    FactDataSourceId = fact.DataSourceId,
+                    FactKeyColumnId = alignedKey.Id,
+                    FactTable = fact.TableName ?? string.Empty,
+                    FactKeyColumn = alignedKey.ColumnName ?? string.Empty,
+                    Score = DirectKeyThreshold,
+                    Reason = "事实表存在稳定 Association ID（FK/PK），且 display 列证明维度在场；无独立主表时采用 DirectKey 汇总。"
+                };
+            }
+        }
 
         var fallback = bestDisplay ?? bestKey;
         if (fallback is null) return null;
@@ -343,6 +366,50 @@ public sealed class DimensionResolutionEvidenceService : IDimensionResolutionEvi
         if (lower.EndsWith("_id")) return true;
         if (name.Length >= 4 && name.EndsWith("Id", StringComparison.Ordinal)) return true;
         return false;
+    }
+
+    /// <summary>
+    /// M5-12 (GQ-006)：当事实表无"含维度词"的稳定关联键时，从事实表全列中
+    /// 通过命名根对齐发现维度稳定 Association ID（FK/PK）。
+    /// 前提：displayCandidates 非空（证明维度确实在场于事实表），避免无证据猜测。
+    /// </summary>
+    private static MetadataColumn? DiscoverAlignedDimensionKey(MetadataTable fact, List<MetadataSemanticSearchResult> displayCandidates)
+    {
+        if (displayCandidates.Count == 0 || fact.Columns is null) return null;
+        var displayRoots = displayCandidates
+            .Select(x => x.Column is not null ? StripDimensionSuffix(x.Column.ColumnName) : null)
+            .Where(r => !string.IsNullOrEmpty(r))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (displayRoots.Count == 0) return null;
+
+        var keys = (fact.Columns ?? new List<MetadataColumn>())
+            .Where(c => c.IsPrimaryKey == true || LooksLikeForeignKey(c.ColumnName))
+            .Where(c => displayRoots.Contains(StripDimensionSuffix(c.ColumnName) ?? string.Empty))
+            .ToList();
+        if (keys.Count == 0) return null;
+
+        // 优先选取 FK 关联键（_id 后缀），而非事实表自身 PK。
+        return keys.FirstOrDefault(c => LooksLikeForeignKey(c.ColumnName))
+            ?? keys.FirstOrDefault();
+    }
+
+    /// <summary>
+    /// 剥离维度列后缀（_id/_code/_name/_no 及对应 camelCase），返回命名根
+    /// （如 material_id/material_name → material），用于把 display 列与其关联键对齐到同一维度实体。
+    /// </summary>
+    private static string? StripDimensionSuffix(string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return null;
+        var lower = name.ToLowerInvariant().Trim();
+        foreach (var suffix in new[] { "_id", "_code", "_name", "_no", "_key", "id", "code", "name", "no", "key" })
+        {
+            if (lower.Length > suffix.Length && lower.EndsWith(suffix))
+            {
+                lower = lower[..^suffix.Length];
+                break;
+            }
+        }
+        return lower.Length == 0 ? null : lower;
     }
 
     /// <summary>
