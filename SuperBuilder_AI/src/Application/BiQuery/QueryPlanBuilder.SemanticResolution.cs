@@ -158,8 +158,8 @@ public partial class QueryPlanBuilder
     }
 
     /// <summary>
-    /// 为单个 Runtime 指标在 Resolution 绑定集合中寻找最佳匹配（与 MatchFilterBinding 同构）。
-    /// 优先级：SemanticText 精确匹配 → Runtime Field 与绑定 SemanticText/物理列同名 → 位置回退。
+    /// M5-02：统一字段解析规则（委托给 <see cref="SemanticFieldBindingMatcher"/>）。
+    /// 优先级：SemanticText 精确匹配 → 物理列与绑定 SemanticText/物理列同名 → 位置回退。
     /// 返回绑定索引；找不到未使用绑定时返回 -1（调用方据此丢弃该幻影指标）。
     /// </summary>
     private static int MatchMetricBinding(
@@ -167,26 +167,11 @@ public partial class QueryPlanBuilder
         QueryMetric runtime,
         HashSet<int> used,
         int positional)
-    {
-        for (var j = 0; j < bindings.Count; j++)
-        {
-            if (used.Contains(j)) continue;
-            if (!string.IsNullOrWhiteSpace(runtime.SemanticText)
-                && string.Equals(runtime.SemanticText, bindings[j].SemanticText, StringComparison.OrdinalIgnoreCase))
-                return j;
-        }
-        for (var j = 0; j < bindings.Count; j++)
-        {
-            if (used.Contains(j)) continue;
-            if (!string.IsNullOrWhiteSpace(runtime.Field)
-                && (string.Equals(runtime.Field, bindings[j].SemanticText, StringComparison.OrdinalIgnoreCase)
-                    || string.Equals(runtime.Field, bindings[j].Column, StringComparison.OrdinalIgnoreCase)))
-                return j;
-        }
-        if (positional < bindings.Count && !used.Contains(positional))
-            return positional;
-        return -1;
-    }
+        => SemanticFieldBindingMatcher.Match(
+            SemanticFieldReference.From(runtime),
+            bindings.Select(SemanticFieldBinding.From).ToList(),
+            used,
+            positional);
 
     private static void ApplyMetricBinding(QueryPlan plan, QueryMetric runtime, QueryPlanMetricResolution b, int index)
     {
@@ -276,8 +261,8 @@ public partial class QueryPlanBuilder
     }
 
     /// <summary>
-    /// 为单个 Runtime Filter 在 Resolution 绑定集合中寻找最佳匹配。
-    /// 匹配优先级：SemanticText 精确匹配 → Runtime Field 与绑定 SemanticText/物理列同名 → 位置回退（1:1 常见情形）。
+    /// M5-02：统一字段解析规则（委托给 <see cref="SemanticFieldBindingMatcher"/>）。
+    /// 匹配优先级：SemanticText 精确匹配 → 物理列与绑定 SemanticText/物理列同名 → 位置回退。
     /// 返回绑定的索引；找不到未使用绑定时返回 -1（调用方据此丢弃该幻影 Filter）。
     /// </summary>
     private static int MatchFilterBinding(
@@ -285,32 +270,11 @@ public partial class QueryPlanBuilder
         QueryFilter runtime,
         HashSet<int> used,
         int positional)
-    {
-        // 1) SemanticText 精确匹配（首选）。
-        for (var j = 0; j < bindings.Count; j++)
-        {
-            if (used.Contains(j)) continue;
-            if (!string.IsNullOrWhiteSpace(runtime.SemanticText)
-                && string.Equals(runtime.SemanticText, bindings[j].SemanticText, StringComparison.OrdinalIgnoreCase))
-                return j;
-        }
-
-        // 2) Runtime Field 既可能是语义名也可能是物理列：与绑定的 SemanticText / 物理 Column 同名即视为对应。
-        for (var j = 0; j < bindings.Count; j++)
-        {
-            if (used.Contains(j)) continue;
-            if (!string.IsNullOrWhiteSpace(runtime.Field)
-                && (string.Equals(runtime.Field, bindings[j].SemanticText, StringComparison.OrdinalIgnoreCase)
-                    || string.Equals(runtime.Field, bindings[j].Column, StringComparison.OrdinalIgnoreCase)))
-                return j;
-        }
-
-        // 3) 位置回退（1:1 常见情形）。
-        if (positional < bindings.Count && !used.Contains(positional))
-            return positional;
-
-        return -1;
-    }
+        => SemanticFieldBindingMatcher.Match(
+            SemanticFieldReference.From(runtime),
+            bindings.Select(SemanticFieldBinding.From).ToList(),
+            used,
+            positional);
 
     private static void ApplyDimensionResolutions(QueryPlan plan, IReadOnlyList<QueryPlanDimensionResolution> bindings)
     {
@@ -387,8 +351,9 @@ public partial class QueryPlanBuilder
         => dimension.MetadataColumnId <= 0 && string.IsNullOrWhiteSpace(dimension.ColumnName);
 
     /// <summary>
-    /// 为单个 Runtime 维度在 Resolution 绑定集合中寻找最佳匹配。
-    /// 匹配优先级：SemanticText 精确匹配 → SemanticText/ColumnName 与绑定物理列同名 → 位置回退（1:1 常见情形）。
+    /// M5-02：统一字段解析规则（委托给 <see cref="SemanticFieldBindingMatcher"/>）。
+    /// 匹配优先级：SemanticText 精确匹配 → 物理列(ColumnName)与绑定 SemanticText/物理列同名
+    /// → SemanticText 与绑定物理列同名（旧维度"语义↔物理"互换情形）→ 位置回退（仅 HasToken）。
     /// 返回绑定索引；找不到未使用绑定时返回 -1（调用方据此丢弃该幻影维度）。
     /// </summary>
     private static int MatchDimensionBinding(
@@ -396,37 +361,11 @@ public partial class QueryPlanBuilder
         QueryDimension runtime,
         HashSet<int> used,
         int positional)
-    {
-        for (var j = 0; j < bindings.Count; j++)
-        {
-            if (used.Contains(j)) continue;
-            if (!string.IsNullOrWhiteSpace(runtime.SemanticText)
-                && string.Equals(runtime.SemanticText, bindings[j].SemanticText, StringComparison.OrdinalIgnoreCase))
-                return j;
-        }
-
-        for (var j = 0; j < bindings.Count; j++)
-        {
-            if (used.Contains(j)) continue;
-            if (!string.IsNullOrWhiteSpace(runtime.SemanticText)
-                && string.Equals(runtime.SemanticText, bindings[j].Column, StringComparison.OrdinalIgnoreCase))
-                return j;
-            if (!string.IsNullOrWhiteSpace(runtime.ColumnName)
-                && (string.Equals(runtime.ColumnName, bindings[j].Column, StringComparison.OrdinalIgnoreCase)
-                    || string.Equals(runtime.ColumnName, bindings[j].SemanticText, StringComparison.OrdinalIgnoreCase)))
-                return j;
-        }
-
-        // 位置回退（1:1 常见情形）：仅当该 Runtime 维度确有可识别文本时才允许。
-        // 空维度（SemanticText 与 ColumnName 皆空）必须判为幻影并丢弃，
-        // 否则会把 LLM 的空维度错误绑定到一条无关的 Resolution 维度上。
-        var hasText = !string.IsNullOrWhiteSpace(runtime.SemanticText)
-                      || !string.IsNullOrWhiteSpace(runtime.ColumnName);
-        if (hasText && positional < bindings.Count && !used.Contains(positional))
-            return positional;
-
-        return -1;
-    }
+        => SemanticFieldBindingMatcher.Match(
+            SemanticFieldReference.From(runtime),
+            bindings.Select(SemanticFieldBinding.From).ToList(),
+            used,
+            positional);
 
     private static void ApplyDimensionBinding(QueryPlan plan, QueryDimension runtime, QueryPlanDimensionResolution b, int index)
     {

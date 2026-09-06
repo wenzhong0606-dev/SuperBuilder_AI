@@ -444,15 +444,8 @@ public class QueryPlanValidator
 				continue;
 			}
 
-			var matchedColumn =
-				metadataColumns.FirstOrDefault(
-					x =>
-						string.Equals(
-							x.ColumnName,
-							metric.Field,
-							StringComparison.OrdinalIgnoreCase));
-
-			if (matchedColumn == null)
+			// M5-02：以统一字段引用词汇表达"物理解析"判定（口径与原有列名匹配完全一致）。
+			if (!SemanticFieldBindingMatcher.IsPhysicallyResolved(SemanticFieldReference.FromPlan(metric), metadataColumns))
 			{
 				result.AddWarning(
 					"METRIC_FIELD_NOT_RESOLVED",
@@ -581,15 +574,8 @@ public class QueryPlanValidator
 					nameof(QueryPlan.Filters));
 			}
 
-			var matched =
-				metadataColumns.Any(
-					x =>
-						string.Equals(
-							x.ColumnName,
-							filter.Field,
-							StringComparison.OrdinalIgnoreCase));
-
-			if (!matched)
+			// M5-02：以统一字段引用词汇表达"物理解析"判定（口径与原有列名匹配完全一致）。
+			if (!SemanticFieldBindingMatcher.IsPhysicallyResolved(SemanticFieldReference.FromPlan(filter), metadataColumns))
 			{
 				result.AddWarning(
 					"FILTER_FIELD_NOT_RESOLVED",
