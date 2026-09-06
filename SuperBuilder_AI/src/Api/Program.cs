@@ -160,6 +160,14 @@ builder.Services.AddScoped<IQueryPlanPipeline>(sp => sp.GetRequiredService<Query
 builder.Services.Configure<DecisionAuditOptions>(builder.Configuration.GetSection(DecisionAuditOptions.SectionName));
 builder.Services.AddScoped<IDecisionAuditSink, ConfigurableDecisionAuditSink>();
 
+// M5-10：Production Feedback 闭环（默认 Mode=Off → NoOp，零行为变更；对 Golden 免疫）
+// 通过 IFeedbackBaselineGateway(默认 NoOp) 解耦既有 Golden Baseline 服务，闭环不触达真实回归。
+builder.Services.Configure<ProductionFeedbackOptions>(builder.Configuration.GetSection(ProductionFeedbackOptions.SectionName));
+builder.Services.AddScoped<IProductionFeedbackStore, InMemoryProductionFeedbackStore>();
+builder.Services.AddScoped<IFeedbackBaselineGateway, NoOpFeedbackBaselineGateway>();
+builder.Services.AddScoped<IProductionFeedbackSink, ConfigurableProductionFeedbackSink>();
+builder.Services.AddScoped<ProductionFeedbackLoop>();
+
 // 阶段按执行顺序注册；MS DI 解析 IEnumerable<IQueryPlanStage> 时保持注册顺序：
 // Build → Context → ColumnSecurity → MetadataIntegrity → DetailProjection →
 // SemanticValidation → Confidence → DecisionGate → CostGovernance → Explainability
