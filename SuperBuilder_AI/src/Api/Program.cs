@@ -165,6 +165,8 @@ builder.Services.AddScoped<IColumnSensitivityClassifier, DenyNothingColumnClassi
 builder.Services.AddScoped<IColumnSecurityPolicy, ColumnSecurityPolicy>();
 builder.Services.AddScoped<IColumnSecurityContextResolver, DefaultColumnSecurityContextResolver>();
 builder.Services.AddScoped<IQueryPlanStage, QueryPlanColumnSecurityStage>();
+// M5-01：规范化语义模型解析器（默认透传，零行为变更；M5-02/M5-08 将接入真实实现）
+builder.Services.AddScoped<ICanonicalSemanticResolver, PassThroughCanonicalResolver>();
 builder.Services.AddScoped<IQueryPlanStage, QueryPlanMetadataIntegrityStage>();
 builder.Services.AddScoped<IQueryPlanStage, QueryPlanDetailProjectionStage>();
 builder.Services.AddScoped<IQueryPlanStage, QueryPlanSemanticValidationStage>();
