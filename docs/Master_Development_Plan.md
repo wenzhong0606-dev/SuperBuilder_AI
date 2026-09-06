@@ -187,7 +187,7 @@
 
 验收：上述两轮对话可以端到端返回真实列表；不会出现 `SB_BI_002`；不会连续产生相同 Medium 分数闸门；生成 SQL 包含正确排序和 Limit；只访问当前用户授权数据源。
 
-> **提前说明（对应选项 B）**：M0-09 是从原 M5-13「Ask 首用例」中提前抽出的 P0 早期批次，仅携带修复首个 Ask 明细对话所需的最小闭环——决策门对合法明细列表（实体 + Limit + Order）放行、`SB_BI_002` 不再误报明细请求、`X 就是 Y` 别名确认与循环检测的最小实现。其唯一前提是目标实体“入库凭证”在授权数据源中可被解析（已有元数据或最小种子即可），**不依赖 M4 元数据企业化完成**。通用化规则仍保留在 M5-13（不强制 Metric/Dimension）与 M6-03（租户级别名 / 循环检测 / 语义学习）。
+> **提前说明（对应选项 B）**：M0-09 是从原 M5-14「Ask 首用例」中提前抽出的 P0 早期批次，仅携带修复首个 Ask 明细对话所需的最小闭环——决策门对合法明细列表（实体 + Limit + Order）放行、`SB_BI_002` 不再误报明细请求、`X 就是 Y` 别名确认与循环检测的最小实现。其唯一前提是目标实体“入库凭证”在授权数据源中可被解析（已有元数据或最小种子即可），**不依赖 M4 元数据企业化完成**。通用化规则仍保留在 M5-13（不强制 Metric/Dimension）与 M6-03（租户级别名 / 循环检测 / 语义学习）。
 
 M0 退出：全部 🔴 完成、凭据已轮换、构建零错误、测试不低于 431、新增安全及契约测试通过。
 
@@ -550,12 +550,15 @@ M3 退出：平台/租户视图严格分离；租户只能使用授权语言；�
 | M5-05 | SB-P1-05 | Column-Level Security | 未授权/脱敏字段不进入 Plan、SQL、结果（✅ 2026-09-06，0fc4a31：管线新阶段 QueryPlanColumnSecurityStage + IColumnSensitivityClassifier/IColumnSecurityPolicy/IColumnSecurityContextResolver，11 例测试全绿，零 schema 变更、对 Golden 免疫） |
 | M5-06 | SB-P1-06 | Query Cost Governance | 高扫描、Join、无界 Limit、高模型成本可拒绝或降级（✅ 2026-09-06，d9e01a1：管线新阶段 QueryPlanCostGovernanceStage + IQueryCostClassifier/ICostGovernancePolicy/ICostGovernanceContextResolver + CostGovernanceOptions，15 例测试全绿，默认关闭零行为变更、对 Golden 免疫） |
 | M5-07 | SB-P1-07 | Decision Gate 状态化 | ALLOW/REJECT/ASK_CLARIFICATION/REQUIRE_APPROVAL/LIMITED_EXECUTION（✅ 2026-09-06，cf6e5db：枚举规范为 5 态 + Decision 派生单一事实来源，33 例决策/状态/管线测试全绿，对 Golden 免疫） |
-| M5-08 | SB-P1-08 | AI Decision Audit | 可追踪问题、意图、计划、修复、置信度、决策、SQL、模型 |
-| M5-09 | SB-P1-10 | Production Feedback | Feedback→Candidate→Review→Baseline→Regression |
-| M5-10 | SB-P1-11 | AI BI E2E | NL→API→Plan→SQL→Test DB→Result 全链覆盖 |
-| M5-11 | GQ-006 | 物料等缺独立主表导致 NotResolved | 不修改 Ranking Contract 绕过，真实解析通过 |
-| M5-12 | Phase 3.1.12.10 | 完成 Phase 2.7 Regression | 证据完整后才宣布 Phase 3.1 Frozen |
-| M5-13 | Ask 首用例 | 明细排序语义：实体 + Limit + Order 可构成有效计划，不强制 Metric/Dimension（具体旗舰回归已提前至 M0-09 早期批次） | “最近十张入库凭证”进入 SQL Builder；SB_BI_002 只用于确实无法形成可查询字段的请求 |
+| M5-08 | SB-P1-12 | Governance Policy Enablement | 真实 `IColumnSensitivityClassifier`（基于 M5-01 规范化语义模型驱动敏感度分类，替换 `DenyNothingColumnClassifier`）+ `CostGovernanceOptions` 按真实数据量/`ModelCostTier` 调校 + 模型成本遥测 + 逐租户策略配置与灰度开关；将 M5-05/06 由安全默认提升为生产可用 |
+| M5-09 | SB-P1-08 | AI Decision Audit | 可追踪问题、意图、计划、修复、置信度、决策、SQL、模型 |
+| M5-10 | SB-P1-10 | Production Feedback | Feedback→Candidate→Review→Baseline→Regression |
+| M5-11 | SB-P1-11 | AI BI E2E | NL→API→Plan→SQL→Test DB→Result 全链覆盖 |
+| M5-12 | GQ-006 | 物料等缺独立主表导致 NotResolved | 不修改 Ranking Contract 绕过，真实解析通过 |
+| M5-13 | Phase 3.1.12.10 | 完成 Phase 2.7 Regression | 证据完整后才宣布 Phase 3.1 Frozen |
+| M5-14 | Ask 首用例 | 明细排序语义：实体 + Limit + Order 可构成有效计划，不强制 Metric/Dimension（具体旗舰回归已提前至 M0-09 早期批次） | "最近十张入库凭证"进入 SQL Builder；SB_BI_002 只用于确实无法形成可查询字段的请求 |
+
+> **M5 执行顺序与边界（2026-09-06 修订）**：基础切片 M5-03~M5-07 已闭环（管线 Stage 化、Builder 收缩、列级安全、成本治理、决策门状态化，均对 Golden 免疫、零默认行为变更）。剩余按依赖顺序推进：**M5-01（规范化语义模型）→ M5-02（统一字段解析规则）→ M5-08（治理策略真实启用，将 M5-05/06 由安全默认提升为生产可用）→ M5-09（AI 决策审计）→ M5-10（生产反馈）→ M5-11（AI BI E2E）→ M5-12/M5-13/M5-14（既有收尾）**。M5-08 依赖 M5-01 的规范化语义模型以驱动真实的列敏感度分类。
 
 ---
 
@@ -767,7 +770,7 @@ A5/A3 在功能和数据约束稳定后分步执行，不得在同一提交中�
 | INIT-1 | M0-05、M9-15 |
 | L10N-1/2 | M3-04/05 |
 | ASK-1/2 | M0-04、M6 |
-| 首个 Ask 对话未跑通 | M0-09、M5-13、M6-03/05 |
+| 首个 Ask 对话未跑通 | M0-09、M5-14、M6-03/05 |
 | IAM-1 | M2-01/02 |
 | FLOW-1 | M7-04~08 |
 | 匿名登录选项与限流 | M0-08 |
@@ -803,7 +806,7 @@ A5/A3 在功能和数据约束稳定后分步执行，不得在同一提交中�
 | S6-8 | M8-05 |
 | S6-9 | M3、M7、M9-13；Localization 写端点已存在，不再列为缺接口 |
 | A5/A3 | M9-11/12 |
-| Phase 3.1.12.10 | M5-12 |
+| Phase 3.1.12.10 | M5-13 |
 
 ### 17.3 平台产品需求
 
