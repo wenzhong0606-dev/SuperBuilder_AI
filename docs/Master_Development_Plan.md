@@ -601,6 +601,12 @@ M3 退出：✅ 已达成当前跟踪页面范围。平台/租户视图严格分
 
 ### M6-04 Cache 完整版本（SB-P1-09）
 
+> **进度**：✅ 核心已交付（提交 a7b1b41，7 文件 +547/−5；完整套件 879/879 零回归、含 Golden）。
+> - 7 维版本上下文：`PermissionFingerprint` + `RlsPolicyFingerprint` + `Culture`(CurrentUICulture) + `ModelVersion`(Qwen:Model) + `SemanticVersion`/`MetadataVersion`/`DataSourceVersion`（基于 `BaseEntity.RowVersion` 聚合，零迁移）。
+> - 各子提供器可空 + try/catch 降级；`DataSourceCatalogVersionProvider` 目录指纹含启用态与行版本，撤权/禁用即时失效；全局语义标签 `TenantId==0` 对所有租户生效。
+> - 未注入 `IAskCacheVersionProvider` 时走 `Legacy` 分支（保留 `policy:` 段），对主链路零侵入、对 Golden 免疫。
+> - 验证：新增 `AskCacheVersionProviderTests`(9) + `AskControllerTests` 7 维键断言(1)。
+
 - 保留 PermissionFingerprint、RLS PolicyFingerprint。
 - 增加 SemanticVersion、MetadataVersion、Culture、ModelVersion、数据源集合版本。
 - 撤权、策略、元数据、语义、语言变化后不复用旧结果。
