@@ -70,6 +70,25 @@ public class Dashboard : BaseEntity
 	/// <summary>主题键（冗余自 DSL，P7 消费）。</summary>
 	public string? ThemeKey { get; set; }
 
+	/// <summary>
+	/// 已发布的 DSL 快照（JSON）。为 null 表示从未发布（仅草稿）。
+	/// 与 <see cref="DslJson"/>（草稿工作副本）物理隔离：编辑草稿不影响线上渲染，
+	/// 只有 <c>Publish</c> 才把草稿复制到此处。
+	/// </summary>
+	public string? PublishedDslJson { get; set; }
+
+	/// <summary>
+	/// 当前发布版本号；<c>0</c> 表示从未发布。每次 <c>Publish</c> 或 <c>Rollback</c> 自增 1，
+	/// 与 <see cref="DashboardVersion.Version"/> 对应，用于前端展示「当前 vN」与回滚定位。
+	/// </summary>
+	public int PublishedVersion { get; set; }
+
+	/// <summary>最近一次发布时间（UTC）；未发布为 null。</summary>
+	public DateTime? PublishedAt { get; set; }
+
+	/// <summary>最近一次发布者标识；未发布为 null。</summary>
+	public string? PublishedBy { get; set; }
+
 	// 刻意不建立指向 Tenant 的外键与导航属性：
 	// TenantId == 0 表示"全局模板"，而 Tenant 表中并无 Id=0 的行，加外键会在写入全局模板时
 	// 直接触发 FOREIGN KEY 约束失败。故与 P5.2 的 SemanticLabel 保持一致——

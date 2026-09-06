@@ -118,6 +118,7 @@ public class SuperBIContext : DbContext
 
     #region P6 Low-code BI
     public DbSet<Dashboard> Dashboards { get; set; }
+    public DbSet<DashboardVersion> DashboardVersions { get; set; }
     #endregion
 
     #region P7 Multi-Theme / Style Engine
@@ -412,6 +413,31 @@ public class SuperBIContext : DbContext
         builder.Entity<Dashboard>().Property(x => x.DslVersion).IsRequired().HasMaxLength(16).HasComment("DSL版本");
         builder.Entity<Dashboard>().Property(x => x.DslJson).IsRequired().HasComment("DSL文档（结构化，非裸HTML）");
         builder.Entity<Dashboard>().Property(x => x.ThemeKey).HasMaxLength(64).HasComment("主题键");
+        builder.Entity<Dashboard>().Property(x => x.PublishedDslJson).HasComment("已发布DSL快照（null=未发布）");
+        builder.Entity<Dashboard>().Property(x => x.PublishedVersion).HasComment("当前发布版本号（0=未发布）");
+        builder.Entity<Dashboard>().Property(x => x.PublishedAt).HasComment("最近发布时间(UTC)");
+        builder.Entity<Dashboard>().Property(x => x.PublishedBy).HasMaxLength(128).HasComment("最近发布者");
+        #endregion
+
+        #region P6.1 DashboardVersion（M7-01 版本快照）
+        // 与 Dashboard 一致：TenantId=0 表示全局模板，不建指向 Tenant 的外键。
+        builder.Entity<DashboardVersion>().ToTable(tb => tb.HasComment("仪表盘发布版本快照"));
+        builder.Entity<DashboardVersion>().HasIndex(x => new { x.DashboardId, x.Version }).IsUnique()
+            .HasDatabaseName("IX_DashboardVersions_DashboardId_Version");
+        builder.Entity<DashboardVersion>().HasIndex(x => new { x.TenantId, x.DashboardId })
+            .HasDatabaseName("IX_DashboardVersions_TenantId_DashboardId");
+        builder.Entity<DashboardVersion>().Property(x => x.TenantId).HasComment("作用域租户（0=全局模板）");
+        builder.Entity<DashboardVersion>().Property(x => x.Code).IsRequired().HasMaxLength(128).HasComment("业务编码快照");
+        builder.Entity<DashboardVersion>().Property(x => x.Title).IsRequired().HasMaxLength(256).HasComment("标题快照");
+        builder.Entity<DashboardVersion>().Property(x => x.Description).HasMaxLength(1024).HasComment("描述快照");
+        builder.Entity<DashboardVersion>().Property(x => x.ThemeKey).HasMaxLength(64).HasComment("主题键快照");
+        builder.Entity<DashboardVersion>().Property(x => x.DslVersion).IsRequired().HasMaxLength(16).HasComment("DSL版本快照");
+        builder.Entity<DashboardVersion>().Property(x => x.DslJson).IsRequired().HasComment("发布时刻固化的DSL文档（只读快照）");
+        builder.Entity<DashboardVersion>().Property(x => x.PublishedBy).HasMaxLength(128).HasComment("发布者");
+        builder.Entity<DashboardVersion>().Property(x => x.RolledBackFromVersion).HasComment("回滚来源版本号（非回滚为null）");
+        builder.Entity<DashboardVersion>()
+            .HasOne<Dashboard>().WithMany().HasForeignKey(x => x.DashboardId)
+            .OnDelete(DeleteBehavior.Cascade);
         #endregion
 
         #region P7.1 Theme

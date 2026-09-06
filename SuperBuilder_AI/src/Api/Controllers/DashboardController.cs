@@ -237,7 +237,13 @@ public sealed class DashboardController : ControllerBase
 			_db.ApplyTenantScope(entity.TenantId);
 		}
 
-		if (!_serializer.TryDeserialize(entity.DslJson, out var dsl, out var errors) || dsl is null)
+		// 草稿/发布隔离：已发布且存在发布快照时，渲染「发布态」而非草稿，
+		// 保证编辑草稿不影响线上。未发布（或发布快照缺失）回退渲染草稿。
+		var dslJsonToRender = (entity.Status == DashboardStatuses.Published
+			&& !string.IsNullOrEmpty(entity.PublishedDslJson))
+			? entity.PublishedDslJson
+			: entity.DslJson;
+		if (!_serializer.TryDeserialize(dslJsonToRender, out var dsl, out var errors) || dsl is null)
 			return StatusCode(500, new { errors });
 
 		// P7.3：按仪表盘所属租户 + 仪表盘显式 ThemeKey 级联解析主题，注入渲染上下文。
@@ -247,6 +253,126 @@ public sealed class DashboardController : ControllerBase
 		var model = await _renderer.RenderAsync(dsl, platformContext, cancellationToken);
 		return Ok(model);
 	}
+
+	/// <summary>
+	/// 发布仪表盘（M7-01）：把当前草稿 <see cref="Dashboard.DslJson"/> 固化为发布快照，
+	/// 写入 <see cref="Dashboard.PublishedDslJson"/> 并自增 <see cref="Dashboard.PublishedVersion"/>，
+	/// 同时在 <c>DashboardVersions</c> 落一条不可变版本记录（可追溯回滚）。
+	/// 仅当草稿非空时允许发布；发布后渲染端点将优先返回发布态。
+	/// </summary>
+	[HttpPost("{id:long}/publish")]
+	public async Task<IActionResult> Publish(
+		long id,
+		[FromQuery] long tenantId = 0,
+		CancellationToken cancellationToken = default)
+	{
+		var (tid, _) = ScopeTo(tenantId);
+		var entity = await _db.Dashboards.FirstOrDefaultAsync(d => d.Id == id, cancellationToken);
+		if (entity is null) return NotFound();
+		if (string.IsNullOrWhiteSpace(entity.DslJson))
+			return BadRequest(new { errors = new[] { "草稿 DSL 为空，无法发布。" } });
+
+		entity.PublishedDslJson = entity.DslJson;
+		entity.PublishedVersion += 1;
+		entity.Status = DashboardStatuses.Published;
+		entity.PublishedAt = DateTime.UtcNow;
+		entity.PublishedBy = Actor();
+
+		_db.DashboardVersions.Add(new DashboardVersion
+		{
+			DashboardId = entity.Id,
+			TenantId = tid,
+			Version = entity.PublishedVersion,
+			Code = entity.Code,
+			Title = entity.Title,
+			Description = entity.Description,
+			ThemeKey = entity.ThemeKey,
+			DslVersion = entity.DslVersion,
+			DslJson = entity.DslJson,
+			PublishedAt = entity.PublishedAt.Value,
+			PublishedBy = entity.PublishedBy,
+			RolledBackFromVersion = null,
+		});
+
+		await _db.SaveChangesAsync(cancellationToken);
+		return Ok(new PublishResult(entity.Id, tid, entity.PublishedVersion, entity.PublishedAt, entity.PublishedBy));
+	}
+
+	/// <summary>
+	/// 回滚仪表盘（M7-01）：把指定历史版本恢复为「当前发布态」。
+	/// 历史快照只读，不会改写；回滚会再固化为一条<em>新</em>版本
+	/// （<see cref="DashboardVersion.RolledBackFromVersion"/> 指向被恢复的来源版本），
+	/// 保证版本链单调递增、全程可追溯。
+	/// </summary>
+	[HttpPost("{id:long}/rollback/{version:int}")]
+	public async Task<IActionResult> Rollback(
+		long id,
+		int version,
+		[FromQuery] long tenantId = 0,
+		CancellationToken cancellationToken = default)
+	{
+		var (tid, _) = ScopeTo(tenantId);
+		var entity = await _db.Dashboards.FirstOrDefaultAsync(d => d.Id == id, cancellationToken);
+		if (entity is null) return NotFound();
+
+		var target = await _db.DashboardVersions.AsNoTracking()
+			.FirstOrDefaultAsync(v => v.DashboardId == id && v.Version == version, cancellationToken);
+		if (target is null)
+			return NotFound(new { errors = new[] { $"版本 {version} 不存在。" } });
+
+		entity.PublishedDslJson = target.DslJson;
+		entity.PublishedVersion += 1;
+		entity.Status = DashboardStatuses.Published;
+		entity.PublishedAt = DateTime.UtcNow;
+		entity.PublishedBy = Actor();
+
+		_db.DashboardVersions.Add(new DashboardVersion
+		{
+			DashboardId = entity.Id,
+			TenantId = tid,
+			Version = entity.PublishedVersion,
+			Code = target.Code,
+			Title = target.Title,
+			Description = target.Description,
+			ThemeKey = target.ThemeKey,
+			DslVersion = target.DslVersion,
+			DslJson = target.DslJson,
+			PublishedAt = entity.PublishedAt.Value,
+			PublishedBy = entity.PublishedBy,
+			RolledBackFromVersion = target.Version,
+		});
+
+		await _db.SaveChangesAsync(cancellationToken);
+		return Ok(new PublishResult(entity.Id, tid, entity.PublishedVersion, entity.PublishedAt, entity.PublishedBy, target.Version));
+	}
+
+	/// <summary>
+	/// 列出仪表盘的全部发布版本（M7-01，按版本号倒序；含是否当前发布态标记）。
+	/// 仅元数据与版本链，不含 DSL 正文（避免大负载；如需恢复用 Rollback）。
+	/// </summary>
+	[HttpGet("{id:long}/versions")]
+	public async Task<IActionResult> Versions(
+		long id,
+		[FromQuery] long tenantId = 0,
+		CancellationToken cancellationToken = default)
+	{
+		ScopeTo(tenantId);
+		var entity = await _db.Dashboards.AsNoTracking()
+			.FirstOrDefaultAsync(d => d.Id == id, cancellationToken);
+		if (entity is null) return NotFound();
+
+		var list = await _db.DashboardVersions.AsNoTracking()
+			.Where(v => v.DashboardId == id)
+			.OrderByDescending(v => v.Version)
+			.Select(v => new DashboardVersionSummary(
+				v.Id, v.Version, v.Title, v.Code, v.DslVersion, v.PublishedAt, v.PublishedBy,
+				v.RolledBackFromVersion, v.Version == entity.PublishedVersion))
+			.ToListAsync(cancellationToken);
+		return Ok(list);
+	}
+
+	/// <summary>当前操作者标识（用于发布/回滚审计）。无认证身份时回退 "system"。</summary>
+	private string Actor() => User.Identity?.Name ?? "system";
 
 	/// <summary>
 	/// 编辑器前端占位（P8 AI App Builder / 前端编辑器接入前的中继）。
@@ -298,7 +424,7 @@ public sealed class DashboardController : ControllerBase
 	}
 
 	private static DashboardSummary ToSummary(Dashboard d) =>
-		new(d.Id, d.TenantId, d.Code, d.Title, d.Description, d.Status, d.DslVersion, d.ThemeKey, d.CreatedTime);
+		new(d.Id, d.TenantId, d.Code, d.Title, d.Description, d.Status, d.DslVersion, d.ThemeKey, d.CreatedTime, d.PublishedVersion, d.PublishedAt);
 }
 
 /// <summary>创建/更新仪表盘请求体。</summary>
@@ -317,7 +443,30 @@ public sealed record DashboardSummary(
 	string Status,
 	string DslVersion,
 	string? ThemeKey,
-	DateTime CreatedTime);
+	DateTime CreatedTime,
+	int PublishedVersion,
+	DateTime? PublishedAt);
+
+/// <summary>发布/回滚结果 DTO（M7-01）。</summary>
+public sealed record PublishResult(
+	long DashboardId,
+	long TenantId,
+	int Version,
+	DateTime? PublishedAt,
+	string? PublishedBy,
+	int? RolledBackFromVersion = null);
+
+/// <summary>仪表盘版本摘要 DTO（M7-01，列表不含 DSL 正文）。</summary>
+public sealed record DashboardVersionSummary(
+	long Id,
+	int Version,
+	string Title,
+	string Code,
+	string DslVersion,
+	DateTime PublishedAt,
+	string? PublishedBy,
+	int? RolledBackFromVersion,
+	bool IsCurrent);
 
 /// <summary>编辑器蓝图 DTO（结构化，无 HTML）。</summary>
 public sealed record DashboardEditorBlueprint(
