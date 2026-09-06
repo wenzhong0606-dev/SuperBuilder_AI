@@ -72,6 +72,22 @@ public sealed class ApiClient : IApiClient
         }
     }
 
+    /// <summary>
+    /// M6 登录兜底：按已知租户编码解析租户（不枚举目录），供 <see cref="Auth:ShowTenantDirectory"/> 关闭时手动登录。
+    /// 命中规则与服务端 <c>TenantByCode</c> 对齐：排除 platform 与已停用租户；空编码 / 不存在返回 Error。
+    /// </summary>
+    public async Task<(long Id, string? TenantCode, string? Name, string? Error)> ResolveTenantByCodeAsync(string code, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(code)) return (0, null, null, "租户编码必填。");
+        var (data, _, error, _) = await GetJsonAsync($"api/auth/tenant-by-code?code={System.Uri.EscapeDataString(code)}", ct);
+        if (data is not { ValueKind: System.Text.Json.JsonValueKind.Object }) return (0, null, null, error ?? "租户解析失败。");
+        var id = data.Value.TryGetProperty("id", out var idEl) && idEl.TryGetInt64(out var idVal) ? idVal : 0L;
+        if (id <= 0) return (0, null, null, error ?? "租户解析失败。");
+        var tenantCode = data.Value.TryGetProperty("tenantCode", out var tc) ? tc.GetString() : null;
+        var name = data.Value.TryGetProperty("name", out var nm) ? nm.GetString() : null;
+        return (id, tenantCode, name, null);
+    }
+
     public async Task<string?> AskRawAsync(string question, long? dataSourceId, CancellationToken ct = default)
     {
         var client = CreateClient();

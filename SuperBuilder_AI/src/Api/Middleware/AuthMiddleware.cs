@@ -251,6 +251,7 @@ public sealed class AuthMiddleware
 		if (IsPrefix(path, "/health")) return true;
 		if (IsPrefix(path, "/api/auth/login")) return true;
 		if (IsPrefix(path, "/api/auth/login-options")) return true;
+		if (IsPrefix(path, "/api/auth/tenant-by-code")) return true;
 		if (IsPrefix(path, "/api/platform-bootstrap")) return true;
 		// 登录前只开放只读的公共语言入口；管理接口仍需解析认证身份。
 		if (IsPrefix(path, "/api/localization/public")) return true;

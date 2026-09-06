@@ -64,10 +64,18 @@
                 <label>@L10n.T("Login.Username")<input class="form-control" @bind="Username" placeholder="@L10n.T(Keys.Login.Username, "用户名")" /></label>
                 <label>@L10n.T("Login.Password")<input class="form-control" @bind="Password" type="password" placeholder="@L10n.T(Keys.Login.Password, "口令")" /></label>
                 <label>@L10n.T("Login.TenantId")
+                @if (_tenantOptions.Count > 0)
+                {
                     <select class="form-control" value="@TenantId" @onchange="ChangeTenant">
                         <option value="0">@L10n.T(Keys.Login.TenantPlaceholder, "-- 请选择租户 --")</option>
                         @foreach (var tenant in _tenantOptions) { <option value="@TenantValue(tenant)">@TenantLabel(tenant)</option> }
                     </select>
+                }
+                else
+                {
+                    <input class="form-control" @bind="_manualTenantCode" placeholder="@L10n.T("Login.TenantCodePlaceholder", "如 demo / tenant-001")" />
+                    <span class="muted tiny">@L10n.T("Login.TenantCodeHint", "租户目录未公开，请输入您已知的确切租户编码登录。")</span>
+                }
                 </label>
                 <button class="btn btn-primary" @onclick="DoLogin" disabled="@Busy">@L10n.T("Common.Login")</button>
                 @if (!string.IsNullOrEmpty(Error)) { <div class="alert alert-danger">@Error</div> }
@@ -99,6 +107,8 @@
     private string BootstrapPasswordConfirm = "";
     private List<string> _loginCultures = new();
     private List<System.Text.Json.JsonElement> _tenantOptions = new();
+    /// <summary>目录未公开时的手动租户编码兜底（M0-08 + M6 登录修复）。</summary>
+    private string _manualTenantCode = "";
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -188,7 +198,28 @@
 
     private async Task DoLogin()
     {
-        if (TenantId <= 0) { Error = L10n.T(Keys.Login.SelectTenantFirst, "请先选择租户。"); return; }
+        if (TenantId <= 0)
+        {
+            // M0-08 + M6：目录未公开时，允许以手动编码兜底解析租户后再登录（不枚举目录）。
+            if (_tenantOptions.Count == 0 && !string.IsNullOrWhiteSpace(_manualTenantCode))
+            {
+                Busy = true;
+                var (id, _, _, resolveErr) = await Api.ResolveTenantByCodeAsync(_manualTenantCode);
+                if (id <= 0)
+                {
+                    Busy = false;
+                    Error = resolveErr ?? L10n.T("Login.TenantCodeInvalid", "租户编码不存在或已停用。");
+                    return;
+                }
+                TenantId = id;
+                try { await JS.InvokeVoidAsync("localStorage.setItem", "sb_last_login_tenant", TenantId.ToString()); } catch { }
+            }
+            else
+            {
+                Error = L10n.T(Keys.Login.SelectTenantFirst, "请先选择租户。");
+                return;
+            }
+        }
         Busy = true; Error = "";
         var (r, loginErr) = await Api.LoginAsync(Username, TenantId, Password);
         Busy = false;

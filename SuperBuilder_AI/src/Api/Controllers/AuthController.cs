@@ -179,6 +179,26 @@ public sealed class AuthController : ControllerBase
 			return new { x.Id, x.TenantCode, Name = x.TenantName, AvailableCultures = cultures, DefaultCulture = defaultCulture };
 		}));
 	}
+
+	/// <summary>
+	/// 按已知租户编码解析租户（M6 登录兜底）：不枚举目录，仅解析调用方已掌握的编码；
+	/// 排除 platform 租户与已停用租户。用于 <c>Auth:ShowTenantDirectory</c> 关闭（M0-08 默认隐藏）时，
+	/// 登录页以「手动输入租户编码」方式仍可登录，避免无目录即无法选租户的死局。
+	/// </summary>
+	[HttpGet("tenant-by-code")]
+	[AllowAnonymous]
+	public async Task<IActionResult> TenantByCode([FromQuery] string? code = null, CancellationToken cancellationToken = default)
+	{
+		if (string.IsNullOrWhiteSpace(code))
+			return BadRequest(new { error = "code 必填。" });
+
+		var tenant = await _db.Tenants.AsNoTracking()
+			.FirstOrDefaultAsync(t => t.TenantCode == code && t.Enabled && t.TenantCode != "platform", cancellationToken);
+		if (tenant is null)
+			return NotFound(new { error = "租户编码不存在或已停用。" });
+
+		return Ok(new { Id = tenant.Id, TenantCode = tenant.TenantCode, Name = tenant.TenantName });
+	}
 }
 
 /// <summary>登录请求。</summary>

@@ -13,6 +13,8 @@ namespace SuperBuilder_AI.Components.Services;
 public interface IApiClient
 {
     Task<(AuthResult? Result, string? Error)> LoginAsync(string username, long tenantId, string? password = null, CancellationToken ct = default);
+    /// <summary>M6 登录兜底：按已知租户编码（不枚举目录）解析租户 Id，供 <c>Auth:ShowTenantDirectory</c> 关闭时手动登录。</summary>
+    Task<(long Id, string? TenantCode, string? Name, string? Error)> ResolveTenantByCodeAsync(string code, CancellationToken ct = default);
     Task<string?> AskRawAsync(string question, long? dataSourceId, CancellationToken ct = default);
     /// <summary>类型化问数：返回 <see cref="BIResponse"/> 并区分传输错误。</summary>
     Task<AskOutcome> AskAsync(string question, long? dataSourceId, string? conversationId = null, CancellationToken ct = default);

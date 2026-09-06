@@ -57,6 +57,7 @@ public sealed class AuthStoreTests
 			=> Task.FromResult<(JsonElement?, int, string?, string?)>((null, status, status == 200 ? null : "temporary", null));
 
 		public Task<(AuthResult? Result, string? Error)> LoginAsync(string username, long tenantId, string? password = null, CancellationToken ct = default) => throw new NotSupportedException();
+		public Task<(long Id, string? TenantCode, string? Name, string? Error)> ResolveTenantByCodeAsync(string code, CancellationToken ct = default) => throw new NotSupportedException();
 		public Task<(TenantSwitchResult? Result, string? Error)> SwitchTenantAsync(long tenantId, CancellationToken ct = default) => throw new NotSupportedException();
 		public Task<(SelfRegistrationResult? Result, string? Error)> RegisterSelfAsync(string tenantCode, string tenantName, string adminUsername, string adminEmail, string adminPassword, string? adminDisplayName = null, CancellationToken ct = default) => throw new NotSupportedException();
 		public Task<(SelfRegistrationConfigView? Result, string? Error)> GetSelfRegistrationConfigAsync(CancellationToken ct = default) => throw new NotSupportedException();
