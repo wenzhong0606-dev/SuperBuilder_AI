@@ -74,7 +74,7 @@ public class QueryPlanStagesTests
 
 	private sealed class FakeDecisionGate : IQueryPlanDecisionGate
 	{
-		public QueryPlanDecision Decision { get; set; } = new() { ShouldExecute = true };
+		public QueryPlanDecision Decision { get; set; } = new() { Decision = QueryPlanDecisionType.Allow };
 		public QueryPlanDecision Evaluate(QueryPlanConfidence confidence) => Decision;
 	}
 
@@ -196,7 +196,7 @@ public class QueryPlanStagesTests
 	{
 		var decision = new FakeDecisionGate
 		{
-			Decision = new QueryPlanDecision { ShouldExecute = false, Reason = "blocked by gate" }
+			Decision = new QueryPlanDecision { Decision = QueryPlanDecisionType.Reject, Reason = "blocked by gate" }
 		};
 
 		var pipeline = BuildPipeline(

@@ -31,7 +31,7 @@ public sealed class QueryPlanDecisionGateTests
 		var gate = new QueryPlanDecisionGate();
 		var decision = gate.Evaluate(MediumDetail(executable: true));
 
-		Assert.Equal(QueryPlanDecisionType.Proceed, decision.Decision);
+		Assert.Equal(QueryPlanDecisionType.Allow, decision.Decision);
 		Assert.True(decision.ShouldExecute);
 		Assert.False(decision.RequiresConfirmation);
 	}
@@ -42,7 +42,7 @@ public sealed class QueryPlanDecisionGateTests
 		var gate = new QueryPlanDecisionGate();
 		var decision = gate.Evaluate(MediumDetail(executable: false));
 
-		Assert.Equal(QueryPlanDecisionType.Confirm, decision.Decision);
+		Assert.Equal(QueryPlanDecisionType.RequireApproval, decision.Decision);
 		Assert.False(decision.ShouldExecute);
 		Assert.True(decision.RequiresConfirmation);
 	}

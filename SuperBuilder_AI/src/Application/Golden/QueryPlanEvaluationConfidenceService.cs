@@ -176,7 +176,7 @@ public sealed class QueryPlanEvaluationConfidenceService
 
         var passed = evaluation.Passed
                      && (semanticEvidence is null || semanticEvidence.Passed)
-                     && decision.Decision == QueryPlanDecisionType.Proceed;
+                     && decision.Decision == QueryPlanDecisionType.Allow;
 
         return new QueryPlanEvaluationConfidenceResult
         {

@@ -15,7 +15,8 @@ namespace SuperBuilder_AI.Services.BI;
 ///        ↓
 /// Decision Gate
 ///        ↓
-/// Proceed / Confirm / Reject
+/// Allow / RequireApproval / Reject
+/// （另含 AskClarification / LimitedExecution 扩展态）
 ///
 /// 本服务不负责：
 ///
@@ -37,9 +38,8 @@ namespace SuperBuilder_AI.Services.BI;
 ///
 /// 用于记录 Decision Gate 为什么做出：
 ///
-/// Proceed
-/// Confirm
-/// Reject
+/// Allow / RequireApproval / Reject
+/// （扩展态：AskClarification / LimitedExecution）
 ///
 /// 的完整决策证据。
 /// </summary>
@@ -152,11 +152,7 @@ public sealed class QueryPlanDecisionGate
 						Confidence =
 							confidence,
 
-						ShouldExecute =
-							false,
 
-						RequiresConfirmation =
-							false,
 
 						Reason =
 							"QueryPlan Confidence Level 无法识别，拒绝进入 SQL Builder。"
@@ -186,16 +182,12 @@ public sealed class QueryPlanDecisionGate
 			return new QueryPlanDecision
 			{
 				Decision =
-					QueryPlanDecisionType.Confirm,
+					QueryPlanDecisionType.RequireApproval,
 
 				Confidence =
 					confidence,
 
-				ShouldExecute =
-					false,
 
-				RequiresConfirmation =
-					true,
 
 				Reason =
 					$"Confidence Level 为 High，但 Score " +
@@ -214,16 +206,12 @@ public sealed class QueryPlanDecisionGate
 			return new QueryPlanDecision
 			{
 				Decision =
-					QueryPlanDecisionType.Confirm,
+					QueryPlanDecisionType.RequireApproval,
 
 				Confidence =
 					confidence,
 
-				ShouldExecute =
-					false,
 
-				RequiresConfirmation =
-					true,
 
 				Reason =
 					"Confidence Level 为 High，但 Confidence Service " +
@@ -239,16 +227,12 @@ public sealed class QueryPlanDecisionGate
 		return new QueryPlanDecision
 		{
 			Decision =
-				QueryPlanDecisionType.Proceed,
+				QueryPlanDecisionType.Allow,
 
 			Confidence =
 				confidence,
 
-			ShouldExecute =
-				true,
 
-			RequiresConfirmation =
-				false,
 
 			Reason =
 				$"QueryPlan Confidence 为 High，" +
@@ -296,16 +280,12 @@ public sealed class QueryPlanDecisionGate
 			return new QueryPlanDecision
 			{
 				Decision =
-					QueryPlanDecisionType.Proceed,
+					QueryPlanDecisionType.Allow,
 
 				Confidence =
 					confidence,
 
-				ShouldExecute =
-					true,
 
-				RequiresConfirmation =
-					false,
 
 				Reason =
 					$"QueryPlan 为合法明细列表（目标实体已解析、含 Limit/Order、无指标/维度），" +
@@ -318,16 +298,12 @@ public sealed class QueryPlanDecisionGate
 		return new QueryPlanDecision
 		{
 			Decision =
-				QueryPlanDecisionType.Confirm,
+				QueryPlanDecisionType.RequireApproval,
 
 			Confidence =
 				confidence,
 
-			ShouldExecute =
-				false,
 
-			RequiresConfirmation =
-				true,
 
 			Reason =
 				$"QueryPlan Confidence 为 Medium，" +
@@ -425,11 +401,7 @@ public sealed class QueryPlanDecisionGate
 			Confidence =
 				confidence,
 
-			ShouldExecute =
-				false,
 
-			RequiresConfirmation =
-				false,
 
 			Reason =
 				reason
@@ -570,6 +542,8 @@ public sealed class QueryPlanDecisionGate
 
 				RequiresConfirmation =
 					decision.RequiresConfirmation,
+
+
 
 
 				// -------------------------------------------------

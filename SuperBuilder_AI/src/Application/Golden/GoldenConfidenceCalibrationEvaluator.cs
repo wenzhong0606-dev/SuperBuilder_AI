@@ -20,8 +20,8 @@ public sealed class GoldenConfidenceCalibrationEvaluator
         var cases = items.Select(ToCase).ToList();
 
         var evaluationPassed = cases.Count(x => x.EvaluationPassed);
-        var proceed = cases.Count(x => IsDecision(x.Decision, QueryPlanDecisionType.Proceed));
-        var confirm = cases.Count(x => IsDecision(x.Decision, QueryPlanDecisionType.Confirm));
+        var proceed = cases.Count(x => IsDecision(x.Decision, QueryPlanDecisionType.Allow));
+        var confirm = cases.Count(x => IsDecision(x.Decision, QueryPlanDecisionType.RequireApproval));
         var reject = cases.Count(x => IsDecision(x.Decision, QueryPlanDecisionType.Reject));
 
         var high = cases.Where(x => IsLevel(x.ConfidenceLevel, "High")).ToList();
@@ -34,8 +34,8 @@ public sealed class GoldenConfidenceCalibrationEvaluator
         var mediumPass = Rate(medium, x => x.EvaluationPassed);
         var lowPass = Rate(low, x => x.EvaluationPassed);
 
-        var highProceed = Rate(high, x => IsDecision(x.Decision, QueryPlanDecisionType.Proceed));
-        var mediumConfirm = Rate(medium, x => IsDecision(x.Decision, QueryPlanDecisionType.Confirm));
+        var highProceed = Rate(high, x => IsDecision(x.Decision, QueryPlanDecisionType.Allow));
+        var mediumConfirm = Rate(medium, x => IsDecision(x.Decision, QueryPlanDecisionType.RequireApproval));
         var lowReject = Rate(low, x => IsDecision(x.Decision, QueryPlanDecisionType.Reject));
 
         if (high.Any() && highPass < 0.90)
@@ -46,8 +46,8 @@ public sealed class GoldenConfidenceCalibrationEvaluator
 
         var agreement = Rate(cases, x =>
             x.EvaluationPassed
-                ? IsDecision(x.Decision, QueryPlanDecisionType.Proceed)
-                : IsDecision(x.Decision, QueryPlanDecisionType.Confirm) || IsDecision(x.Decision, QueryPlanDecisionType.Reject));
+                ? IsDecision(x.Decision, QueryPlanDecisionType.Allow)
+                : IsDecision(x.Decision, QueryPlanDecisionType.RequireApproval) || IsDecision(x.Decision, QueryPlanDecisionType.Reject));
 
         if (cases.Any() && agreement < 0.90)
             warnings.Add($"Evaluation/Decision agreement is only {agreement:P1}.");
@@ -76,8 +76,8 @@ public sealed class GoldenConfidenceCalibrationEvaluator
     {
         var decision = result.Decision.Decision;
         var agreement = result.Evaluation.Passed
-            ? decision == QueryPlanDecisionType.Proceed
-            : decision == QueryPlanDecisionType.Confirm || decision == QueryPlanDecisionType.Reject;
+            ? decision == QueryPlanDecisionType.Allow
+            : decision == QueryPlanDecisionType.RequireApproval || decision == QueryPlanDecisionType.Reject;
 
         return new GoldenConfidenceCalibrationCase
         {
