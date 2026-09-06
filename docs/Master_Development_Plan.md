@@ -588,6 +588,8 @@ M3 退出：✅ 已达成当前跟踪页面范围。平台/租户视图严格分
 
 ### M6-03 澄清与语义学习
 
+> **进度**：M6-03-A 核心已交付（提交 cf04bef，869/869 零回归）。✅ 行为分类 + 结构化澄清详情 + 待澄清状态富化 + 循环检测（阈值3）。⏳ 后续增量（见下「待续」）：①管线结构化候选项（指标/维度/时间）从 `QueryPlanDecision`/`Explanation` 透传至 `ClarificationDetail`；②`TenantSemanticAlias` 持久化（提议/管理员审核/启停/审计）；③确认后免首问校验重放原 QueryPlan。
+
 - 增加 NewQuestion/Clarification/Correction/Confirmation/Cancel 行为分类。
 - 返回结构化指标、维度、实体、时间候选项。
 - 建立 TenantSemanticAlias：提议、管理员审核、启停和审计。
