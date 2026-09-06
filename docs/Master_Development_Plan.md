@@ -555,7 +555,7 @@ M3 退出：平台/租户视图严格分离；租户只能使用授权语言；�
 | M5-10 | SB-P1-10 | Production Feedback | Feedback→Candidate→Review→Baseline→Regression ✅ 2026-09-06（af88953） |
 | M5-11 | SB-P1-11 | AI BI E2E | NL→API→Plan→SQL→Test DB→Result 全链覆盖（✅ 2026-09-06，0d81281：确定性桩隔离 LLM/metadata，真实 SqlQueryBuilder+QueryExecutionService+ResultUnderstandingService+BIConversationService 贯通；文件型 SQLite 临时库离线可还原、PostgreSQL 方言 SQL 在 SQLite 兼容执行；3 例 E2E 全绿，完整套件 837/837 零回归、对 Golden 免疫） |
 | M5-12 | GQ-006 | 物料等缺独立主表导致 NotResolved | 真实解析为 DirectKey（✅ 2026-09-06，be6ac70：DimensionResolutionEvidenceService 命名根对齐发现稳定 FK 关联键 material_id，配合 display 列 material_name 存在性证明建立 DirectKey；符合 D03 契约第 4 条；零默认行为变更、不碰 Ranking Contract；3 例测试全绿，完整套件 840/840 零回归、对 Golden 免疫） |
-| M5-13 | Phase 3.1.12.10 | 完成 Phase 2.7 Regression | 证据完整后才宣布 Phase 3.1 Frozen |
+| M5-13 | Phase 3.1.12.10 | 完成 Phase 2.7 Regression | Phase 2.7 Regression 完成（✅ 2026-09-06：唯一缺口 GQ-006 经 M5-12 闭合为 DirectKey；全量 840/840 零回归、对 Golden 免疫；Phase 2.7 文档无其他 BLOCK/NotResolved；暂不宣布 Phase 3.1 Frozen，因 M5-14 仍开放） |
 | M5-14 | Ask 首用例 | 明细排序语义：实体 + Limit + Order 可构成有效计划，不强制 Metric/Dimension（具体旗舰回归已提前至 M0-09 早期批次） | "最近十张入库凭证"进入 SQL Builder；SB_BI_002 只用于确实无法形成可查询字段的请求 |
 
 > **M5 执行顺序与边界（2026-09-06 修订）**：基础切片 M5-03~M5-07 已闭环（管线 Stage 化、Builder 收缩、列级安全、成本治理、决策门状态化，均对 Golden 免疫、零默认行为变更）。剩余按依赖顺序推进：**M5-01（规范化语义模型）→ M5-02（统一字段解析规则）→ M5-08（治理策略真实启用，将 M5-05/06 由安全默认提升为生产可用）→ M5-09（AI 决策审计）→ M5-10（生产反馈）→ M5-11（AI BI E2E）→ M5-12/M5-13/M5-14（既有收尾）**。M5-08 依赖 M5-01 的规范化语义模型以驱动真实的列敏感度分类。
