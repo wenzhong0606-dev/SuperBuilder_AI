@@ -155,6 +155,11 @@ builder.Services.AddScoped<IQueryPlanBuilder>(sp => sp.GetRequiredService<QueryP
 builder.Services.AddScoped<QueryPlanPipeline>();
 builder.Services.AddScoped<IQueryPlanPipeline>(sp => sp.GetRequiredService<QueryPlanPipeline>());
 
+// M5-09：AI Decision Audit——决策全过程审计 Sink
+// 默认 Mode=None → NoOp，零行为变更；配置切 Log 启用结构化日志输出（对 Golden 免疫）。
+builder.Services.Configure<DecisionAuditOptions>(builder.Configuration.GetSection(DecisionAuditOptions.SectionName));
+builder.Services.AddScoped<IDecisionAuditSink, ConfigurableDecisionAuditSink>();
+
 // 阶段按执行顺序注册；MS DI 解析 IEnumerable<IQueryPlanStage> 时保持注册顺序：
 // Build → Context → ColumnSecurity → MetadataIntegrity → DetailProjection →
 // SemanticValidation → Confidence → DecisionGate → CostGovernance → Explainability

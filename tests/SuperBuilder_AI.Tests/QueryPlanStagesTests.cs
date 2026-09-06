@@ -105,7 +105,9 @@ public class QueryPlanStagesTests
 			new QueryPlanDecisionGateStage(decisionGate),
 			new QueryPlanExplainabilityStage(explain)
 		};
-		return new QueryPlanPipeline(stages);
+		return new QueryPlanPipeline(
+			stages,
+			new NoOpDecisionAuditSink());
 	}
 
 	#endregion
