@@ -91,7 +91,7 @@ public class QueryPlanBuilderDataSourceConstraintTests
 	}
 
 	private static QueryPlanBuilder BuildBuilder(FakeSearch search, SuperBIContext ctx)
-		=> new QueryPlanBuilder(search, new FakeJoin(), new QueryPlanValidator(ctx));
+		=> new QueryPlanBuilder(search, new FakeJoin(), new QueryPlanValidator(ctx), new QueryPlanDataSourceScope());
 
 	private static QueryIntent MakeIntent()
 		=> new QueryIntent

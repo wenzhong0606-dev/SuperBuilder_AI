@@ -83,7 +83,7 @@ public class QueryPlanBuilderQaRegressionTests
 	}
 
 	private static QueryPlanBuilder BuildBuilder(FakeSearch search, SuperBIContext ctx)
-		=> new QueryPlanBuilder(search, new FakeJoin(), new QueryPlanValidator(ctx));
+		=> new QueryPlanBuilder(search, new FakeJoin(), new QueryPlanValidator(ctx), new QueryPlanDataSourceScope());
 
 	private static MetadataTable T(long id, string name, params (string col, string type, bool pk)[] cols)
 	{

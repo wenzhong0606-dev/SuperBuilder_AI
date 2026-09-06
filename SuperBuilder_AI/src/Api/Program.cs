@@ -145,6 +145,8 @@ builder.Services.AddScoped<IQueryUnderstandingService>(sp => sp.GetRequiredServi
 builder.Services.AddScoped<QueryJoinInferenceService>();
 builder.Services.AddScoped<IQueryJoinInferenceService>(sp => sp.GetRequiredService<QueryJoinInferenceService>());
 builder.Services.AddScoped<QueryPlanValidator>();
+builder.Services.AddScoped<QueryPlanDataSourceScope>();
+builder.Services.AddScoped<IQueryPlanDataSourceScope>(sp => sp.GetRequiredService<QueryPlanDataSourceScope>());
 builder.Services.AddScoped<QueryPlanBuilder>();
 builder.Services.AddScoped<IQueryPlanBuilder>(sp => sp.GetRequiredService<QueryPlanBuilder>());
 

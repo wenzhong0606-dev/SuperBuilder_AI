@@ -98,7 +98,7 @@ public class QueryPlanBuilderDetailListTests
 	}
 
 	private static QueryPlanBuilder BuildBuilder(FakeSearch search, SuperBIContext ctx)
-		=> new QueryPlanBuilder(search, new FakeJoin(), new QueryPlanValidator(ctx));
+		=> new QueryPlanBuilder(search, new FakeJoin(), new QueryPlanValidator(ctx), new QueryPlanDataSourceScope());
 
 	private static QueryIntent MakeDetailIntent(string question, int? limit = 10, string? orderBy = null)
 		=> new QueryIntent
