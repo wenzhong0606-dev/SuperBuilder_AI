@@ -37,7 +37,7 @@ public class QueryPlanMetadataValidator
 	/// <summary>
 	/// 验证 QueryPlan Metadata关系。
 	/// </summary>
-	public void Validate(
+	public virtual void Validate(
 		QueryPlan plan,
 		QueryPlanValidationContext context)
 	{

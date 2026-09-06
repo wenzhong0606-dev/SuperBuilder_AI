@@ -150,9 +150,21 @@ builder.Services.AddScoped<IQueryPlanDataSourceScope>(sp => sp.GetRequiredServic
 builder.Services.AddScoped<QueryPlanBuilder>();
 builder.Services.AddScoped<IQueryPlanBuilder>(sp => sp.GetRequiredService<QueryPlanBuilder>());
 
-// A4 重构：QueryPlanPipeline（从 BIConversationService 抽取的 QueryPlan 编排管线）
+// M5-03：QueryPlanPipeline 阶段化——管线本身 + 有序阶段注册
 builder.Services.AddScoped<QueryPlanPipeline>();
 builder.Services.AddScoped<IQueryPlanPipeline>(sp => sp.GetRequiredService<QueryPlanPipeline>());
+
+// 阶段按执行顺序注册；MS DI 解析 IEnumerable<IQueryPlanStage> 时保持注册顺序：
+// Build → Context → MetadataIntegrity → DetailProjection →
+// SemanticValidation → Confidence → DecisionGate → Explainability
+builder.Services.AddScoped<IQueryPlanStage, QueryPlanBuildStage>();
+builder.Services.AddScoped<IQueryPlanStage, QueryPlanContextStage>();
+builder.Services.AddScoped<IQueryPlanStage, QueryPlanMetadataIntegrityStage>();
+builder.Services.AddScoped<IQueryPlanStage, QueryPlanDetailProjectionStage>();
+builder.Services.AddScoped<IQueryPlanStage, QueryPlanSemanticValidationStage>();
+builder.Services.AddScoped<IQueryPlanStage, QueryPlanConfidenceStage>();
+builder.Services.AddScoped<IQueryPlanStage, QueryPlanDecisionGateStage>();
+builder.Services.AddScoped<IQueryPlanStage, QueryPlanExplainabilityStage>();
 builder.Services.AddScoped<QuerySemanticValidator>();
 builder.Services.AddScoped<IQueryPlanRepairService, QueryPlanRepairService>();
 builder.Services.AddScoped<IQueryPlanValidationPipeline, QueryPlanValidationPipeline>();

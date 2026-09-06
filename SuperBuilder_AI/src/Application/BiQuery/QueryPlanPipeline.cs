@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using SuperBuilder_AI.Interfaces.BI;
 using SuperBuilder_AI.Interfaces.BI.Planning;
@@ -8,96 +9,34 @@ using SuperBuilder_AI.Models.BI;
 namespace SuperBuilder_AI.Services.BI;
 
 /// <summary>
-/// QueryPlan 编排管线。
+/// QueryPlan 编排管线（M5-03 阶段化）。
 ///
-/// 从 BIConversationService 抽取而来，负责：
+/// 从 BIConversationService 抽取而来，把原先硬编码在 RunAsync 的 8 段链路
+/// 抽离为有序的 <see cref="IQueryPlanStage"/> 集合：
 ///
-/// QueryIntent
-///     ↓
-/// QueryPlan 构建
-///     ↓
-/// Metadata 关系完整性验证
-///     ↓
-/// 语义验证 + 自动修复
-///     ↓
-/// Confidence
-///     ↓
-/// Decision Gate
-///     ↓
-/// Explainability
+/// Build → Context → MetadataIntegrity → DetailProjection →
+/// SemanticValidation → Confidence → DecisionGate → Explainability
 ///
-/// 纯结构化重构：步骤与早期返回条件与 BIConversationService 原实现完全一致，
-/// 仅将实现从对话服务平移到本管线，逻辑与输出保持不变。
+/// RunAsync 仅负责：构造上下文、按序执行阶段、每阶段后检查 EarlyResponse 短路、
+/// 并最终处理 Decision Gate 阻断（Step 5.4）或返回成功结果。
+///
+/// 行为与重构前完全一致：步骤顺序、提前返回条件、解释文本生成点均不变。
 /// </summary>
 public sealed class QueryPlanPipeline : IQueryPlanPipeline
 {
-	private readonly IQueryPlanBuilder
-		_queryPlanBuilder;
-
-	private readonly IQueryPlanContextBuilder
-		_queryPlanContextBuilder;
-
-	private readonly QueryPlanMetadataValidator
-		_queryPlanMetadataValidator;
-
-	private readonly IQueryPlanValidationPipeline
-		_validationPipeline;
-
-	private readonly IQueryPlanConfidenceService
-		_queryPlanConfidenceService;
-
-	private readonly IQueryPlanDecisionGate
-		_queryPlanDecisionGate;
-
-	private readonly IQueryPlanExplainabilityService
-		_queryPlanExplainabilityService;
+	private readonly IEnumerable<IQueryPlanStage> _stages;
 
 	/// <summary>
 	/// 创建 QueryPlan 编排管线。
 	/// </summary>
-	public QueryPlanPipeline(
-		IQueryPlanBuilder queryPlanBuilder,
-		IQueryPlanContextBuilder queryPlanContextBuilder,
-		QueryPlanMetadataValidator queryPlanMetadataValidator,
-		IQueryPlanValidationPipeline validationPipeline,
-		IQueryPlanConfidenceService queryPlanConfidenceService,
-		IQueryPlanDecisionGate queryPlanDecisionGate,
-		IQueryPlanExplainabilityService queryPlanExplainabilityService)
+	/// <param name="stages">
+	/// 有序阶段集合（执行顺序即 DI 注册顺序）。
+	/// 任一阶段设置 <see cref="QueryPlanPipelineContext.EarlyResponse"/> 即短路返回。
+	/// </param>
+	public QueryPlanPipeline(IEnumerable<IQueryPlanStage> stages)
 	{
-		_queryPlanBuilder =
-			queryPlanBuilder
-			?? throw new ArgumentNullException(
-				nameof(queryPlanBuilder));
-
-		_queryPlanContextBuilder =
-			queryPlanContextBuilder
-			?? throw new ArgumentNullException(
-				nameof(queryPlanContextBuilder));
-
-		_queryPlanMetadataValidator =
-			queryPlanMetadataValidator
-			?? throw new ArgumentNullException(
-				nameof(queryPlanMetadataValidator));
-
-		_validationPipeline =
-			validationPipeline
-			?? throw new ArgumentNullException(
-				nameof(validationPipeline));
-
-		_queryPlanConfidenceService =
-			queryPlanConfidenceService
-			?? throw new ArgumentNullException(
-				nameof(queryPlanConfidenceService));
-
-		_queryPlanDecisionGate =
-			queryPlanDecisionGate
-			?? throw new ArgumentNullException(
-				nameof(queryPlanDecisionGate));
-
-		_queryPlanExplainabilityService =
-			queryPlanExplainabilityService
-			?? throw new ArgumentNullException(
-				nameof(queryPlanExplainabilityService));
+		_stages = stages
+			?? throw new ArgumentNullException(nameof(stages));
 	}
 
 	/// <inheritdoc />
@@ -107,195 +46,60 @@ public sealed class QueryPlanPipeline : IQueryPlanPipeline
 		long? requestedDataSourceId = null,
 		IReadOnlyCollection<long>? authorizedDataSourceIds = null)
 	{
-		/*
-         * Step 2
-         *
-         * 构建 QueryPlan
-         */
-		var plan =
-			await _queryPlanBuilder
-				.BuildAsync(intent, requestedDataSourceId, authorizedDataSourceIds);
+		var ctx = new QueryPlanPipelineContext(
+			question,
+			intent,
+			requestedDataSourceId,
+			authorizedDataSourceIds);
 
-
-		/*
-         * Step 3
-         *
-         * 构建 QueryPlan Validation Context
-         */
-		var validationContext =
-			await _queryPlanContextBuilder
-				.BuildAsync(plan);
-
-
-		/*
-         * Step 4
-         *
-         * Metadata关系完整性验证
-         */
-		try
+		foreach (var stage in _stages)
 		{
-			_queryPlanMetadataValidator
-				.Validate(
-					plan,
-					validationContext);
-		}
-		catch (Exception ex)
-		{
-			return new QueryPlanPipelineResult
+			await stage.ExecuteAsync(ctx);
+
+			if (ctx.EarlyResponse is not null)
 			{
-				EarlyResponse =
-					new BIResponse
-					{
-						Success = false,
-
-						Question = question,
-
-						ErrorMessage =
-							ex.Message
-					}
-			};
+				return new QueryPlanPipelineResult
+				{
+					EarlyResponse = ctx.EarlyResponse
+				};
+			}
 		}
-
-
-		/*
-         * Step 5
-         *
-         * QueryPlan语义验证+自动修复
-         */
-		// 最终 Metadata 投影兜底必须位于语义验证之前：确保新增字段和软删除条件
-		// 同样经过验证、Confidence、权限安全闸门，而不是在 SQL Builder 前临时绕过门禁。
-		DetailQueryProjectionPolicy.Apply(plan, validationContext, question);
-
-		var semanticValidation =
-			await _validationPipeline
-				.ValidateAsync(
-					plan,
-					validationContext,
-					question);
-
-		plan =
-			semanticValidation.Plan;
-
-
-		/*
-         * Step 5.1
-         *
-         * Validation 最终失败。
-         */
-		if (!semanticValidation.ValidationResult.IsValid)
-		{
-			var validationExplanation =
-				_queryPlanExplainabilityService
-					.Explain(
-						question,
-						plan,
-						semanticValidation.ValidationResult,
-						semanticValidation.RepairTrace,
-						null,
-						null);
-
-			return new QueryPlanPipelineResult
-			{
-				EarlyResponse =
-					new BIResponse
-					{
-						Success = false,
-
-						Question = question,
-
-						ErrorMessage =
-							string.Join(
-								"\n",
-								semanticValidation.ValidationResult.Errors
-									.Select(x => x.Message)),
-
-						Explanation =
-							validationExplanation
-					}
-			};
-		}
-
-
-		/*
-         * Step 5.2
-         *
-         * QueryPlan Confidence
-         */
-		var confidence =
-			await _queryPlanConfidenceService
-				.EvaluateAsync(
-					plan,
-					semanticValidation,
-					semanticValidation.RepairTrace,
-					question);
-
-
-		/*
-         * Step 5.3
-         *
-         * QueryPlan Decision Gate
-         */
-		var decision =
-			_queryPlanDecisionGate
-				.Evaluate(
-					confidence);
-
-
-		/*
-         * Step 5.3.1
-         *
-         * QueryPlan Explainability。
-         */
-		var explanation =
-			_queryPlanExplainabilityService
-				.Explain(
-					question,
-					plan,
-					semanticValidation.ValidationResult,
-					semanticValidation.RepairTrace,
-					confidence,
-					decision);
-
 
 		/*
          * Step 5.4
          *
-         * Decision Gate 阻断。
+         * Decision Gate 阻断。Explainability 已在 Explainability 阶段产出，
+         * 此处仅据此构造提前返回（与原 Step 5.3.1 + 5.4 等价）。
          */
-		if (!decision.ShouldExecute)
+		if (ctx.Decision is { } decision && !decision.ShouldExecute)
 		{
 			return new QueryPlanPipelineResult
 			{
-				EarlyResponse =
-					new BIResponse
-					{
-						Success = false,
+				EarlyResponse = new BIResponse
+				{
+					Success = false,
 
-						Question = question,
+					Question = question,
 
-						ErrorMessage =
-							decision.Reason
-							??
-							"QueryPlan 未通过 Decision Gate，禁止进入 SQL Builder。",
+					ErrorMessage = decision.Reason
+						?? "QueryPlan 未通过 Decision Gate，禁止进入 SQL Builder。",
 
-						Explanation =
-							explanation
-					}
+					Explanation = ctx.Explanation
+				}
 			};
 		}
 
-
 		return new QueryPlanPipelineResult
 		{
-			Plan = plan,
+			Plan = ctx.Plan!,
 
-			SemanticValidation = semanticValidation,
+			SemanticValidation = ctx.SemanticValidation!,
 
-			Confidence = confidence,
+			Confidence = ctx.Confidence!,
 
-			Decision = decision,
+			Decision = ctx.Decision!,
 
-			Explanation = explanation
+			Explanation = ctx.Explanation!
 		};
 	}
 }
