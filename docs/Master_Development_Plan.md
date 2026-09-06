@@ -578,6 +578,8 @@ M3 退出：平台/租户视图严格分离；租户只能使用授权语言；�
 - History 限轮数、单轮及总长度；主要历史从服务端读取。
 - ConversationStatus 使用稳定枚举：AwaitingClarification、Completed、Failed、Expired、Cancelled。
 
+（✅ 2026-09-06，70724b4：ConversationStatus 稳定枚举化并以 JsonStringEnumConverter 字符串序列化，wire 值不变、前端独立 string 副本无需改动；Question 长度契约 2–2000、ConversationId ≤128 护栏、Refine history ≤20 护栏；归属仍由 AskConversationService 按租户/用户校验；零默认行为变更；4 例 AskControllerTests 全绿，完整套件 846/846 零回归、对 Golden 免疫）
+
 ### M6-03 澄清与语义学习
 
 - 增加 NewQuestion/Clarification/Correction/Confirmation/Cancel 行为分类。
