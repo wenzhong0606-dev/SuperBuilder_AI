@@ -1,4 +1,5 @@
-﻿using SuperBuilder_AI.Data;
+﻿using System.Diagnostics;
+using SuperBuilder_AI.Data;
 using SuperBuilder_AI.Infrastructure.Database;
 using SuperBuilder_AI.Interfaces;
 using SuperBuilder_AI.Interfaces.BI;
@@ -194,6 +195,10 @@ public class BIConversationService
 		// P4.3：开启全局租户过滤（tenantId <= 0 时 ApplyTenantScope 内部保持关闭，等价于 no-op）。
 		_superBIContext.ApplyTenantScope(tenantId);
 
+		// M6-05：总耗时计时（旁路，仅读取，不影响主流程结果）。
+		var swTotal = Stopwatch.StartNew();
+		var sw = Stopwatch.StartNew();
+
 		/*
          * Step 1
          *
@@ -202,6 +207,9 @@ public class BIConversationService
 		var intent =
 			await _queryUnderstandingService
 				.UnderstandAsync(question, platformContext);
+
+		var metadataUnderstandMs = sw.ElapsedMilliseconds;
+		sw.Restart();
 
 
 		/*
@@ -230,9 +238,16 @@ public class BIConversationService
 					requestedDataSourceId,
 					authorizedDataSourceIds);
 
+		var planMs = sw.ElapsedMilliseconds;
+		sw.Restart();
+
 		if (pipelineResult.EarlyResponse != null)
 		{
-			return pipelineResult.EarlyResponse;
+			// M6-05：提前返回也填充耗时（仅 Plan 段有效，SQL/DB/Result 段为 0）。
+			var early = pipelineResult.EarlyResponse;
+			early.DurationMs = swTotal.ElapsedMilliseconds;
+			early.SegmentTimings = new AskSegmentTimings(metadataUnderstandMs, planMs, 0, 0, 0);
+			return early;
 		}
 
 		var plan =
@@ -296,6 +311,9 @@ public class BIConversationService
 					plan,
 					dialect);
 
+		var sqlBuildMs = sw.ElapsedMilliseconds;
+		sw.Restart();
+
 
 		/*
          * Step 7
@@ -309,6 +327,9 @@ public class BIConversationService
 				.ExecuteAsync(
 					sql,
 					plan.DataSourceId);
+
+		var dbExecMs = sw.ElapsedMilliseconds;
+		sw.Restart();
 
 
 		/*
@@ -324,6 +345,10 @@ public class BIConversationService
 					question,
 					data,
 					plan);
+
+		var resultUnderstandMs = sw.ElapsedMilliseconds;
+		sw.Stop();
+		swTotal.Stop();
 
 
 		/*
@@ -352,7 +377,11 @@ public class BIConversationService
 				data,
 
 			Explanation =
-				explanation
+				explanation,
+
+			// M6-05：填充总耗时与分段耗时（仅读取，不改变响应其它语义）。
+			DurationMs = swTotal.ElapsedMilliseconds,
+			SegmentTimings = new AskSegmentTimings(metadataUnderstandMs, planMs, sqlBuildMs, dbExecMs, resultUnderstandMs)
 		};
 	}
 }

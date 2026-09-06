@@ -163,4 +163,16 @@ public sealed class BIResponse
 		get;
 		set;
 	}
+
+	/// <summary>
+	/// 本次 Ask 调用总耗时（毫秒，M6-05 指标）。由 <c>BIConversationService.ExecuteAsync</c> 填充；
+	/// 为新增加法字段，不改变既有 wire 结构，前端（独立 string 副本）可忽略。
+	/// </summary>
+	public long DurationMs { get; set; }
+
+	/// <summary>
+	/// 本次 Ask 调用内分段耗时（M6-05 指标：LLM/Metadata/Plan/SQL/DB/Repair）。
+	/// 为新增加法字段，不改变既有 wire 结构。
+	/// </summary>
+	public AskSegmentTimings? SegmentTimings { get; set; }
 }

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using System.Security.Claims;
 using System.Security.Cryptography;
@@ -44,6 +45,7 @@ public sealed class AskController : ControllerBase
 	private readonly IRowLevelSecurityService? _rowSecurity;
 	private readonly IAskConversationService _conversations;
 	private readonly IAskCacheVersionProvider? _versionProvider;
+	private readonly IAskAuditSink? _askAudit;
 
 	public AskController(
 		IBIConversationService bi,
@@ -52,7 +54,8 @@ public sealed class AskController : ControllerBase
 		IDataSourceAuthorizationService? dataSourceAuthorization = null,
 		IRowLevelSecurityService? rowSecurity = null,
 		IAskConversationService? conversations = null,
-		IAskCacheVersionProvider? versionProvider = null)
+		IAskCacheVersionProvider? versionProvider = null,
+		IAskAuditSink? askAudit = null)
 	{
 		_bi = bi;
 		_identity = identity;
@@ -61,6 +64,7 @@ public sealed class AskController : ControllerBase
 		_rowSecurity = rowSecurity;
 		_conversations = conversations ?? new AskConversationService();
 		_versionProvider = versionProvider;
+		_askAudit = askAudit;
 	}
 
 	/// <summary>提交一个自然语言问题并执行 BI 查询。</summary>
@@ -115,22 +119,43 @@ public sealed class AskController : ControllerBase
 			Response.Headers["X-Cache"] = "MISS";
 		}
 
-		var response = await _bi.AskAsync(
-			turn.StandaloneQuestion,
-			tenantId,
-			access.EffectiveDataSourceId,
-			access.AuthorizedDataSourceIds);
+		var correlationId = Guid.NewGuid().ToString();
+		BIResponse? response = null;
+		string? auditError = null;
+		var outcome = AskAuditOutcome.Completed;
+		var sw = Stopwatch.StartNew();
+		try
+		{
+			response = await _bi.AskAsync(
+				turn.StandaloneQuestion,
+				tenantId,
+				access.EffectiveDataSourceId,
+				access.AuthorizedDataSourceIds);
 
-		var awaiting = response.Explanation?.Summary.RequiresConfirmation == true;
-		_conversations.Record(turn.ConversationId, tenantId, userId, turn.StandaloneQuestion, awaiting,
-			new AskResolveContext { AuthorizedDataSourceIds = access.AuthorizedDataSourceIds });
-		response.ConversationId = turn.ConversationId;
-		response.ConversationStatus = awaiting ? ConversationStatus.AwaitingClarification : ConversationStatus.Completed;
-		response.RewrittenQuestion = turn.AppliedClarification ? turn.StandaloneQuestion : null;
-		// M6-03：单轮行为分类 + 结构化澄清详情（仅非首问且澄清态下填充）。
-		response.AskBehavior = turn.Behavior;
-		if (turn.Clarification is not null) response.Clarification = turn.Clarification;
-		if (_cache is not null && !bypass) _cache.Set(tenantId, cacheQuestion, access.EffectiveDataSourceId ?? 0, response);
+			var awaiting = response.Explanation?.Summary.RequiresConfirmation == true;
+			_conversations.Record(turn.ConversationId, tenantId, userId, turn.StandaloneQuestion, awaiting,
+				new AskResolveContext { AuthorizedDataSourceIds = access.AuthorizedDataSourceIds });
+			response.ConversationId = turn.ConversationId;
+			response.ConversationStatus = awaiting ? ConversationStatus.AwaitingClarification : ConversationStatus.Completed;
+			response.RewrittenQuestion = turn.AppliedClarification ? turn.StandaloneQuestion : null;
+			// M6-03：单轮行为分类 + 结构化澄清详情（仅非首问且澄清态下填充）。
+			response.AskBehavior = turn.Behavior;
+			if (turn.Clarification is not null) response.Clarification = turn.Clarification;
+			if (_cache is not null && !bypass) _cache.Set(tenantId, cacheQuestion, access.EffectiveDataSourceId ?? 0, response);
+			outcome = DeriveAuditOutcome(response, awaiting);
+		}
+		catch (Exception ex)
+		{
+			auditError = ex.Message;
+			outcome = AskAuditOutcome.Failed;
+			throw;
+		}
+		finally
+		{
+			sw.Stop();
+			await RecordAuditSafeAsync(correlationId, turn, access, response, auditError, outcome, sw.ElapsedMilliseconds);
+		}
+
 		return Ok(response);
 	}
 
@@ -182,12 +207,74 @@ public sealed class AskController : ControllerBase
 		if (string.IsNullOrWhiteSpace(composed))
 			return BadRequest(new ApiError { Code = ErrorCodes.BadRequest, Message = "缺少可用于查询的问题内容。" });
 
-		var response = await _bi.AskAsync(
-			composed,
-			tenantId,
-			access.EffectiveDataSourceId,
-			access.AuthorizedDataSourceIds);
+		var correlationId = Guid.NewGuid().ToString();
+		BIResponse? response = null;
+		string? auditError = null;
+		var outcome = AskAuditOutcome.Completed;
+		var sw = Stopwatch.StartNew();
+		try
+		{
+			response = await _bi.AskAsync(
+				composed,
+				tenantId,
+				access.EffectiveDataSourceId,
+				access.AuthorizedDataSourceIds);
+			outcome = DeriveAuditOutcome(response, response.Explanation?.Summary.RequiresConfirmation == true);
+		}
+		catch (Exception ex)
+		{
+			auditError = ex.Message;
+			outcome = AskAuditOutcome.Failed;
+			throw;
+		}
+		finally
+		{
+			sw.Stop();
+			// Refine 不维护会话状态，构造最小 turn 供审计（ConversationId 空、行为 NewQuestion）。
+			var refineTurn = new AskConversationTurn(string.Empty, composed, false, composed);
+			await RecordAuditSafeAsync(correlationId, refineTurn, access, response, auditError, outcome, sw.ElapsedMilliseconds);
+		}
+
 		return Ok(response);
+	}
+
+	/// <summary>
+	/// 从响应推导审计产出结果（M6-05）。
+	/// </summary>
+	private static AskAuditOutcome DeriveAuditOutcome(BIResponse response, bool awaiting)
+	{
+		if (!response.Success) return AskAuditOutcome.Failed;
+		if (response.AskBehavior == AskBehavior.Cancel) return AskAuditOutcome.Cancelled;
+		var decision = response.Explanation?.Decision?.Decision;
+		if (decision == QueryPlanDecisionType.Reject) return AskAuditOutcome.Rejected;
+		if (decision == QueryPlanDecisionType.RequireApproval) return AskAuditOutcome.RequiresConfirmation;
+		if (awaiting || decision == QueryPlanDecisionType.AskClarification) return AskAuditOutcome.AskClarification;
+		return AskAuditOutcome.Completed;
+	}
+
+	/// <summary>
+	/// 安全提交 Ask 审计记录（M6-05）：审计旁路故障绝不破坏主流程返回；敏感字段已在构建器内脱敏。
+	/// </summary>
+	private async Task RecordAuditSafeAsync(
+		string? correlationId,
+		AskConversationTurn turn,
+		DataSourceAccessResolution access,
+		BIResponse? response,
+		string? errorMessage,
+		AskAuditOutcome outcome,
+		long durationMs)
+	{
+		if (_askAudit is null) return;
+		try
+		{
+			var record = AskAuditRecordBuilder.Build(
+				correlationId, turn, access.AuthorizedDataSourceIds, response, errorMessage, outcome, durationMs, response?.SegmentTimings);
+			await _askAudit.RecordAsync(record);
+		}
+		catch
+		{
+			// 审计写入失败不影响主响应。
+		}
 	}
 
 	private async Task<DataSourceAccessResolution> ResolveDataSourceAccessAsync(

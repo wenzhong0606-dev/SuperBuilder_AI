@@ -164,6 +164,11 @@ builder.Services.AddScoped<IQueryPlanPipeline>(sp => sp.GetRequiredService<Query
 builder.Services.Configure<DecisionAuditOptions>(builder.Configuration.GetSection(DecisionAuditOptions.SectionName));
 builder.Services.AddScoped<IDecisionAuditSink, ConfigurableDecisionAuditSink>();
 
+// M6-05：Ask 审计——会话/轮次/问题/授权源/Decision/SQL/耗时/状态审计 Sink
+// 默认 Mode=None → NoOp，零行为变更；配置切 Log 启用结构化日志输出（对 Golden 免疫）。
+builder.Services.Configure<AskAuditOptions>(builder.Configuration.GetSection(AskAuditOptions.SectionName));
+builder.Services.AddScoped<IAskAuditSink, ConfigurableAskAuditSink>();
+
 // M5-10：Production Feedback 闭环（默认 Mode=Off → NoOp，零行为变更；对 Golden 免疫）
 // 通过 IFeedbackBaselineGateway(默认 NoOp) 解耦既有 Golden Baseline 服务，闭环不触达真实回归。
 builder.Services.Configure<ProductionFeedbackOptions>(builder.Configuration.GetSection(ProductionFeedbackOptions.SectionName));

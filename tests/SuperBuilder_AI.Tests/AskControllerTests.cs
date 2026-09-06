@@ -25,13 +25,34 @@ public class AskControllerTests
 		public long? CapturedRequestedDataSourceId;
 		public IReadOnlyCollection<long>? CapturedAuthorizedDataSourceIds;
 		public int Calls;
+		/// <summary>可注入的 SQL（用于脱敏/审计测试）。</summary>
+		public string? SqlToReturn;
+		/// <summary>可注入的决策类型（用于审计 DecisionType 断言）。</summary>
+		public QueryPlanDecisionType? Decision;
 		public Task<BIResponse> AskAsync(string question, long tenantId, long? requestedDataSourceId = null, IReadOnlyCollection<long>? authorizedDataSourceIds = null)
 		{
 			Calls++;
-			Captured = new BIResponse { Success = true, Question = question };
+			Captured = new BIResponse
+			{
+				Success = true,
+				Question = question,
+				Sql = SqlToReturn,
+				Explanation = Decision is null ? null : new QueryPlanExplanation { Decision = new QueryPlanDecision { Decision = Decision.Value } }
+			};
 			CapturedRequestedDataSourceId = requestedDataSourceId;
 			CapturedAuthorizedDataSourceIds = authorizedDataSourceIds;
 			return Task.FromResult(Captured);
+		}
+	}
+
+	/// <summary>记录审计记录的测试 Sink，用于验证 AskController 审计接线。</summary>
+	private sealed class FakeAskAuditSink : IAskAuditSink
+	{
+		public List<AskAuditRecord> Records { get; } = new();
+		public Task RecordAsync(AskAuditRecord record, CancellationToken ct = default)
+		{
+			Records.Add(record);
+			return Task.CompletedTask;
 		}
 	}
 
@@ -349,5 +370,83 @@ public class AskControllerTests
 		Assert.Contains("semantic:sem", key);
 		Assert.Contains("metadata:meta", key);
 		Assert.Contains("ds:ds", key);
+	}
+
+	// ---------- M6-05 Ask 审计 ----------
+
+	[Fact]
+	public async Task Ask_WithAuditSink_RecordsAuditOnSuccess()
+	{
+		var bi = new FakeBi { Decision = QueryPlanDecisionType.Allow };
+		var audit = new FakeAskAuditSink();
+		var ctrl = new AskController(
+			bi, new FakeIdentity { Allow = true }, null,
+			new FakeDataSourceAuthorization { Allowed = new[] { 7L } },
+			new FakeRowSecurity(), null, null, audit)
+		{
+			ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext { User = Authenticated(3, 5) } }
+		};
+
+		var result = await ctrl.Ask(new AskRequest { Question = "请查询销售额", DataSourceId = 7 });
+
+		Assert.IsType<OkObjectResult>(result);
+		var rec = Assert.Single(audit.Records);
+		Assert.Equal(AskAuditOutcome.Completed, rec.Outcome);
+		Assert.Equal(QueryPlanDecisionType.Allow, rec.DecisionType);
+		Assert.NotNull(rec.ConversationId);
+		Assert.True(rec.DurationMs >= 0);
+		// 授权源透传（P0-01 同源）。
+		Assert.Contains(7L, rec.AuthorizedDataSourceIds);
+	}
+
+	[Fact]
+	public async Task Ask_WithAuditSink_RedactsSensitiveFields()
+	{
+		var bi = new FakeBi { SqlToReturn = "SELECT salary, phone FROM emp", Decision = QueryPlanDecisionType.Allow };
+		var audit = new FakeAskAuditSink();
+		var ctrl = new AskController(
+			bi, new FakeIdentity { Allow = true }, null,
+			new FakeDataSourceAuthorization { Allowed = new[] { 7L } },
+			new FakeRowSecurity(), null, null, audit)
+		{
+			ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext { User = Authenticated(3, 5) } }
+		};
+
+		await ctrl.Ask(new AskRequest { Question = "我的 phone 是 13800138000 查销售额", DataSourceId = 7 });
+
+		var rec = Assert.Single(audit.Records);
+		// 原问题脱敏：phone/手机号被掩码，不落明文。
+		Assert.Contains("***", rec.OriginalQuestion ?? string.Empty);
+		Assert.DoesNotContain("phone", rec.OriginalQuestion ?? string.Empty);
+		Assert.DoesNotContain("13800138000", rec.OriginalQuestion ?? string.Empty);
+		// SQL 摘要脱敏：PII 列名被掩码。
+		Assert.Contains("***", rec.SqlSummary ?? string.Empty);
+		Assert.DoesNotContain("salary", rec.SqlSummary ?? string.Empty);
+	}
+
+	[Fact]
+	public async Task Ask_WithAuditSink_RecordsFailure_WhenBiThrows()
+	{
+		var audit = new FakeAskAuditSink();
+		var ctrl = new AskController(
+			new FakeBiThrowing(), new FakeIdentity { Allow = true }, null,
+			new FakeDataSourceAuthorization { Allowed = new[] { 7L } },
+			new FakeRowSecurity(), null, null, audit)
+		{
+			ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext { User = Authenticated(3, 5) } }
+		};
+
+		await Assert.ThrowsAsync<InvalidOperationException>(() =>
+			ctrl.Ask(new AskRequest { Question = "请查询销售额", DataSourceId = 7 }));
+
+		var rec = Assert.Single(audit.Records);
+		Assert.Equal(AskAuditOutcome.Failed, rec.Outcome);
+		Assert.NotNull(rec.ErrorMessage);
+	}
+
+	private sealed class FakeBiThrowing : IBIConversationService
+	{
+		public Task<BIResponse> AskAsync(string question, long tenantId, long? requestedDataSourceId = null, IReadOnlyCollection<long>? authorizedDataSourceIds = null)
+			=> throw new InvalidOperationException("boom");
 	}
 }
