@@ -155,10 +155,15 @@ builder.Services.AddScoped<QueryPlanPipeline>();
 builder.Services.AddScoped<IQueryPlanPipeline>(sp => sp.GetRequiredService<QueryPlanPipeline>());
 
 // 阶段按执行顺序注册；MS DI 解析 IEnumerable<IQueryPlanStage> 时保持注册顺序：
-// Build → Context → MetadataIntegrity → DetailProjection →
+// Build → Context → ColumnSecurity → MetadataIntegrity → DetailProjection →
 // SemanticValidation → Confidence → DecisionGate → Explainability
 builder.Services.AddScoped<IQueryPlanStage, QueryPlanBuildStage>();
 builder.Services.AddScoped<IQueryPlanStage, QueryPlanContextStage>();
+// M5-05：列级安全净化（Context 之后、MetadataIntegrity 之前）
+builder.Services.AddScoped<IColumnSensitivityClassifier, DenyNothingColumnClassifier>();
+builder.Services.AddScoped<IColumnSecurityPolicy, ColumnSecurityPolicy>();
+builder.Services.AddScoped<IColumnSecurityContextResolver, DefaultColumnSecurityContextResolver>();
+builder.Services.AddScoped<IQueryPlanStage, QueryPlanColumnSecurityStage>();
 builder.Services.AddScoped<IQueryPlanStage, QueryPlanMetadataIntegrityStage>();
 builder.Services.AddScoped<IQueryPlanStage, QueryPlanDetailProjectionStage>();
 builder.Services.AddScoped<IQueryPlanStage, QueryPlanSemanticValidationStage>();
