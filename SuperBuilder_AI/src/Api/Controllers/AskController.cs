@@ -91,7 +91,8 @@ public sealed class AskController : ControllerBase
 
 		var access = await ResolveDataSourceAccessAsync(tenantId, userId, request.DataSourceId, cancellationToken);
 		if (access.ForbiddenResult is not null) return access.ForbiddenResult;
-		var turn = _conversations.Resolve(tenantId, userId, request.ConversationId, request.Question!);
+		var turn = _conversations.Resolve(tenantId, userId, request.ConversationId, request.Question!,
+			new AskResolveContext { AuthorizedDataSourceIds = access.AuthorizedDataSourceIds });
 
 		// P11.5.1 语义缓存：命中则直接返回，跳过整条 BI 链路（仅作用于 api/ask；Golden 走独立端点不受影响）。
 		// ?noCache=1 旁路，便于联调/强制刷新。
@@ -118,10 +119,14 @@ public sealed class AskController : ControllerBase
 			access.AuthorizedDataSourceIds);
 
 		var awaiting = response.Explanation?.Summary.RequiresConfirmation == true;
-		_conversations.Record(turn.ConversationId, tenantId, userId, turn.StandaloneQuestion, awaiting);
+		_conversations.Record(turn.ConversationId, tenantId, userId, turn.StandaloneQuestion, awaiting,
+			new AskResolveContext { AuthorizedDataSourceIds = access.AuthorizedDataSourceIds });
 		response.ConversationId = turn.ConversationId;
 		response.ConversationStatus = awaiting ? ConversationStatus.AwaitingClarification : ConversationStatus.Completed;
 		response.RewrittenQuestion = turn.AppliedClarification ? turn.StandaloneQuestion : null;
+		// M6-03：单轮行为分类 + 结构化澄清详情（仅非首问且澄清态下填充）。
+		response.AskBehavior = turn.Behavior;
+		if (turn.Clarification is not null) response.Clarification = turn.Clarification;
 		if (_cache is not null && !bypass) _cache.Set(tenantId, cacheQuestion, access.EffectiveDataSourceId ?? 0, response);
 		return Ok(response);
 	}

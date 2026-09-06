@@ -12,6 +12,10 @@ public sealed class BIResponse
 	public string? ConversationId { get; set; }
 	public string ConversationStatus { get; set; } = "Completed";
 	public string? RewrittenQuestion { get; set; }
+	/// <summary>单轮行为分类（M6-03）：NewQuestion / Clarification / Correction / Confirmation / Cancel（字符串副本，与后端枚举值一致）。</summary>
+	public string AskBehavior { get; set; } = "NewQuestion";
+	/// <summary>结构化澄清详情（M6-03，对齐后端 ClarificationDetail）。</summary>
+	public ClarificationDetail? Clarification { get; set; }
 	public bool Success { get; set; }
 	public string? Question { get; set; }
 	public string? Sql { get; set; }
@@ -65,6 +69,20 @@ public sealed class ApiError
 	public string? Message { get; set; }
 	public string? TraceId { get; set; }
 	public string? Details { get; set; }
+}
+
+/// <summary>结构化澄清详情（对齐后端 <c>ClarificationDetail</c>）。</summary>
+public sealed class ClarificationDetail
+{
+	public string? OriginalQuestion { get; set; }
+	public string? PendingSlot { get; set; }
+	public List<string> CandidateEntities { get; set; } = new();
+	public List<string> CandidateMetrics { get; set; } = new();
+	public List<string> CandidateDimensions { get; set; } = new();
+	public List<string> CandidateTime { get; set; } = new();
+	public List<long> AuthorizedDataSourceIds { get; set; } = new();
+	public bool LoopDetected { get; set; }
+	public int RepeatCount { get; set; }
 }
 
 /// <summary>问数结果封装：区分「成功响应」与「传输/服务端错误（统一错误码）」。</summary>

@@ -184,6 +184,8 @@ public sealed class LocalizationSeedService : ILocalizationSeedService
         ["Login.AdminUsernameRequired"] = "管理员用户名必填。", ["Login.AdminEmailInvalid"] = "请输入有效的管理员邮箱。",
         ["Login.AdminPasswordTooShort"] = "管理员口令至少 8 位。", ["Login.AdminPasswordMismatch"] = "两次输入的口令不一致。",
         ["Login.InitFailed"] = "平台管理员初始化失败。", ["Login.SelectTenantFirst"] = "请先选择租户。",
+        ["Login.TenantCodePlaceholder"] = "如 demo / tenant-001", ["Login.TenantCodeHint"] = "租户目录未公开，请输入您已知的确切租户编码登录。",
+        ["Login.TenantCodeInvalid"] = "租户编码不存在或已停用。",
         ["Login.LoginFailed"] = "登录失败：用户不存在或已禁用。",
         ["Login.Hero.AINativeBI"] = "AI Native BI", ["Login.Hero.MultiTenant"] = "多租户", ["Login.Hero.Multilingual"] = "多语言",
         ["Login.Hero.LowCode"] = "低代码", ["Login.Hero.EnterpriseSaaS"] = "企业级 SaaS",

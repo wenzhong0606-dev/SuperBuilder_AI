@@ -19,6 +19,7 @@
 - ⚠️ RCL 不可引 `Microsoft.AspNetCore.Components.WebView.Maui`（与 MAUI 头冲突→build error）；RCL 只引 `Microsoft.AspNetCore.Components.Web`+`Microsoft.Extensions.Http`(全 TFM)。
 - ⚠️ 签名密钥坑(已修)：`TokenService` 缺 `Auth:SigningKey` 回退硬编码 `dev-insecure-signing-key-P11-change-in-prod`→可伪造 token；生产须密钥管理覆盖。
 - token 链路：`Login`→`AuthStore.SetFromLoginAsync`→`AppState`(localStorage)；`MainLayout` 自举 `RestoreAsync`+`ValidateAsync(/api/auth/me)`；`ApiClient` 401→`AppState.NotifySessionExpired`→跳 `/login`。
+- 登录租户兜底（2026-09-06 修复）：`Auth:ShowTenantDirectory`（M0-08 默认 `false`）关闭时 `LoginOptions` 返回 `[]` → `Login.razor` 改渲染「手动租户编码」输入，`DoLogin` 经匿名端点 `/api/auth/tenant-by-code?code=`（`AuthController.TenantByCode`，排除 platform/停用）解析 `Id` 后再登录；开发/演示环境在 `appsettings.Development.json` 设 `ShowTenantDirectory=true` 可见完整下拉。语言切换器缺失多为运行实例 DB 未播种 `UiLanguages` → 重启后端（Program.cs:430 无条件种子 5 语言）即现，非登录代码 bug。
 
 ## ⚠️ Blazor/Razor 踩坑
 1. 事件处理器含 C# 字符串→属性单引号：`@onclick='() => Toast("文本")'`；双引号提前闭合→CS1056/CS1026；`@onclick="() => Toast('文本')"` 单引号变 char→CS1012。

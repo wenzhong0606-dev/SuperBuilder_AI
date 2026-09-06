@@ -62,6 +62,9 @@ public static class Keys
         public const string AdminPasswordMismatch = "Login.AdminPasswordMismatch";
         public const string InitFailed = "Login.InitFailed";
         public const string SelectTenantFirst = "Login.SelectTenantFirst";
+        public const string TenantCodePlaceholder = "Login.TenantCodePlaceholder";
+        public const string TenantCodeHint = "Login.TenantCodeHint";
+        public const string TenantCodeInvalid = "Login.TenantCodeInvalid";
         public const string LoginFailed = "Login.LoginFailed";
         public const string HeroAINativeBI = "Login.Hero.AINativeBI";
         public const string HeroMultiTenant = "Login.Hero.MultiTenant";
@@ -1319,6 +1322,9 @@ public static class Keys
         [Login.AdminPasswordMismatch] = new("两次输入的口令不一致。", "The two passwords do not match."),
         [Login.InitFailed] = new("平台管理员初始化失败。", "Platform admin initialization failed."),
         [Login.SelectTenantFirst] = new("请先选择租户。", "Please select a tenant first."),
+        [Login.TenantCodePlaceholder] = new("如 demo / tenant-001", "e.g. demo / tenant-001"),
+        [Login.TenantCodeHint] = new("租户目录未公开，请输入您已知的确切租户编码登录。", "The tenant directory is not public; enter a tenant code you know to sign in."),
+        [Login.TenantCodeInvalid] = new("租户编码不存在或已停用。", "The tenant code does not exist or is disabled."),
         [Login.LoginFailed] = new("登录失败：用户不存在或已禁用。", "Sign-in failed: user does not exist or is disabled."),
         [Login.HeroAINativeBI] = new("AI Native BI", "AI Native BI"),
         [Login.HeroMultiTenant] = new("多租户", "Multi-tenant"),
