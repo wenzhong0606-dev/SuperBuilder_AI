@@ -644,6 +644,13 @@ M3 退出：✅ 已达成当前跟踪页面范围。平台/租户视图严格分
 | M7-10 | P11 §12 | 自定义风格/主题复用 | App/Dashboard 可选择授权主题 |
 | M7-11 | P11 §12 | Ask 结果发布 App 的生命周期 | 可编辑、授权、版本化、回滚 |
 
+> **进度 M7-01**：✅ 已交付（提交 7aa731e，8 文件 +3927/−3；全量 894/894 零回归、含 Golden）。
+> - 草稿/发布隔离：`Dashboard.DslJson`（草稿工作副本）与 `Dashboard.PublishedDslJson`（发布快照）物理隔离；`Render` 优先返回发布态，编辑草稿不影响线上。
+> - 可追踪回滚：新增 `DashboardVersion` 快照表（受控迁移 `20260906131855_M7_01_DashboardVersion`）；`Publish` 固化版本快照、自增 `PublishedVersion`；`Rollback(id,version)` 把历史版本恢复为发布态并再固化为新版本（`RolledBackFromVersion` 记录来源），版本链单调递增、全程可审计。
+> - 端点：`POST api/dashboards/{id}/publish`、`POST api/dashboards/{id}/rollback/{version}`、`GET api/dashboards/{id}/versions`；`DashboardSummary` 暴露 `PublishedVersion`/`PublishedAt`。
+> - 验证：`DashboardControllerVersioningTests`(7) 覆盖发布快照/草稿隔离/回滚恢复/版本列表/空草稿拒绝/未知版本 404/租户隔离。
+> - ⏳ 后续：前端编辑器蓝图占位（`editor/blueprint`）接真实编辑器；M7-02~M7-11 待办。
+
 无后端能力的按钮必须禁用并显示原因，不得提示虚假的“已保存/已运行”。
 
 ---
