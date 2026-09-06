@@ -61,7 +61,6 @@ public class IdentityService : IIdentityService
 			await _ctx.SaveChangesAsync(ct);
 		}
 
-        // 1) 权限
         var existingPerms = new HashSet<string>(
             await _ctx.Permissions.Where(p => p.TenantId == 0).Select(p => p.Code).ToListAsync(ct));
         foreach (var perm in IdentityCatalog.Permissions)
@@ -80,7 +79,6 @@ public class IdentityService : IIdentityService
         }
         await _ctx.SaveChangesAsync(ct);
 
-        // 2) 角色
         var existingRoles = new HashSet<string>(
             await _ctx.Roles.Where(r => r.TenantId == 0).Select(r => r.Code).ToListAsync(ct));
         foreach (var role in IdentityCatalog.Roles)
@@ -96,10 +94,8 @@ public class IdentityService : IIdentityService
                 });
             }
         }
-
         await _ctx.SaveChangesAsync(ct);
 
-        // 3) 角色→权限绑定（幂等，按 (RoleId, PermissionId) 去重）
         var roleEntities = await _ctx.Roles.Where(r => r.TenantId == 0)
             .ToDictionaryAsync(r => r.Code, r => r.Id, ct);
         var permEntities = await _ctx.Permissions.Where(p => p.TenantId == 0)
@@ -128,8 +124,6 @@ public class IdentityService : IIdentityService
             }
         }
 
-		// Built-in role bindings are authoritative. This removes the historical
-		// business permissions from platform-admin instead of leaving additive residue.
 		var platformRoleId = roleEntities[IdentityRoles.PlatformAdmin];
 		var platformPermissionIds = IdentityCatalog.Roles
 			.Single(r => r.Code == IdentityRoles.PlatformAdmin).Permissions
@@ -139,8 +133,6 @@ public class IdentityService : IIdentityService
 			.ToListAsync(ct);
 		_ctx.RolePermissions.RemoveRange(obsoletePlatformBindings);
 
-		// Governance role membership is valid only for users owned by the positive-id
-		// platform tenant. Historical tenant-user bindings are revoked during seeding.
 		var invalidGovernanceBindings = await _ctx.UserRoles
 			.Where(ur => ur.RoleId == platformRoleId && ur.TenantId != platformTenant.Id)
 			.ToListAsync(ct);
@@ -153,9 +145,11 @@ public class IdentityService : IIdentityService
         if (tenantId <= 0) return IdentityResult.Fail("tenantId 必须大于 0");
         if (string.IsNullOrWhiteSpace(username)) return IdentityResult.Fail("username 必填");
 
-        // M1-03：User→Tenant 一致性（同 M1-02 的 TenantCode 策略）——DB 级 FK 延后，避免破坏以
-        // new User{TenantId=N} 直接注入且不建对应租户行的集成测试种子；此处仅校验 tenantId>0，
-        // 完整外键与存在性校验列入后续硬化项（见 Master_Development_Plan.md）。
+        // M1 closure：应用层与数据库 FK 使用同一不变量，拒绝向不存在或已停用的租户创建用户。
+        var tenantExists = await _ctx.Tenants.IgnoreQueryFilters()
+            .AnyAsync(t => t.Id == tenantId && t.Enabled, ct);
+        if (!tenantExists) return IdentityResult.Fail($"租户不存在或已停用: {tenantId}");
+
         var normalized = User.NormalizeUsername(username);
         if (await _ctx.Users.AnyAsync(u => u.TenantId == tenantId && u.NormalizedUsername == normalized, ct))
             return IdentityResult.Fail($"该租户内用户名已存在: {username}");
@@ -178,9 +172,7 @@ public class IdentityService : IIdentityService
         {
             var roleIds = await ResolveRoleIdsAsync(tenantId, roleCodes, ct);
             foreach (var roleId in roleIds)
-            {
                 _ctx.UserRoles.Add(new UserRole { TenantId = tenantId, UserId = user.Id, RoleId = roleId });
-            }
             await _ctx.SaveChangesAsync(ct);
         }
         return IdentityResult.Ok(user.Id);
@@ -192,13 +184,10 @@ public class IdentityService : IIdentityService
         if (string.IsNullOrWhiteSpace(roleCode)) return IdentityResult.Fail("roleCode 必填");
         if (!await _ctx.Users.AnyAsync(u => u.Id == userId && u.TenantId == tenantId, ct))
             return IdentityResult.Fail($"用户不存在: {userId}");
-
         var roleId = await ResolveRoleIdAsync(tenantId, roleCode, ct);
         if (roleId == null) return IdentityResult.Fail($"角色不存在: {roleCode}");
-
         if (await _ctx.UserRoles.AnyAsync(ur => ur.TenantId == tenantId && ur.UserId == userId && ur.RoleId == roleId.Value, ct))
             return IdentityResult.Ok(userId);
-
         _ctx.UserRoles.Add(new UserRole { TenantId = tenantId, UserId = userId, RoleId = roleId.Value });
         await _ctx.SaveChangesAsync(ct);
         await RotateSecurityStampAsync(tenantId, userId, ct);
@@ -209,14 +198,10 @@ public class IdentityService : IIdentityService
     {
         if (tenantId <= 0) return IdentityResult.Fail("tenantId 必须大于 0");
         if (string.IsNullOrWhiteSpace(roleCode)) return IdentityResult.Fail("roleCode 必填");
-
         var roleId = await ResolveRoleIdAsync(tenantId, roleCode, ct);
         if (roleId == null) return IdentityResult.Fail($"角色不存在: {roleCode}");
-
-        var link = await _ctx.UserRoles
-            .FirstOrDefaultAsync(ur => ur.TenantId == tenantId && ur.UserId == userId && ur.RoleId == roleId.Value, ct);
+        var link = await _ctx.UserRoles.FirstOrDefaultAsync(ur => ur.TenantId == tenantId && ur.UserId == userId && ur.RoleId == roleId.Value, ct);
         if (link == null) return IdentityResult.Ok(userId);
-
         _ctx.UserRoles.Remove(link);
         await _ctx.SaveChangesAsync(ct);
         await RotateSecurityStampAsync(tenantId, userId, ct);
@@ -229,28 +214,19 @@ public class IdentityService : IIdentityService
         if (string.IsNullOrWhiteSpace(password)) return IdentityResult.Fail("password 必填");
         if (!await _ctx.Users.AnyAsync(u => u.Id == userId && u.TenantId == tenantId, ct))
             return IdentityResult.Fail($"用户不存在: {userId}");
-
         var user = await _ctx.Users.FirstAsync(u => u.Id == userId && u.TenantId == tenantId, ct);
         user.PasswordHash = _hasher.Hash(password);
-        // 口令变更即轮换安全戳，使所有旧令牌失效（P0-04B）。
         user.SecurityStamp = Guid.NewGuid().ToString("N");
         await _ctx.SaveChangesAsync(ct);
         return IdentityResult.Ok(userId);
     }
 
-    /// <summary>
-    /// 设置用户状态（M1-03：用户状态机 + 停用轮换）。仅允许 <see cref="UserStatus.Active"/> ↔
-    /// <see cref="UserStatus.Disabled"/> 切换；状态变更即轮换 <see cref="User.SecurityStamp"/>，
-    /// 使既有令牌在下次请求时失效（下次请求 401，须重新登录）。
-    /// </summary>
     public async Task<IdentityResult> SetUserStatusAsync(long tenantId, long userId, UserStatus newStatus, CancellationToken ct = default)
     {
         if (tenantId <= 0) return IdentityResult.Fail("tenantId 必须大于 0");
         var user = await _ctx.Users.FirstOrDefaultAsync(u => u.Id == userId && u.TenantId == tenantId, ct);
         if (user is null) return IdentityResult.Fail($"用户不存在: {userId}");
         if (user.Status == newStatus) return IdentityResult.Ok(userId);
-
-        // 状态机：仅允许 Active <-> Disabled 切换。
         var allowed = (user.Status, newStatus) switch
         {
             (UserStatus.Active, UserStatus.Disabled) => true,
@@ -258,46 +234,29 @@ public class IdentityService : IIdentityService
             _ => false,
         };
         if (!allowed) return IdentityResult.Fail($"不允许的状态切换: {user.Status} -> {newStatus}");
-
         user.Status = newStatus;
-        // 停用/启用即轮换安全戳，使既有令牌失效（M1-03：停用后轮换）。
         user.SecurityStamp = Guid.NewGuid().ToString("N");
         await _ctx.SaveChangesAsync(ct);
         return IdentityResult.Ok(userId);
     }
 
-    /// <summary>
-    /// P0-04B 吊销：角色/权限变更后轮换用户安全戳，使既有令牌立即失效（下次请求 401，须重新登录）。
-    /// 用户不存在时静默跳过（调用方已先行校验）。
-    /// </summary>
     private async Task RotateSecurityStampAsync(long tenantId, long userId, CancellationToken ct)
     {
         var rows = await _ctx.Users
             .Where(u => u.Id == userId && u.TenantId == tenantId)
             .ExecuteUpdateAsync(u => u.SetProperty(x => x.SecurityStamp, Guid.NewGuid().ToString("N")), ct);
-        // ExecuteUpdateAsync 在部分提供程序返回受影响行数；用户存在性已由调用方保证。
         _ = rows;
     }
 
     public async Task<IReadOnlyList<string>> GetPermissionsAsync(long tenantId, long userId, CancellationToken ct = default)
     {
-        var roleIds = await _ctx.UserRoles
-            .Where(ur => ur.TenantId == tenantId && ur.UserId == userId)
-            .Select(ur => ur.RoleId)
-            .Distinct().ToListAsync(ct);
+        var roleIds = await _ctx.UserRoles.Where(ur => ur.TenantId == tenantId && ur.UserId == userId)
+            .Select(ur => ur.RoleId).Distinct().ToListAsync(ct);
         if (roleIds.Count == 0) return Array.Empty<string>();
-
-        var permIds = await _ctx.RolePermissions
-            .Where(rp => roleIds.Contains(rp.RoleId))
-            .Select(rp => rp.PermissionId)
-            .Distinct().ToListAsync(ct);
+        var permIds = await _ctx.RolePermissions.Where(rp => roleIds.Contains(rp.RoleId))
+            .Select(rp => rp.PermissionId).Distinct().ToListAsync(ct);
         if (permIds.Count == 0) return Array.Empty<string>();
-
-        var codes = await _ctx.Permissions
-            .Where(p => permIds.Contains(p.Id))
-            .Select(p => p.Code)
-            .Distinct().ToListAsync(ct);
-        return codes;
+        return await _ctx.Permissions.Where(p => permIds.Contains(p.Id)).Select(p => p.Code).Distinct().ToListAsync(ct);
     }
 
     public async Task<bool> HasPermissionAsync(long tenantId, long userId, string permissionCode, CancellationToken ct = default)
@@ -309,16 +268,14 @@ public class IdentityService : IIdentityService
     private async Task<List<long>> ResolveRoleIdsAsync(long tenantId, IEnumerable<string> roleCodes, CancellationToken ct)
     {
 		var codes = roleCodes.Where(code => code != IdentityRoles.PlatformAdmin).ToList();
-        return await _ctx.Roles
-            .Where(r => (r.TenantId == tenantId || r.TenantId == 0) && codes.Contains(r.Code))
+        return await _ctx.Roles.Where(r => (r.TenantId == tenantId || r.TenantId == 0) && codes.Contains(r.Code))
             .Select(r => r.Id).ToListAsync(ct);
     }
 
     private async Task<long?> ResolveRoleIdAsync(long tenantId, string roleCode, CancellationToken ct)
     {
 		if (roleCode == IdentityRoles.PlatformAdmin) return null;
-        return await _ctx.Roles
-            .Where(r => (r.TenantId == tenantId || r.TenantId == 0) && r.Code == roleCode)
+        return await _ctx.Roles.Where(r => (r.TenantId == tenantId || r.TenantId == 0) && r.Code == roleCode)
             .Select(r => (long?)r.Id).FirstOrDefaultAsync(ct);
     }
 }
