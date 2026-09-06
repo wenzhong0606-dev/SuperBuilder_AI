@@ -331,6 +331,19 @@ builder.Services.AddMemoryCache(o =>
 builder.Services.AddSingleton<SuperBuilder_AI.Api.Caching.IAskResponseCache,
 	SuperBuilder_AI.Api.Caching.MemoryAskResponseCache>();
 
+// M6-04 Cache 完整版本：把撤权/策略/语言/模型/语义/元数据/数据源集合 7 维版本折叠进 api/ask 缓存键。
+// 各维度提供器可空且内部 try/catch 降级，缺失即该维度置 na/legacy，绝不影响主查询链路。
+builder.Services.Configure<SuperBuilder_AI.Application.Common.Options.QwenOptions>(
+	builder.Configuration.GetSection(SuperBuilder_AI.Application.Common.Options.QwenOptions.SectionName));
+builder.Services.AddScoped<SuperBuilder_AI.Interfaces.BI.IMetadataVersionProvider,
+	SuperBuilder_AI.Application.BiQuery.MetadataVersionProvider>();
+builder.Services.AddScoped<SuperBuilder_AI.Interfaces.BI.ISemanticVersionProvider,
+	SuperBuilder_AI.Application.BiQuery.SemanticVersionProvider>();
+builder.Services.AddScoped<SuperBuilder_AI.Interfaces.BI.IDataSourceCatalogVersionProvider,
+	SuperBuilder_AI.Application.BiQuery.DataSourceCatalogVersionProvider>();
+builder.Services.AddScoped<SuperBuilder_AI.Interfaces.BI.IAskCacheVersionProvider,
+	SuperBuilder_AI.Application.BiQuery.CompositeAskCacheVersionProvider>();
+
 // P11.5.2 安全/运维轨：请求指标采集器（请求数 / 错误数 / P95 延迟，按路由聚合）
 builder.Services.AddSingleton<SuperBuilder_AI.Middleware.RequestMetricsCollector>();
 

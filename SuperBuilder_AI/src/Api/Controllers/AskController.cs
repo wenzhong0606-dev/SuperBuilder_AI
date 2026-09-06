@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
@@ -42,6 +43,7 @@ public sealed class AskController : ControllerBase
 	private readonly IDataSourceAuthorizationService? _dataSourceAuthorization;
 	private readonly IRowLevelSecurityService? _rowSecurity;
 	private readonly IAskConversationService _conversations;
+	private readonly IAskCacheVersionProvider? _versionProvider;
 
 	public AskController(
 		IBIConversationService bi,
@@ -49,7 +51,8 @@ public sealed class AskController : ControllerBase
 		IAskResponseCache? cache = null,
 		IDataSourceAuthorizationService? dataSourceAuthorization = null,
 		IRowLevelSecurityService? rowSecurity = null,
-		IAskConversationService? conversations = null)
+		IAskConversationService? conversations = null,
+		IAskCacheVersionProvider? versionProvider = null)
 	{
 		_bi = bi;
 		_identity = identity;
@@ -57,6 +60,7 @@ public sealed class AskController : ControllerBase
 		_dataSourceAuthorization = dataSourceAuthorization;
 		_rowSecurity = rowSecurity;
 		_conversations = conversations ?? new AskConversationService();
+		_versionProvider = versionProvider;
 	}
 
 	/// <summary>提交一个自然语言问题并执行 BI 查询。</summary>
@@ -97,10 +101,9 @@ public sealed class AskController : ControllerBase
 		// P11.5.1 语义缓存：命中则直接返回，跳过整条 BI 链路（仅作用于 api/ask；Golden 走独立端点不受影响）。
 		// ?noCache=1 旁路，便于联调/强制刷新。
 		var bypass = BypassCache() || access.BypassCache;
-		var policyFingerprint = _rowSecurity is null
-			? "legacy"
-			: await _rowSecurity.GetPolicyFingerprintAsync(tenantId, userId, cancellationToken);
-		var cacheQuestion = string.Concat(turn.StandaloneQuestion, "\u001fperm:", access.PermissionFingerprint ?? "legacy", "\u001fpolicy:", policyFingerprint);
+		// M6-04：缓存键折叠 7 维版本上下文（权限/策略/语言/模型/语义/元数据/数据源集合），
+		// 任一维度变化即不复用旧结果。未注入版本提供器时走 Legacy 分支（保留 policy 段，兼容旧测试）。
+		var cacheQuestion = await BuildCacheKeyAsync(turn.StandaloneQuestion, tenantId, userId, access, cancellationToken);
 		if (_cache is not null && !bypass)
 		{
 			var cached = _cache.Get(tenantId, cacheQuestion, access.EffectiveDataSourceId ?? 0);
@@ -220,6 +223,31 @@ public sealed class AskController : ControllerBase
 		return allowed.Count == 1
 			? new DataSourceAccessResolution(allowed[0], allowed, fingerprint, false, null)
 			: new DataSourceAccessResolution(null, allowed, fingerprint, true, null);
+	}
+
+	/// <summary>
+	/// 构建 Ask 缓存键：优先用注入的 <see cref="IAskCacheVersionProvider"/> 折叠 7 维版本上下文；
+	/// 未注入时走 <see cref="AskCacheVersionContext.Legacy"/>（仅权限/策略，其余 na），兼容旧测试。
+	/// </summary>
+	private async Task<string> BuildCacheKeyAsync(
+		string standaloneQuestion, long tenantId, long userId, DataSourceAccessResolution access, CancellationToken cancellationToken)
+	{
+		AskCacheVersionContext versionCtx;
+		if (_versionProvider is not null)
+		{
+			versionCtx = await _versionProvider.ResolveAsync(
+				tenantId, userId, access.AuthorizedDataSourceIds ?? Array.Empty<long>(),
+				access.PermissionFingerprint, cancellationToken);
+		}
+		else
+		{
+			var policyFingerprint = _rowSecurity is null
+				? "legacy"
+				: await _rowSecurity.GetPolicyFingerprintAsync(tenantId, userId, cancellationToken);
+			versionCtx = AskCacheVersionContext.Legacy(access.PermissionFingerprint, policyFingerprint, CultureInfo.CurrentUICulture.Name);
+		}
+
+		return versionCtx.BuildCacheKey(standaloneQuestion);
 	}
 
 	private sealed record DataSourceAccessResolution(

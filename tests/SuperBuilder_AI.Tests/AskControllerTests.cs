@@ -53,6 +53,14 @@ public class AskControllerTests
 		public Task ApplyAsync(QueryPlan plan, long tenantId, long userId, CancellationToken ct = default) => Task.CompletedTask;
 	}
 
+	/// <summary>固定返回 7 维版本上下文的假提供器，用于验证 Ask 缓存键折叠完整维度。</summary>
+	private sealed class FakeVersionProvider : IAskCacheVersionProvider
+	{
+		public Task<AskCacheVersionContext> ResolveAsync(long tenantId, long userId, IReadOnlyCollection<long> authorizedDataSourceIds, string? permissionFingerprint, CancellationToken ct = default)
+			=> Task.FromResult(new AskCacheVersionContext(
+				permissionFingerprint ?? "perm", "pol", "en-US", "qwen-plus", "sem", "meta", "ds"));
+	}
+
 	/// <summary>记录缓存读写使用的数据源Id，用于验证缓存键与执行约束同源（P0-01）。</summary>
 	private sealed class FakeCache : IAskResponseCache
 	{
@@ -316,5 +324,30 @@ public class AskControllerTests
 		});
 
 		Assert.IsType<BadRequestObjectResult>(result);
+	}
+
+	[Fact]
+	public async Task Ask_WithVersionProvider_BuildsFullSevenDimensionCacheKey()
+	{
+		var cache = new FakeCache();
+		var version = new FakeVersionProvider();
+		var ctrl = new AskController(
+			new FakeBi(), new FakeIdentity(), cache,
+			new FakeDataSourceAuthorization { Allowed = new[] { 7L } },
+			new FakeRowSecurity(), null, version)
+		{
+			ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext { User = Authenticated(3, 5) } }
+		};
+
+		await ctrl.Ask(new AskRequest { Question = "请查询销售额", DataSourceId = 7 });
+
+		var key = cache.GetQuestions[0];
+		Assert.Contains("perm:", key);
+		Assert.Contains("policy:", key);
+		Assert.Contains("culture:", key);
+		Assert.Contains("model:qwen-plus", key);
+		Assert.Contains("semantic:sem", key);
+		Assert.Contains("metadata:meta", key);
+		Assert.Contains("ds:ds", key);
 	}
 }
