@@ -531,6 +531,12 @@ M3 退出：平台/租户视图严格分离；租户只能使用授权语言；�
 - 扫描幂等处理新增、删除、重命名；失败不覆盖最后成功版本。
 - 元数据版本与向量重建同步；空数据提供“测试连接/扫描/检查授权”下一步。
 
+- **M4-05 数据源扫描与同步闭环 ✅ 完成（2026-09-06，本地待提交）。** 此前后端已在位（Channel 队列 `MetadataScanQueue` + `MetadataScanHostedService` 后台处理器 + `MetadataScanJob`/`ScanTelemetry` 领域模型 + 迁移 `20260906000108_M4_05_ScanJob` + `MetadataController` 的 `POST /api/data-sources/{id}/metadata/scan`（202 + jobId）、`GET …/scan/{jobId}` 轮询端点 + `Program.cs` 单例队列/宿主服务注册；`MetadataScannerService.ScanAsync` 已支持 `progress/telemetry/cleanupOrphans` 孤儿安全清理）。本轮补齐**前端扫描集成**（此前 `DataSourceDetail.razor` 仍用旧同步 `Api.PostAsync`，对 202 误报“完成”且不轮询）：
+  - **前端（`SuperBuilder_AI.Components`）**：`DataSourceDetail.razor` 的「重新扫描」改为异步任务模型——`StartScanAsync` 取 jobId 后 `PollScanAsync` 每 1.5s 轮询 `GetScanJobAsync` 直至 `Succeeded`/`Failed`（`CancellationTokenSource` 在 `IDisposable.Dispose` 中取消，导航离开即停）；扫描态面板显示状态徽标（排队/扫描中/完成/失败）、进度条、已扫描表/字段/清理孤儿计数、开始/结束时间、失败错误码+脱敏摘要及「重试」按钮；`app.css` 新增 `.scan-job*` 样式（成功/失败描边、进度条、统计、错误块）。`ApiClient` 的 `StartScanAsync`/`GetScanJobAsync`/`ScanJobView` 已在前序工作中就绪。
+  - **后端收口**：`MetadataController.ScanDataSource` 的 202 响应 `status` 由硬编码小写 `"queued"` 改为 `job.Status.ToString()`（与 GET 端点枚举字符串一致）；`IApiClient` 新增 `StartScanAsync`/`GetScanJobAsync` 后补齐测试桩 `AuthStoreTests.StatusApiClient`（此前因接口扩展未实现导致测试工程编译失败）。
+  - **测试**：新增 `MetadataScanControllerTests` 6 例（创建 Queued 任务并入队 jobId 一致 / GET 轮询返回状态 / 未授权 403 / 缺 `metadata:scan` 权限 403 / 旧固定扫描入口 410 / 401 缺令牌）；全量相关 9 例（含 `AuthStoreTests`）绿。
+  - **验证**：RCL（net10.0/android/ios）、API、Web 三端构建均 0 error；四端构建全绿；M4-01~M4-05 后端+前端闭环完成。
+
 ---
 
 ## 9. M5：语义模型与 QueryPlan 企业化

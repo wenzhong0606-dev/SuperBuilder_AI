@@ -105,6 +105,7 @@ public class SuperBIContext : DbContext
     public DbSet<MetadataColumn> MetadataColumns { get; set; }
     public DbSet<MetadataSemantic> MetadataSemantics { get; set; }
     public DbSet<MetadataLearningRecord> LearningRecords { get; set; }
+    public DbSet<MetadataScanJob> MetadataScanJobs { get; set; }
     #endregion
 
     #region P5 Localization
@@ -318,6 +319,24 @@ public class SuperBIContext : DbContext
         builder.Entity<MetadataLearningRecord>().HasOne(x => x.Tenant).WithMany().HasForeignKey(x => x.TenantId);
         builder.Entity<MetadataLearningRecord>().HasOne(x => x.MetadataColumn).WithMany().HasForeignKey(x => x.MetadataColumnId).OnDelete(DeleteBehavior.SetNull);
         builder.Entity<MetadataLearningRecord>().ToTable(tb => tb.HasComment("学习记录"));
+        #endregion
+
+        #region MetadataScanJob
+        builder.Entity<MetadataScanJob>().HasOne(x => x.DataSource).WithMany().HasForeignKey(x => x.DataSourceId).OnDelete(DeleteBehavior.Cascade);
+        builder.Entity<MetadataScanJob>().ToTable(tb => tb.HasComment("元数据扫描任务"));
+        builder.Entity<MetadataScanJob>().Property(x => x.Status).HasConversion<string>().HasMaxLength(16).IsRequired().HasDefaultValue(MetadataScanJobStatus.Queued).HasComment("扫描状态");
+        builder.Entity<MetadataScanJob>().Property(x => x.ProgressPercent).HasDefaultValue(0).HasComment("进度百分比");
+        builder.Entity<MetadataScanJob>().Property(x => x.StartedAt).HasConversion(UtcNullableDateTimeConverter).HasComment("开始时间(UTC)");
+        builder.Entity<MetadataScanJob>().Property(x => x.FinishedAt).HasConversion(UtcNullableDateTimeConverter).HasComment("结束时间(UTC)");
+        builder.Entity<MetadataScanJob>().Property(x => x.TablesScanned).HasDefaultValue(0).HasComment("已扫描表数");
+        builder.Entity<MetadataScanJob>().Property(x => x.ColumnsScanned).HasDefaultValue(0).HasComment("已扫描字段数");
+        builder.Entity<MetadataScanJob>().Property(x => x.OrphansDetected).HasDefaultValue(0).HasComment("孤儿对象数");
+        builder.Entity<MetadataScanJob>().Property(x => x.TriggeredBy).HasMaxLength(64).HasComment("触发用户标识");
+        builder.Entity<MetadataScanJob>().Property(x => x.ErrorCode).HasMaxLength(64).HasComment("错误码(仅异常类型名,脱敏)");
+        builder.Entity<MetadataScanJob>().Property(x => x.ErrorMessage).HasMaxLength(2000).HasComment("错误摘要(脱敏,不含连接串)");
+        builder.Entity<MetadataScanJob>().HasIndex(x => x.DataSourceId).HasDatabaseName("IX_MetadataScanJobs_DataSourceId");
+        builder.Entity<MetadataScanJob>().HasIndex(x => x.TenantId).HasDatabaseName("IX_MetadataScanJobs_TenantId");
+        builder.Entity<MetadataScanJob>().HasIndex(x => x.Status).HasDatabaseName("IX_MetadataScanJobs_Status");
         #endregion
 
         #region P5.2 SemanticLabel

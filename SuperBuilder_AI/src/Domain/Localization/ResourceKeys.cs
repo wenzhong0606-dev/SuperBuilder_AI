@@ -306,6 +306,21 @@ public static class ResourceKeys
         public const string DataSourceLoadingMeta = "Content.DataSourceLoadingMeta";
         public const string DataSourceEmptyMetaTitle = "Content.DataSourceEmptyMetaTitle";
         public const string DataSourceEmptyMetaText = "Content.DataSourceEmptyMetaText";
+
+        // ScanJob（M4-05 扫描任务）
+        public const string DataSourceScanQueued = "Content.DataSourceScanQueued";
+        public const string DataSourceScanRunning = "Content.DataSourceScanRunning";
+        public const string DataSourceScanProgressLabel = "Content.DataSourceScanProgressLabel";
+        public const string DataSourceScanTablesScanned = "Content.DataSourceScanTablesScanned";
+        public const string DataSourceScanColumnsScanned = "Content.DataSourceScanColumnsScanned";
+        public const string DataSourceScanOrphansRemoved = "Content.DataSourceScanOrphansRemoved";
+        public const string DataSourceScanSucceededBanner = "Content.DataSourceScanSucceededBanner";
+        public const string DataSourceScanFailedBanner = "Content.DataSourceScanFailedBanner";
+        public const string DataSourceScanJobLost = "Content.DataSourceScanJobLost";
+        public const string DataSourceScanRetry = "Content.DataSourceScanRetry";
+        public const string DataSourceEmptyMetaNextStep = "Content.DataSourceEmptyMetaNextStep";
+        public const string DataSourceScanPollingError = "Content.DataSourceScanPollingError";
+
         public const string DataSourceFieldsBadge = "Content.DataSourceFieldsBadge";
         public const string DataSourceColFieldRel = "Content.DataSourceColFieldRel";
         public const string DataSourceColType = "Content.DataSourceColType";
@@ -1527,6 +1542,20 @@ public static class ResourceKeys
         [Content.DataSourceLoadingMeta] = new("Content", Page: "DataSource", DefaultValue: "Loading metadata…"),
         [Content.DataSourceEmptyMetaTitle] = new("Content", Page: "DataSource", DefaultValue: "No metadata scanned yet"),
         [Content.DataSourceEmptyMetaText] = new("Content", Page: "DataSource", DefaultValue: "Click re-scan to read table and column structures from the business database."),
+
+        [Content.DataSourceScanQueued] = new("Content", Page: "DataSource", DefaultValue: "Queued, waiting for background scan…"),
+        [Content.DataSourceScanRunning] = new("Content", Page: "DataSource", DefaultValue: "Scanning metadata…"),
+        [Content.DataSourceScanProgressLabel] = new("Content", Page: "DataSource", DefaultValue: "Scan progress"),
+        [Content.DataSourceScanTablesScanned] = new("Content", Page: "DataSource", DefaultValue: "Tables scanned: {0}"),
+        [Content.DataSourceScanColumnsScanned] = new("Content", Page: "DataSource", DefaultValue: "Columns scanned: {0}"),
+        [Content.DataSourceScanOrphansRemoved] = new("Content", Page: "DataSource", DefaultValue: "Orphans removed: {0}"),
+        [Content.DataSourceScanSucceededBanner] = new("Content", Page: "DataSource", DefaultValue: "Scan completed"),
+        [Content.DataSourceScanFailedBanner] = new("Content", Page: "DataSource", DefaultValue: "Scan failed"),
+        [Content.DataSourceScanJobLost] = new("Content", Page: "DataSource", DefaultValue: "Scan job not found or already cleaned up."),
+        [Content.DataSourceScanRetry] = new("Content", Page: "DataSource", DefaultValue: "Retry"),
+        [Content.DataSourceEmptyMetaNextStep] = new("Content", Page: "DataSource", DefaultValue: "Test the connection and grant access, then re-scan."),
+        [Content.DataSourceScanPollingError] = new("Content", Page: "DataSource", DefaultValue: "Failed to poll scan status: {0}"),
+
         [Content.DataSourceFieldsBadge] = new("Content", Page: "DataSource", DefaultValue: "{0} fields"),
         [Content.DataSourceColFieldRel] = new("Content", Page: "DataSource", DefaultValue: "Field / Relation"),
         [Content.DataSourceColType] = new("Content", Page: "DataSource", DefaultValue: "Type"),

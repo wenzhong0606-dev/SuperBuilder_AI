@@ -8,6 +8,7 @@
 - 测试基线 504/504 全绿、build 0 error；Golden 18/18 未改。
 - M0：M0-01~M0-09 **全部 ✅（2026-09-04 收尾）**。M0-01 = Git 历史重写(629 提交, `git log --all -S` 5 类明文 0 命中) + 外部凭据轮换(WMS/LLM/Auth:SigningKey/元库) + 强制推送至 `wenzhong0606-dev/SuperBuilder_AI`。M0-02~M0-08 经本回合代码核查确认已在 P10/P11 落地：`AuthMiddleware`+`TokenService`+`TenantDataPlanePolicy`+`RowLevelSecurityService`(Program.cs 已接线, deny-by-default)、`SchemaProbe`+固定迁移/种子启动序列(受控 Migration)、`RateLimitMiddleware`+`ForwardedHeaders` 仅信任配置代理 + `/metrics` 受 `platform:diagnostics:view` 守卫(限流与匿名端点治理)、TenantId 取自 JWT 而非请求体(字段越权/跨租户隔离)、四路由契约统一为 `api/agent|apps|ask|data-sources` 等。测试基线按既有记忆：476/476 全绿、build 0 error、Golden 18/18。
 - Stage 0 ✅；Stage 1 🟡(A3/A5 暂缓)；Stage 2 P3~P10 ✅；P11 前端 P11.0~P11.5 ✅（UI 现代化、P11.5 鉴权收尾、P11.6 结构等部分改动仍待提交，三端 build 0 error）。
+- 里程碑：M0 ✅；M1-01~M1-06 ✅；M2-01~M2-07 ✅（含 M2-06 默认关闭自注册骨架、M2-07 独立 Demo 安装器）；**M3-G0 多语言核心子集 ✅（2026-09-05，661/661 测试、四端 0 error）**；**M3-01 语言关系模型 ✅（2026-09-05，674/674 测试、四端 0 error）**；M3-02~06 仍为发布门禁；**M4 数据源与元数据闭环 ✅（2026-09-06：M4-01 页面增强 + M4-05 扫描与同步（队列+后台处理器+迁移+POST202触发/GET轮询+前端异步轮询面板+6例测试）完成；M4-02/03/04 经 M4-01 审计声明已就绪）**。下一步 M5 语义模型与 QueryPlan 企业化。
 
 ## 零回归手法
 门控隔离(多语言/AI 路径「非默认才启用」短路，默认路径逐字节不变) + 双路径 Agent/AppBuilder(默认确定性不调 LLM)。Golden 契约 `Evaluation/Golden/query-plan-golden-v1.json` 不可删改。

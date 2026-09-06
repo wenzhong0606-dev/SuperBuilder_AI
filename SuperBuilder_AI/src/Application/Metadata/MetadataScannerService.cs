@@ -1,6 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using SuperBuilder_AI.Data;
 using SuperBuilder_AI.Interfaces;
+using System;
 using SuperBuilder_AI.Models.Metadata;
 
 
@@ -86,7 +87,11 @@ public class MetadataScannerService
 	public async Task ScanAsync(
 		long tenantId,
 		long dataSourceId,
-		string connectionString)
+		string connectionString,
+		IProgress<int>? progress = null,
+		ScanTelemetry? telemetry = null,
+		bool cleanupOrphans = false,
+		CancellationToken ct = default)
 	{
 
 
@@ -94,7 +99,7 @@ public class MetadataScannerService
 		// 解析归属数据源，以 dataSource.TenantId 为权威写入租户；拒绝非归属租户的扫描请求。
 		var dataSource = await _context.DataSources
 			.AsNoTracking()
-			.FirstOrDefaultAsync(x => x.Id == dataSourceId, CancellationToken.None);
+			.FirstOrDefaultAsync(x => x.Id == dataSourceId, ct);
 		if (dataSource is null)
 			throw new KeyNotFoundException($"数据源 {dataSourceId} 不存在，无法扫描元数据。");
 		if (dataSource.TenantId != tenantId)
@@ -124,6 +129,14 @@ public class MetadataScannerService
 			.GetColumnsAsync(
 				connectionString);
 
+		// M4-05：记录可观测基数并上报初始进度。
+		if (telemetry is not null)
+		{
+			telemetry.TablesScanned = tables.Count;
+			telemetry.ColumnsScanned = columns.Count;
+		}
+		progress?.Report(10);
+
 
 
 
@@ -151,13 +164,76 @@ public class MetadataScannerService
 				&&
 				x.DataSourceId == dataSourceId)
 
-			.ToListAsync();
+			.ToListAsync(ct);
 
 
 
 
 
 
+
+		// M4-05：安全孤儿清理（在同步前执行）。移除源中已不存在的表/字段，
+		// 但跳过被行级安全策略或学习记录引用的对象，避免破坏租户安全配置或丢失学习数据。
+		if (cleanupOrphans)
+		{
+			var protectedColumnIds = await _context.RowLevelSecurityPolicies
+				.Select(p => p.MetadataColumnId)
+				.ToListAsync(ct);
+			protectedColumnIds.AddRange(await _context.LearningRecords
+				.Where(r => r.MetadataColumnId.HasValue)
+				.Select(r => r.MetadataColumnId!.Value)
+				.ToListAsync(ct));
+			var protectedColumns = new HashSet<long>(protectedColumnIds);
+
+			var protectedTables = new HashSet<long>(await _context.RowLevelSecurityPolicies
+				.Select(p => p.MetadataTableId)
+				.ToListAsync(ct));
+
+			var sourceTableNames = new HashSet<string>(
+				tables.Select(t => t.TableName ?? string.Empty),
+				StringComparer.OrdinalIgnoreCase);
+			var sourceColumnsByTable = columns
+				.GroupBy(c => c.TableName ?? string.Empty, StringComparer.OrdinalIgnoreCase)
+				.ToDictionary(
+					g => g.Key,
+					g => new HashSet<string>(g.Select(c => c.ColumnName ?? string.Empty), StringComparer.OrdinalIgnoreCase),
+					StringComparer.OrdinalIgnoreCase);
+
+			var orphanRemoved = 0;
+			foreach (var existingTable in existsTables)
+			{
+				var tableName = existingTable.TableName ?? string.Empty;
+				if (!sourceTableNames.Contains(tableName))
+				{
+					var tableProtected = protectedTables.Contains(existingTable.Id)
+						|| existingTable.Columns.Any(c => protectedColumns.Contains(c.Id));
+					if (!tableProtected)
+					{
+						_context.MetadataTables.Remove(existingTable);
+						orphanRemoved += 1 + existingTable.Columns.Count;
+					}
+					continue;
+				}
+
+				if (sourceColumnsByTable.TryGetValue(tableName, out var sourceCols))
+				{
+					foreach (var col in existingTable.Columns.ToList())
+					{
+						if (!sourceCols.Contains(col.ColumnName ?? string.Empty)
+							&& !protectedColumns.Contains(col.Id))
+						{
+							_context.MetadataColumns.Remove(col);
+							orphanRemoved++;
+						}
+					}
+				}
+			}
+
+			if (telemetry is not null)
+			{
+				telemetry.OrphansDetected = orphanRemoved;
+			}
+		}
 
 		foreach (var table in tables)
 		{
@@ -376,9 +452,12 @@ public class MetadataScannerService
 		 * =============================
 		 */
 
+		progress?.Report(45);
 
 		await _context
-			.SaveChangesAsync();
+			.SaveChangesAsync(ct);
+
+		progress?.Report(55);
 
 
 
@@ -414,7 +493,7 @@ public class MetadataScannerService
 				&&
 				x.Semantic == null)
 
-			.ToListAsync();
+			.ToListAsync(ct);
 
 
 
@@ -428,6 +507,8 @@ public class MetadataScannerService
 					semanticColumns);
 
 		}
+
+		progress?.Report(70);
 
 
 
@@ -459,7 +540,7 @@ public class MetadataScannerService
 				&&
 				x.DataSourceId == dataSourceId)
 
-			.ToListAsync();
+			.ToListAsync(ct);
 
 
 
@@ -601,8 +682,12 @@ public class MetadataScannerService
 		 */
 
 
+		progress?.Report(95);
+
 		await _context
-			.SaveChangesAsync();
+			.SaveChangesAsync(ct);
+
+		progress?.Report(100);
 
 	}
 

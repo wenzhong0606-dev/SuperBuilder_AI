@@ -34,6 +34,8 @@ using SuperBuilder_AI.Interfaces.Localization;
 using SuperBuilder_AI.Services.Localization;
 using SuperBuilder_AI.Interfaces.Quota;
 using SuperBuilder_AI.Services.Quota;
+using SuperBuilder_AI.Application.Metadata;
+using SuperBuilder_AI.Api.Background;
 using SuperBuilder_AI.Middleware;
 using SuperBuilder_AI.Api.Diagnostics;
 using SuperBuilder_AI.Application.Common.Options;
@@ -72,6 +74,9 @@ builder.Services.Configure<SelfRegistrationOptions>(builder.Configuration.GetSec
 builder.Services.AddScoped<IDataSourceMetadataReader, MySqlMetadataReader>();
 builder.Services.AddScoped<PlatformAdminBootstrapper>();
 builder.Services.AddScoped<MetadataScannerService>();
+// M4-05：扫描任务队列与后台处理器（Channel + BackgroundService）。
+builder.Services.AddSingleton<IMetadataScanQueue, MetadataScanQueue>();
+builder.Services.AddHostedService<MetadataScanHostedService>();
 builder.Services.AddScoped<MetadataSearchTextBuilder>();
 builder.Services.AddScoped<IMetadataSearchTextBuilder>(sp => sp.GetRequiredService<MetadataSearchTextBuilder>());
 builder.Services.AddScoped<MetadataPromptBuilder>();

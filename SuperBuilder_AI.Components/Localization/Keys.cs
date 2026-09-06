@@ -338,6 +338,21 @@ public static class Keys
         public const string DataSourceLoadingMeta = "Content.DataSourceLoadingMeta";
         public const string DataSourceEmptyMetaTitle = "Content.DataSourceEmptyMetaTitle";
         public const string DataSourceEmptyMetaText = "Content.DataSourceEmptyMetaText";
+
+        // ScanJob（M4-05 扫描任务）
+        public const string DataSourceScanQueued = "Content.DataSourceScanQueued";
+        public const string DataSourceScanRunning = "Content.DataSourceScanRunning";
+        public const string DataSourceScanProgressLabel = "Content.DataSourceScanProgressLabel";
+        public const string DataSourceScanTablesScanned = "Content.DataSourceScanTablesScanned";
+        public const string DataSourceScanColumnsScanned = "Content.DataSourceScanColumnsScanned";
+        public const string DataSourceScanOrphansRemoved = "Content.DataSourceScanOrphansRemoved";
+        public const string DataSourceScanSucceededBanner = "Content.DataSourceScanSucceededBanner";
+        public const string DataSourceScanFailedBanner = "Content.DataSourceScanFailedBanner";
+        public const string DataSourceScanJobLost = "Content.DataSourceScanJobLost";
+        public const string DataSourceScanRetry = "Content.DataSourceScanRetry";
+        public const string DataSourceEmptyMetaNextStep = "Content.DataSourceEmptyMetaNextStep";
+        public const string DataSourceScanPollingError = "Content.DataSourceScanPollingError";
+
         public const string DataSourceFieldsBadge = "Content.DataSourceFieldsBadge";
         public const string DataSourceColFieldRel = "Content.DataSourceColFieldRel";
         public const string DataSourceColType = "Content.DataSourceColType";
@@ -1535,6 +1550,20 @@ public static class Keys
         [Content.DataSourceLoadingMeta] = new("正在加载元数据…", "Loading metadata…"),
         [Content.DataSourceEmptyMetaTitle] = new("尚未扫描到元数据", "No metadata scanned yet"),
         [Content.DataSourceEmptyMetaText] = new("点击重新扫描，从业务数据库读取表和字段结构。", "Click re-scan to read table and column structures from the business database."),
+
+        [Content.DataSourceScanQueued] = new("已排队，等待后台扫描…", "Queued, waiting for background scan…"),
+        [Content.DataSourceScanRunning] = new("正在扫描元数据…", "Scanning metadata…"),
+        [Content.DataSourceScanProgressLabel] = new("扫描进度", "Scan progress"),
+        [Content.DataSourceScanTablesScanned] = new("已扫描表：{0}", "Tables scanned: {0}"),
+        [Content.DataSourceScanColumnsScanned] = new("已扫描字段：{0}", "Columns scanned: {0}"),
+        [Content.DataSourceScanOrphansRemoved] = new("已清理孤儿对象：{0}", "Orphans removed: {0}"),
+        [Content.DataSourceScanSucceededBanner] = new("扫描完成", "Scan completed"),
+        [Content.DataSourceScanFailedBanner] = new("扫描失败", "Scan failed"),
+        [Content.DataSourceScanJobLost] = new("扫描任务不存在或已被清理。", "Scan job not found or already cleaned up."),
+        [Content.DataSourceScanRetry] = new("重试", "Retry"),
+        [Content.DataSourceEmptyMetaNextStep] = new("可先测试数据源连接、授予访问授权，再重新扫描。", "Test the connection and grant access, then re-scan."),
+        [Content.DataSourceScanPollingError] = new("轮询扫描状态失败：{0}", "Failed to poll scan status: {0}"),
+
         [Content.DataSourceFieldsBadge] = new("{0} 字段", "{0} fields"),
         [Content.DataSourceColFieldRel] = new("字段 / 关系", "Field / Relation"),
         [Content.DataSourceColType] = new("类型", "Type"),

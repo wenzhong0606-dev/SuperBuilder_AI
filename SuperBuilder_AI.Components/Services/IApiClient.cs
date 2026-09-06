@@ -96,4 +96,10 @@ public interface IApiClient
     /// 与 <see cref="GetJsonAsync"/> 的区别是不做 JSON 解析，非 2xx 返回错误信息而非抛出。
     /// </summary>
     Task<(string? Text, int Status, string? Error)> GetTextAsync(string relativeUrl, CancellationToken ct = default);
+
+    /// <summary>M4-05 触发后台元数据扫描：创建扫描任务并入队，返回 202 与任务 Id。</summary>
+    Task<(bool Ok, int Status, long? JobId, string? Error, string? Code)> StartScanAsync(long dataSourceId, CancellationToken ct = default);
+
+    /// <summary>M4-05 轮询扫描任务状态（进度/计数/脱敏错误）。</summary>
+    Task<(ScanJobView? Job, int Status, string? Error, string? Code)> GetScanJobAsync(long dataSourceId, long jobId, CancellationToken ct = default);
 }

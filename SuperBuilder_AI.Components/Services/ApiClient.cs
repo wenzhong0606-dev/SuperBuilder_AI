@@ -574,6 +574,51 @@ public sealed class ApiClient : IApiClient
             return (null, 0, "网络错误：" + ex.Message);
         }
     }
+
+    /// <summary>M4-05 触发后台扫描：POST 创建任务并入队，从 202 响应体解析 jobId。</summary>
+    public async Task<(bool Ok, int Status, long? JobId, string? Error, string? Code)> StartScanAsync(long dataSourceId, CancellationToken ct = default)
+    {
+        var client = CreateClient();
+        try
+        {
+            var resp = await client.PostAsJsonAsync($"api/data-sources/{dataSourceId}/metadata/scan", new { }, ct);
+            var body = await resp.Content.ReadAsStringAsync(ct);
+            if (resp.StatusCode == HttpStatusCode.Unauthorized) OnUnauthorized();
+            if (!resp.IsSuccessStatusCode)
+            {
+                var (code, msg, _) = ParseApiError(body);
+                return (false, (int)resp.StatusCode, null, msg ?? $"请求失败（{(int)resp.StatusCode}）。", code);
+            }
+            long? jobId = null;
+            if (!string.IsNullOrWhiteSpace(body))
+            {
+                using var doc = JsonDocument.Parse(body);
+                if (doc.RootElement.TryGetProperty("jobId", out var jp) && jp.ValueKind == JsonValueKind.Number)
+                    jobId = jp.GetInt64();
+            }
+            return (true, (int)resp.StatusCode, jobId, null, null);
+        }
+        catch (Exception ex)
+        {
+            return (false, 0, null, "网络错误：" + ex.Message, null);
+        }
+    }
+
+    /// <summary>M4-05 轮询扫描任务状态；成功解析为 <see cref="ScanJobView"/>。</summary>
+    public async Task<(ScanJobView? Job, int Status, string? Error, string? Code)> GetScanJobAsync(long dataSourceId, long jobId, CancellationToken ct = default)
+    {
+        var (data, status, err, code) = await GetJsonAsync($"api/data-sources/{dataSourceId}/metadata/scan/{jobId}", ct);
+        if (data is null) return (null, status, err, code);
+        try
+        {
+            var job = JsonSerializer.Deserialize<ScanJobView>(data.Value.GetRawText(), new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            return (job, status, null, null);
+        }
+        catch (Exception ex)
+        {
+            return (null, status, "解析扫描任务失败：" + ex.Message, code);
+        }
+    }
 }
 
 /// <summary>
@@ -587,6 +632,22 @@ public sealed class RefineTurn
 
     public static RefineTurn User(string content) => new() { Role = "user", Content = content };
     public static RefineTurn Assistant(string content) => new() { Role = "assistant", Content = content };
+}
+
+/// <summary>M4-05 扫描任务轮询视图（与后端 MetadataScanJob 状态端点对齐）。</summary>
+public sealed class ScanJobView
+{
+    public long JobId { get; set; }
+    public long DataSourceId { get; set; }
+    public string Status { get; set; } = "Queued";
+    public int ProgressPercent { get; set; }
+    public int TablesScanned { get; set; }
+    public int ColumnsScanned { get; set; }
+    public int OrphansDetected { get; set; }
+    public string? ErrorCode { get; set; }
+    public string? ErrorMessage { get; set; }
+    public DateTime? StartedAt { get; set; }
+    public DateTime? FinishedAt { get; set; }
 }
 
 /// <summary>登录 / 当前用户响应（与 api/auth 的 AuthResult 字段对齐）。</summary>
