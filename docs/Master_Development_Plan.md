@@ -543,7 +543,7 @@ M3 退出：平台/租户视图严格分离；租户只能使用授权语言；�
 
 | ID | 原编号 | 任务 | 验收 |
 |---|---|---|---|
-| M5-01 | SB-P1-01 | Canonical Semantic Model | Entity/Metric/Dimension/Filter/Binding 统一 ID 和定义 |
+| M5-01 | SB-P1-01 | Canonical Semantic Model | Entity/Metric/Dimension/Filter/Binding 统一 ID 和定义（✅ 2026-09-06，1bb1d63：规范化语义 ID `CanonicalSemanticId` + 五类定义记录（Entity/Metric/Dimension/Filter/Binding）+ `ICanonicalSemanticResolver`/`PassThroughCanonicalResolver` 默认透传，11 例测试全绿，零默认行为变更、对 Golden 免疫） |
 | M5-02 | SB-P1-02 | 统一字段解析规则 | Understanding/Builder/Validator 结果一致 |
 | M5-03 | SB-P1-03 | QueryPlan Pipeline Stage 化 | Metadata/Semantic/Security/Repair/Confidence/Decision 可扩展测试（✅ 2026-09-06，fb38cea：8 段链路抽离为有序 `IQueryPlanStage`，14 例阶段测试全绿，行为逐字节不变） |
 | M5-04 | SB-P1-04 | 收缩 QueryPlanBuilder | Builder 只构造，不承担权限、安全判断（✅ 2026-09-06，bcbe537：数据源候选收敛抽离为 `IQueryPlanDataSourceScope`，45 例测试全绿，对 Golden 免疫） |
