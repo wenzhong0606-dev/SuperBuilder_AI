@@ -1,4 +1,20 @@
-﻿namespace SuperBuilder_AI.Models.BI;
+﻿using System.Text.Json.Serialization;
+
+namespace SuperBuilder_AI.Models.BI;
+
+/// <summary>
+/// Ask 会话状态稳定枚举（M6-02 输入与状态契约）。
+/// 以字符串形式序列化（JsonStringEnumConverter），与历史 wire 值
+/// "AwaitingClarification" / "Completed" 保持兼容，前端（独立 string 副本）无需改动。
+/// </summary>
+public enum ConversationStatus
+{
+	AwaitingClarification,
+	Completed,
+	Failed,
+	Expired,
+	Cancelled,
+}
 
 /// <summary>
 /// BI 对话响应。
@@ -6,7 +22,9 @@
 public sealed class BIResponse
 {
 	public string? ConversationId { get; set; }
-	public string ConversationStatus { get; set; } = "Completed";
+
+	[JsonConverter(typeof(JsonStringEnumConverter))]
+	public ConversationStatus ConversationStatus { get; set; } = ConversationStatus.Completed;
 	public string? RewrittenQuestion { get; set; }
 	/// <summary>
 	/// 是否成功。

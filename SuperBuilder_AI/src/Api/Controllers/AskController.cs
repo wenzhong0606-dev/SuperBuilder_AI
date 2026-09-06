@@ -10,6 +10,7 @@ using SuperBuilder_AI.Api.Caching;
 using SuperBuilder_AI.Api.Errors;
 using SuperBuilder_AI.Interfaces.BI;
 using SuperBuilder_AI.Interfaces.Identity;
+using SuperBuilder_AI.Models.BI;
 using SuperBuilder_AI.Models.Identity;
 using SuperBuilder_AI.Services.BI;
 
@@ -68,6 +69,15 @@ public sealed class AskController : ControllerBase
 		if (string.IsNullOrWhiteSpace(request.Question))
 			return BadRequest(new ApiError { Code = ErrorCodes.BadRequest, Message = "question 必填。" });
 
+		// M6-02：Question 长度契约 2–2000 字符。
+		var question = request.Question!;
+		if (question.Length < 2 || question.Length > 2000)
+			return BadRequest(new ApiError { Code = ErrorCodes.BadRequest, Message = "question 长度须为 2–2000 字符。" });
+
+		// M6-02：ConversationId 仅作长度护栏（归属由 AskConversationService 按租户/用户校验）。
+		if (request.ConversationId is { Length: > 128 })
+			return BadRequest(new ApiError { Code = ErrorCodes.BadRequest, Message = "conversationId 长度不得超过 128 字符。" });
+
 		if (User?.Identity is not { IsAuthenticated: true })
 			return Unauthorized(new ApiError { Code = ErrorCodes.Unauthorized, Message = "未授权：缺少访问令牌。" });
 
@@ -110,7 +120,7 @@ public sealed class AskController : ControllerBase
 		var awaiting = response.Explanation?.Summary.RequiresConfirmation == true;
 		_conversations.Record(turn.ConversationId, tenantId, userId, turn.StandaloneQuestion, awaiting);
 		response.ConversationId = turn.ConversationId;
-		response.ConversationStatus = awaiting ? "AwaitingClarification" : "Completed";
+		response.ConversationStatus = awaiting ? ConversationStatus.AwaitingClarification : ConversationStatus.Completed;
 		response.RewrittenQuestion = turn.AppliedClarification ? turn.StandaloneQuestion : null;
 		if (_cache is not null && !bypass) _cache.Set(tenantId, cacheQuestion, access.EffectiveDataSourceId ?? 0, response);
 		return Ok(response);
@@ -141,6 +151,10 @@ public sealed class AskController : ControllerBase
 
 		if (string.IsNullOrWhiteSpace(request.Instruction))
 			return BadRequest(new ApiError { Code = ErrorCodes.BadRequest, Message = "instruction 必填：请提供本轮细化指令（如「只看华东地区」）。" });
+
+		// M6-02：Refine 历史轮数护栏（最多 20 轮），避免无限拼接历史导致意图漂移。
+		if (request.History is { Count: > 20 })
+			return BadRequest(new ApiError { Code = ErrorCodes.BadRequest, Message = "history 轮数过多（最多 20 轮）。" });
 
 		if (User?.Identity is not { IsAuthenticated: true })
 			return Unauthorized(new ApiError { Code = ErrorCodes.Unauthorized, Message = "未授权：缺少访问令牌。" });

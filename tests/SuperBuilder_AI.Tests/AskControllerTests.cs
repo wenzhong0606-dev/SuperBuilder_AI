@@ -125,7 +125,7 @@ public class AskControllerTests
 	public async Task Ask_Without_Permission_Returns_403()
 	{
 		var ctrl = Build(allow: false, out _);
-		var result = await ctrl.Ask(new AskRequest { Question = "q" });
+		var result = await ctrl.Ask(new AskRequest { Question = "请查询销售额" });
 
 		var forbid = Assert.IsType<ObjectResult>(result);
 		Assert.Equal(403, forbid.StatusCode);
@@ -150,7 +150,7 @@ public class AskControllerTests
 			HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(new ClaimsIdentity()) },
 		};
 
-		var result = await ctrl.Ask(new AskRequest { Question = "q" });
+		var result = await ctrl.Ask(new AskRequest { Question = "请查询销售额" });
 		Assert.IsType<UnauthorizedObjectResult>(result);
 	}
 
@@ -198,7 +198,7 @@ public class AskControllerTests
 			}
 		};
 
-		var result = await ctrl.Ask(new AskRequest { Question = "q", DataSourceId = 8 });
+		var result = await ctrl.Ask(new AskRequest { Question = "请查询销售额", DataSourceId = 8 });
 
 		var forbidden = Assert.IsType<ObjectResult>(result);
 		Assert.Equal(403, forbidden.StatusCode);
@@ -220,12 +220,12 @@ public class AskControllerTests
 			}
 		};
 
-		Assert.IsType<OkObjectResult>(await ctrl.Ask(new AskRequest { Question = "q" }));
+		Assert.IsType<OkObjectResult>(await ctrl.Ask(new AskRequest { Question = "请查询销售额" }));
 		Assert.Equal(7, bi.CapturedRequestedDataSourceId);
 		Assert.Contains(7, cache.GetDataSourceIds);
 		authorization.Allowed = Array.Empty<long>();
 
-		var result = await ctrl.Ask(new AskRequest { Question = "q" });
+		var result = await ctrl.Ask(new AskRequest { Question = "请查询销售额" });
 		Assert.Equal(403, Assert.IsType<ObjectResult>(result).StatusCode);
 		Assert.Equal(1, bi.Calls);
 		Assert.Single(cache.GetDataSourceIds);
@@ -248,7 +248,7 @@ public class AskControllerTests
 			}
 		};
 
-		Assert.IsType<OkObjectResult>(await ctrl.Ask(new AskRequest { Question = "q" }));
+		Assert.IsType<OkObjectResult>(await ctrl.Ask(new AskRequest { Question = "请查询销售额" }));
 		Assert.Null(bi.CapturedRequestedDataSourceId);
 		Assert.Equal(new[] { 7L, 8L }, bi.CapturedAuthorizedDataSourceIds);
 		Assert.Empty(cache.GetDataSourceIds);
@@ -267,13 +267,54 @@ public class AskControllerTests
 			ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext { User = Authenticated(3, 5) } }
 		};
 
-		await ctrl.Ask(new AskRequest { Question = "q", DataSourceId = 7 });
+		await ctrl.Ask(new AskRequest { Question = "请查询销售额", DataSourceId = 7 });
 		rowSecurity.Fingerprint = "v2";
-		await ctrl.Ask(new AskRequest { Question = "q", DataSourceId = 7 });
+		await ctrl.Ask(new AskRequest { Question = "请查询销售额", DataSourceId = 7 });
 
 		Assert.Equal(2, cache.GetQuestions.Count);
 		Assert.NotEqual(cache.GetQuestions[0], cache.GetQuestions[1]);
 		Assert.Contains("policy:v1", cache.GetQuestions[0]);
 		Assert.Contains("policy:v2", cache.GetQuestions[1]);
+	}
+
+	[Fact]
+	public async Task Ask_Question_Too_Short_Returns_400()
+	{
+		var ctrl = Build(allow: true, out _);
+		var result = await ctrl.Ask(new AskRequest { Question = "q" });
+		Assert.IsType<BadRequestObjectResult>(result);
+	}
+
+	[Fact]
+	public async Task Ask_Question_Too_Long_Returns_400()
+	{
+		var ctrl = Build(allow: true, out _);
+		var result = await ctrl.Ask(new AskRequest { Question = new string('x', 2001) });
+		Assert.IsType<BadRequestObjectResult>(result);
+	}
+
+	[Fact]
+	public async Task Ask_ConversationId_Too_Long_Returns_400()
+	{
+		var ctrl = Build(allow: true, out _);
+		var result = await ctrl.Ask(new AskRequest { Question = "请查询销售额", ConversationId = new string('a', 200) });
+		Assert.IsType<BadRequestObjectResult>(result);
+	}
+
+	[Fact]
+	public async Task Ask_Refine_History_Too_Many_Rounds_Returns_400()
+	{
+		var ctrl = Build(allow: true, out _);
+		var history = new List<AskRefineTurn>();
+		for (var i = 0; i < 21; i++)
+			history.Add(new AskRefineTurn { Role = "user", Content = $"轮次{i}" });
+
+		var result = await ctrl.Refine(new AskRefineRequest
+		{
+			Instruction = "只看华东地区",
+			History = history,
+		});
+
+		Assert.IsType<BadRequestObjectResult>(result);
 	}
 }
