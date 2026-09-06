@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using SuperBuilder_AI.Controllers;
+using static SuperBuilder_AI.Controllers.AppBuilderController;
 using SuperBuilder_AI.Data;
 using SuperBuilder_AI.Interfaces.AppBuilder;
 using SuperBuilder_AI.Models.AppBuilder;
@@ -106,7 +107,7 @@ public sealed class AppBuilderControllerVersioningTests
 			var code = await CreateAppAsync(controller, dsl);
 
 			var pubResult = await controller.Publish(code, 1, CancellationToken.None);
-			var pub = Assert.IsType<PublishResult>(Assert.IsType<OkObjectResult>(pubResult).Value);
+			var pub = Assert.IsType<AppBuilderController.PublishResult>(Assert.IsType<OkObjectResult>(pubResult).Value);
 			Assert.Equal(1, pub.Version);
 
 			var entity = await db.AppPlans.AsNoTracking().FirstAsync(p => p.Code == code);
@@ -173,7 +174,7 @@ public sealed class AppBuilderControllerVersioningTests
 			await controller.Publish(code, 1, CancellationToken.None);          // v2 = B
 
 			var rbResult = await controller.Rollback(code, 1, 1, CancellationToken.None);
-			var rb = Assert.IsType<PublishResult>(Assert.IsType<OkObjectResult>(rbResult).Value);
+			var rb = Assert.IsType<AppBuilderController.PublishResult>(Assert.IsType<OkObjectResult>(rbResult).Value);
 			Assert.Equal(3, rb.Version);                 // 回滚固化为 v3
 			Assert.Equal(1, rb.RolledBackFromVersion);   // 来源 v1
 
