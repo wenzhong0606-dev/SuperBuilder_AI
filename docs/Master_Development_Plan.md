@@ -548,7 +548,7 @@ M3 退出：平台/租户视图严格分离；租户只能使用授权语言；�
 | M5-03 | SB-P1-03 | QueryPlan Pipeline Stage 化 | Metadata/Semantic/Security/Repair/Confidence/Decision 可扩展测试（✅ 2026-09-06，fb38cea：8 段链路抽离为有序 `IQueryPlanStage`，14 例阶段测试全绿，行为逐字节不变） |
 | M5-04 | SB-P1-04 | 收缩 QueryPlanBuilder | Builder 只构造，不承担权限、安全判断（✅ 2026-09-06，bcbe537：数据源候选收敛抽离为 `IQueryPlanDataSourceScope`，45 例测试全绿，对 Golden 免疫） |
 | M5-05 | SB-P1-05 | Column-Level Security | 未授权/脱敏字段不进入 Plan、SQL、结果（✅ 2026-09-06，0fc4a31：管线新阶段 QueryPlanColumnSecurityStage + IColumnSensitivityClassifier/IColumnSecurityPolicy/IColumnSecurityContextResolver，11 例测试全绿，零 schema 变更、对 Golden 免疫） |
-| M5-06 | SB-P1-06 | Query Cost Governance | 高扫描、Join、无界 Limit、高模型成本可拒绝或降级 |
+| M5-06 | SB-P1-06 | Query Cost Governance | 高扫描、Join、无界 Limit、高模型成本可拒绝或降级（✅ 2026-09-06，d9e01a1：管线新阶段 QueryPlanCostGovernanceStage + IQueryCostClassifier/ICostGovernancePolicy/ICostGovernanceContextResolver + CostGovernanceOptions，15 例测试全绿，默认关闭零行为变更、对 Golden 免疫） |
 | M5-07 | SB-P1-07 | Decision Gate 状态化 | ALLOW/REJECT/ASK_CLARIFICATION/REQUIRE_APPROVAL/LIMITED_EXECUTION（✅ 2026-09-06，cf6e5db：枚举规范为 5 态 + Decision 派生单一事实来源，33 例决策/状态/管线测试全绿，对 Golden 免疫） |
 | M5-08 | SB-P1-08 | AI Decision Audit | 可追踪问题、意图、计划、修复、置信度、决策、SQL、模型 |
 | M5-09 | SB-P1-10 | Production Feedback | Feedback→Candidate→Review→Baseline→Regression |
