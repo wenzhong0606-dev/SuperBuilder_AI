@@ -12,6 +12,7 @@ using SuperBuilder_AI.Api.Errors;
 using SuperBuilder_AI.Controllers;
 using SuperBuilder_AI.Data;
 using SuperBuilder_AI.Interfaces.Identity;
+using SuperBuilder_AI.Models.Organization;
 using SuperBuilder_AI.Services.Auth;
 using SuperBuilder_AI.Services.Identity;
 using Xunit;
@@ -35,6 +36,10 @@ public class IdentityControllerTests
 		var options = new DbContextOptionsBuilder<SuperBIContext>().UseSqlite(connection).Options;
 		var ctx = new SuperBIContext(options);
 		ctx.Database.EnsureCreated();
+		ctx.Tenants.AddRange(
+			new Tenant { Id = Tenant5, TenantCode = "t5", TenantName = "Tenant 5", Enabled = true },
+			new Tenant { Id = Tenant6, TenantCode = "t6", TenantName = "Tenant 6", Enabled = true });
+		ctx.SaveChanges();
 		return ctx;
 	}
 

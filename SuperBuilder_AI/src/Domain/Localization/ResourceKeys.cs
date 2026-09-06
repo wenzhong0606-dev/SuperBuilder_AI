@@ -428,6 +428,9 @@ public static class ResourceKeys
         public const string ComponentGalleryColName = "Content.ComponentGalleryColName";
         public const string ComponentGalleryColStatus = "Content.ComponentGalleryColStatus";
         public const string ComponentGalleryColTenant = "Content.ComponentGalleryColTenant";
+        public const string ComponentGalleryDemoSales = "Content.ComponentGalleryDemoSales";
+        public const string ComponentGalleryDemoStock = "Content.ComponentGalleryDemoStock";
+        public const string ComponentGalleryDemoFinance = "Content.ComponentGalleryDemoFinance";
         public const string ComponentGalleryCardAskTitle = "Content.ComponentGalleryCardAskTitle";
         public const string ComponentGalleryCardAskDesc = "Content.ComponentGalleryCardAskDesc";
         public const string ComponentGalleryCardDashTitle = "Content.ComponentGalleryCardDashTitle";
@@ -1691,6 +1694,9 @@ public static class ResourceKeys
         [Content.ComponentGalleryColName] = new("Content", Page: "ComponentGallery", DefaultValue: "Name"),
         [Content.ComponentGalleryColStatus] = new("Content", Page: "ComponentGallery", DefaultValue: "Status"),
         [Content.ComponentGalleryColTenant] = new("Content", Page: "ComponentGallery", DefaultValue: "Tenant"),
+        [Content.ComponentGalleryDemoSales] = new("Content", Page: "ComponentGallery", DefaultValue: "Sales dashboard"),
+        [Content.ComponentGalleryDemoStock] = new("Content", Page: "ComponentGallery", DefaultValue: "Inventory alerts"),
+        [Content.ComponentGalleryDemoFinance] = new("Content", Page: "ComponentGallery", DefaultValue: "Monthly finance report"),
         [Content.ComponentGalleryCardAskTitle] = new("Content", Page: "ComponentGallery", DefaultValue: "Ask BI"),
         [Content.ComponentGalleryCardAskDesc] = new("Content", Page: "ComponentGallery", DefaultValue: "The flagship entry for natural-language analytics."),
         [Content.ComponentGalleryCardDashTitle] = new("Content", Page: "ComponentGallery", DefaultValue: "Dashboards"),

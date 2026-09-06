@@ -12,6 +12,9 @@ public class MetadataTable : BaseEntity
 	/// </summary>
 	public long TenantId { get; set; }
 
+	/// <summary>所属租户。</summary>
+	public SuperBuilder_AI.Models.Organization.Tenant? Tenant { get; set; }
+
 	/// <summary>
 	/// 数据源标识。
 	/// </summary>
@@ -25,7 +28,7 @@ public class MetadataTable : BaseEntity
 	/// <summary>
 	/// 表名（必填，建议按数据源原始大小写保留）。
 	/// </summary>
-	public string? TableName { get; set; }
+	public string TableName { get; set; } = string.Empty;
 
 	/// <summary>
 	/// 目录名（如 MySQL 的 database / PostgreSQL 的 catalog）。

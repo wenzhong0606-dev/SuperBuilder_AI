@@ -77,7 +77,7 @@ public class QueryPlanBuilderQaRegressionTests
 	{
 		ctx.Tenants.Add(new Tenant { Id = TenantId, TenantCode = "qa", TenantName = "qa", Enabled = true, CreatedTime = DateTime.UtcNow });
 		foreach (var dsId in tables.Select(t => t.DataSourceId).Distinct())
-			ctx.DataSources.Add(new DataSource { Id = dsId, DbType = "sqlserver", ConnectionString = "x" });
+			ctx.DataSources.Add(new DataSource { Id = dsId, TenantId = TenantId, Name = $"ds-{dsId}", NormalizedName = $"ds-{dsId}", DbType = "sqlserver", ConnectionString = "x" });
 		ctx.MetadataTables.AddRange(tables);
 		await ctx.SaveChangesAsync();
 	}

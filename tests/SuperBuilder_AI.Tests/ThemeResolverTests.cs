@@ -93,7 +93,7 @@ public class ThemeResolverTests
 		await using var __ = ctx;
 		ctx.Themes.Add(MakeTheme(0, "default", "#2563eb"));
 		ctx.Themes.Add(MakeTheme(Tenant5, "acme-dark", "#0b0b0b"));
-		ctx.Tenants.Add(new Tenant { Id = Tenant5 });
+		ctx.Tenants.Add(new Tenant { Id = Tenant5, TenantCode = "t5", TenantName = "Tenant 5" });
 		ctx.TenantSettings.Add(new TenantSetting
 		{
 			TenantId = Tenant5,

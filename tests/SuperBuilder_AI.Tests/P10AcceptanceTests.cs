@@ -7,6 +7,7 @@ using SuperBuilder_AI.Interfaces.Audit;
 using SuperBuilder_AI.Interfaces.Identity;
 using SuperBuilder_AI.Interfaces.Quota;
 using SuperBuilder_AI.Models.Identity;
+using SuperBuilder_AI.Models.Organization;
 using SuperBuilder_AI.Models.Quota;
 using SuperBuilder_AI.Services.Audit;
 using SuperBuilder_AI.Services.Auth;
@@ -32,6 +33,10 @@ public class P10AcceptanceTests
         var options = new DbContextOptionsBuilder<SuperBIContext>().UseSqlite(connection).Options;
         var ctx = new SuperBIContext(options);
         ctx.Database.EnsureCreated();
+        ctx.Tenants.AddRange(
+            new Tenant { Id = Tenant1, TenantCode = "t110", TenantName = "Tenant 110" },
+            new Tenant { Id = Tenant2, TenantCode = "t120", TenantName = "Tenant 120" });
+        ctx.SaveChanges();
         return ctx;
     }
 

@@ -9,7 +9,7 @@ namespace SuperBuilder_AI.Models.Metadata;
 public class DataSource : BaseEntity
 {
 
-	public long? TenantId { get; set; }
+	public long TenantId { get; set; }
 
 
 	public Tenant? Tenant { get; set; }
@@ -18,25 +18,25 @@ public class DataSource : BaseEntity
 	/// <summary>
 	/// 名称（展示用，保留原始大小写）。
 	/// </summary>
-	public string? Name { get; set; }
+	public string Name { get; set; } = string.Empty;
 
 
 	/// <summary>
 	/// 规范化名称（小写去空白），作为租户内唯一键。
 	/// </summary>
-	public string? NormalizedName { get; set; }
+	public string NormalizedName { get; set; } = string.Empty;
 
 
 	/// <summary>
 	/// MYSQL / SQLSERVER / POSTGRESQL（连接器目录稳定 code，由方言 Code 返回）。
 	/// </summary>
-	public string? DbType { get; set; }
+	public string DbType { get; set; } = string.Empty;
 
 
 	/// <summary>
 	/// 数据库连接字符串（敏感，禁止日志记录与接口返回）。
 	/// </summary>
-	public string? ConnectionString { get; set; }
+	public string ConnectionString { get; set; } = string.Empty;
 
 
 	/// <summary>

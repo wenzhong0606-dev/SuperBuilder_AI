@@ -53,7 +53,7 @@ public sealed class BusinessEntityRuntimeVerificationController : ControllerBase
         html.Append("<label>BusinessEntity：</label><select name='businessEntityId'>");
         foreach (var entity in entities) html.Append($"<option value='{entity.Id}'>{H(entity.TenantId.ToString())} / {H(entity.Name)} (#{entity.Id})</option>");
         html.Append("</select><label>DataSource：</label><select name='dataSourceId'>");
-        foreach (var source in dataSources) html.Append($"<option value='{source.Id}'>{H(source.TenantId?.ToString() ?? "-")} / {H(source.Name ?? "-")} (#{source.Id}, {H(source.DbType ?? "-")})</option>");
+		foreach (var source in dataSources) html.Append($"<option value='{source.Id}'>{H(source.TenantId.ToString())} / {H(source.Name)} (#{source.Id}, {H(source.DbType)})</option>");
         html.Append("</select><button type='submit'>运行 Golden Cases</button></form>");
         html.Append("<h2>当前可用数据</h2><table><tr><th>Tenant</th><th>BusinessEntity</th><th>Status</th></tr>");
         foreach (var e in entities) html.Append($"<tr><td>{e.TenantId}</td><td>{H(e.DisplayName ?? e.Name)} (#{e.Id})</td><td>{H(e.Status)}</td></tr>");

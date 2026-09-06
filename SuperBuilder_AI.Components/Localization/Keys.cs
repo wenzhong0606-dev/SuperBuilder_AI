@@ -460,6 +460,9 @@ public static class Keys
         public const string ComponentGalleryColName = "Content.ComponentGalleryColName";
         public const string ComponentGalleryColStatus = "Content.ComponentGalleryColStatus";
         public const string ComponentGalleryColTenant = "Content.ComponentGalleryColTenant";
+        public const string ComponentGalleryDemoSales = "Content.ComponentGalleryDemoSales";
+        public const string ComponentGalleryDemoStock = "Content.ComponentGalleryDemoStock";
+        public const string ComponentGalleryDemoFinance = "Content.ComponentGalleryDemoFinance";
         public const string ComponentGalleryCardAskTitle = "Content.ComponentGalleryCardAskTitle";
         public const string ComponentGalleryCardAskDesc = "Content.ComponentGalleryCardAskDesc";
         public const string ComponentGalleryCardDashTitle = "Content.ComponentGalleryCardDashTitle";
@@ -1669,6 +1672,9 @@ public static class Keys
         [Content.ComponentGalleryColName] = new("名称", "Name"),
         [Content.ComponentGalleryColStatus] = new("状态", "Status"),
         [Content.ComponentGalleryColTenant] = new("租户", "Tenant"),
+        [Content.ComponentGalleryDemoSales] = new("销售看板", "Sales dashboard"),
+        [Content.ComponentGalleryDemoStock] = new("库存预警", "Inventory alerts"),
+        [Content.ComponentGalleryDemoFinance] = new("财务月报", "Monthly finance report"),
         [Content.ComponentGalleryCardAskTitle] = new("Ask BI", "Ask BI"),
         [Content.ComponentGalleryCardAskDesc] = new("自然语言问数的旗舰入口。", "The flagship entry for natural-language analytics."),
         [Content.ComponentGalleryCardDashTitle] = new("仪表盘", "Dashboards"),

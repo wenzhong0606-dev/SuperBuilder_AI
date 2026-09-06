@@ -19,12 +19,12 @@ public class Tenant : BaseEntity
 	/// 租户编码，唯一标识租户（用于登录或命名空间划分）。
 	/// 规范化为小写并去除首尾空白后存储；创建后默认不可变更。
 	/// </summary>
-	public string? TenantCode { get; set; }
+	public string TenantCode { get; set; } = string.Empty;
 
 	/// <summary>
 	/// 租户名称，用于展示。
 	/// </summary>
-	public string? TenantName { get; set; }
+	public string TenantName { get; set; } = string.Empty;
 
 	/// <summary>
 	/// 是否启用该租户。

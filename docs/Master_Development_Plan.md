@@ -1,12 +1,12 @@
 # SuperBuilder AI 最终开发计划（Master Development Plan）
 
-> 版本：v2.0
+> 版本：v2.1
 >
-> 基线日期：2026-09-03
+> 基线日期：2026-09-06
 >
 > 性质：唯一执行计划与状态跟踪入口
 >
-> 当前自动化测试基线：431/431 通过，Golden 18/18 通过
+> 当前自动化测试基线：854/854 通过，Golden 18/18 基线保持
 > 范围：API、Web、共享 RCL、MAUI、数据库、向量服务、部署与产品验收
 
 ---
@@ -52,7 +52,9 @@
 - 租户管理员可创建数据源并按用户或角色授权。
 - Ask 自动使用当前用户全部授权数据源；已有基础 ConversationId、待澄清状态和租户/用户隔离。
 - MetadataColumn、MetadataSemantic、Vector 已有基础详情和关系入口。
-- 当前测试基线 431/431，Golden 18/18。
+- M1 物理完整性收尾已完成：核心租户键、必填字段、父子关系和数据源同租户关系已下沉到数据库约束。
+- M3 本地化收尾已建立可执行门禁：未知资源键、格式占位符漂移和 Razor 用户可见硬编码中文均可检测。
+- 当前测试基线 854/854，Golden 18/18 基线保持。
 
 ### 1.2 最高风险
 
@@ -151,6 +153,8 @@
 - 数据库不可达、Schema 未创建和 Seed 不完整必须区分；允许 Web 启动到受限诊断/初始化页，不得形成启动崩溃或普通页面 500，也不向普通用户输出堆栈。
 - 修订空迁移、真实建表迁移、升级和回滚说明。
 
+> **2026-09-06 配置优先级硬化**：`appsettings.Local.json` 仅作本地默认值，加载后重新应用环境变量和命令行，保证部署注入始终具有最高优先级，避免迁移或启动误连本地库。
+
 ### M0-06 字段越权与关系链一致性 🔴
 
 - 租户管理员接口忽略请求体 TenantId，从 JWT tid 获取；平台代管使用独立治理路由。
@@ -217,7 +221,7 @@ M0 退出：全部 🔴 完成、凭据已轮换、构建零错误、测试不�
 - TenantSetting.DataType 限定 string/int/bool/json 并校验 Value。
 - TenantSetting.Key 进入允许目录，租户不能覆盖安全配置。
 
-> 落地说明：必填/规范化唯一在**控制器写入路径**强制（既有测试以 `new Tenant { Id }` 形式造数不设 Code，故未加 DB 级 NOT NULL，避免破坏集成测试种子）；DB 级 `nvarchar` 长度约束已加。停用治理三字段 + `IsLocked` 已落库并通过迁移 `M1_02_TenantAndSettingIntegrity`。全量 **576/576 通过**，构建 0 error。
+> 落地说明：写入路径与 DB 双重强制必填/规范化唯一。2026-09-06 收尾迁移 `M1_ClosureIntegrity` 将 `TenantCode`/`TenantName` 收紧为 DB `NOT NULL`，历史空值按主键确定性回填，唯一索引不再依赖 nullable 过滤条件。
 
 ### M1-03 User、Role、Permission ✅（2026-09-04 收尾）
 
@@ -225,10 +229,8 @@ M0 退出：全部 🔴 完成、凭据已轮换、构建零错误、测试不�
 - ✅ **Username 租户内唯一**：唯一索引由全局 `Username` 收窄为 `(TenantId, NormalizedUsername)`（过滤 `[NormalizedUsername] IS NOT NULL`，兼容存量 NULL 行）；`User.NormalizeUsername`/`NormalizeEmail` 小写去空白；`CreateUserAsync` 改为按租户内规范化名查重。
 - ✅ **新增字段**：`NormalizedUsername`(max128)、`NormalizedEmail`(max256)、`EmailConfirmed`(bit, default false)。
 - ✅ **SecurityStamp 轮换闭环**：改密、角色指派/撤销（既有）**+ 停用/启用（`SetUserStatusAsync` + `PUT /api/identity/users/{id}/status`）** 均轮换；状态机仅允许 `Active ↔ Disabled`。
-- ⏸️ **未做（明确延后，记入硬化项）**：
-  1. `User→Tenant` 的 DB 级外键与"租户存在性"校验——沿用 M1-02 策略：因 `IdentityServiceTests`/`AuthControllerDisabledTenantTests`/`P10AcceptanceTests`/`IdentityControllerTests` 等多处以 `new User{TenantId=N}` 直接注入且不建对应租户行，加 FK 会破坏种子测试；当前仅在 `CreateUserAsync` 校验 `tenantId>0`，DB 级 FK 待测试种子补充租户行后启用。
-  2. `SecurityStamp` 的 DB 级 `IsRequired()`——同因测试直接注入 `User` 不设该字段，维持 `string?` + 创建/回填/轮换保证。
-  3. 用户邀请、首次设密、忘记密码、重置密码全流程——属功能里程碑，超出"字段与数据完整性"主题，本批未覆盖（DEC-02 已落地唯一范围）。
+- ✅ **2026-09-06 物理约束收尾**：测试 Fixture 先补齐租户根数据，再启用 `User→Tenant` DB 外键（`Restrict`）和 `SecurityStamp NOT NULL`；新增数据库负向测试验证孤儿 User 被拒绝。
+- ⏸️ **功能性后续项，不属于 M1 数据完整性退出条件**：用户邀请、首次设密、忘记密码和重置密码产品流程应在身份产品化后续里程碑单独跟踪。
 - 验证：全量测试 **581/581 通过**，构建 0 error。
 
 ### M1-04 DataSource ✅（2026-09-04 收尾，已推送 origin/master）
@@ -238,7 +240,7 @@ M0 退出：全部 🔴 完成、凭据已轮换、构建零错误、测试不�
 - ✅ **Enabled 非空**：由 `bool?` 改为 `bool` + `default true`；迁移 `20260904155755_M1_04_DataSourceIntegrity` 先 `UPDATE ... SET Enabled=1 WHERE NULL` 再 `AlterColumn` 非空（避免生产 NULL 行致 `AlterColumn` 失败）；3 个查询计划测试注入 `Enabled=true` 兼容。
 - ✅ **连接测试记录（脱敏）**：新增 `LastTestStatus`(max32)/`LastTestTime`(UTC 转换)/`LastErrorCode`(max64)。诊断控制器 `CheckDbConnectionAsync` 记录脱敏错误码（仅异常类型名，超时记 `"Timeout"`）；`FlattenException` 经 `SanitizeErrorMessage` 移除 `Password/Pwd/User Id/Uid` 键值。
 - ✅ **连接测试超时与长度约束**：`CheckDbConnectionAsync`/`QueryRelationsAsync` 的 `OpenAsync` 加 15s 硬性超时（`CancellationTokenSource` 联动）；连接串/DbType/Name 限长 2048/32/128；原始连接串不在日志或接口返回。
-- ⏸️ **延后（记入硬化项）**：`TenantId` 的 DB 级 `NOT NULL` + 租户存在性校验——沿用 M1-02/03 策略：3 个查询计划测试以 `new DataSource { Id, DbType, ConnectionString }` 持久化且**不设 TenantId/Name**，加 NOT NULL 会破坏种子；当前 TenantId 由 token 提供、`DataSource→Tenant` FK 已存在（写入路径保证存在），DB 级 NOT NULL 待测试造数补齐后启用。
+- ✅ **2026-09-06 物理约束收尾**：`TenantId`/`Name`/`NormalizedName`/`DbType`/`ConnectionString` 均收紧为 DB `NOT NULL`，`DataSource→Tenant` 为必需 `Restrict` 外键；历史名称与规范化名称确定性回填，`DbType` 归一化后通过白名单预检。
 - 验证：新增 6 项测试（白名单拒绝、租户内唯一、跨租户放行、空值校验、规范化持久化、静态方法），全量 **587/587 通过**，构建 0 error（三端 Components/Web/Maui）。
 
 ### M1-05 Metadata 与 Vector ✅（2026-09-05 收尾，已推送 origin/master）
@@ -250,7 +252,7 @@ M0 退出：全部 🔴 完成、凭据已轮换、构建零错误、测试不�
 - ✅ **LearningRecord 租户化**：`TenantId` 由 `long?` 改为 `long`（必填）+ `Tenant` 导航 FK（写入路径保证存在）；新增 `MetadataColumn` 导航（`OnDelete SetNull`）；新增静态 `IsTenantConsistent(recordTenantId, columnTenantId)`；using 由 `Models.Identity` 修正为 `Models.Organization`（修复 CS0246）。迁移先 `UPDATE ... SET TenantId=1 WHERE NULL` 再非空。
 - ✅ **向量状态闭环**：`MetadataVectorService.IndexAsync` 三段（Table/Column/Semantic）`try` 成功写 `VectorId`/`VectorDimension`/`VectorStatus="Synced"`/`VectorSyncTime=UtcNow`/`VectorErrorCode=null`，`catch` 写 `VectorStatus="Failed"`/`VectorErrorCode=异常类型名`（脱敏）；无 `SearchText` 置 `Pending`。
 - ✅ **孤儿检测与维度校验**：`MetadataVectorIndexService` 构造函数注入 `IOptions<QdrantOptions>`；新增 `DetectOrphansAsync`（`IQdrantService.ListPointIdsAsync` 滚动列出全部 Point Id，与 DB `VectorId` 比对）与 `ValidateVectorsAsync`（期望维度 `(int)QdrantOptions.VectorSize`，不符标 `Stale`）；`RebuildAsync` 去掉 `AsNoTracking` 并 `SaveChangesAsync` 持久化状态；诊断控制器新增 `GET /api/metadata-vector/orphans`、`GET /api/metadata-vector/validate`。
-- ⏸️ **延后（记入硬化项）**：`MetadataTable.TenantId` / `MetadataColumn.MetadataTableId` 的 DB 级 `NOT NULL` + 租户存在性校验——沿用 M1-02/03/04 策略：多数集成测试以 `new MetadataTable{DataSourceId,...}` 持久化且不建租户/父行，加 NOT NULL 破坏种子；当前由 `DataSource→Tenant` FK 与写入路径保证，DB 级 NOT NULL 待测试造数补齐后启用。
+- ✅ **2026-09-06 物理约束收尾**：`MetadataTable→Tenant` 为必需 `Restrict` 外键；`MetadataColumn.MetadataTableId` 收紧为必填并建立必需父外键；`MetadataTable(DataSourceId,TenantId)→DataSource(Id,TenantId)` 复合外键在 DB 层拒绝跨租户数据源/表组合。
 - 验证：新增 16 项 `MetadataVectorIntegrityTests`（受控词表/结构化辅助、DB 约束：表唯一键/同目录放行/空 Catalog 兼容/列必填/新字段持久化/置信度 CHECK/学习记录租户 FK、向量状态 Synced/Failed、孤儿检测），**16/16 通过**；全量回归构建 0 error（三端 Components/Web/Maui）。
 
 ### M1-06 PhysicalBinding、授权与 RLS ✅（2026-09-05 收尾，本地提交待推送）
@@ -262,7 +264,9 @@ M0 退出：全部 🔴 完成、凭据已轮换、构建零错误、测试不�
 - ✅ **迁移与快照一致**：`20260905020528_M1_06_PhysicalBindingAuthorizationRls` 先 DROP `CK_PhysicalBindings_ExactlyOneOwner` 再新增上述约束/索引/FK/列；CHECK 字面量统一为 SQLite 与 SQL Server 兼容的纯 `'...'`（去除 SQL Server `N'...'` 前缀）；Designer 快照与 ModelSnapshot 同步去除旧约束，避免未来迁移重复 DROP。
 - 验证：新增 16 项 `M1_06_PhysicalBindingAuthorizationRlsTests`（RlsVocabularyValidator 单元、RevokeBySubject/DetectOrphanGrants 行为、写入路径 Priority 校验、RLS/PhysicalBinding CHECK、BusinessDomain/MetadataSemantic 收敛），**16/16 通过**；全量回归 **619/619 通过**，构建 0 error（三端 Components/Web/Maui）。
 
-M1 退出：Migration 可在历史副本执行；无孤儿；跨租户组合均拒绝；数据库约束与 API 校验一致。
+> **M1 Closure Batch 验收（2026-09-06）**：迁移 `20260906075147_M1_ClosureIntegrity` 在隔离 SQL Server 历史副本上完成 `Up → Down → Up`；执行 51001–51007 预检后再回填和收紧，且不留下永久默认约束。新增 5 个 `M1ClosureIntegrityTests`，覆盖必填列、孤儿 User/DataSource/MetadataColumn 和跨租户 MetadataTable；全量 854/854 通过。
+
+M1 退出：✅ 已达成。Migration 可在历史副本执行并可回滚；孤儿核心关系和跨租户组合由数据库拒绝；数据库约束与 API 校验一致。
 
 ---
 
@@ -482,7 +486,9 @@ M3-G0 是 M4/M7/M8 的最小前置，不等同于完成全部 i18n。它只包�
   - **测试补齐（发布门禁）**：`UserLanguagePreferenceServiceTests.Get_FallsBackToTenantDefault_WhenStoredLanguageDisabled`（设 en-US→停用 en-US→读回退 zh-CN）、`Get_ReturnsStoredCulture_WhenStillEnabled`（启用态保持用户偏好）、`UserPreferenceControllerTests.Get_ReturnsTenantDefault_WhenStoredLanguageDisabled`（同场景经 API 返回有效文化）；既有 `Set_OutOfRange`/RoundTrip/Idempotent 全绿。覆盖「刷新/换设备（服务端持久化读取）」「越界回退」「首次登录无偏好(null)」「语言停用回退」四项门禁。
   - **验证**：后端构建 0 error（25 个既有 CS0618 告警）；`UserLanguagePreferenceServiceTests`(6) + `UserPreferenceControllerTests`(4) + `ResourceKeyRegistryTests`(6) 全绿；全量回归 708/708。`Login.razor` 已按「选租户→加载语言→登录→按 (TenantId,UserId) 服务端偏好」顺序解析（满足「登录前恢复租户再加载语言」），`LocalizationService.SetCultureAsync` 仅登录用户写服务端、localStorage 仅作快速恢复，满足 M3-06 全部边界。
 
-M3 退出：平台/租户视图严格分离；租户只能使用授权语言；核心及全部页面可切换；刷新、换设备、语言停用回退均通过测试。
+> **M3 Closure Batch 验收（2026-09-06）**：补齐 404、登录、自助注册和组件库演示项的残余用户可见文本；`ResourceKeyRegistryTests` 扩展为 9 项，新增「Razor 字面资源键必须已注册」「中英文格式占位符集必须一致」「Razor 用户可见中文节点/占位符禁止硬编码」门禁，9/9 通过。带 `PageHead Key` 的 Title/Desc 字面值明确为 key-backed 容错文本，不重复本地化。
+
+M3 退出：✅ 已达成当前跟踪页面范围。平台/租户视图严格分离；租户只能使用授权语言；核心及全部页面可切换；刷新、换设备、语言停用回退均通过测试。
 
 ---
 
@@ -864,7 +870,7 @@ A5/A3 在功能和数据约束稳定后分步执行，不得在同一提交中�
 - [ ] 登录、Layout、Nav、全部页面可切换；选项来自数据库。
 - [ ] 租户只使用授权语言；默认语言和用户偏好正确回退。
 - [ ] 平台基线、租户覆盖、删除覆盖恢复继承正确。
-- [ ] 缺失译文、未知键、硬编码和占位符错误可检测。
+- [x] 缺失译文、未知键、硬编码和占位符错误可检测（`ResourceKeyRegistryTests` 9/9）。
 
 ### 18.4 数据源、元数据与 Ask
 
@@ -915,4 +921,4 @@ A5/A3 在功能和数据约束稳定后分步执行，不得在同一提交中�
 
 ---
 
-文档状态：**v2.0 最终整合版，可作为后续开发、排期和验收的唯一执行计划。**
+文档状态：**v2.1 M0–M5 收尾更新版，可作为后续开发、排期和验收的唯一执行计划。**

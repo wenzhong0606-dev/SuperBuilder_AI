@@ -1,3 +1,5 @@
+@inject LocalizationService L10n
+
 <Router AppAssembly="@typeof(Routes).Assembly">
     <Found Context="routeData">
         <RouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)" />
@@ -6,9 +8,11 @@
     <NotFound>
         @* 404 页面自带 BlankLayout，此处以内联空态呈现，避免布局嵌套 *@
         <LayoutView Layout="@typeof(MainLayout)">
-            <SbEmptyState Icon="sb-ico-search" Title="页面不存在" Text="该地址没有对应的页面，可能是链接已失效或输入有误。">
+            <SbEmptyState Icon="sb-ico-search"
+                          Title="@L10n.T(Keys.Content.ErrNotFoundTitle, "页面不存在")"
+                          Text="@L10n.T(Keys.Content.ErrNotFoundText, "该地址没有对应的页面，可能是链接已失效或输入有误。")">
                 <Actions>
-                    <a class="btn btn-primary btn-sm" href="">返回工作台</a>
+                    <a class="btn btn-primary btn-sm" href="">@L10n.T(Keys.Common.BackToWorkspace, "返回工作台")</a>
                 </Actions>
             </SbEmptyState>
         </LayoutView>

@@ -98,9 +98,9 @@ public sealed class DemoDataInstallerTests
         Assert.Equal(1, await ctx.DataSources.CountAsync(d => d.TenantId == tenant.Id));
         Assert.Equal(1, await ctx.MetadataTables.CountAsync(m => m.TenantId == tenant.Id));
         var demoTableIds = await ctx.MetadataTables.Where(m => m.TenantId == tenant.Id).Select(m => m.Id).ToListAsync();
-        Assert.Equal(5, await ctx.MetadataColumns.CountAsync(c => demoTableIds.Contains(c.MetadataTableId ?? 0)));
+        Assert.Equal(5, await ctx.MetadataColumns.CountAsync(c => demoTableIds.Contains(c.MetadataTableId)));
 
-        var colIds = await ctx.MetadataColumns.Where(c => demoTableIds.Contains(c.MetadataTableId ?? 0)).Select(c => c.Id).ToListAsync();
+        var colIds = await ctx.MetadataColumns.Where(c => demoTableIds.Contains(c.MetadataTableId)).Select(c => c.Id).ToListAsync();
         Assert.Equal(5, await ctx.MetadataSemantics.CountAsync(s => colIds.Contains(s.MetadataColumnId ?? 0)));
 
         Assert.Equal(1, await ctx.BusinessEntities.CountAsync(b => b.TenantId == tenant.Id));

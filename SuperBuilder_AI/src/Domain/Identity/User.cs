@@ -1,4 +1,5 @@
 using System;
+using SuperBuilder_AI.Models.Organization;
 
 namespace SuperBuilder_AI.Models.Identity;
 
@@ -16,6 +17,7 @@ public class User
 {
     public long Id { get; set; }
     public long TenantId { get; set; }
+    public Tenant? Tenant { get; set; }
     public string Username { get; set; } = string.Empty;
     /// <summary>
     /// 规范化登录名（小写、去首尾空白），用于租户内唯一约束 <c>(TenantId, NormalizedUsername)</c>。
@@ -35,7 +37,7 @@ public class User
     /// 令牌载荷携带其值，<see cref="AuthMiddleware"/> 在校验时比对，不一致即视为已吊销（401）。
     /// 新用户创建时生成；存量用户由 <see cref="IIdentityService"/> 种子幂等回填。
     /// </summary>
-    public string? SecurityStamp { get; set; }
+    public string SecurityStamp { get; set; } = Guid.NewGuid().ToString("N");
     public UserStatus Status { get; set; } = UserStatus.Active;
     public DateTime CreatedTime { get; set; } = DateTime.UtcNow;
 

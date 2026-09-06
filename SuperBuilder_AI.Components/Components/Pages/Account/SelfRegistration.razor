@@ -45,13 +45,13 @@
                 <h2 style="margin:0 0 4px;">@L10n.T(Keys.Content.SelfRegistrationApplyTitle, "申请开通新租户")</h2>
                 <p class="muted tiny">@L10n.T(Keys.Content.SelfRegistrationApplyDesc, "填写以下信息创建您的专属租户与首位管理员账户。")</p>
                 <label>@L10n.T(Keys.Content.SelfRegistrationLabelTenantCode, "租户编码（小写字母/数字，创建后不可变更）")
-                    <input class="form-control" @bind="TenantCode" placeholder="例如 acme" />
+                    <input class="form-control" @bind="TenantCode" placeholder="@L10n.T(Keys.Content.SelfRegistrationLabelTenantCode, "租户编码")" />
                 </label>
                 <label>@L10n.T(Keys.Content.SelfRegistrationLabelTenantName, "租户名称")
                     <input class="form-control" @bind="TenantName" placeholder="@L10n.T(Keys.Content.SelfRegistrationPhTenantName, "例如 Acme 科技")" />
                 </label>
                 <label>@L10n.T(Keys.Content.SelfRegistrationLabelAdminUsername, "管理员用户名")
-                    <input class="form-control" @bind="AdminUsername" placeholder="例如 admin" />
+                    <input class="form-control" @bind="AdminUsername" placeholder="@L10n.T(Keys.Content.SelfRegistrationLabelAdminUsername, "管理员用户名")" />
                 </label>
                 <label>@L10n.T(Keys.Content.SelfRegistrationLabelAdminEmail, "管理员邮箱")
                     <input class="form-control" @bind="AdminEmail" placeholder="admin@example.com" />

@@ -58,8 +58,8 @@ public class RowLevelSecurityControllerTests
 		await using var __ = ctx;
 
 		// 租户 7 的数据源/表/列
-		ctx.Tenants.Add(new Tenant { Id = 7 });
-		ctx.DataSources.Add(new DataSource { Id = 70, TenantId = 7, Name = "ds7" });
+		ctx.Tenants.Add(new Tenant { Id = 7, TenantCode = "t7", TenantName = "Tenant 7" });
+		ctx.DataSources.Add(new DataSource { Id = 70, TenantId = 7, Name = "ds7", NormalizedName = "ds7", DbType = "SQLSERVER", ConnectionString = "x" });
 		ctx.MetadataTables.Add(new MetadataTable { Id = 71, TenantId = 7, DataSourceId = 70, TableName = "t7" });
 		ctx.MetadataColumns.Add(new MetadataColumn { Id = 72, MetadataTableId = 71, ColumnName = "c7" });
 		await ctx.SaveChangesAsync();
@@ -89,9 +89,9 @@ public class RowLevelSecurityControllerTests
 		await using var __ = ctx;
 
 		// 租户 5 自己的列
-		ctx.Tenants.Add(new Tenant { Id = 5 });
-		ctx.Tenants.Add(new Tenant { Id = 7 });
-		ctx.DataSources.Add(new DataSource { Id = 50, TenantId = 5, Name = "ds5" });
+		ctx.Tenants.Add(new Tenant { Id = 5, TenantCode = "t5", TenantName = "Tenant 5" });
+		ctx.Tenants.Add(new Tenant { Id = 7, TenantCode = "t7", TenantName = "Tenant 7" });
+		ctx.DataSources.Add(new DataSource { Id = 50, TenantId = 5, Name = "ds5", NormalizedName = "ds5", DbType = "SQLSERVER", ConnectionString = "x" });
 		ctx.MetadataTables.Add(new MetadataTable { Id = 51, TenantId = 5, DataSourceId = 50, TableName = "t5" });
 		ctx.MetadataColumns.Add(new MetadataColumn { Id = 52, MetadataTableId = 51, ColumnName = "c5" });
 		// 租户 7 的用户

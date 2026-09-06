@@ -38,8 +38,8 @@ public class MetadataScannerServiceTests
 		await using var _ = connection;
 		await using var __ = ctx;
 
-		ctx.Tenants.Add(new Tenant { Id = 7 });
-		ctx.DataSources.Add(new DataSource { Id = 1, TenantId = 7, Name = "other" });
+		ctx.Tenants.Add(new Tenant { Id = 7, TenantCode = "t7", TenantName = "Tenant 7" });
+		ctx.DataSources.Add(new DataSource { Id = 1, TenantId = 7, Name = "other", NormalizedName = "other", DbType = "SQLSERVER", ConnectionString = "x" });
 		await ctx.SaveChangesAsync();
 		var dsId = ctx.DataSources.First().Id;
 

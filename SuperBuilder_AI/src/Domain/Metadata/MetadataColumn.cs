@@ -14,7 +14,7 @@ public class MetadataColumn : BaseEntity
 	/// <summary>
 	/// 所属元数据表标识。
 	/// </summary>
-	public long? MetadataTableId { get; set; }
+	public long MetadataTableId { get; set; }
 
 
 
@@ -68,7 +68,7 @@ public class MetadataColumn : BaseEntity
 	/// <summary>
 	/// 列名称（必填）。
 	/// </summary>
-	public string? ColumnName { get; set; }
+	public string ColumnName { get; set; } = string.Empty;
 
 
 	/// <summary>

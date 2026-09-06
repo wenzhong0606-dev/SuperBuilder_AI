@@ -408,6 +408,8 @@ public sealed class LocalizationSeedService : ILocalizationSeedService
         ["Content.ComponentGallerySampleTable"] = "示例表格",
         ["Content.ComponentGalleryColCode"] = "编码", ["Content.ComponentGalleryColName"] = "名称",
         ["Content.ComponentGalleryColStatus"] = "状态", ["Content.ComponentGalleryColTenant"] = "租户",
+        ["Content.ComponentGalleryDemoSales"] = "销售看板", ["Content.ComponentGalleryDemoStock"] = "库存预警",
+        ["Content.ComponentGalleryDemoFinance"] = "财务月报",
         ["Content.ComponentGalleryCardAskTitle"] = "Ask BI", ["Content.ComponentGalleryCardAskDesc"] = "自然语言问数的旗舰入口。",
         ["Content.ComponentGalleryCardDashTitle"] = "仪表盘", ["Content.ComponentGalleryCardDashDesc"] = "固化可复用的可视化看板。",
         ["Content.ComponentGalleryCardAppTitle"] = "应用工厂", ["Content.ComponentGalleryCardAppDesc"] = "把会话沉淀为 BI 应用。",

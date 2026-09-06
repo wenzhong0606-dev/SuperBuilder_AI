@@ -174,9 +174,13 @@ public class QueryPlanWidgetDataResolverTests
 		await using var _ = connection;
 		await using var __ = ctx;
 
+		ctx.Tenants.Add(new Tenant { Id = 1, TenantCode = "t1", TenantName = "Tenant 1" });
 		ctx.DataSources.Add(new SuperBuilder_AI.Models.Metadata.DataSource
 		{
 			Id = 1,
+			TenantId = 1,
+			Name = "main",
+			NormalizedName = "main",
 			DbType = "sqlserver",
 			ConnectionString = "x",
 		});

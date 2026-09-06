@@ -110,7 +110,7 @@ public class M1_06_PhysicalBindingAuthorizationRlsTests
 		var svc = new DataSourceAuthorizationService(db);
 		await svc.GrantAsync(1, 1, DataSourceGrantSubjectType.User, 10);
 		// 第二数据源（复用同一连接需先建表/数据源行）
-		db.DataSources.Add(new DataSource { Id = 2, TenantId = 1, Name = "ds2", NormalizedName = "ds2", DbType = "MYSQL" });
+		db.DataSources.Add(new DataSource { Id = 2, TenantId = 1, Name = "ds2", NormalizedName = "ds2", DbType = "MYSQL", ConnectionString = "x" });
 		await db.SaveChangesAsync();
 		await svc.GrantAsync(1, 2, DataSourceGrantSubjectType.User, 10);
 
@@ -170,8 +170,8 @@ public class M1_06_PhysicalBindingAuthorizationRlsTests
 
 	private static (long dsId, long tableId, long columnId) SeedChain(SuperBIContext ctx, long tenantId)
 	{
-		ctx.Tenants.Add(new Tenant { Id = tenantId });
-		var ds = new DataSource { Id = tenantId * 100 + 1, TenantId = tenantId, Name = $"ds{tenantId}", NormalizedName = $"ds{tenantId}", DbType = "MYSQL" };
+		ctx.Tenants.Add(new Tenant { Id = tenantId, TenantCode = $"t{tenantId}", TenantName = $"Tenant {tenantId}" });
+		var ds = new DataSource { Id = tenantId * 100 + 1, TenantId = tenantId, Name = $"ds{tenantId}", NormalizedName = $"ds{tenantId}", DbType = "MYSQL", ConnectionString = "x" };
 		var table = new MetadataTable { Id = tenantId * 100 + 2, TenantId = tenantId, DataSourceId = ds.Id, TableName = $"t{tenantId}" };
 		var column = new MetadataColumn { Id = tenantId * 100 + 3, MetadataTableId = table.Id, ColumnName = $"c{tenantId}" };
 		ctx.DataSources.Add(ds);

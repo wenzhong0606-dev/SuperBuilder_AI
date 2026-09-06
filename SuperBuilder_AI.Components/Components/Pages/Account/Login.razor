@@ -40,10 +40,10 @@
                 <div class="card">
                     <h2 style="margin:0 0 4px;">@L10n.T(Keys.Login.InitPlatformAdmin, "初始化平台系统管理员")</h2>
                     <p class="muted tiny">@L10n.T(Keys.Login.InitNotice, "这是一次性初始化入口。创建完成后将永久关闭，请妥善保管管理员口令。")</p>
-                    <label>@L10n.T(Keys.Login.AdminUsername, "管理员用户名")<input class="form-control" @bind="BootstrapUsername" placeholder="例如 platform-admin" /></label>
+                    <label>@L10n.T(Keys.Login.AdminUsername, "管理员用户名")<input class="form-control" @bind="BootstrapUsername" placeholder="@L10n.T(Keys.Login.AdminUsername, "管理员用户名")" /></label>
                     <label>@L10n.T(Keys.Login.DisplayName, "显示名")<input class="form-control" @bind="BootstrapDisplayName" /></label>
                     <label>@L10n.T(Keys.Login.AdminEmail, "管理员邮箱")<input class="form-control" @bind="BootstrapEmail" placeholder="admin@example.com" /></label>
-                    <label>@L10n.T(Keys.Login.AdminPassword, "管理员口令")<input class="form-control" @bind="BootstrapPassword" type="password" placeholder="至少 8 位" /></label>
+                    <label>@L10n.T(Keys.Login.AdminPassword, "管理员口令")<input class="form-control" @bind="BootstrapPassword" type="password" placeholder="@L10n.T(Keys.Login.AdminPassword, "管理员口令")" /></label>
                     <label>@L10n.T(Keys.Login.ConfirmPassword, "确认口令")<input class="form-control" @bind="BootstrapPasswordConfirm" type="password" /></label>
                     <button class="btn btn-primary" @onclick="InitializePlatform" disabled="@Busy">@L10n.T(Keys.Login.CreateAdmin, "创建平台管理员")</button>
                     @if (!string.IsNullOrEmpty(Error)) { <div class="alert alert-danger">@Error</div> }
@@ -61,8 +61,8 @@
         {
             <div class="card">
                 <h2 style="margin:0 0 4px;">@L10n.T("Login.Title")</h2>
-                <label>@L10n.T("Login.Username")<input class="form-control" @bind="Username" placeholder="例如 admin" /></label>
-                <label>@L10n.T("Login.Password")<input class="form-control" @bind="Password" type="password" placeholder="账户口令" /></label>
+                <label>@L10n.T("Login.Username")<input class="form-control" @bind="Username" placeholder="@L10n.T(Keys.Login.Username, "用户名")" /></label>
+                <label>@L10n.T("Login.Password")<input class="form-control" @bind="Password" type="password" placeholder="@L10n.T(Keys.Login.Password, "口令")" /></label>
                 <label>@L10n.T("Login.TenantId")
                     <select class="form-control" value="@TenantId" @onchange="ChangeTenant">
                         <option value="0">@L10n.T(Keys.Login.TenantPlaceholder, "-- 请选择租户 --")</option>

@@ -91,7 +91,7 @@ public sealed class MetadataCsvFixtureService : IMetadataCsvFixtureService
             if (fixtureTableIds.Count > 0)
             {
                 var fixtureColumnIds = await _context.MetadataColumns
-                    .Where(c => c.MetadataTableId != null && fixtureTableIds.Contains(c.MetadataTableId.Value))
+			.Where(c => fixtureTableIds.Contains(c.MetadataTableId))
                     .Select(c => c.Id)
                     .ToListAsync();
                 if (fixtureColumnIds.Count > 0)
@@ -100,7 +100,7 @@ public sealed class MetadataCsvFixtureService : IMetadataCsvFixtureService
                         _context.MetadataSemantics.Where(s => s.MetadataColumnId != null && fixtureColumnIds.Contains(s.MetadataColumnId.Value)));
                     await _context.SaveChangesAsync();
                     _context.MetadataColumns.RemoveRange(
-                        _context.MetadataColumns.Where(c => c.MetadataTableId != null && fixtureTableIds.Contains(c.MetadataTableId.Value)));
+			_context.MetadataColumns.Where(c => fixtureTableIds.Contains(c.MetadataTableId)));
                     await _context.SaveChangesAsync();
                 }
                 _context.MetadataTables.RemoveRange(

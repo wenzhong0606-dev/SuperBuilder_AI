@@ -200,9 +200,8 @@ public class SuperBIContext : DbContext
         #region Tenant
         builder.Entity<Tenant>().HasIndex(x => x.TenantCode).IsUnique();
         builder.Entity<Tenant>().ToTable(tb => tb.HasComment("租户"));
-        // M1-02：编码/名称长度约束（必填校验在写入路径强制，避免破坏既有测试的不完整种子）。
-        builder.Entity<Tenant>().Property(x => x.TenantCode).HasMaxLength(Tenant.MaxCodeLength).HasComment("租户编码（规范化小写存储）");
-        builder.Entity<Tenant>().Property(x => x.TenantName).HasMaxLength(Tenant.MaxNameLength).HasComment("租户名称");
+        builder.Entity<Tenant>().Property(x => x.TenantCode).IsRequired().HasMaxLength(Tenant.MaxCodeLength).HasComment("租户编码（规范化小写存储）");
+        builder.Entity<Tenant>().Property(x => x.TenantName).IsRequired().HasMaxLength(Tenant.MaxNameLength).HasComment("租户名称");
         builder.Entity<Tenant>().Property(x => x.Enabled).HasComment("是否启用");
         // M1-02：停用治理字段。
         builder.Entity<Tenant>().Property(x => x.DisabledReason).HasMaxLength(Tenant.MaxDisabledReasonLength).HasComment("停用原因");
@@ -222,18 +221,20 @@ public class SuperBIContext : DbContext
         #endregion
 
         #region DataSource
-        builder.Entity<DataSource>().HasOne(x => x.Tenant).WithMany(x => x.DataSources).HasForeignKey(x => x.TenantId);
+        builder.Entity<DataSource>().HasOne(x => x.Tenant).WithMany(x => x.DataSources).HasForeignKey(x => x.TenantId).IsRequired().OnDelete(DeleteBehavior.Restrict);
         builder.Entity<DataSource>().ToTable(tb => tb.HasComment("数据源"));
         // M1-04：保留按 TenantId 的常规查询索引（List/Manage 按租户过滤），与下方过滤唯一索引共存。
         builder.Entity<DataSource>().HasIndex(x => x.TenantId).HasDatabaseName("IX_DataSources_TenantId");
-        // M1-04：名称规范化 + 租户内唯一（过滤 NULL 兼容存量/测试种子，写入路径强制必填与去重）。
-        builder.Entity<DataSource>().Property(x => x.Name).HasMaxLength(128).HasComment("名称（展示用，保留原始大小写）");
-        builder.Entity<DataSource>().Property(x => x.NormalizedName).HasMaxLength(128).HasComment("规范化名称（小写去空白），租户内唯一键");
+        // M1 退出门禁：作为 MetadataTable 组合外键的主键，强制表与数据源属于同一租户。
+        builder.Entity<DataSource>().HasAlternateKey(x => new { x.Id, x.TenantId })
+            .HasName("AK_DataSources_Id_TenantId");
+        // M1-04：名称规范化 + 租户内唯一，写入路径与数据库双重强制必填与去重。
+        builder.Entity<DataSource>().Property(x => x.Name).IsRequired().HasMaxLength(128).HasComment("名称（展示用，保留原始大小写）");
+        builder.Entity<DataSource>().Property(x => x.NormalizedName).IsRequired().HasMaxLength(128).HasComment("规范化名称（小写去空白），租户内唯一键");
         builder.Entity<DataSource>().HasIndex(x => new { x.TenantId, x.NormalizedName }).IsUnique()
-            .HasDatabaseName("IX_DataSources_TenantId_NormalizedName")
-            .HasFilter("[NormalizedName] IS NOT NULL");
-        builder.Entity<DataSource>().Property(x => x.DbType).HasMaxLength(32).HasComment("数据库类型(MYSQL/SQLSERVER/POSTGRESQL)");
-        builder.Entity<DataSource>().Property(x => x.ConnectionString).HasMaxLength(2048).HasComment("连接字符串（敏感，禁止日志记录）");
+            .HasDatabaseName("IX_DataSources_TenantId_NormalizedName");
+        builder.Entity<DataSource>().Property(x => x.DbType).IsRequired().HasMaxLength(32).HasComment("数据库类型(MYSQL/SQLSERVER/POSTGRESQL)");
+        builder.Entity<DataSource>().Property(x => x.ConnectionString).IsRequired().HasMaxLength(2048).HasComment("连接字符串（敏感，禁止日志记录）");
         // M1-04：Enabled 非空（默认启用），兼容既有种子与查询计划测试。
         builder.Entity<DataSource>().Property(x => x.Enabled).IsRequired().HasDefaultValue(true).HasComment("是否启用");
         // M1-04：连接测试记录（脱敏）。
@@ -243,7 +244,12 @@ public class SuperBIContext : DbContext
         #endregion
 
         #region MetadataTable
-        builder.Entity<MetadataTable>().HasOne(x => x.DataSource).WithMany(x => x.Tables).HasForeignKey(x => x.DataSourceId);
+        builder.Entity<MetadataTable>().HasOne(x => x.Tenant).WithMany().HasForeignKey(x => x.TenantId).IsRequired().OnDelete(DeleteBehavior.Restrict);
+        builder.Entity<MetadataTable>().HasOne(x => x.DataSource).WithMany(x => x.Tables)
+            .HasForeignKey(x => new { x.DataSourceId, x.TenantId })
+            .HasPrincipalKey(x => new { x.Id, x.TenantId })
+            .IsRequired()
+            .OnDelete(DeleteBehavior.Cascade);
         builder.Entity<MetadataTable>().ToTable(tb => tb.HasComment("元数据表"));
         // 租户内唯一键：DataSource + Catalog + Schema + Table。
         // 使用过滤唯一索引：仅当 Catalog/Schema 均非空时才强制唯一，
@@ -268,7 +274,7 @@ public class SuperBIContext : DbContext
         #endregion
 
         #region MetadataColumn
-        builder.Entity<MetadataColumn>().HasOne(x => x.MetadataTable).WithMany(x => x.Columns).HasForeignKey(x => x.MetadataTableId);
+        builder.Entity<MetadataColumn>().HasOne(x => x.MetadataTable).WithMany(x => x.Columns).HasForeignKey(x => x.MetadataTableId).IsRequired().OnDelete(DeleteBehavior.Cascade);
         builder.Entity<MetadataColumn>().ToTable(tb => tb.HasComment("元数据字段"));
         builder.Entity<MetadataColumn>().HasIndex(x => new { x.MetadataTableId, x.ColumnName }).IsUnique();
         builder.Entity<MetadataColumn>().Property(x => x.ColumnName).IsRequired().HasMaxLength(128).HasComment("列名");
@@ -452,10 +458,8 @@ public class SuperBIContext : DbContext
 
         #region P10.1 Identity
         // User：租户作用域。用户名唯一范围收窄为租户内 (TenantId, NormalizedUsername)（DEC-02）。
-        // User→Tenant 的外键在本阶段以写入路径（CreateUserAsync 的租户存在性校验）强制，
-        // 未加 DB 级 FK：既有集成测试以 new User{TenantId=N} 直接注入且不建对应租户行，加 FK 会破坏种子。
-        // 后续硬化项见 Master_Development_Plan.md。
         builder.Entity<User>().ToTable(tb => tb.HasComment("用户"));
+        builder.Entity<User>().HasOne(u => u.Tenant).WithMany().HasForeignKey(u => u.TenantId).IsRequired().OnDelete(DeleteBehavior.Restrict);
         builder.Entity<User>().HasIndex(u => new { u.TenantId, u.NormalizedUsername }).IsUnique()
             .HasDatabaseName("IX_Users_TenantId_NormalizedUsername");
         builder.Entity<User>().HasIndex(u => u.TenantId);
@@ -468,7 +472,7 @@ public class SuperBIContext : DbContext
         builder.Entity<User>().Property(u => u.EmailConfirmed).IsRequired().HasDefaultValue(false).HasComment("邮箱是否已验证");
         builder.Entity<User>().Property(u => u.Status).HasComment("状态");
         builder.Entity<User>().Property(u => u.PasswordHash).HasMaxLength(256).HasComment("口令哈希（PBKDF2，可选）");
-        builder.Entity<User>().Property(u => u.SecurityStamp).HasMaxLength(64).HasComment("安全戳（令牌吊销用）");
+        builder.Entity<User>().Property(u => u.SecurityStamp).IsRequired().HasMaxLength(64).HasComment("安全戳（令牌吊销用）");
 
         // Role：TenantId=0 为平台全局角色；同租户内 Code 唯一。
         builder.Entity<Role>().ToTable(tb => tb.HasComment("角色"));
@@ -609,9 +613,9 @@ public class SuperBIContext : DbContext
         // 表达式 !_tenantFilterEnabled || e.TenantId == _scopedTenantId：
         //   - 未开启（Golden/系统路径，ApplyTenantScope 未被调用）：!false => 恒真，SQL 不产生 WHERE，等价于 no-op；
         //   - 已开启：e.TenantId == 当前租户，强制跨租户不可见（与现有应用层手动 tenantId 过滤一致）。
-        // DataSource.TenantId 为 long?：必须用 HasValue 守卫，避免 long? == long 产生被提升的 bool?
+        // DataSource.TenantId 为数据库必填字段，可直接与当前租户比较。
         // 与 !_tenantFilterEnabled 做 || 时破坏 EF 表达式处理（"Nullable object must have a value"）。
-        builder.Entity<DataSource>().HasQueryFilter(e => !_tenantFilterEnabled || (e.TenantId.HasValue && e.TenantId.Value == _scopedTenantId));
+        builder.Entity<DataSource>().HasQueryFilter(e => !_tenantFilterEnabled || e.TenantId == _scopedTenantId);
         builder.Entity<MetadataTable>().HasQueryFilter(e => !_tenantFilterEnabled || e.TenantId == _scopedTenantId);
         builder.Entity<Models.BI.Entity.BusinessEntity>().HasQueryFilter(e => !_tenantFilterEnabled || e.TenantId == _scopedTenantId);
         builder.Entity<TenantSetting>().HasQueryFilter(e => !_tenantFilterEnabled || e.TenantId == _scopedTenantId);

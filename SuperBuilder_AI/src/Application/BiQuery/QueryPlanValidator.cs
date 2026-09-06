@@ -387,7 +387,7 @@ public class QueryPlanValidator
 			}
 
 			if (!tableIds.Contains(
-				column.MetadataTableId ?? 0))
+				column.MetadataTableId))
 			{
 				result.AddError(
 					"FIELD_TABLE_MISMATCH",

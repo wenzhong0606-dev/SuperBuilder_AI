@@ -52,7 +52,7 @@ public sealed class QueryPlanSecurityGate : IQueryPlanSecurityGate
 			!metadataTables.TryGetValue(x.MetadataTableId, out var table) || !Same(x.TableName, table.TableName)));
 
 		var columns = await _db.MetadataColumns.AsNoTracking()
-			.Where(x => x.MetadataTableId.HasValue && tableIds.Contains(x.MetadataTableId.Value))
+			.Where(x => tableIds.Contains(x.MetadataTableId))
 			.ToListAsync(ct);
 		var byId = columns.ToDictionary(x => x.Id);
 		var columnNames = columns.Select(x => x.ColumnName ?? string.Empty).ToHashSet(StringComparer.OrdinalIgnoreCase);

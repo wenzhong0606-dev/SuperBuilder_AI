@@ -105,7 +105,7 @@ public class MetadataScannerService
 		if (dataSource.TenantId != tenantId)
 			throw new InvalidOperationException(
 				$"数据源 {dataSourceId} 不属于租户 {tenantId}（实际归属租户 {dataSource.TenantId}），拒绝元数据扫描写入。");
-		var effectiveTenantId = dataSource.TenantId ?? 0;
+		var effectiveTenantId = dataSource.TenantId;
 
 		/*
 		 * =============================

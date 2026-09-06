@@ -29,8 +29,8 @@ public class BusinessEntityServiceTests
 
 	private static (long dsId, long tableId, long columnId) SeedChain(SuperBIContext ctx, long tenantId)
 	{
-		ctx.Tenants.Add(new Tenant { Id = tenantId });
-		var ds = new DataSource { Id = tenantId * 100 + 1, TenantId = tenantId, Name = $"ds{tenantId}" };
+		ctx.Tenants.Add(new Tenant { Id = tenantId, TenantCode = $"t{tenantId}", TenantName = $"Tenant {tenantId}" });
+		var ds = new DataSource { Id = tenantId * 100 + 1, TenantId = tenantId, Name = $"ds{tenantId}", NormalizedName = $"ds{tenantId}", DbType = "SQLSERVER", ConnectionString = "x" };
 		var table = new MetadataTable { Id = tenantId * 100 + 2, TenantId = tenantId, DataSourceId = ds.Id, TableName = $"t{tenantId}" };
 		var column = new MetadataColumn { Id = tenantId * 100 + 3, MetadataTableId = table.Id, ColumnName = $"c{tenantId}" };
 		ctx.DataSources.Add(ds);

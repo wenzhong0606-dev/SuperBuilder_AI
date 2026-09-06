@@ -41,8 +41,8 @@ public class SuperBIContextTenantFilterTests
         ctx.Tenants.AddRange(t1, t2);
         ctx.SaveChanges();
 
-        var ds1 = new DataSource { TenantId = t1.Id, DbType = "SQLServer", ConnectionString = "cs1" };
-        var ds2 = new DataSource { TenantId = t2.Id, DbType = "MySQL", ConnectionString = "cs2" };
+		var ds1 = new DataSource { TenantId = t1.Id, Name = "ds1", NormalizedName = "ds1", DbType = "SQLServer", ConnectionString = "cs1" };
+		var ds2 = new DataSource { TenantId = t2.Id, Name = "ds2", NormalizedName = "ds2", DbType = "MySQL", ConnectionString = "cs2" };
         ctx.DataSources.AddRange(ds1, ds2);
         ctx.SaveChanges();
 

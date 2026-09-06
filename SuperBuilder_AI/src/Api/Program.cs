@@ -50,6 +50,10 @@ var builder = WebApplication.CreateBuilder(args);
 // M0-01：支持本地未提交覆盖文件（appsettings.Local.json），用于存放开发/本地密钥，禁止提交。
 // 该文件已被 .gitignore 忽略；生产环境应通过环境变量（如 ConnectionStrings__WmsMySql / Qwen__ApiKey）注入。
 builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: true);
+// AddJsonFile 是后加入的配置源；必须重新把环境变量和命令行放到最高优先级，
+// 否则 appsettings.Local.json 会意外覆盖容器/生产环境注入的密钥与连接字符串。
+builder.Configuration.AddEnvironmentVariables();
+builder.Configuration.AddCommandLine(args);
 
 builder.Services.AddControllersWithViews(options =>
 {

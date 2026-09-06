@@ -181,7 +181,7 @@ public class ThemeControllerTests
 		await using var _ = connection;
 		await using var __ = ctx;
 
-		ctx.Tenants.Add(new Tenant { Id = Tenant5 });
+		ctx.Tenants.Add(new Tenant { Id = Tenant5, TenantCode = "t5", TenantName = "Tenant 5" });
 		await ctx.SaveChangesAsync();
 
 		var controller = Build(ctx);
@@ -281,8 +281,8 @@ public class ThemeControllerTests
 		await using var _ = connection;
 		await using var __ = ctx;
 
-		ctx.Tenants.Add(new Tenant { Id = 5 });
-		ctx.Tenants.Add(new Tenant { Id = 7 });
+		ctx.Tenants.Add(new Tenant { Id = 5, TenantCode = "t5", TenantName = "Tenant 5" });
+		ctx.Tenants.Add(new Tenant { Id = 7, TenantCode = "t7", TenantName = "Tenant 7" });
 		await ctx.SaveChangesAsync();
 
 		var controller = new ThemeController(ctx);
