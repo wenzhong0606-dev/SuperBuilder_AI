@@ -160,8 +160,12 @@ builder.Services.AddScoped<IQueryPlanPipeline>(sp => sp.GetRequiredService<Query
 // SemanticValidation → Confidence → DecisionGate → CostGovernance → Explainability
 builder.Services.AddScoped<IQueryPlanStage, QueryPlanBuildStage>();
 builder.Services.AddScoped<IQueryPlanStage, QueryPlanContextStage>();
-// M5-05：列级安全净化（Context 之后、MetadataIntegrity 之前）
-builder.Services.AddScoped<IColumnSensitivityClassifier, DenyNothingColumnClassifier>();
+// M5-05 + M5-08：列级安全净化（Context 之后、MetadataIntegrity 之前）
+// M5-08：可配置分类器（默认 DenyNothing → 零行为变更；配置切 PolicyDriven 启用真实治理）
+builder.Services.Configure<ColumnSecurityOptions>(builder.Configuration.GetSection(ColumnSecurityOptions.SectionName));
+builder.Services.AddScoped<DenyNothingColumnClassifier>();
+builder.Services.AddScoped<PolicyDrivenColumnClassifier>();
+builder.Services.AddScoped<IColumnSensitivityClassifier, ConfigurableColumnClassifier>();
 builder.Services.AddScoped<IColumnSecurityPolicy, ColumnSecurityPolicy>();
 builder.Services.AddScoped<IColumnSecurityContextResolver, DefaultColumnSecurityContextResolver>();
 builder.Services.AddScoped<IQueryPlanStage, QueryPlanColumnSecurityStage>();
@@ -176,6 +180,11 @@ builder.Services.AddScoped<IQueryPlanStage, QueryPlanDecisionGateStage>();
 builder.Services.AddScoped<IQueryCostClassifier, StructuralQueryCostClassifier>();
 builder.Services.AddScoped<ICostGovernancePolicy, ThresholdCostGovernancePolicy>();
 builder.Services.AddScoped<ICostGovernanceContextResolver, DefaultCostGovernanceContextResolver>();
+// M5-08：成本治理灰度主开关 + 模型成本遥测（默认 Off / None → 零行为变更）
+builder.Services.Configure<CostGovernanceOptions>(builder.Configuration.GetSection(CostGovernanceOptions.SectionName));
+builder.Services.AddScoped<NoOpModelCostTelemetry>();
+builder.Services.AddScoped<LogModelCostTelemetry>();
+builder.Services.AddScoped<IModelCostTelemetry, ConfigurableModelCostTelemetry>();
 builder.Services.AddScoped<IQueryPlanStage, QueryPlanCostGovernanceStage>();
 builder.Services.AddScoped<IQueryPlanStage, QueryPlanExplainabilityStage>();
 builder.Services.AddScoped<QuerySemanticValidator>();

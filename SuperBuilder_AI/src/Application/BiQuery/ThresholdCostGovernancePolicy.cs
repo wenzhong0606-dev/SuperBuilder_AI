@@ -27,6 +27,10 @@ public sealed class ThresholdCostGovernancePolicy : ICostGovernancePolicy
 		QueryPlanDecision? currentDecision,
 		CostGovernanceContext context)
 	{
+		// 灰度主开关（M5-08）：默认 Off = 整条成本治理关闭（零默认行为变更）。
+		if (_options.Mode != CostGovernanceMode.Threshold)
+			return NoAction();
+
 		if (context.Bypass)
 			return NoAction();
 

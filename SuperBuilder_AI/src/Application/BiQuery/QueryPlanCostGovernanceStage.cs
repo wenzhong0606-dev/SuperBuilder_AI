@@ -1,6 +1,8 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Options;
+using SuperBuilder_AI.Application.Common.Options;
 using SuperBuilder_AI.Interfaces.BI.Planning;
 using SuperBuilder_AI.Models.BI;
 
@@ -19,16 +21,22 @@ public sealed class QueryPlanCostGovernanceStage : IQueryPlanStage
 	private readonly IQueryCostClassifier _classifier;
 	private readonly ICostGovernancePolicy _policy;
 	private readonly ICostGovernanceContextResolver _resolver;
+	private readonly IModelCostTelemetry _telemetry;
+	private readonly CostGovernanceOptions _options;
 
 	/// <summary>创建成本治理阶段。</summary>
 	public QueryPlanCostGovernanceStage(
 		IQueryCostClassifier classifier,
 		ICostGovernancePolicy policy,
-		ICostGovernanceContextResolver resolver)
+		ICostGovernanceContextResolver resolver,
+		IModelCostTelemetry telemetry,
+		IOptions<CostGovernanceOptions> options)
 	{
 		_classifier = classifier ?? throw new ArgumentNullException(nameof(classifier));
 		_policy = policy ?? throw new ArgumentNullException(nameof(policy));
 		_resolver = resolver ?? throw new ArgumentNullException(nameof(resolver));
+		_telemetry = telemetry ?? throw new ArgumentNullException(nameof(telemetry));
+		_options = options?.Value ?? new CostGovernanceOptions();
 	}
 
 	/// <inheritdoc />
@@ -48,6 +56,10 @@ public sealed class QueryPlanCostGovernanceStage : IQueryPlanStage
 
 		var assessment = await _classifier.AssessAsync(ctx.Plan, ctx.Confidence, ct);
 		var verdict = _policy.Evaluate(assessment, ctx.Decision, context);
+
+		// M5-08：非放行裁决写入成本遥测（NoOp / Log 由 TelemetryMode 决定；默认零行为）。
+		if (verdict.Action != CostGovernanceAction.NoAction)
+			await _telemetry.RecordAsync(assessment, verdict, context, ct);
 
 		if (verdict.Action == CostGovernanceAction.NoAction)
 			return;

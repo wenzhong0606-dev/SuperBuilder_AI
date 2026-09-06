@@ -78,7 +78,7 @@ public class QueryPlanCostGovernanceTests
 	public void Policy_UnboundedGuardOn_DegradeWithAppliedLimit()
 	{
 		var policy = new ThresholdCostGovernancePolicy(Options.Create(
-			new CostGovernanceOptions { EnableUnboundedGuard = true, UnboundedDefaultLimit = 100 }));
+			new CostGovernanceOptions { Mode = CostGovernanceMode.Threshold, EnableUnboundedGuard = true, UnboundedDefaultLimit = 100 }));
 		var a = new QueryCostAssessment { IsUnbounded = true };
 
 		var v = policy.Evaluate(a, null, new CostGovernanceContext(0, false));
@@ -91,7 +91,7 @@ public class QueryPlanCostGovernanceTests
 	public void Policy_JoinWarn_DegradeWithoutLimit()
 	{
 		var policy = new ThresholdCostGovernancePolicy(Options.Create(
-			new CostGovernanceOptions { EnableJoinGuard = true, WarnJoins = 3 }));
+			new CostGovernanceOptions { Mode = CostGovernanceMode.Threshold, EnableJoinGuard = true, WarnJoins = 3 }));
 		var a = new QueryCostAssessment { JoinCount = 4 };
 
 		var v = policy.Evaluate(a, null, new CostGovernanceContext(0, false));
@@ -104,7 +104,7 @@ public class QueryPlanCostGovernanceTests
 	public void Policy_JoinMax_Rejects()
 	{
 		var policy = new ThresholdCostGovernancePolicy(Options.Create(
-			new CostGovernanceOptions { EnableJoinGuard = true, MaxJoins = 6 }));
+			new CostGovernanceOptions { Mode = CostGovernanceMode.Threshold, EnableJoinGuard = true, MaxJoins = 6 }));
 		var a = new QueryCostAssessment { JoinCount = 7 };
 
 		var v = policy.Evaluate(a, null, new CostGovernanceContext(0, false));
@@ -116,7 +116,7 @@ public class QueryPlanCostGovernanceTests
 	public void Policy_Bypass_IgnoresThresholds()
 	{
 		var policy = new ThresholdCostGovernancePolicy(Options.Create(
-			new CostGovernanceOptions { EnableJoinGuard = true, MaxJoins = 1 }));
+			new CostGovernanceOptions { Mode = CostGovernanceMode.Threshold, EnableJoinGuard = true, MaxJoins = 1 }));
 		var a = new QueryCostAssessment { JoinCount = 20 };
 
 		var v = policy.Evaluate(a, null, new CostGovernanceContext(0, true));
@@ -130,6 +130,7 @@ public class QueryPlanCostGovernanceTests
 		var policy = new ThresholdCostGovernancePolicy(Options.Create(
 			new CostGovernanceOptions
 			{
+				Mode = CostGovernanceMode.Threshold,
 				EnableModelCostGuard = true,
 				RejectModelCostTier = ModelCostTier.High
 			}));
@@ -146,6 +147,7 @@ public class QueryPlanCostGovernanceTests
 		var policy = new ThresholdCostGovernancePolicy(Options.Create(
 			new CostGovernanceOptions
 			{
+				Mode = CostGovernanceMode.Threshold,
 				EnableModelCostGuard = false,
 				RejectModelCostTier = ModelCostTier.High
 			}));
@@ -178,7 +180,9 @@ public class QueryPlanCostGovernanceTests
 		new QueryPlanCostGovernanceStage(
 			new StructuralQueryCostClassifier(),
 			new ThresholdCostGovernancePolicy(Options.Create(opts)),
-			new FakeResolver(new CostGovernanceContext(0, false)));
+			new FakeResolver(new CostGovernanceContext(0, false)),
+			new NoOpModelCostTelemetry(),
+			Options.Create(opts));
 
 	[Fact]
 	public async Task Stage_DefaultAllOff_KeepsDecisionAndPlan()
@@ -197,6 +201,7 @@ public class QueryPlanCostGovernanceTests
 		var ctx = BuildContext(new QueryPlan());
 		await BuildStage(new CostGovernanceOptions
 		{
+			Mode = CostGovernanceMode.Threshold,
 			EnableUnboundedGuard = true,
 			UnboundedDefaultLimit = 200
 		}).ExecuteAsync(ctx);
@@ -213,6 +218,7 @@ public class QueryPlanCostGovernanceTests
 		var ctx = BuildContext(new QueryPlan { Limit = 50 });
 		await BuildStage(new CostGovernanceOptions
 		{
+			Mode = CostGovernanceMode.Threshold,
 			EnableUnboundedGuard = true,
 			UnboundedDefaultLimit = 200
 		}).ExecuteAsync(ctx);
@@ -230,7 +236,9 @@ public class QueryPlanCostGovernanceTests
 		var stage = new QueryPlanCostGovernanceStage(
 			new StructuralQueryCostClassifier(),
 			new FakeDegradePolicy(200),
-			new FakeResolver(new CostGovernanceContext(0, false)));
+			new FakeResolver(new CostGovernanceContext(0, false)),
+			new NoOpModelCostTelemetry(),
+			Options.Create(new CostGovernanceOptions { Mode = CostGovernanceMode.Threshold }));
 
 		await stage.ExecuteAsync(ctx);
 
@@ -247,6 +255,7 @@ public class QueryPlanCostGovernanceTests
 		});
 		await BuildStage(new CostGovernanceOptions
 		{
+			Mode = CostGovernanceMode.Threshold,
 			EnableJoinGuard = true,
 			MaxJoins = 2
 		}).ExecuteAsync(ctx);
