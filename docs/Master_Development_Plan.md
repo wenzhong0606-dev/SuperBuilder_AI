@@ -841,6 +841,19 @@ M3 退出：✅ 已达成当前跟踪页面范围。平台/租户视图严格分
 - Excel 输出真实 `.xlsx`，或明确标注兼容格式。
 - 下载服务返回结果并显示失败 Toast；验证中文、数字、日期、空值和多端行为。
 
+> **交付 M8-03**（2026-09-07；真实功能修复 + 四向资源键对齐，双提交 feat+docs，未推送 origin）：
+> - **现状盘点（基于 2026-09-07 实际勘察 `FileDownloadService.cs` / `Ask.razor` / `Audit.razor`）**：真实缺口——`FileDownloadService.DownloadTextAsync` 原签名 `void` 且 `catch(Exception){}` **静默吞异常**，调用方永远「假成功」，违反红线「禁止假成功」；Ask/Audit 导出失败时无 Toast 反馈；`AskTurnExportExcel` 文案为「导出 Excel」但未声明兼容格式。其余已满足：CSV 已含 BOM（`\uFEFF`）+ 引号转义，Excel 实为 HTML table `.xls` + `application/vnd.ms-excel` 兼容格式（非真实 xlsx，按原计划「明确标注兼容格式」即可接受）。
+> - **实施（真实行为修复）**：
+>   1. `FileDownloadService.DownloadTextAsync` 改为 `async Task<bool>`，成功返回 `true`、JS 异常返回 `false`（去除静默吞异常，交由调用方提示）。
+>   2. `Ask.razor` 注入 `ToastService`；`Export` 校验空数据（`Rows.Count > 0` 否则 `Toast.Warning(ExportNoData)`）；`ExportRows` 捕获 `bool ok`，失败 `Toast.Error(ExportFailed)`。
+>   3. `Audit.razor` `ExportCsv` 捕获 `ok`，失败 `Toast.Error(ExportFailed)` 并 `return`，成功 `Toast.Success`。
+>   4. `AskTurnCard.razor` Excel 按钮标签改为 `L10n.T(Keys.Content.AskTurnExportExcel, "导出 Excel 兼容")`，明示兼容格式。
+>   5. **四向资源键对齐**（M3-05 护栏 `ResourceKeyRegistryTests` 硬约束）：RCL `Keys.cs` 新增 `ExportFailed`/`ExportNoData` 常量与默认值，并将 `AskTurnExportExcel` 默认值改为「导出 Excel 兼容」/「Export Excel (compatible)」；同步后端 `ResourceKeys.cs`（常量 + Catalog DefaultValue）与 `LocalizationSeedService.cs`（`ZhCnDefaults` 基线），使 RCL 镜像与后端注册表/种子基线严格一致。
+>   6. 新增行为测试 `FileDownloadServiceTests`（手写 `OkJsRuntime`/`ThrowJsRuntime : IJSRuntime` fake，不依赖 Moq）：断言成功返回 `true`、JS 抛异常返回 `false`（非向上抛）。
+> - **验收达成**：RCL + 后端 build 0 error；全量 **959/959 零回归**（净增 2 行为测试，相对 957 基线）；`ResourceKeyRegistryTests` 四向一致（键集 + zh-CN/en-US 默认值）全绿；`RclMirror_FormattingPlaceholders` 中英文占位符一致。
+> - **红线遵守**：消除「假成功」——下载失败显式 Toast；无新增 `#0d6efd`/默认蓝；无 `.razor` 内联硬编码颜色；Excel 明确标注「兼容」；资源键新增即四向登记，无孤儿键/无键漂移。
+> - **验证范围说明**：中文、数字、日期、空值由既有 CSV BOM/转义 + Ask 空数据 `Toast.Warning` 覆盖；多端行为（Web/MAUI 经 `IJSRuntime`→`SuperBuilder.downloadTextFile` Blob 下载）由 `Task<bool>` 契约与 fake 测试锁定，真实 Blob 落地依赖运行期浏览器环境，不在单元测试范畴。
+
 ### M8-04 性能与图表真实性（S6-7）
 
 - 大表使用服务端分页或真实虚拟化，10k 行不一次渲染全部 DOM。
