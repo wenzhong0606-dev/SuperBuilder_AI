@@ -914,6 +914,14 @@ M3 退出：✅ 已达成当前跟踪页面范围。平台/租户视图严格分
 - Web 5080/5081 的 HTTP/HTTPS、证书和 API BaseAddress 与部署一致。
 - 验证重定向不丢 Authorization；优先避免 API 跨协议重定向。
 
+> **交付 M8-07**（2026-09-07；多端发布基建，双提交 feat+docs，未推送 origin）：
+> - **现状盘点**：四端工程齐备；端口关系——API HTTP 5032 / HTTPS 7086，Web 自身 5080(HTTP)/5081(HTTPS)，MAUI 按平台硬编码（Android 模拟器 10.0.2.2:5032、Windows/iOS 模拟器 https://localhost:7086）。真实缺口：MAUI 基地址不可配置，且 `#else` 分支用 `localhost` 仅对 iOS **模拟器**成立，对物理 iOS/Android 设备（独立机器）会指向设备自身回环，违反计划「真机不使用设备自身 localhost」。
+> - **实施（物理设备可配）**：MAUI 新增 `Resources/Raw/appsettings.json`（MauiAsset），含 `ApiBaseUrlWindows/MacCatalyst/Android/Ios` 四个可选覆盖键；`MauiProgram.cs` 按 `DeviceInfo.Platform` 选键，覆盖非空则用之，否则回退平台默认回环。物理设备联调只需把对应键设为宿主/开发机地址（如 `http://192.168.x.x:5032`），绝不填设备 localhost。修复 `DevicePlatform` 为 readonly 字段导致的 `CS9135`（switch 表达式不可用非常量标签）→ 改 `if/else` 等值比较。
+> - **实施（Web/重定向）**：Web `ApiBaseUrl` 已 HTTPS 优先（Dev=5032、默认回退 7086 HTTPS），无 `UseHttpsRedirection`，避免跨协议重定向剥离 Authorization；CSP `connect-src` 含 `ApiBaseUrl`。生产须在部署环境设定 `ApiBaseUrl`（HTTPS 端点）与 TLS 终止，未提交占位地址。
+> - **验收（构建）**：API 0 错误；RCL 0 错误；Web 0 错误（0 警告）；MAUI Windows（net10.0-windows10.0.19041.0）0 错误。注：首次并行构建 Web 报 `CS2012`（RCL dll 被并发构建锁定），串行重建即 0 错误——属并行构建文件锁竞争，非代码缺陷。
+> - **红线/诚实声明（环境门控，未在本环境执行）**：iOS Release 在配对 Mac 的编译/裁剪/静态资源/签名/安装验证；Android 真机安装与证书；MAUI Windows 打包（MSIX）与签名；Web 生产 TLS 证书与 5080/5081 部署一致性——均依赖 Mac/证书/签名配置文件，归发布流水线执行，本里程碑仅完成基建与四端构建校验。补充验证项：MAUI WebView 调 API 的 CORS 须放行设备端源（或 API 同源）。
+> - **验证范围**：四端 Debug 构建全绿；MAUI 配置机制与 Web ApiBaseUrl 策略经代码确认；iOS/Android 物理设备与签名属发布步骤。
+
 ---
 
 ## 13. M9：架构、测试与运维治理
