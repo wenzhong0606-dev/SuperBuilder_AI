@@ -650,7 +650,7 @@ M3 退出：✅ 已达成当前跟踪页面范围。平台/租户视图严格分
 > - 可追踪回滚：新增 `DashboardVersion` 快照表（受控迁移 `20260906131855_M7_01_DashboardVersion`）；`Publish` 固化版本快照、自增 `PublishedVersion`；`Rollback(id,version)` 把历史版本恢复为发布态并再固化为新版本（`RolledBackFromVersion` 记录来源），版本链单调递增、全程可审计。
 > - 端点：`POST api/dashboards/{id}/publish`、`POST api/dashboards/{id}/rollback/{version}`、`GET api/dashboards/{id}/versions`；`DashboardSummary` 暴露 `PublishedVersion`/`PublishedAt`。
 > - 验证：`DashboardControllerVersioningTests`(7) 覆盖发布快照/草稿隔离/回滚恢复/版本列表/空草稿拒绝/未知版本 404/租户隔离。
-> - ⏳ 后续：前端编辑器蓝图占位（`editor/blueprint`）接真实编辑器；M7-03~M7-11 待办。
+> - ⏳ 后续：前端编辑器蓝图占位（`editor/blueprint`）已于 M7-09 接真实编辑器（`ComponentGallery.razor` 的 `OpenCreate`/`SaveAsync`）；**当前待办收敛为 M7-11、M7-12**（M7-03~M7-10 均已交付）。
 
 > **进度 M7-02**：✅ 已交付（shell 恢复后 rebuild/retest/commit；全量 **901/901** 零回归、含 Golden 18/18，预期 894→901）。
 > - 草稿/发布隔离（验收「不直接覆盖线上版本」）：`AppVersion` 快照实体（Domain/AppBuilder）+ `AppVersions` 表；`AppPlan` 加 `PublishedDslJson`/`PublishedVersion`/`PublishedAt`/`PublishedBy`；`Update` 仅改草稿 `DslJson`，发布态物理隔离。
