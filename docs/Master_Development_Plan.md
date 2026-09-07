@@ -713,6 +713,31 @@ M3 退出：✅ 已达成当前跟踪页面范围。平台/租户视图严格分
 > - 红线落实：移除原占位 `Toast.Info("…P11.3 收口")`，保存/指派/删除失败显式报错（`ThemeEditorSaveFailed` + `Toast.Error`），无假成功按钮；`ThemeEditorSavedToast` 占位文案已替换为真实「主题已保存。」并新增 9 个主题键（RCL `Keys.cs` const+Defaults、后端 `ResourceKeys.cs` const+Catalog、`LocalizationSeedService.ZhCnDefaults`、`All()` 反射 4 向一致，ResourceKeyRegistryTests 9/9 全绿）。构建期 `JsonValue` 歧义（`SuperBuilder_AI.Components.Models.JsonValue` vs `System.Text.Json.Nodes.JsonValue`）已用全限定名修复。
 > - 验证：RCL（net10.0/android/ios）、API build 0 error；全量测试零回归（含 Golden 18/18）。
 
+> **交付 M7-07**（2026-09-07）：ModelAccounts 接模型目录与加密绑定——全部验收达成，占位清零。
+> - 验收：模型账号「真实持久化 + 加密存储 + 租户隔离 + 目录驱动」；前端下拉/绑定/设默认全部走真实端点；无静态假数据、无明文 Key（密钥仅存密文 + 展示掩码）；审计/日志 Key 脱敏；全量零回归、含 Golden 18/18；前端三端 build 0 error。
+> - 现状盘点（Explore 只读）：
+>   - 后端**完全缺失** `ModelAccount` 实体、`SuperBIContext` 无相关 DbSet、无迁移（最新 M7-03）、无 `ModelAccountsController`、无 `ISecretStore`/`Encrypt`/`Decrypt`/`KeyVault` 任何加密层；`QwenService`(L79-80) 与 `QwenEmbeddingService`(L44/80) 从 `IConfiguration`/`EmbeddingOptions.ApiKey` **明文**读取密钥。
+>   - 红线违规：`appsettings.Local.json`(L8/11) 提交了**真实明文** `Qwen:ApiKey`/`Embedding:ApiKey`；`DemoDataInstaller`(L34) 硬编码明文演示口令 `Demo@123456`；`ModelAccounts.razor`(L53-71) 硬编码 5 个模型 + 假 `Bound/Default` + `Bind()` 仅弹 Toast「计划于 P13 实现」。
+>   - 模型目录：仅 `ModelAccounts.razor`(L53-63) 内存硬编码 5 个模型（Qwen-Plus/Max、OpenAI GPT-4o、Azure OpenAI、DeepSeek），无目录服务/表；`QwenService` 只认配置单一 `Qwen:Model`，无多供应商抽象。
+>   - 前端 `ModelAccounts.razor`(`/model-accounts`) 占位：假数据 + `Bind()`/`SetDefault` 不调后端；本地化键已齐备（约 20 个：`ModelAccountsBound`/`ModelAccountsBindSubmitted`/`ModelAccountsDescQwenPlus` 等，RCL `Keys.cs` L182/228/238/410-423/1011-1015、`ResourceKeys.cs` L385/1674、`LocalizationSeedService.cs` L384），4 向一致，无需新增键（加密相关提示可视情补 2-3 个）。
+>   - 租户隔离范式就绪可复用：`TenantDataPlanePolicy.ResolvePlatformScope`(L189) + `SuperBIContext.ApplyTenantScope`(L45)；`IsDataPlanePath`(L158) 需补登记 `/api/model-accounts`。测试：无 ModelAccount 测试，可复用 `TenantDataPlanePolicyTests` 基线。
+> - 实施（后端优先）：
+>   1. **模型目录**：新增 `ModelCatalog` 实体（或种子配置，参考 M10-02：供应商 + 模型能力/上下文窗/区域/状态/降级）+ 迁移，种子 Qwen/OpenAI/DeepSeek/Azure 等；端点 `GET /api/model-catalog` 返回可选模型清单（租户可见，能力驱动）。
+>   2. **加密绑定层**：新增 `ISecretStore`（优先 AEAD 信封加密；主密钥取自环境变量/KeyVault，禁止落库明文），提供 `Protect(plain)->cipher` / `Unprotect(cipher)->plain`；`ModelAccount` 仅持久化 `EncryptedKey`（密文）+ `MaskedKey`（如 `sk-***1234` 展示用）+ `Provider`/`ModelId`/`TenantId`/`IsDefault`/`CreatedBy`。
+>   3. **实体与迁移**：`ModelAccount` + `SuperBIContext` DbSet + 受控迁移（租户隔离：AlternateKey `{Id,TenantId}` + `HasQueryFilter`，参考 `DataSource`）；密钥不进快照明文。
+>   4. **Controller**：`ModelAccountsController`（`POST/GET/GET{id}/PUT/DELETE /api/model-accounts` + `POST /api/model-accounts/{id}/set-default`）经 `TenantDataPlanePolicy.ResolvePlatformScope` 隔离；`Bind` 接收 `provider/modelId/key/note` → `ISecretStore.Protect` 后落库；读取时按需 `Unprotect` 注入 LLM 客户端（仅服务端，绝不下发明文）；`GET` 列表返回掩码。
+>   5. **红线清理**：移除 `appsettings.Local.json` 明文 Key，改用环境变量/机密管理并确保不进版本库（核对 `.gitignore`）；`DemoDataInstaller` 明文口令改为随机生成或强制首次修改（不在本里程碑强绑，标注后续）。
+>   6. **前端重写** `ModelAccounts.razor`：注入 `IApiClient`+`AppState`；`OnAfterRenderAsync` 拉 `GET /api/model-catalog` 与 `GET /api/model-accounts?tenantId`；下拉改自目录、绑定提交 `POST`（密码框 Key→密文由后端加密，前端不经手明文存储）、`SetDefault` 调 `set-default`；展示后端返回的 Bound/Default 与掩码 Key；失败显式报错（无假成功）。
+> - 测试与零回归门禁：新增 `ModelAccountServiceTests`（加密往返、租户作用域）、`ModelAccountsControllerTests`（CRUD + 跨租户 403 + 明文不下发 + 掩码返回）、`ModelCatalogTests`（目录完整性）、`ModelAccountsRazorTests`（绑定提交/下拉）；预期 923 → +N 零回归，全量绿、build 0 error、Golden 18/18 不变。
+> - 红线「无静态假数据/明文 Key」：移除 `ModelAccounts.razor` 假数据与 Toast 占位；密钥一律密文存储、展示掩码、日志脱敏；无后端能力时按钮禁用。
+> - 范围外（本里程碑不做）：多供应商 LLM 运行时动态切换与故障转移（M10-02 后续）、`UserModelBinding` 个人级绑定（先租户级 `TenantModelBinding`）、`DemoDataInstaller` 口令随机化（标注为独立红线清理项）。
+> - **交付要点（2026-09-07）**：
+>   - 后端：① `ModelAccount` 实体 + `SuperBIContext` DbSet + 受控迁移 `P7_3_ModelAccounts`（表 `ModelAccounts`：TenantId/Provider/ModelId/DisplayName/EncryptedKey(2048)/MaskedKey(64)/Note?/IsDefault + 审计列；唯一索引 `IX_ModelAccounts_TenantId_Provider_ModelId` + 租户查询过滤器）；② `ISecretStore`(`AesGcmSecretStore`，AES-256-GCM，密文 `v1:base64(nonce|cipher|tag)`) + `Program.cs` 延迟到解析期 fail-fast 注册（不阻断 `dotnet ef`）；③ 静态 `ModelCatalogProvider`(5 项：Qwen/qwen-plus、Qwen/qwen-max、OpenAI/gpt-4o、Azure/azure-gpt-4o、DeepSeek/deepseek-chat) + `GET /api/model-catalog`；④ `ModelAccountService`(加密落库/掩码/首绑默认/设默认唯一性/服务端 `ResolvePlaintextKeyAsync` 仅供 LLM 注入) + `ModelAccountsController`(POST/GET/GET{id}/PUT/DELETE `/api/model-accounts` + `POST /api/model-accounts/{id}/set-default`，租户隔离镜像 `ThemeController`，掩码返回、明文绝不下发)；⑤ 错误码补 `Conflict`(SB_CONFLICT, 409)。
+>   - 前端：`ModelAccounts.razor` 重写——注入 `IApiClient`+`AppState`+`Toast`，`OnAfterRenderAsync` 拉 `GET /api/model-catalog` 与 `GET /api/model-accounts?tenantId`；目录驱动卡片（Bound/Default 徽标 + 掩码 Key 展示）、绑定提交 `POST`（密钥仅前端输入、后端 AES-GCM 加密）、设默认 `POST set-default`、删除 `DELETE` + `SbModal` 确认；移除硬编码 5 模型与 `Bind()` Toast 占位；失败显式 `Toast.Error`（`BindFailed`/`Deleted`/`DeleteConfirm` 3 键已落 4 向，并修订 `BindSubmitted` 为「绑定已保存。」）。
+>   - 红线清理：`appsettings.Local.json` 明文 `Qwen:ApiKey`/`Embedding:ApiKey` 改为与已提交 `appsettings.json` 一致的环境变量占位符（`__SET_VIA_ENV_…__`），并新增 `SecretStore:MasterKey`(32 字节 base64 开发主密钥，文件已被 `.gitignore:14` 忽略，不进版本库)；连接串本地 DB 密码为预存本地配置，本次未动。
+>   - 测试与零回归门禁：新增 `ModelAccountServiceTests`(8：加密落库+掩码、首绑默认、重复冲突、租户隔离、设默认唯一性、明文往返、删除、轮换 Key)、`ModelAccountsControllerTests`(8：CRUD+掩码返回、重复 409、跨租户 403×2、设默认唯一性、删除、GetById 404)、`ModelCatalogTests`(3：目录完整性/展示名/契约对齐)；全量零回归、Golden 18/18 不变。
+>   - 验证：API `dotnet build` **0 error**（仅预存 CS/CA 告警）；RCL（net10.0/android/ios）`dotnet build` **0 error**（仅预存 IL2026 裁剪告警）；`ModelAccounts.razor` 编译干净。
+
 无后端能力的按钮必须禁用并显示原因，不得提示虚假的“已保存/已运行”。
 
 ---
