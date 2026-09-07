@@ -25,17 +25,23 @@ public static class ToolRegistry
 	private const string CategoryMonitor = "monitor";
 	private const string CategoryAutomation = "automation";
 
+	/// <summary>后端连接状态：已接真实后端。</summary>
+	private const string BackendLive = "live";
+
+	/// <summary>后端连接状态：尚为诚实受控信封（未接真实后端）。</summary>
+	private const string BackendPending = "pending";
+
 	/// <summary>工具目录（有序，供编辑器/蓝图展示）。</summary>
 	private static readonly IReadOnlyList<AgentToolDescriptor> Catalog = new[]
 	{
-		new AgentToolDescriptor(AgentTools.Metadata, "元数据探查", "探查业务数据库中的表、字段与语义映射。", CategoryGovernance, false),
-		new AgentToolDescriptor(AgentTools.Semantic, "语义解析", "解析业务术语、同义词与指标口径。", CategorySemantic, true),
-		new AgentToolDescriptor(AgentTools.Query, "指标查询", "计算指标、聚合与取数。", CategoryAnalytics, true),
-		new AgentToolDescriptor(AgentTools.Dashboard, "看板编排", "将查询结果编排为可视化看板。", CategoryVisual, true),
-		new AgentToolDescriptor(AgentTools.Report, "报表导出", "生成固定格式报表并导出。", CategoryVisual, true),
-		new AgentToolDescriptor(AgentTools.Forecast, "趋势预测", "基于历史数据预测趋势与 What-If 模拟。", CategoryPlanning, true),
-		new AgentToolDescriptor(AgentTools.Alert, "告警监控", "设置阈值监控与异常通知。", CategoryMonitor, true),
-		new AgentToolDescriptor(AgentTools.Workflow, "流程编排", "跨系统编排审批/同步等工作流。", CategoryAutomation, false),
+		new AgentToolDescriptor(AgentTools.Metadata, "元数据探查", "探查业务数据库中的表、字段与语义映射。", CategoryGovernance, false, BackendLive, "M7-04"),
+		new AgentToolDescriptor(AgentTools.Semantic, "语义解析", "解析业务术语、同义词与指标口径。", CategorySemantic, true, BackendLive, "M7-04"),
+		new AgentToolDescriptor(AgentTools.Query, "指标查询", "计算指标、聚合与取数。", CategoryAnalytics, true, BackendPending, "M7-05~M7-08"),
+		new AgentToolDescriptor(AgentTools.Dashboard, "看板编排", "将查询结果编排为可视化看板。", CategoryVisual, true, BackendPending, "M7-05~M7-08"),
+		new AgentToolDescriptor(AgentTools.Report, "报表导出", "生成固定格式报表并导出。", CategoryVisual, true, BackendPending, "M7-05~M7-08"),
+		new AgentToolDescriptor(AgentTools.Forecast, "趋势预测", "基于历史数据预测趋势与 What-If 模拟。", CategoryPlanning, true, BackendPending, "M7-05~M7-08"),
+		new AgentToolDescriptor(AgentTools.Alert, "告警监控", "设置阈值监控与异常通知。", CategoryMonitor, true, BackendPending, "M7-05~M7-08"),
+		new AgentToolDescriptor(AgentTools.Workflow, "流程编排", "跨系统编排审批/同步等工作流。", CategoryAutomation, false, BackendPending, "M7-05~M7-08"),
 	};
 
 	/// <summary>返回全部工具描述（供蓝图与目录端点）。</summary>
@@ -141,12 +147,16 @@ public static class ToolRegistry
 /// <param name="Description">能力说明。</param>
 /// <param name="Category">分类。</param>
 /// <param name="RequiresEntity">是否需要关联业务实体（取数类为 true，治理/自动化类可为 false）。</param>
+/// <param name="BackendStatus">后端连接状态：<c>live</c>=已接真实后端；<c>pending</c>=尚为诚实受控信封（未接真实后端，绝不伪造成功）。</param>
+/// <param name="BackendMilestone">真实后端计划接入的里程碑（<c>pending</c> 时有效）。</param>
 public sealed record AgentToolDescriptor(
 	string Tool,
 	string Name,
 	string Description,
 	string Category,
-	bool RequiresEntity);
+	bool RequiresEntity,
+	string BackendStatus = "pending",
+	string? BackendMilestone = null);
 
 /// <summary>HashSet 批量添加扩展（内部使用）。</summary>
 internal static class ToolRegistryHashSetExtensions

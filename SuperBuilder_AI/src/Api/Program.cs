@@ -272,8 +272,9 @@ builder.Services.AddScoped<IAgentPlanner, AgentPlanner>();
 // M7-03 Agent 运行时（受控工具执行 + 权限 deny-by-default + 状态机 + 重试 + 审批闸门）
 builder.Services.AddScoped<IToolPermissionPolicy, ToolPermissionPolicy>();
 builder.Services.AddScoped<IRetryPolicy, RetryPolicy>();
-builder.Services.AddScoped<ITool, MetadataTool>();
-builder.Services.AddScoped<ITool, SemanticTool>();
+// M7-04：确定性、只读、无 LLM 的 Safe 工具接真实后端（live）；其余 Read/Write 工具仍为诚实受控信封（pending）。
+builder.Services.AddScoped<ITool, LiveMetadataTool>();
+builder.Services.AddScoped<ITool, LiveSemanticTool>();
 builder.Services.AddScoped<ITool, QueryTool>();
 builder.Services.AddScoped<ITool, DashboardTool>();
 builder.Services.AddScoped<ITool, ForecastTool>();

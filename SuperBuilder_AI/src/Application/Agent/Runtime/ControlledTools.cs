@@ -6,11 +6,13 @@ using SuperBuilder_AI.Models.Agent;
 namespace SuperBuilder_AI.Services.Agent.Runtime;
 
 /// <summary>
-/// 受控工具基类（M7-03）：统一产出<strong>诚实</strong>的执行信封（<c>Mode = controlled</c>）。
+/// 受控工具基类（M7-03，沿用至 M7-04~M7-08）：统一产出<strong>诚实</strong>的执行信封（<c>Mode = controlled</c>）。
 ///
 /// <para>关键红线：不触碰任何真实后端、不声称业务结果、无外部副作用。
-/// 输出明确声明"真实后端将于 M7-04 接入"，杜绝"假成功按钮"。M7-04 把后端接入后，
-/// 对应工具翻为 <c>live</c> 模式即可，无需改动运行时框架。</para>
+/// 输出明确声明 <c>connected:false</c> 与待接入里程碑（M7-05~M7-08），杜绝"假成功按钮"。
+/// M7-04 已把确定性、只读、无 LLM 的 Safe 工具（metadata/semantic）翻为 <c>live</c> 模式（见
+/// <see cref="LiveMetadataTool"/>/<see cref="LiveSemanticTool"/>）；其余 Read/Write 工具在对应后端
+/// 于后续里程碑接入前，继续走本诚实信封。运行时框架无需改动。</para>
 /// </summary>
 public abstract class ControlledToolBase : ITool
 {
@@ -34,7 +36,9 @@ public abstract class ControlledToolBase : ITool
 			["tool"] = Tool,
 			["displayName"] = DisplayName,
 			["mode"] = "controlled",
-			["note"] = "受控执行信封：真实后端将于 M7-04 接入，此处仅校验参数并回执，不触碰外部系统，不声称业务结果。",
+			["connected"] = false,
+			["backendMilestone"] = "M7-05~M7-08",
+			["note"] = "真实后端尚未接入（计划 M7-05~M7-08 逐工具接入）：此处仅校验参数并回执，不触碰外部系统、不声称业务结果。",
 			["parameters"] = context.Parameters,
 			["correlationId"] = context.CorrelationId,
 		});

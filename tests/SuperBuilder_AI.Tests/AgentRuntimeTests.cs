@@ -10,6 +10,9 @@ using SuperBuilder_AI.Data;
 using SuperBuilder_AI.Interfaces.Agent;
 using SuperBuilder_AI.Interfaces.Agent.Runtime;
 using SuperBuilder_AI.Models.Agent;
+using SuperBuilder_AI.Models.Localization;
+using SuperBuilder_AI.Models.Metadata;
+using SuperBuilder_AI.Models.Organization;
 using SuperBuilder_AI.Services.Agent;
 using SuperBuilder_AI.Services.Agent.Runtime;
 using Xunit;
@@ -281,10 +284,9 @@ public class AgentRuntimeTests
 		var step = run.GetStepLog().Single();
 		Assert.Equal("controlled", step.Mode);
 		Assert.NotNull(step.Output);
-		// 受控信封须如实声明后端未接入（M7-04），绝不伪造成功。
-		// 注：信封 note 中的中文在 StepLogJson 中以字面 \uXXXX 转义存储，反序列化后 step.Output
-		// 仍持有转义序列；"M7-04" 为 ASCII 明文，必出现在信封里，作为稳健断言锚点。
-		Assert.Contains("M7-04", step.Output);
+		// 受控（pending）信封须诚实声明未接真实后端、不伪造成功：
+		// 信封显式携带 "connected":false（ASCII，规避中文 \uXXXX 转义差异），作为稳健断言锚点。
+		Assert.Contains("\"connected\":false", step.Output);
 	}
 
 	[Fact]
@@ -305,6 +307,69 @@ public class AgentRuntimeTests
 		Assert.NotNull(reloaded);
 		Assert.Equal(AgentRunStatuses.Succeeded, reloaded!.Status);
 		Assert.Equal(2, reloaded.GetStepLog().Count);
+	}
+
+	#endregion
+
+	#region M7-04 live 工具接真实后端
+
+	[Fact]
+	public async Task StartRun_LiveMetadata_ReturnsRealTables_NotFakeSuccess()
+	{
+		var ctx = CreateContext(out var conn);
+		await using var _ = conn;
+		await using var __ = ctx;
+
+		await SeedMetadataAsync(ctx, Tenant5);
+		await InsertPlan(ctx, Tenant5, "p-meta-live", AgentTools.Metadata); // Safe，默认授权
+		var runtime = BuildRuntime(ctx, LiveCatalog(ctx));
+
+		var run = await runtime.StartRunAsync(Tenant5, "p-meta-live", null, null, CancellationToken.None);
+
+		Assert.Equal(AgentRunStatuses.Succeeded, run.Status);
+		var step = run.GetStepLog().Single();
+		// live 模式：真实后端返回真实表结构，而非受控回执占位。
+		Assert.Equal("live", step.Mode);
+		Assert.NotNull(step.Output);
+		Assert.Contains("\"connected\":true", step.Output);
+		Assert.Contains("t_sales", step.Output);  // 真实表名（ASCII，规避 \uXXXX 转义）
+		Assert.Contains("amount", step.Output);    // 真实字段名
+	}
+
+	[Fact]
+	public async Task StartRun_LiveSemantic_ReturnsRealLabels_NotFakeSuccess()
+	{
+		var ctx = CreateContext(out var conn);
+		await using var _ = conn;
+		await using var __ = ctx;
+
+		await SeedSemanticAsync(ctx, Tenant5);
+		await InsertPlan(ctx, Tenant5, "p-sem-live", AgentTools.Semantic); // Safe，默认授权
+		var runtime = BuildRuntime(ctx, LiveCatalog(ctx));
+
+		var run = await runtime.StartRunAsync(Tenant5, "p-sem-live", null, null, CancellationToken.None);
+
+		Assert.Equal(AgentRunStatuses.Succeeded, run.Status);
+		var step = run.GetStepLog().Single();
+		Assert.Equal("live", step.Mode);
+		Assert.NotNull(step.Output);
+		Assert.Contains("\"connected\":true", step.Output);
+		Assert.Contains("SalesAmount", step.Output); // 真实标签值（ASCII）
+	}
+
+	[Fact]
+	public void ToolsCatalog_HonestBackendStatus()
+	{
+		var all = ToolRegistry.GetAll().ToDictionary(d => d.Tool);
+		// 已接真实后端的工具诚实标注 live（M7-04）。
+		Assert.Equal("live", all[AgentTools.Metadata].BackendStatus);
+		Assert.Equal("live", all[AgentTools.Semantic].BackendStatus);
+		Assert.Equal("M7-04", all[AgentTools.Metadata].BackendMilestone);
+		// 其余 Read/Write 工具诚实标注 pending（未接真实后端，绝不伪造成功）。
+		foreach (var t in new[] { AgentTools.Query, AgentTools.Dashboard, AgentTools.Report, AgentTools.Forecast, AgentTools.Alert, AgentTools.Workflow })
+			Assert.Equal("pending", all[t].BackendStatus);
+		Assert.Equal(2, all.Values.Count(d => d.BackendStatus == "live"));
+		Assert.Equal(6, all.Values.Count(d => d.BackendStatus == "pending"));
 	}
 
 	#endregion
@@ -362,6 +427,46 @@ public class AgentRuntimeTests
 		public bool RequiresApproval { get; }
 		public Task<ToolResult> ExecuteAsync(ToolContext context, CancellationToken ct = default)
 			=> throw new InvalidOperationException("permanent failure (non-transient)");
+	}
+
+	/// <summary>M7-04 live 目录：metadata/semantic 接真实后端，其余保持受控信封。</summary>
+	private static IToolCatalog LiveCatalog(SuperBIContext db)
+		=> new ControlledToolCatalog(new ITool[]
+		{
+			new LiveMetadataTool(db), new LiveSemanticTool(db),
+			new QueryTool(), new DashboardTool(), new ForecastTool(), new ReportTool(), new AlertTool(), new WorkflowTool(),
+		});
+
+	/// <summary>播种租户 + 数据源 + 元数据表/字段（满足 MetadataTable→DataSource 复合 FK）。</summary>
+	private static async Task SeedMetadataAsync(SuperBIContext db, long tenantId)
+	{
+		db.Tenants.Add(new Tenant { Id = tenantId });
+		db.DataSources.Add(new DataSource { Id = 1, TenantId = tenantId, Name = "ds", NormalizedName = "ds", DbType = "MYSQL", ConnectionString = "x", Enabled = true });
+		await db.SaveChangesAsync();
+
+		var table = new MetadataTable { TenantId = tenantId, DataSourceId = 1, TableName = "t_sales", TableComment = "销售表" };
+		db.MetadataTables.Add(table);
+		await db.SaveChangesAsync();
+
+		db.MetadataColumns.Add(new MetadataColumn { MetadataTableId = table.Id, ColumnName = "amount", DataType = "decimal", Ordinal = 0, IsPrimaryKey = false });
+		await db.SaveChangesAsync();
+	}
+
+	/// <summary>播种租户 + 一条语义标签。</summary>
+	private static async Task SeedSemanticAsync(SuperBIContext db, long tenantId)
+	{
+		db.Tenants.Add(new Tenant { Id = tenantId });
+		db.SemanticLabels.Add(new SemanticLabel
+		{
+			TenantId = tenantId,
+			ConceptType = "Metric",
+			ConceptId = 1,
+			Culture = "zh-CN",
+			LabelKind = "DisplayName",
+			Value = "SalesAmount",
+			SortOrder = 0,
+		});
+		await db.SaveChangesAsync();
 	}
 
 	#endregion
