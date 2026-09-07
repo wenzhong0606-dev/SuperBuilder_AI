@@ -1,80 +1,362 @@
 @page "/admin/quota"
 @inject IApiClient Api
-@inject AppState State
 @inject ToastService Toast
 @using System.Text.Json
-@using SuperBuilder_AI.Components.Shared
 
 <AuthGuard>
-    <PermissionGuard>
-    <PageHead Icon="sb-ico-quota" Key="Quota" Title="配额管理" Desc="@L10n.T(Keys.Content.AdminQuotaDesc, "查看与配置租户资源配额：问数次数、Token、存储与并发等，超阈预警。")" />
+    <PermissionGuard Require="@(new[]{ PermissionCodes.PlatformQuotaManage })">
+        <PageHead Icon="sb-ico-quota" Key="Quota" Title="配额管理" Desc="@L10n.T(Keys.Content.AdminQuotaDesc, "查看与配置租户资源配额：问数次数、Token、存储与并发等，超阈预警。")" />
 
-    @if (_loading)
-    {
-        <LoadingState Text="@L10n.T(Keys.Content.AdminQuotaLoading, "正在加载配额…")" />
-    }
-    else if (!string.IsNullOrWhiteSpace(_error))
-    {
-        <ErrorState Message="@_error" OnRetry="Reload" />
-    }
-    else if (_obj is null)
-    {
-        <SbPanel Icon="sb-ico-quota" Title="@L10n.T(Keys.Content.AdminQuotaPanelTitle, "当前租户配额")">
+        <SbPanel Icon="sb-ico-scope" Title="@L10n.T(Keys.Content.AdminQuotaTarget, "管理范围")">
             <Body>
-                <SbEmptyState Icon="sb-ico-quota" Title="@L10n.T(Keys.Content.AdminQuotaEmptyTitle, "暂无配额数据")" Text="@L10n.T(Keys.Content.AdminQuotaEmptyText, "联系平台管理员为当前租户配置资源配额。")" />
-            </Body>
-        </SbPanel>
-    }
-    else
-    {
-        <SbPanel Icon="sb-ico-quota" Title="@L10n.T(Keys.Content.AdminQuotaPanelTitle, "当前租户配额")">
-            <Body>
-                <dl class="kv">
-                    @foreach (var p in _obj.Value.EnumerateObject())
-                    {
-                        <dt>@TablePresenter.Friendly(p.Name)</dt>
-                        <dd>
-                            @if (p.Value.ValueKind == JsonValueKind.Number)
+                <div class="form-grid">
+                    <SbField Label="@L10n.T(Keys.Content.AdminQuotaTarget, "管理范围")" Full="true" Hint="@L10n.T(Keys.Content.AdminQuotaSelectTenant, "选择租户以查看继承和覆盖策略")">
+                        <select value="@_selectedTenantId" @onchange="TargetChanged" disabled="@_loadingTenants">
+                            <option value="0">@L10n.T(Keys.Content.AdminQuotaPlatformDefaults, "平台默认配额")</option>
+                            @foreach (var tenant in _tenants)
                             {
-                                <div style="display:flex;align-items:center;gap:10px">
-                                    <div class="progress" style="flex:1;max-width:220px"><span style="width:@Width(p.Name, p.Value.GetDouble())"></span></div>
-                                    <span class="tiny muted">@p.Value.GetRawText()</span>
-                                </div>
+                                <option value="@tenant.Id">@tenant.Name (@tenant.Code)</option>
                             }
-                            else { @TablePresenter.StringifySafe(p.Value) }
-                        </dd>
-                    }
-                </dl>
+                        </select>
+                    </SbField>
+                </div>
             </Body>
         </SbPanel>
-    }
+
+        @if (_loading)
+        {
+            <LoadingState Text="@L10n.T(Keys.Content.AdminQuotaLoading, "正在加载配额…")" />
+        }
+        else if (!string.IsNullOrWhiteSpace(_error))
+        {
+            <ErrorState Message="@_error" OnRetry="Reload" />
+        }
+        else if (_rows.Count == 0)
+        {
+            <SbPanel Icon="sb-ico-quota" Title="@L10n.T(Keys.Content.AdminQuotaPanelTitle, "当前租户配额")">
+                <Body>
+                    <SbEmptyState Icon="sb-ico-quota" Title="@L10n.T(Keys.Content.AdminQuotaEmptyTitle, "暂无配额数据")" Text="@L10n.T(Keys.Content.AdminQuotaEmptyText, "联系平台管理员为当前租户配置资源配额。")" />
+                </Body>
+            </SbPanel>
+        }
+        else
+        {
+            <SbPanel Icon="sb-ico-quota" Title="@PanelTitle">
+                <Body>
+                    <div class="table-wrap">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>@L10n.T(Keys.Content.AdminQuotaResource, "资源")</th>
+                                    <th>@L10n.T(Keys.Content.AdminQuotaLimit, "上限")</th>
+                                    <th>@L10n.T(Keys.Content.AdminQuotaUsed, "已用")</th>
+                                    <th>@L10n.T(Keys.Content.AdminQuotaRemaining, "剩余")</th>
+                                    <th>@L10n.T(Keys.Content.AdminQuotaWindow, "周期")</th>
+                                    <th>@L10n.T(Keys.Content.AdminQuotaPeriod, "当前周期键")</th>
+                                    <th>@L10n.T(Keys.Content.AdminQuotaSource, "策略来源")</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var row in _rows)
+                                {
+                                    <tr>
+                                        <td><strong>@ResourceLabel(row.ResourceType)</strong></td>
+                                        <td>@row.Limit.ToString("N0")</td>
+                                        <td>
+                                            @if (_selectedTenantId > 0)
+                                            {
+                                                <div class="progress" title="@($"{row.Used:N0} / {row.Limit:N0}")"><span style="width:@UsageWidth(row)"></span></div>
+                                                <span class="tiny muted">@row.Used.ToString("N0")</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="muted">—</span>
+                                            }
+                                        </td>
+                                        <td>@(_selectedTenantId > 0 ? row.Remaining.ToString("N0") : "—")</td>
+                                        <td>@WindowLabel(row.Window)</td>
+                                        <td><code>@row.PeriodKey</code></td>
+                                        <td>
+                                            @if (_selectedTenantId == 0)
+                                            {
+                                                <span class="badge badge-primary">@L10n.T(Keys.Content.AdminQuotaPlatformSource, "平台默认")</span>
+                                            }
+                                            else if (row.IsOverride)
+                                            {
+                                                <span class="badge badge-warning">@L10n.T(Keys.Content.AdminQuotaOverrideSource, "租户覆盖")</span>
+                                                <span class="tiny muted">@row.PlatformLimit.ToString("N0") / @WindowLabel(row.PlatformWindow)</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge badge-muted">@L10n.T(Keys.Content.AdminQuotaInheritedSource, "继承平台")</span>
+                                            }
+                                        </td>
+                                        <td class="ta-right">
+                                            <button class="btn btn-sm btn-primary" @onclick="() => OpenPolicy(row)">@L10n.T(Keys.Content.AdminQuotaEditPolicy, "编辑策略")</button>
+                                            @if (_selectedTenantId > 0)
+                                            {
+                                                <button class="btn btn-sm btn-outline-secondary" @onclick="() => OpenUsage(row)">@L10n.T(Keys.Content.AdminQuotaEditUsage, "维护用量")</button>
+                                                @if (row.IsOverride)
+                                                {
+                                                    <button class="btn btn-sm btn-outline-secondary" @onclick="() => RestoreInheritance(row)">@L10n.T(Keys.Content.AdminQuotaRestoreInheritance, "恢复继承")</button>
+                                                }
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </Body>
+            </SbPanel>
+        }
+
+        <SbModal Visible="@_editingPolicy" VisibleChanged="v => _editingPolicy = v" Title="@string.Format(L10n.T(Keys.Content.AdminQuotaPolicyTitle, "编辑配额策略 · {0}"), ResourceLabel(_editResource))">
+            <Body>
+                <SbField Label="@L10n.T(Keys.Content.AdminQuotaLimit, "上限")" Full="true" Required="true" Error="@_editError">
+                    <input type="number" min="0" step="1" @bind="_editLimit" />
+                </SbField>
+                <SbField Label="@L10n.T(Keys.Content.AdminQuotaWindow, "周期")" Full="true">
+                    <select @bind="_editWindow">
+                        <option value="Total">@L10n.T(Keys.Content.AdminQuotaWindowTotal, "累计")</option>
+                        <option value="Monthly">@L10n.T(Keys.Content.AdminQuotaWindowMonthly, "每月")</option>
+                        <option value="Daily">@L10n.T(Keys.Content.AdminQuotaWindowDaily, "每日")</option>
+                    </select>
+                </SbField>
+            </Body>
+            <Footer>
+                <button class="btn btn-outline-secondary btn-sm" @onclick="() => _editingPolicy = false">@L10n.T(Keys.Content.CommonCancel, "取消")</button>
+                <button class="btn btn-primary btn-sm" disabled="@_saving" @onclick="SavePolicy">@L10n.T(Keys.Content.CommonSave, "保存")</button>
+            </Footer>
+        </SbModal>
+
+        <SbModal Visible="@_editingUsage" VisibleChanged="v => _editingUsage = v" Title="@string.Format(L10n.T(Keys.Content.AdminQuotaUsageTitle, "维护当前用量 · {0}"), ResourceLabel(_editResource))">
+            <Body>
+                <SbField Label="@L10n.T(Keys.Content.AdminQuotaUsed, "已用")" Full="true" Required="true" Error="@_editError">
+                    <input type="number" min="0" step="1" @bind="_editUsed" />
+                </SbField>
+            </Body>
+            <Footer>
+                <button class="btn btn-outline-secondary btn-sm" @onclick="() => _editingUsage = false">@L10n.T(Keys.Content.CommonCancel, "取消")</button>
+                <button class="btn btn-primary btn-sm" disabled="@_saving" @onclick="SaveUsage">@L10n.T(Keys.Content.CommonSave, "保存")</button>
+            </Footer>
+        </SbModal>
     </PermissionGuard>
 </AuthGuard>
 
 @code {
-    private JsonElement? _obj;
-    private string _error = "";
+    private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
+    private readonly List<TenantOption> _tenants = new();
+    private List<QuotaRow> _rows = new();
+    private long _selectedTenantId;
     private bool _loading = true;
+    private bool _loadingTenants = true;
+    private bool _saving;
+    private string _error = "";
+    private string _tenantError = "";
+    private string _editError = "";
+    private bool _editingPolicy;
+    private bool _editingUsage;
+    private string _editResource = "";
+    private string _editWindow = "Total";
+    private long _editLimit;
+    private long _editUsed;
+
+    private string PanelTitle => _selectedTenantId == 0
+        ? L10n.T(Keys.Content.AdminQuotaPlatformDefaults, "平台默认配额")
+        : $"{L10n.T(Keys.Content.AdminQuotaPanelTitle, "当前租户配额")} · {_tenants.FirstOrDefault(x => x.Id == _selectedTenantId)?.Name}";
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (firstRender) await Reload();
+        if (!firstRender) return;
+        await LoadTenants();
+        await Reload();
+    }
+
+    private async Task LoadTenants()
+    {
+        _loadingTenants = true;
+        _tenantError = "";
+        var (data, _, err, _) = await Api.GetJsonAsync("api/tenant-management");
+        if (data is { ValueKind: JsonValueKind.Array })
+        {
+            _tenants.Clear();
+            foreach (var item in data.Value.EnumerateArray())
+            {
+                var id = Long(item, "id");
+                if (id <= 0) continue;
+                _tenants.Add(new TenantOption(id, Text(item, "tenantCode"), Text(item, "tenantName")));
+            }
+        }
+        else if (!string.IsNullOrWhiteSpace(err))
+        {
+            _tenantError = err;
+        }
+        _loadingTenants = false;
+    }
+
+    private async Task TargetChanged(ChangeEventArgs args)
+    {
+        _selectedTenantId = long.TryParse(args.Value?.ToString(), out var id) ? id : 0;
+        await Reload();
     }
 
     private async Task Reload()
     {
         _loading = true;
-        var (data, _, err, _) = await Api.GetJsonAsync($"api/quota?tenantId={State.TenantId}");
+        _error = _tenantError;
+        if (!string.IsNullOrWhiteSpace(_error))
+        {
+            _rows = new();
+            _loading = false;
+            StateHasChanged();
+            return;
+        }
+        var url = _selectedTenantId == 0 ? "api/quota/defaults" : $"api/quota?tenantId={_selectedTenantId}";
+        var (data, _, err, _) = await Api.GetJsonAsync(url);
         _error = err ?? "";
-        _obj = data is { ValueKind: JsonValueKind.Object } ? data : null;
+        _rows = new();
+        if (data is { ValueKind: JsonValueKind.Object }
+            && data.Value.TryGetProperty("items", out var items)
+            && items.ValueKind == JsonValueKind.Array)
+        {
+            _rows = items.Deserialize<List<QuotaRow>>(JsonOptions) ?? new();
+        }
         _loading = false;
         StateHasChanged();
     }
 
-    private static string Width(string name, double v)
+    private void OpenPolicy(QuotaRow row)
     {
-        if (v <= 0) return "0%";
-        var pct = Math.Min(100, 20 + Math.Log10(v + 1) * 30);
-        return pct.ToString("0") + "%";
+        _editResource = row.ResourceType;
+        _editLimit = row.Limit;
+        _editWindow = row.Window;
+        _editError = "";
+        _editingPolicy = true;
+    }
+
+    private void OpenUsage(QuotaRow row)
+    {
+        if (_selectedTenantId <= 0)
+        {
+            Toast.Warning(L10n.T(Keys.Content.AdminQuotaTenantRequired, "请先选择一个实际租户。"));
+            return;
+        }
+        _editResource = row.ResourceType;
+        _editUsed = row.Used;
+        _editError = "";
+        _editingUsage = true;
+    }
+
+    private async Task SavePolicy()
+    {
+        _editError = "";
+        if (_editLimit < 0)
+        {
+            _editError = L10n.T(Keys.Content.AdminQuotaNonnegative, "数值不能小于 0。");
+            return;
+        }
+        _saving = true;
+        var (ok, _, err, _) = await Api.PutAsync(
+            $"api/quota/policy/{Uri.EscapeDataString(_editResource)}?tenantId={_selectedTenantId}",
+            new { limit = _editLimit, window = _editWindow });
+        _saving = false;
+        if (!ok)
+        {
+            _editError = err ?? L10n.T(Keys.Content.AdminQuotaSaveFailed, "配额保存失败。");
+            return;
+        }
+        _editingPolicy = false;
+        Toast.Success(L10n.T(Keys.Content.AdminQuotaPolicySaved, "配额策略已保存。"));
+        await Reload();
+    }
+
+    private async Task SaveUsage()
+    {
+        _editError = "";
+        if (_selectedTenantId <= 0)
+        {
+            _editError = L10n.T(Keys.Content.AdminQuotaTenantRequired, "请先选择一个实际租户。");
+            return;
+        }
+        if (_editUsed < 0)
+        {
+            _editError = L10n.T(Keys.Content.AdminQuotaNonnegative, "数值不能小于 0。");
+            return;
+        }
+        _saving = true;
+        var (ok, _, err, _) = await Api.PutAsync(
+            $"api/quota/usage/{Uri.EscapeDataString(_editResource)}?tenantId={_selectedTenantId}",
+            new { used = _editUsed });
+        _saving = false;
+        if (!ok)
+        {
+            _editError = err ?? L10n.T(Keys.Content.AdminQuotaSaveFailed, "配额保存失败。");
+            return;
+        }
+        _editingUsage = false;
+        Toast.Success(L10n.T(Keys.Content.AdminQuotaUsageSaved, "当前周期用量已更新。"));
+        await Reload();
+    }
+
+    private async Task RestoreInheritance(QuotaRow row)
+    {
+        if (_selectedTenantId <= 0) return;
+        var (ok, _, err, _) = await Api.DeleteAsync(
+            $"api/quota/policy/{Uri.EscapeDataString(row.ResourceType)}?tenantId={_selectedTenantId}");
+        if (!ok)
+        {
+            Toast.Error(err ?? L10n.T(Keys.Content.AdminQuotaSaveFailed, "配额保存失败。"));
+            return;
+        }
+        Toast.Success(L10n.T(Keys.Content.AdminQuotaInheritanceRestored, "租户覆盖已移除，现已继承平台默认。"));
+        await Reload();
+    }
+
+    private string ResourceLabel(string resourceType) => resourceType switch
+    {
+        "Users" => L10n.T(Keys.Content.AdminQuotaUsers, "用户数"),
+        "Apps" => L10n.T(Keys.Content.AdminQuotaApps, "应用数"),
+        "Agents" => L10n.T(Keys.Content.AdminQuotaAgents, "智能体数"),
+        "Dashboards" => L10n.T(Keys.Content.AdminQuotaDashboards, "仪表盘数"),
+        "DataSources" => L10n.T(Keys.Content.AdminQuotaDataSources, "数据源数"),
+        "ApiCallsPerMonth" => L10n.T(Keys.Content.AdminQuotaApiCalls, "每月 API 调用"),
+        "StorageMb" => L10n.T(Keys.Content.AdminQuotaStorage, "存储空间（MB）"),
+        _ => resourceType,
+    };
+
+    private string WindowLabel(string window) => window switch
+    {
+        "Monthly" => L10n.T(Keys.Content.AdminQuotaWindowMonthly, "每月"),
+        "Daily" => L10n.T(Keys.Content.AdminQuotaWindowDaily, "每日"),
+        _ => L10n.T(Keys.Content.AdminQuotaWindowTotal, "累计"),
+    };
+
+    private static string UsageWidth(QuotaRow row)
+    {
+        if (row.Limit <= 0) return row.Used > 0 ? "100%" : "0%";
+        return Math.Clamp(row.Used * 100d / row.Limit, 0, 100).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture) + "%";
+    }
+
+    private static string Text(JsonElement item, string name) =>
+        item.TryGetProperty(name, out var value) ? value.ToString() : "";
+
+    private static long Long(JsonElement item, string name) =>
+        item.TryGetProperty(name, out var value) && value.TryGetInt64(out var result) ? result : 0;
+
+    private sealed record TenantOption(long Id, string Code, string Name);
+
+    private sealed class QuotaRow
+    {
+        public string ResourceType { get; set; } = "";
+        public long Limit { get; set; }
+        public long Used { get; set; }
+        public long Remaining { get; set; }
+        public string Window { get; set; } = "Total";
+        public string PeriodKey { get; set; } = "total";
+        public bool IsOverride { get; set; }
+        public long PlatformLimit { get; set; }
+        public string PlatformWindow { get; set; } = "Total";
     }
 }

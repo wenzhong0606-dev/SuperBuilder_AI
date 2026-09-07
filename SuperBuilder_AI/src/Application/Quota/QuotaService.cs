@@ -48,9 +48,19 @@ public class QuotaService : IQuotaService
         var now = DateTime.UtcNow;
         foreach (var rt in QuotaDefaults.PlatformDefaults.Keys)
         {
-            var (limit, window) = await ResolveLimitAsync(tenantId, rt, ct);
-            var (used, periodKey) = await ResolveUsageAsync(tenantId, rt, window, now, ct);
-            items.Add(new QuotaItemView(limit, used, Math.Max(0, limit - used), window, periodKey));
+            var platform = await ResolvePlatformLimitAsync(rt, ct);
+            var tenantOverride = tenantId > 0
+                ? await _ctx.QuotaPolicies.AsNoTracking()
+                    .Where(p => p.TenantId == tenantId && p.ResourceType == rt)
+                    .OrderByDescending(p => p.Id)
+                    .FirstOrDefaultAsync(ct)
+                : null;
+            var limit = tenantOverride?.Limit ?? platform.Limit;
+            var window = tenantOverride?.Window ?? platform.Window;
+            var (used, periodKey) = tenantId > 0
+                ? await ResolveUsageAsync(tenantId, rt, window, now, ct)
+                : (0L, PeriodKeyFor(window, now));
+            items.Add(ToView(rt, limit, used, window, periodKey, tenantOverride is not null, platform));
         }
         return new QuotaOverviewResponse(tenantId, items);
     }
@@ -79,6 +89,71 @@ public class QuotaService : IQuotaService
         return true;
     }
 
+    public async Task<QuotaItemView> UpsertPolicyAsync(
+        long tenantId,
+        QuotaResourceType resourceType,
+        long limit,
+        QuotaWindow window,
+        CancellationToken ct = default)
+    {
+        if (tenantId < 0) throw new ArgumentException("tenantId 不能为负。", nameof(tenantId));
+        if (limit < 0) throw new ArgumentException("limit 不能为负。", nameof(limit));
+        if (!Enum.IsDefined(resourceType)) throw new ArgumentException("未知资源类型。", nameof(resourceType));
+        if (!Enum.IsDefined(window)) throw new ArgumentException("未知周期窗口。", nameof(window));
+        await EnsureTenantExistsAsync(tenantId, ct);
+
+        var policy = await _ctx.QuotaPolicies
+            .FirstOrDefaultAsync(p => p.TenantId == tenantId && p.ResourceType == resourceType, ct);
+        if (policy is null)
+        {
+            policy = new QuotaPolicy
+            {
+                TenantId = tenantId,
+                ResourceType = resourceType,
+                CreatedTime = DateTime.UtcNow,
+            };
+            _ctx.QuotaPolicies.Add(policy);
+        }
+        policy.Limit = limit;
+        policy.Window = window;
+        await _ctx.SaveChangesAsync(ct);
+        return await GetItemAsync(tenantId, resourceType, ct);
+    }
+
+    public async Task<bool> RemoveTenantOverrideAsync(
+        long tenantId,
+        QuotaResourceType resourceType,
+        CancellationToken ct = default)
+    {
+        if (tenantId <= 0) throw new ArgumentException("只能删除实际租户的覆盖策略。", nameof(tenantId));
+        var policy = await _ctx.QuotaPolicies
+            .FirstOrDefaultAsync(p => p.TenantId == tenantId && p.ResourceType == resourceType, ct);
+        if (policy is null) return false;
+        _ctx.QuotaPolicies.Remove(policy);
+        await _ctx.SaveChangesAsync(ct);
+        return true;
+    }
+
+    public async Task<QuotaItemView> SetUsageAsync(
+        long tenantId,
+        QuotaResourceType resourceType,
+        long used,
+        CancellationToken ct = default)
+    {
+        if (tenantId <= 0) throw new ArgumentException("用量只能维护到实际租户。", nameof(tenantId));
+        if (used < 0) throw new ArgumentException("used 不能为负。", nameof(used));
+        await EnsureTenantExistsAsync(tenantId, ct);
+
+        var now = DateTime.UtcNow;
+        var (_, window) = await ResolveLimitAsync(tenantId, resourceType, ct);
+        var usage = await GetOrCreateUsageAsync(tenantId, resourceType, window, now, ct);
+        usage.Used = used;
+        usage.PeriodKey = PeriodKeyFor(window, now);
+        usage.LastReset = now;
+        await _ctx.SaveChangesAsync(ct);
+        return await GetItemAsync(tenantId, resourceType, ct);
+    }
+
     #region helpers
     private async Task<(long Limit, QuotaWindow Window)> ResolveLimitAsync(long tenantId, QuotaResourceType rt, CancellationToken ct)
     {
@@ -90,16 +165,54 @@ public class QuotaService : IQuotaService
         if (overridePolicy != null) return (overridePolicy.Limit, overridePolicy.Window);
 
         // 回退平台默认
-        var defaultPolicy = await _ctx.QuotaPolicies
+        return await ResolvePlatformLimitAsync(rt, ct);
+    }
+
+    private async Task<(long Limit, QuotaWindow Window)> ResolvePlatformLimitAsync(QuotaResourceType rt, CancellationToken ct)
+    {
+        var defaultPolicy = await _ctx.QuotaPolicies.AsNoTracking()
             .Where(p => p.TenantId == 0 && p.ResourceType == rt)
             .OrderByDescending(p => p.Id)
             .FirstOrDefaultAsync(ct);
         if (defaultPolicy != null) return (defaultPolicy.Limit, defaultPolicy.Window);
 
         // 极端兜底：连种子都没有，用常量
-        var def = QuotaDefaults.PlatformDefaults.TryGetValue(rt, out var d) ? d : (0, QuotaWindow.Total);
-        return (def.Limit, def.Window);
+        return QuotaDefaults.PlatformDefaults.TryGetValue(rt, out var d)
+            ? d
+            : (0, QuotaWindow.Total);
     }
+
+    private async Task<QuotaItemView> GetItemAsync(long tenantId, QuotaResourceType resourceType, CancellationToken ct)
+    {
+        var overview = await GetQuotaAsync(tenantId, ct);
+        return overview.Items.Single(x => string.Equals(x.ResourceType, resourceType.ToString(), StringComparison.OrdinalIgnoreCase));
+    }
+
+    private async Task EnsureTenantExistsAsync(long tenantId, CancellationToken ct)
+    {
+        if (tenantId == 0) return;
+        if (!await _ctx.Tenants.IgnoreQueryFilters().AnyAsync(t => t.Id == tenantId, ct))
+            throw new InvalidOperationException($"租户不存在：{tenantId}。");
+    }
+
+    private static QuotaItemView ToView(
+        QuotaResourceType resourceType,
+        long limit,
+        long used,
+        QuotaWindow window,
+        string periodKey,
+        bool isOverride,
+        (long Limit, QuotaWindow Window) platform) =>
+        new(
+            resourceType.ToString(),
+            limit,
+            used,
+            Math.Max(0, limit - used),
+            window.ToString(),
+            periodKey,
+            isOverride,
+            platform.Limit,
+            platform.Window.ToString());
 
     // 只读解析：不创建用量行（视图上跨周期视为已归零）
     private async Task<(long Used, string PeriodKey)> ResolveUsageAsync(long tenantId, QuotaResourceType rt, QuotaWindow window, DateTime now, CancellationToken ct)

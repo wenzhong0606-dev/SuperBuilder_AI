@@ -101,7 +101,7 @@ public static class NavMenuItems
                 new NavItem { Href = "admin/platform-admin-scopes", Title = "管理员租户范围", Key = Keys.Nav.PlatformAdminScopes, Icon = "sb-ico-scope", Permission = PermissionCodes.PlatformAdminManage },
                 new NavItem { Href = "admin/identity", Title = "身份权限", Key = Keys.Nav.Identity, Icon = "sb-ico-shield", Permission = PermissionCodes.IdentityManage },
                 new NavItem { Href = "admin/audit", Title = "审计", Key = Keys.Nav.Audit, Icon = "sb-ico-audit", Permission = PermissionCodes.AuditView },
-                new NavItem { Href = "admin/quota", Title = "配额", Key = Keys.Nav.Quota, Icon = "sb-ico-quota" },
+                new NavItem { Href = "admin/quota", Title = "配额", Key = Keys.Nav.Quota, Icon = "sb-ico-quota", Permission = PermissionCodes.PlatformQuotaManage },
                 new NavItem { Href = "admin/localization", Title = "多语言", Key = Keys.Nav.Localization, Icon = "sb-ico-lang", Permission = PermissionCodes.LocalizationView },
                 new NavItem { Href = "admin/themes", Title = "主题", Key = Keys.Nav.Themes, Icon = "sb-ico-theme", Permission = PermissionCodes.ThemeView },
                 new NavItem { Href = "admin/system", Title = "系统状态", Key = Keys.Nav.System, Icon = "sb-ico-activity" }

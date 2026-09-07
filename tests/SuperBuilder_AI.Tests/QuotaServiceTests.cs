@@ -6,6 +6,7 @@ using SuperBuilder_AI.Data;
 using SuperBuilder_AI.Interfaces.Quota;
 using SuperBuilder_AI.Services.Quota;
 using SuperBuilder_AI.Models.Quota;
+using SuperBuilder_AI.Models.Organization;
 using Xunit;
 
 namespace SuperBuilder_AI.Tests;
@@ -30,6 +31,18 @@ public class QuotaServiceTests
     }
 
     private static QuotaService CreateService(SuperBIContext ctx) => new(ctx);
+
+    private static void SeedTenant(SuperBIContext ctx, long tenantId)
+    {
+        ctx.Tenants.Add(new Tenant
+        {
+            Id = tenantId,
+            TenantCode = $"t-{tenantId}",
+            TenantName = $"Tenant {tenantId}",
+            Enabled = true,
+        });
+        ctx.SaveChanges();
+    }
 
     [Fact]
     public async Task EnsureSeeded_Is_Idempotent()
@@ -168,5 +181,55 @@ public class QuotaServiceTests
         var svc = CreateService(ctx);
         await svc.EnsureSeededAsync();
         await Assert.ThrowsAsync<System.ArgumentException>(() => svc.ConsumeAsync(Tenant100, QuotaResourceType.Users, -1));
+    }
+
+    [Fact]
+    public async Task UpsertPolicy_Creates_Override_And_Reports_Platform_Baseline()
+    {
+        using var ctx = CreateContext(out var conn);
+        SeedTenant(ctx, Tenant100);
+        var svc = CreateService(ctx);
+        await svc.EnsureSeededAsync();
+
+        var row = await svc.UpsertPolicyAsync(Tenant100, QuotaResourceType.DataSources, 9, QuotaWindow.Monthly);
+
+        Assert.True(row.IsOverride);
+        Assert.Equal("DataSources", row.ResourceType);
+        Assert.Equal(9, row.Limit);
+        Assert.Equal("Monthly", row.Window);
+        Assert.Equal(5, row.PlatformLimit);
+        Assert.Equal("Total", row.PlatformWindow);
+    }
+
+    [Fact]
+    public async Task RemoveOverride_Restores_Platform_Default()
+    {
+        using var ctx = CreateContext(out var conn);
+        SeedTenant(ctx, Tenant100);
+        var svc = CreateService(ctx);
+        await svc.EnsureSeededAsync();
+        await svc.UpsertPolicyAsync(Tenant100, QuotaResourceType.Users, 2, QuotaWindow.Daily);
+
+        Assert.True(await svc.RemoveTenantOverrideAsync(Tenant100, QuotaResourceType.Users));
+        var row = Assert.Single((await svc.GetQuotaAsync(Tenant100)).Items, x => x.ResourceType == "Users");
+        Assert.False(row.IsOverride);
+        Assert.Equal(50, row.Limit);
+        Assert.Equal("Total", row.Window);
+    }
+
+    [Fact]
+    public async Task SetUsage_Maintains_Current_Effective_Window()
+    {
+        using var ctx = CreateContext(out var conn);
+        SeedTenant(ctx, Tenant100);
+        var svc = CreateService(ctx);
+        await svc.EnsureSeededAsync();
+        await svc.UpsertPolicyAsync(Tenant100, QuotaResourceType.ApiCallsPerMonth, 200, QuotaWindow.Daily);
+
+        var row = await svc.SetUsageAsync(Tenant100, QuotaResourceType.ApiCallsPerMonth, 42);
+
+        Assert.Equal(42, row.Used);
+        Assert.Equal(158, row.Remaining);
+        Assert.Equal(System.DateTime.UtcNow.ToString("yyyy-MM-dd"), row.PeriodKey);
     }
 }
