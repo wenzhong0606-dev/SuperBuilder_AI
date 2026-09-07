@@ -524,6 +524,20 @@ public static class ResourceKeys
         public const string ThemeEditorKeyInvalid = "Content.ThemeEditorKeyInvalid";
         public const string ThemeEditorDeleteConfirm = "Content.ThemeEditorDeleteConfirm";
         public const string ThemeEditorAssigned = "Content.ThemeEditorAssigned";
+        public const string ThemeReuseLabel = "Content.ThemeReuseLabel";
+        public const string ThemeReuseHint = "Content.ThemeReuseHint";
+        public const string ThemeReuseTenantDefault = "Content.ThemeReuseTenantDefault";
+        public const string ThemeReuseSnapshotHint = "Content.ThemeReuseSnapshotHint";
+        public const string ThemeReuseEditDashboard = "Content.ThemeReuseEditDashboard";
+        public const string ThemeReuseUpdate = "Content.ThemeReuseUpdate";
+        public const string ThemeReuseUpdated = "Content.ThemeReuseUpdated";
+        public const string ThemeCopy = "Content.ThemeCopy";
+        public const string ThemeCopyTitle = "Content.ThemeCopyTitle";
+        public const string ThemeCopyKey = "Content.ThemeCopyKey";
+        public const string ThemeCopyName = "Content.ThemeCopyName";
+        public const string ThemeCopyKeyInvalid = "Content.ThemeCopyKeyInvalid";
+        public const string ThemeCopyFailed = "Content.ThemeCopyFailed";
+        public const string ThemeCopySuccess = "Content.ThemeCopySuccess";
 
         // MetadataEntityDetail（元数据关系详情）
         public const string MetadataEntityLoading = "Content.MetadataEntityLoading";
@@ -1883,6 +1897,20 @@ public static class ResourceKeys
         [Content.ThemeEditorKeyInvalid] = new("Content", Page: "ThemeEditor", DefaultValue: "Theme key may only contain lowercase letters, digits and hyphens (-)."),
         [Content.ThemeEditorDeleteConfirm] = new("Content", Page: "ThemeEditor", DefaultValue: "Delete this theme? This action cannot be undone."),
         [Content.ThemeEditorAssigned] = new("Content", Page: "ThemeEditor", DefaultValue: "Assigned as the tenant default theme."),
+        [Content.ThemeReuseLabel] = new("Content", Page: "ThemeReuse", DefaultValue: "Visual theme"),
+        [Content.ThemeReuseHint] = new("Content", Page: "ThemeReuse", DefaultValue: "Only themes accessible to the current tenant can be selected."),
+        [Content.ThemeReuseTenantDefault] = new("Content", Page: "ThemeReuse", DefaultValue: "Use tenant default theme"),
+        [Content.ThemeReuseSnapshotHint] = new("Content", Page: "ThemeReuse", DefaultValue: "Changes are saved to the draft; the theme is frozen into the published version snapshot."),
+        [Content.ThemeReuseEditDashboard] = new("Content", Page: "ThemeReuse", DefaultValue: "Edit and theme"),
+        [Content.ThemeReuseUpdate] = new("Content", Page: "ThemeReuse", DefaultValue: "Save changes"),
+        [Content.ThemeReuseUpdated] = new("Content", Page: "ThemeReuse", DefaultValue: "Dashboard and theme saved."),
+        [Content.ThemeCopy] = new("Content", Page: "ThemeEditor", DefaultValue: "Copy theme"),
+        [Content.ThemeCopyTitle] = new("Content", Page: "ThemeEditor", DefaultValue: "Copy as tenant theme"),
+        [Content.ThemeCopyKey] = new("Content", Page: "ThemeEditor", DefaultValue: "New theme key"),
+        [Content.ThemeCopyName] = new("Content", Page: "ThemeEditor", DefaultValue: "New theme name"),
+        [Content.ThemeCopyKeyInvalid] = new("Content", Page: "ThemeEditor", DefaultValue: "The new theme key is invalid."),
+        [Content.ThemeCopyFailed] = new("Content", Page: "ThemeEditor", DefaultValue: "Failed to copy theme."),
+        [Content.ThemeCopySuccess] = new("Content", Page: "ThemeEditor", DefaultValue: "Theme copy created."),
 
         [Content.MetadataEntityLoading] = new("Content", Page: "MetadataEntityDetail", DefaultValue: "Reading metadata entity…"),
         [Content.MetadataEntityIntro] = new("Content", Page: "MetadataEntityDetail", DefaultValue: "The following content comes from the current tenant's actual metadata records."),

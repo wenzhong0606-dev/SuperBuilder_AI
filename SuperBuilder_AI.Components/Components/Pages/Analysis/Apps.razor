@@ -4,6 +4,7 @@
 @inject NavigationManager Nav
 @inject ToastService Toast
 @using System.Text.Json
+@using System.Text.Json.Nodes
 @using SuperBuilder_AI.Components.Shared
 
 <AuthGuard>
@@ -68,6 +69,9 @@
                 <SbField Label="@L10n.T(Keys.Content.AppsGenCodeLabel, "应用编码")" Hint="@L10n.T(Keys.Content.AppsGenCodeHint, "留空由系统生成（如 my-app-1733）。")">
                     <input class="form-control" @bind="_genCode" placeholder="@L10n.T(Keys.Content.AppsGenCodePlaceholder, "可选")" />
                 </SbField>
+                <SbField Label="@L10n.T(Keys.Content.ThemeReuseLabel, "视觉主题")" Hint="@L10n.T(Keys.Content.ThemeReuseHint, "仅可选择当前租户可访问的主题。")">
+                    <select class="form-select" @bind="_genThemeKey"><option value="">@L10n.T(Keys.Content.ThemeReuseTenantDefault, "跟随租户默认主题")</option>@foreach (var theme in _themes) { <option value="@theme.Key">@theme.Name</option> }</select>
+                </SbField>
             </div>
         </Body>
         <Footer>
@@ -86,6 +90,9 @@
             <SbField Label="@L10n.T(Keys.Content.AppsDslFieldLabel, "DslJson")" Required="true" Error="@_dslErr">
                 <textarea class="form-control sb-pre" rows="14" @bind="_dslJson" readonly="@_dslGlobal"></textarea>
             </SbField>
+            <SbField Label="@L10n.T(Keys.Content.ThemeReuseLabel, "视觉主题")" Hint="@L10n.T(Keys.Content.ThemeReuseSnapshotHint, "保存后进入草稿；发布时主题会随版本快照固化。")">
+                <select class="form-select" @bind="_dslThemeKey" disabled="@_dslGlobal"><option value="">@L10n.T(Keys.Content.ThemeReuseTenantDefault, "跟随租户默认主题")</option>@foreach (var theme in _themes) { <option value="@theme.Key">@theme.Name</option> }</select>
+            </SbField>
         </Body>
         <Footer>
             <button class="btn btn-outline-secondary btn-sm" @onclick="() => _dslModal = false">@L10n.T(Keys.Content.AppsGenCancel, "取消")</button>
@@ -99,6 +106,8 @@
     private List<string> _cols = new();
     private string _error = "";
     private bool _loading = true;
+    private sealed record ThemeChoice(string Key, string Name);
+    private List<ThemeChoice> _themes = new();
 
     private List<SbColumn<JsonElement>> Columns =>
         _cols.Select(c => SbCol.Of<JsonElement>(
@@ -108,7 +117,7 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (firstRender) await Reload();
+        if (firstRender) { await LoadThemes(); await Reload(); }
     }
 
     private async Task Reload()
@@ -140,11 +149,12 @@
     private bool _genModal;
     private string _genDesc = "";
     private string _genCode = "";
+    private string _genThemeKey = "";
     private string _genErr = "";
 
     private void OpenGen()
     {
-        _genDesc = ""; _genCode = ""; _genErr = "";
+        _genDesc = ""; _genCode = ""; _genThemeKey = ""; _genErr = "";
         _genModal = true;
     }
 
@@ -159,7 +169,8 @@
         {
             tenantId = State.TenantId,
             description = _genDesc,
-            code = string.IsNullOrWhiteSpace(_genCode) ? null : _genCode
+            code = string.IsNullOrWhiteSpace(_genCode) ? null : _genCode,
+            themeKey = string.IsNullOrWhiteSpace(_genThemeKey) ? null : _genThemeKey
         });
         if (status is >= 200 and < 300)
         {
@@ -179,6 +190,7 @@
     private bool _dslModal;
     private string _dslCode = "";
     private string _dslJson = "";
+    private string _dslThemeKey = "";
     private bool _dslGlobal;
     private string _dslErr = "";
 
@@ -194,12 +206,20 @@
         _dslJson = data.Value.TryGetProperty("dslJson", out var dj) && dj.ValueKind == JsonValueKind.String
             ? dj.GetString()!
             : data.Value.GetRawText();
+        _dslThemeKey = data.Value.TryGetProperty("themeKey", out var tk) && tk.ValueKind == JsonValueKind.String ? tk.GetString() ?? "" : "";
         _dslModal = true;
     }
 
     private async Task SaveDsl()
     {
         if (string.IsNullOrWhiteSpace(_dslJson)) { _dslErr = L10n.T(Keys.Content.AppsDslJsonEmpty, "DslJson 不能为空。"); return; }
+        try
+        {
+            var node = JsonNode.Parse(_dslJson)!.AsObject();
+            node["themeKey"] = string.IsNullOrWhiteSpace(_dslThemeKey) ? null : _dslThemeKey;
+            _dslJson = node.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
+        }
+        catch (Exception ex) { _dslErr = ex.Message; return; }
         var (_, status, err, code) = await Api.PutAsync($"api/apps/{Uri.EscapeDataString(_dslCode)}", new { dslJson = _dslJson });
         if (status is >= 200 and < 300)
         {
@@ -239,4 +259,18 @@
     private static string Cell(JsonElement row, string col) => TablePresenter.Cell(row, col);
 
     private static bool IsGlobal(JsonElement row) => Cell(row, "tenantId") == "0";
+
+    private async Task LoadThemes()
+    {
+        var (data, _, _, _) = await Api.GetJsonAsync($"api/themes?tenantId={State.TenantId}");
+        _themes = data is { ValueKind: JsonValueKind.Array }
+            ? data.Value.EnumerateArray()
+                .Select(x => new ThemeChoice(
+                    Cell(x, "key"),
+                    Cell(x, "key").Equals("default", StringComparison.OrdinalIgnoreCase)
+                        ? L10n.T(Keys.Content.ComponentGalleryBadgeDefault, "默认")
+                        : Cell(x, "name")))
+                .Where(x => !string.IsNullOrWhiteSpace(x.Key)).ToList()
+            : new();
+    }
 }

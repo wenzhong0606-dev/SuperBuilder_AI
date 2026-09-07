@@ -9,7 +9,9 @@ using SuperBuilder_AI.Data;
 using SuperBuilder_AI.Interfaces;
 using SuperBuilder_AI.Interfaces.AppBuilder;
 using SuperBuilder_AI.Models.AppBuilder;
+using SuperBuilder_AI.Models.Theme;
 using SuperBuilder_AI.Services.AppBuilder;
+using SuperBuilder_AI.Services.Theming;
 using Xunit;
 
 namespace SuperBuilder_AI.Tests;
@@ -31,12 +33,13 @@ public class AppBuilderControllerTests
 		public Task<string> GenerateSqlAsync(string prompt) => Task.FromResult(_response);
 	}
 
-	private static string DslJson(string code, string name) =>
+	private static string DslJson(string code, string name, string? themeKey = null) =>
 		new AppDslSerializer().Serialize(new AppDsl
 		{
 			Version = AppDslVersions.Current,
 			Code = code,
 			Name = name,
+			ThemeKey = themeKey,
 			Pages = new List<PagePlan>
 			{
 				new()
@@ -80,6 +83,24 @@ public class AppBuilderControllerTests
 
 	private static AppBuilderController Build(SuperBIContext db, string qwenResponse = "ignored") =>
 		new(db, new AppDslSerializer(), CreateAgent(qwenResponse));
+
+	[Fact]
+	public async Task Create_ThemeMustBeAccessibleToTenant()
+	{
+		var ctx = CreateContext(out var connection);
+		await using var _ = connection;
+		await using var __ = ctx;
+		ctx.Themes.AddRange(
+			new Theme { TenantId = Tenant5, Key = "own-theme", Name = "Own", DslVersion = ThemeDslVersions.Current, DslJson = ThemeDslSerializer.Serialize(BuiltInThemes.DefaultDsl()) },
+			new Theme { TenantId = 6, Key = "other-theme", Name = "Other", DslVersion = ThemeDslVersions.Current, DslJson = ThemeDslSerializer.Serialize(BuiltInThemes.DefaultDsl()) });
+		await ctx.SaveChangesAsync();
+
+		var controller = Build(ctx);
+		Assert.IsType<Microsoft.AspNetCore.Mvc.CreatedAtActionResult>(await controller.Create(
+			new AppBuilderController.CreateAppRequest(Tenant5, DslJson("own-app", "Own app", "own-theme")), CancellationToken.None));
+		Assert.IsType<Microsoft.AspNetCore.Mvc.BadRequestObjectResult>(await controller.Create(
+			new AppBuilderController.CreateAppRequest(Tenant5, DslJson("bad-app", "Bad app", "other-theme")), CancellationToken.None));
+	}
 
 	[Fact]
 	public async Task Create_Then_Get_Returns_Dsl()

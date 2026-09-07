@@ -22,12 +22,13 @@ else
         </div>
         <div class="spacer"></div>
         <button class="btn btn-outline-secondary btn-sm" @onclick="ResetTokens" disabled="@_saving">@L10n.T(Keys.Action.Reset, "重置")</button>
-        @if (_selectedKey != "new" && !_isBuiltIn)
+        @if (_selectedKey != "new")
         {
-            <button class="btn btn-outline-danger btn-sm" @onclick="OpenDelete" disabled="@_saving">@L10n.T(Keys.Action.Delete, "删除")</button>
+            <button class="btn btn-outline-secondary btn-sm" @onclick="OpenCopy" disabled="@_saving">@L10n.T(Keys.Content.ThemeCopy, "复制主题")</button>
             <button class="btn btn-outline-primary btn-sm" @onclick="AssignDefault" disabled="@_saving">@L10n.T(Keys.Action.ThemeAssignDefault, "指派为默认")</button>
+            @if (!_isBuiltIn) { <button class="btn btn-outline-danger btn-sm" @onclick="OpenDelete" disabled="@_saving">@L10n.T(Keys.Action.Delete, "删除")</button> }
         }
-        <button class="btn btn-primary btn-sm" @onclick="Save" disabled="@_saving">@(_saving ? "正在保存…" : (@L10n.T(Keys.Action.Save, "保存") + " " + @L10n.T(Keys.Content.ThemeEditorSaveTheme, "主题")))</button>
+        <button class="btn btn-primary btn-sm" @onclick="Save" disabled="@(_saving || _isBuiltIn)">@(_saving ? L10n.T(Keys.Content.ComponentLibrarySaving, "保存中…") : (@L10n.T(Keys.Action.Save, "保存") + " " + @L10n.T(Keys.Content.ThemeEditorSaveTheme, "主题")))</button>
     </div>
 
     <div class="panel" style="margin-bottom:0">
@@ -38,14 +39,7 @@ else
                         <option value="new">@L10n.T(Keys.Content.ThemeEditorNew, "新建主题")</option>
                         @foreach (var t in _themes)
                         {
-                            @if (t.IsBuiltIn)
-                            {
-                                <option value="@t.Key" disabled>@t.Name</option>
-                            }
-                            else
-                            {
-                                <option value="@t.Key">@t.Name</option>
-                            }
+                            <option value="@t.Key">@t.Name</option>
                         }
                     </select>
                 </SbField>
@@ -53,7 +47,7 @@ else
                     <input @bind="_newKey" disabled="@(_selectedKey != "new")" placeholder="my-theme" />
                 </SbField>
                 <SbField Label="@L10n.T(Keys.Content.ThemeEditorName, "主题名称")">
-                    <input @bind="_newName" placeholder="My Theme" />
+                    <input @bind="_newName" disabled="@_isBuiltIn" placeholder="My Theme" />
                 </SbField>
             </div>
             @if (!string.IsNullOrWhiteSpace(_error))
@@ -111,6 +105,17 @@ else
             <button class="btn btn-danger" @onclick="ConfirmDelete" disabled="@Deleting">@(Deleting ? "正在删除…" : @L10n.T(Keys.Action.Delete, "删除"))</button>
         </Footer>
     </SbModal>
+
+    <SbModal Visible="@CopyVisible" VisibleChanged="v => CopyVisible = v" Title="@L10n.T(Keys.Content.ThemeCopyTitle, "复制为租户主题")" Size="sm">
+        <Body>
+            <div class="form-stack">
+                <SbField Label="@L10n.T(Keys.Content.ThemeCopyKey, "新主题键")" Required="true"><input @bind="_copyKey" placeholder="my-theme-copy" /></SbField>
+                <SbField Label="@L10n.T(Keys.Content.ThemeCopyName, "新主题名称")"><input @bind="_copyName" /></SbField>
+                @if (!string.IsNullOrWhiteSpace(_copyError)) { <div class="alert alert-danger tiny">@_copyError</div> }
+            </div>
+        </Body>
+        <Footer><button class="btn btn-outline-secondary" @onclick="() => CopyVisible = false">@L10n.T(Keys.Action.Cancel, "取消")</button><button class="btn btn-primary" @onclick="CopyTheme" disabled="@_saving">@L10n.T(Keys.Content.ThemeCopy, "复制主题")</button></Footer>
+    </SbModal>
 }
 
 @code {
@@ -131,6 +136,10 @@ else
     private bool DeleteVisible;
     private bool Deleting;
     private string? _deleteError;
+    private bool CopyVisible;
+    private string _copyKey = "";
+    private string _copyName = "";
+    private string? _copyError;
 
     private bool _isBuiltIn => _themes.FirstOrDefault(t => t.Key == _selectedKey)?.IsBuiltIn ?? false;
 
@@ -182,9 +191,12 @@ else
         {
             foreach (var e in data.Value.EnumerateArray())
             {
+                var key = e.GetProperty("key").GetString() ?? "";
                 _themes.Add(new ThemeListItem(
-                    Key: e.GetProperty("key").GetString() ?? "",
-                    Name: e.GetProperty("name").GetString() ?? "",
+                    Key: key,
+                    Name: key.Equals("default", StringComparison.OrdinalIgnoreCase)
+                        ? L10n.T(Keys.Content.ComponentGalleryBadgeDefault, "默认")
+                        : e.GetProperty("name").GetString() ?? "",
                     IsBuiltIn: e.GetProperty("isBuiltIn").GetBoolean()));
             }
         }
@@ -296,6 +308,28 @@ else
     }
 
     private void OpenDelete() => DeleteVisible = true;
+
+    private void OpenCopy()
+    {
+        _copyKey = _selectedKey == "new" ? "" : _selectedKey + "-copy";
+        _copyName = string.IsNullOrWhiteSpace(_newName) ? "" : _newName + " Copy";
+        _copyError = null;
+        CopyVisible = true;
+    }
+
+    private async Task CopyTheme()
+    {
+        if (_selectedKey == "new" || !Regex.IsMatch(_copyKey, @"^[a-z][a-z0-9-]{1,63}$"))
+        { _copyError = L10n.T(Keys.Content.ThemeCopyKeyInvalid, "新主题键格式无效。"); return; }
+        _saving = true;
+        var (ok, _, err, _) = await Api.PostAsync($"api/themes/{Uri.EscapeDataString(_selectedKey)}/copy?tenantId={State.TenantId}", new { targetTenantId = State.TenantId, targetKey = _copyKey, targetName = string.IsNullOrWhiteSpace(_copyName) ? null : _copyName });
+        _saving = false;
+        if (!ok) { _copyError = err ?? L10n.T(Keys.Content.ThemeCopyFailed, "主题复制失败。"); return; }
+        CopyVisible = false;
+        Toast.Success(L10n.T(Keys.Content.ThemeCopySuccess, "主题副本已创建。"));
+        await LoadThemesAsync();
+        await SelectThemeAsync(_copyKey);
+    }
 
     private async Task ConfirmDelete()
     {

@@ -4,6 +4,7 @@
 @inject NavigationManager Nav
 @inject ToastService Toast
 @using System.Text.Json
+@using System.Text.Json.Nodes
 @using SuperBuilder_AI.Components.Shared
 
 <AuthGuard>
@@ -33,6 +34,7 @@
 
         <RowActions>
             <button class="btn btn-sm btn-outline-secondary" @onclick="() => Open(context)">@L10n.T(Keys.Content.DashboardsRowDetail, "详情")</button>
+            <button class="btn btn-sm btn-outline-secondary" @onclick="() => OpenEdit(context)">@L10n.T(Keys.Content.ThemeReuseEditDashboard, "编辑与主题")</button>
             <button class="btn btn-sm btn-outline-danger" @onclick="() => AskDelete(context)">@L10n.T(Keys.Content.DashboardsRowDelete, "删除")</button>
         </RowActions>
     </SbListPage>
@@ -41,7 +43,7 @@
                Message="@L10n.T(Keys.Content.DashboardsDeleteConfirmMsg, "删除后不可恢复，确认要删除该仪表盘吗？")" ConfirmText="@L10n.T(Keys.Content.DashboardsDeleteConfirmText, "删除")"
                Tone="danger" OnConfirm="DoDelete" />
 
-    <SbModal Visible="@_createModal" VisibleChanged="v => _createModal = v" Title="@L10n.T(Keys.Content.DashboardsCreateTitle, "新建仪表盘")" Size="lg">
+    <SbModal Visible="@_createModal" VisibleChanged="v => _createModal = v" Title="@(_editingId is null ? L10n.T(Keys.Content.DashboardsCreateTitle, "新建仪表盘") : L10n.T(Keys.Content.ThemeReuseEditDashboard, "编辑与主题"))" Size="lg">
         <Body>
             <div class="form-stack">
                 <SbField Label="@L10n.T(Keys.Content.DashboardsFieldStatus, "状态")">
@@ -50,6 +52,9 @@
                         <option value="published">@L10n.T(Keys.Content.DashboardsStatusPublished, "已发布")</option>
                     </select>
                 </SbField>
+                <SbField Label="@L10n.T(Keys.Content.ThemeReuseLabel, "视觉主题")" Hint="@L10n.T(Keys.Content.ThemeReuseSnapshotHint, "保存后进入草稿；发布时主题会随版本快照固化。")">
+                    <select class="form-select" @bind="_newThemeKey"><option value="">@L10n.T(Keys.Content.ThemeReuseTenantDefault, "跟随租户默认主题")</option>@foreach (var theme in _themes) { <option value="@theme.Key">@theme.Name</option> }</select>
+                </SbField>
                 <SbField Label="@L10n.T(Keys.Content.DashboardsFieldDslJson, "DslJson")" Required="true" Error="@_createErr" Hint="@L10n.T(Keys.Content.DashboardsFieldDslJsonHint, "声明式仪表盘定义（DashboardDsl JSON）。保存将校验后创建。")">
                     <textarea class="form-control sb-pre" rows="16" @bind="_newDsl"></textarea>
                 </SbField>
@@ -57,7 +62,7 @@
         </Body>
         <Footer>
             <button class="btn btn-outline-secondary btn-sm" @onclick="() => _createModal = false">@L10n.T(Keys.Content.DashboardsModalCancel, "取消")</button>
-            <button class="btn btn-primary btn-sm" @onclick="CreateDashboard">@L10n.T(Keys.Content.DashboardsModalCreate, "创建")</button>
+            <button class="btn btn-primary btn-sm" @onclick="SaveDashboard">@(_editingId is null ? L10n.T(Keys.Content.DashboardsModalCreate, "创建") : L10n.T(Keys.Content.ThemeReuseUpdate, "保存修改"))</button>
         </Footer>
     </SbModal>
 </AuthGuard>
@@ -67,6 +72,8 @@
     private List<string> _cols = new();
     private string _error = "";
     private bool _loading = true;
+    private sealed record ThemeChoice(string Key, string Name);
+    private List<ThemeChoice> _themes = new();
 
     /// <summary>列定义由后端返回结构推断（表头友好化与状态徽章复用 TablePresenter）。</summary>
     private List<SbColumn<JsonElement>> Columns =>
@@ -77,7 +84,7 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (firstRender) await Reload();
+        if (firstRender) { await LoadThemes(); await Reload(); }
     }
 
     private async Task Reload()
@@ -123,18 +130,22 @@
         await Reload();
     }
 
-    private void Create() => OpenCreate();
+    private Task Create() => OpenCreate();
 
     // ---- 新建仪表盘 ----
     private bool _createModal;
     private string _newDsl = "";
     private string _newStatus = "draft";
+    private string _newThemeKey = "";
     private string _createErr = "";
+    private long? _editingId;
 
     private async Task OpenCreate()
     {
         _createErr = "";
         _newStatus = "draft";
+        _newThemeKey = "";
+        _editingId = null;
         var (data, _, err, _) = await Api.GetJsonAsync("api/dashboards/editor/blueprint");
         if (data is { ValueKind: JsonValueKind.Object } && data.Value.TryGetProperty("skeleton", out var sk) && sk.ValueKind == JsonValueKind.String)
         {
@@ -148,18 +159,42 @@
         _createModal = true;
     }
 
-    private async Task CreateDashboard()
+    private async Task OpenEdit(JsonElement row)
+    {
+        if (!long.TryParse(TablePresenter.Cell(row, "id"), out var id)) return;
+        var (data, _, err, code) = await Api.GetJsonAsync($"api/dashboards/{id}?tenantId={State.TenantId}");
+        if (data is not { ValueKind: JsonValueKind.Object }) { Toast.Error(L10n.Friendly(code, err ?? L10n.T(Keys.Content.DashboardsLoadFailed, "加载失败。"))); return; }
+        _editingId = id;
+        _newDsl = data.Value.TryGetProperty("dslJson", out var dsl) && dsl.ValueKind == JsonValueKind.String ? dsl.GetString() ?? "" : "";
+        _newStatus = TablePresenter.Cell(data.Value, "status");
+        _newThemeKey = data.Value.TryGetProperty("themeKey", out var theme) && theme.ValueKind == JsonValueKind.String ? theme.GetString() ?? "" : "";
+        _createErr = "";
+        _createModal = true;
+    }
+
+    private async Task SaveDashboard()
     {
         if (string.IsNullOrWhiteSpace(_newDsl)) { _createErr = L10n.T(Keys.Content.DashboardsDslJsonEmpty, "DslJson 不能为空。"); return; }
-        var (_, status, err, code) = await Api.PostAsync("api/dashboards", new
+        try
+        {
+            var node = JsonNode.Parse(_newDsl)!.AsObject();
+            node["themeKey"] = string.IsNullOrWhiteSpace(_newThemeKey) ? null : _newThemeKey;
+            _newDsl = node.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
+        }
+        catch (Exception ex) { _createErr = ex.Message; return; }
+        var request = new
         {
             tenantId = State.TenantId,
             dslJson = _newDsl,
             status = _newStatus
-        });
+        };
+        var result = _editingId is null
+            ? await Api.PostAsync("api/dashboards", request)
+            : await Api.PutAsync($"api/dashboards/{_editingId}?tenantId={State.TenantId}", request);
+        var (_, status, err, code) = result;
         if (status is >= 200 and < 300)
         {
-            Toast.Success(L10n.T(Keys.Content.DashboardsCreateSuccess, "仪表盘已创建。"));
+            Toast.Success(_editingId is null ? L10n.T(Keys.Content.DashboardsCreateSuccess, "仪表盘已创建。") : L10n.T(Keys.Content.ThemeReuseUpdated, "仪表盘与主题已保存。"));
             _createModal = false;
             await Reload();
         }
@@ -175,5 +210,19 @@
     {
         var s = TablePresenter.Cell(row, "status");
         return s.Equals("published", StringComparison.OrdinalIgnoreCase) || s.Equals("ready", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private async Task LoadThemes()
+    {
+        var (data, _, _, _) = await Api.GetJsonAsync($"api/themes?tenantId={State.TenantId}");
+        _themes = data is { ValueKind: JsonValueKind.Array }
+            ? data.Value.EnumerateArray()
+                .Select(x => new ThemeChoice(
+                    TablePresenter.Cell(x, "key"),
+                    TablePresenter.Cell(x, "key").Equals("default", StringComparison.OrdinalIgnoreCase)
+                        ? L10n.T(Keys.Content.ComponentGalleryBadgeDefault, "默认")
+                        : TablePresenter.Cell(x, "name")))
+                .Where(x => !string.IsNullOrWhiteSpace(x.Key)).ToList()
+            : new();
     }
 }

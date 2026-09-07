@@ -15,6 +15,8 @@ using SuperBuilder_AI.Interfaces.Theme;
 using SuperBuilder_AI.Models.Dashboard;
 using SuperBuilder_AI.Models.Dashboard.Rendering;
 using SuperBuilder_AI.Models.Organization;
+using SuperBuilder_AI.Models.Theme;
+using SuperBuilder_AI.Services.Theming;
 
 // 实体类 Dashboard 与命名空间 SuperBuilder_AI.Models.Dashboard 同名，用别名消歧。
 using DashboardEntity = SuperBuilder_AI.Models.Dashboard.Dashboard;
@@ -75,12 +77,16 @@ public class DashboardControllerTests
 
 	private sealed class FakeThemeResolver : IThemeResolver
 	{
+		public string? LastThemeKey { get; private set; }
 		public SuperBuilder_AI.Models.Theme.ThemeContext Resolved { get; set; }
 			= SuperBuilder_AI.Models.Theme.ThemeContext.Default;
 
 		public Task<SuperBuilder_AI.Models.Theme.ThemeContext> ResolveAsync(
-			long tenantId, string? dashboardThemeKey = null, CancellationToken ct = default) =>
-			Task.FromResult(Resolved);
+			long tenantId, string? dashboardThemeKey = null, CancellationToken ct = default)
+		{
+			LastThemeKey = dashboardThemeKey;
+			return Task.FromResult(Resolved);
+		}
 	}
 
 	private static SuperBIContext CreateContext(out SqliteConnection connection)
@@ -104,6 +110,23 @@ public class DashboardControllerTests
 		accessor = new FakeAccessor();
 		var themeResolver = new FakeThemeResolver();
 		return new DashboardController(serializer, renderer, accessor, themeResolver, db);
+	}
+
+	[Fact]
+	public async Task Create_ThemeMustBeAccessibleToTenant()
+	{
+		var ctx = CreateContext(out var connection);
+		await using var connDispose = connection;
+		await using var ctxDispose = ctx;
+		ctx.Themes.Add(new Theme { TenantId = 2, Key = "tenant-two", Name = "Other", DslVersion = ThemeDslVersions.Current, DslJson = ThemeDslSerializer.Serialize(BuiltInThemes.DefaultDsl()) });
+		await ctx.SaveChangesAsync();
+		var controller = Build(ctx, out var serializer, out _, out _);
+		serializer.NextDsl = new DashboardDsl { Title = "Bad theme", ThemeKey = "tenant-two", Pages = new List<PageDsl> { new() { Id = "p1", Name = "Page" } } };
+
+		var result = await controller.Create(new CreateDashboardRequest(1, "{}"));
+
+		Assert.IsType<BadRequestObjectResult>(result);
+		Assert.Empty(ctx.Dashboards);
 	}
 
 	[Fact]
@@ -214,8 +237,9 @@ public class DashboardControllerTests
 		var result = await controller.GetById(entity.Id, tenantId: 1);
 
 		var ok = Assert.IsType<OkObjectResult>(result);
-		var summary = Assert.IsType<DashboardSummary>(ok.Value);
-		Assert.Equal("T1", summary.Title);
+		var detail = Assert.IsType<DashboardDetail>(ok.Value);
+		Assert.Equal("T1", detail.Title);
+		Assert.Equal("{}", detail.DslJson);
 	}
 
 	[Fact]
@@ -290,6 +314,45 @@ public class DashboardControllerTests
 		Assert.Same(renderer.Model, ok.Value);
 		Assert.NotNull(accessor.Current);
 		Assert.Equal(7, accessor.Current!.Tenant.TenantId);
+	}
+
+	[Fact]
+	public async Task Render_PublishedDashboard_UsesThemeFromPublishedSnapshot()
+	{
+		var ctx = CreateContext(out var connection);
+		await using var connDispose = connection;
+		await using var ctxDispose = ctx;
+		var entity = new DashboardEntity
+		{
+			TenantId = 7,
+			Code = "published-theme-snapshot",
+			Title = "Published",
+			Status = "published",
+			ThemeKey = "draft-theme",
+			DslJson = "{\"themeKey\":\"draft-theme\"}",
+			PublishedDslJson = "{\"themeKey\":\"published-theme\"}",
+		};
+		ctx.Dashboards.Add(entity);
+		await ctx.SaveChangesAsync();
+
+		var serializer = new FakeSerializer
+		{
+			NextDsl = new DashboardDsl
+			{
+				Title = "Published",
+				ThemeKey = "published-theme",
+				Pages = new List<PageDsl> { new() { Id = "p1", Name = "Home", Order = 1 } },
+			},
+		};
+		var renderer = new FakeRenderer();
+		var accessor = new FakeAccessor();
+		var themeResolver = new FakeThemeResolver();
+		var controller = new DashboardController(serializer, renderer, accessor, themeResolver, ctx);
+
+		var result = await controller.Render(entity.Id, tenantId: 7);
+
+		Assert.IsType<OkObjectResult>(result);
+		Assert.Equal("published-theme", themeResolver.LastThemeKey);
 	}
 
 	[Fact]

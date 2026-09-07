@@ -112,7 +112,10 @@ public sealed class ThemeController : ControllerBase
 			.OrderBy(t => t.TenantId) // 内置(0) 在前，租户自有在后
 			.ThenBy(t => t.Key)
 			.ToListAsync(cancellationToken);
-		return Ok(items.Select(ToSummary).ToList());
+		var result = items.Select(ToSummary).ToList();
+		if (result.All(x => x.Key != BuiltInThemeKeys.Default))
+			result.Insert(0, new ThemeSummary(0, 0, BuiltInThemeKeys.Default, "Platform default", true, ThemeDslVersions.Current));
+		return Ok(result);
 	}
 
 	/// <summary>获取单个主题（含完整 DSL）。内置主题无 DB 行时由代码默认合成。</summary>
@@ -186,6 +189,13 @@ public sealed class ThemeController : ControllerBase
 		if (entity is null) return NotFound();
 		if (entity.IsBuiltIn || entity.TenantId == 0)
 			return BadRequest(new { errors = new[] { "内置主题不可删除。" } });
+
+		var inUse = await _db.Dashboards.IgnoreQueryFilters().AnyAsync(x => x.TenantId == entity.TenantId && x.ThemeKey == key, cancellationToken)
+			|| await _db.DashboardVersions.IgnoreQueryFilters().AnyAsync(x => x.TenantId == entity.TenantId && x.ThemeKey == key, cancellationToken)
+			|| await _db.AppPlans.IgnoreQueryFilters().AnyAsync(x => x.TenantId == entity.TenantId && x.ThemeKey == key, cancellationToken)
+			|| await _db.AppVersions.IgnoreQueryFilters().AnyAsync(x => x.TenantId == entity.TenantId && x.ThemeKey == key, cancellationToken)
+			|| await _db.TenantSettings.IgnoreQueryFilters().AnyAsync(x => x.TenantId == entity.TenantId && x.Key == TenantDefaultThemeKey && x.Value == key, cancellationToken);
+		if (inUse) return Conflict(new { errors = new[] { "主题正在被默认设置、应用或仪表盘使用，请先解除引用。" } });
 
 		_db.Themes.Remove(entity);
 		await _db.SaveChangesAsync(cancellationToken);

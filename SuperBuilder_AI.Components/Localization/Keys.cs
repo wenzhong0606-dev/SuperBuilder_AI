@@ -557,6 +557,21 @@ public static class Keys
         public const string ThemeEditorKeyInvalid = "Content.ThemeEditorKeyInvalid";
         public const string ThemeEditorDeleteConfirm = "Content.ThemeEditorDeleteConfirm";
         public const string ThemeEditorAssigned = "Content.ThemeEditorAssigned";
+        // M7-10 主题复用与复制
+        public const string ThemeReuseLabel = "Content.ThemeReuseLabel";
+        public const string ThemeReuseHint = "Content.ThemeReuseHint";
+        public const string ThemeReuseTenantDefault = "Content.ThemeReuseTenantDefault";
+        public const string ThemeReuseSnapshotHint = "Content.ThemeReuseSnapshotHint";
+        public const string ThemeReuseEditDashboard = "Content.ThemeReuseEditDashboard";
+        public const string ThemeReuseUpdate = "Content.ThemeReuseUpdate";
+        public const string ThemeReuseUpdated = "Content.ThemeReuseUpdated";
+        public const string ThemeCopy = "Content.ThemeCopy";
+        public const string ThemeCopyTitle = "Content.ThemeCopyTitle";
+        public const string ThemeCopyKey = "Content.ThemeCopyKey";
+        public const string ThemeCopyName = "Content.ThemeCopyName";
+        public const string ThemeCopyKeyInvalid = "Content.ThemeCopyKeyInvalid";
+        public const string ThemeCopyFailed = "Content.ThemeCopyFailed";
+        public const string ThemeCopySuccess = "Content.ThemeCopySuccess";
 
         // MetadataEntityDetail（元数据关系详情）
         public const string MetadataEntityLoading = "Content.MetadataEntityLoading";
@@ -1862,6 +1877,20 @@ public static class Keys
         [Content.ThemeEditorKeyInvalid] = new("主题键仅允许小写字母、数字和连字符（-）。", "Theme key may only contain lowercase letters, digits and hyphens (-)."),
         [Content.ThemeEditorDeleteConfirm] = new("确定要删除该主题吗？此操作不可撤销。", "Delete this theme? This action cannot be undone."),
         [Content.ThemeEditorAssigned] = new("已指派为租户默认主题。", "Assigned as the tenant default theme."),
+        [Content.ThemeReuseLabel] = new("视觉主题", "Visual theme"),
+        [Content.ThemeReuseHint] = new("仅可选择当前租户可访问的主题。", "Only themes accessible to the current tenant can be selected."),
+        [Content.ThemeReuseTenantDefault] = new("跟随租户默认主题", "Use tenant default theme"),
+        [Content.ThemeReuseSnapshotHint] = new("保存后进入草稿；发布时主题会随版本快照固化。", "Changes are saved to the draft; the theme is frozen into the published version snapshot."),
+        [Content.ThemeReuseEditDashboard] = new("编辑与主题", "Edit and theme"),
+        [Content.ThemeReuseUpdate] = new("保存修改", "Save changes"),
+        [Content.ThemeReuseUpdated] = new("仪表盘与主题已保存。", "Dashboard and theme saved."),
+        [Content.ThemeCopy] = new("复制主题", "Copy theme"),
+        [Content.ThemeCopyTitle] = new("复制为租户主题", "Copy as tenant theme"),
+        [Content.ThemeCopyKey] = new("新主题键", "New theme key"),
+        [Content.ThemeCopyName] = new("新主题名称", "New theme name"),
+        [Content.ThemeCopyKeyInvalid] = new("新主题键格式无效。", "The new theme key is invalid."),
+        [Content.ThemeCopyFailed] = new("主题复制失败。", "Failed to copy theme."),
+        [Content.ThemeCopySuccess] = new("主题副本已创建。", "Theme copy created."),
 
         [Content.MetadataEntityLoading] = new("正在读取元数据实体…", "Reading metadata entity…"),
         [Content.MetadataEntityIntro] = new("以下内容来自当前租户的实际元数据记录。", "The following content comes from the current tenant's actual metadata records."),

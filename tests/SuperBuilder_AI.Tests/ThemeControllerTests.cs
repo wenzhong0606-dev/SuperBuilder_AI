@@ -270,8 +270,30 @@ public class ThemeControllerTests
 		var result = await controller.List(Tenant5, CancellationToken.None) as Microsoft.AspNetCore.Mvc.OkObjectResult;
 		Assert.NotNull(result);
 		var list = Assert.IsType<List<ThemeController.ThemeSummary>>(result!.Value);
-		// 即便未落库内置行，列表在租户作用域下不强制含内置；此处只断言租户自有主题可见。
+		// 内置默认即便没有数据库行，也必须作为可选主题返回。
+		Assert.Contains(list, s => s.Key == "default" && s.IsBuiltIn);
 		Assert.Contains(list, s => s.Key == "tenant-only" && s.TenantId == Tenant5);
+	}
+
+	[Fact]
+	public async Task Delete_ThemeReferencedByApp_ReturnsConflict()
+	{
+		var ctx = CreateContext(out var connection);
+		await using var _ = connection;
+		await using var __ = ctx;
+		var controller = Build(ctx);
+		await controller.Create(new ThemeController.CreateThemeRequest(Tenant5, "in-use", DslJson("#555555")), CancellationToken.None);
+		ctx.AppPlans.Add(new SuperBuilder_AI.Models.AppBuilder.AppPlan
+		{
+			TenantId = Tenant5, Code = "uses-theme", Name = "Uses theme", DslVersion = "1.0",
+			DslJson = "{}", ThemeKey = "in-use"
+		});
+		await ctx.SaveChangesAsync();
+
+		var result = await controller.Delete("in-use", Tenant5, CancellationToken.None);
+
+		Assert.IsType<ConflictObjectResult>(result);
+		Assert.True(await ctx.Themes.IgnoreQueryFilters().AnyAsync(x => x.TenantId == Tenant5 && x.Key == "in-use"));
 	}
 
 	[Fact]

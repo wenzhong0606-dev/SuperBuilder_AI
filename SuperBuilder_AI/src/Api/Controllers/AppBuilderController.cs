@@ -8,6 +8,7 @@ using SuperBuilder_AI.Data;
 using SuperBuilder_AI.Api.Security;
 using SuperBuilder_AI.Interfaces.AppBuilder;
 using SuperBuilder_AI.Models.AppBuilder;
+using SuperBuilder_AI.Models.Theme;
 
 namespace SuperBuilder_AI.Controllers;
 
@@ -73,6 +74,14 @@ public sealed class AppBuilderController : ControllerBase
 		return resolution.EffectiveTenantId;
 	}
 
+	private async Task<IActionResult?> ValidateThemeAsync(long tenantId, string? themeKey, CancellationToken ct)
+	{
+		if (string.IsNullOrWhiteSpace(themeKey) || themeKey == BuiltInThemeKeys.Default) return null;
+		var accessible = await _db.Themes.IgnoreQueryFilters()
+			.AnyAsync(t => t.Key == themeKey && (t.TenantId == tenantId || t.TenantId == 0), ct);
+		return accessible ? null : BadRequest(new { errors = new[] { $"主题不可用或不属于当前租户：{themeKey}。" } });
+	}
+
 	/// <summary>创建应用：从结构化 DSL 编排（默认路径，确定性、不调 LLM）。</summary>
 	[HttpPost]
 	public async Task<IActionResult> Create(
@@ -94,6 +103,7 @@ public sealed class AppBuilderController : ControllerBase
 		var plan = result.Plan;
 		var tenantId = ScopeTo(request.TenantId);
 		plan.TenantId = tenantId;
+		if (await ValidateThemeAsync(tenantId, plan.ThemeKey, cancellationToken) is { } themeDenied) return themeDenied;
 
 		// 同租户或全局模板已存在该 Code 则冲突。
 		var conflict = await _db.AppPlans
@@ -133,6 +143,15 @@ public sealed class AppBuilderController : ControllerBase
 		var plan = result.Plan;
 		var tenantId = ScopeTo(request.TenantId);
 		plan.TenantId = tenantId;
+		if (!string.IsNullOrWhiteSpace(request.ThemeKey))
+		{
+			if (!_dslSerializer.TryDeserialize(plan.DslJson, out var generatedDsl, out var generatedErrors) || generatedDsl is null)
+				return BadRequest(new { errors = generatedErrors });
+			generatedDsl.ThemeKey = request.ThemeKey;
+			plan.ThemeKey = request.ThemeKey;
+			plan.DslJson = _dslSerializer.Serialize(generatedDsl);
+		}
+		if (await ValidateThemeAsync(tenantId, plan.ThemeKey, cancellationToken) is { } themeDenied) return themeDenied;
 
 		var conflict = await _db.AppPlans
 			.IgnoreQueryFilters()
@@ -200,6 +219,7 @@ public sealed class AppBuilderController : ControllerBase
 		var result = await _agent.BuildFromDslAsync(entity.TenantId, dsl, entity.Code);
 		if (!result.Success || result.Plan is null)
 			return BadRequest(new { errors = result.Errors });
+		if (await ValidateThemeAsync(entity.TenantId, result.Plan.ThemeKey, cancellationToken) is { } themeDenied) return themeDenied;
 
 		entity.Name = result.Plan.Name;
 		entity.Description = result.Plan.Description;
@@ -248,6 +268,7 @@ public sealed class AppBuilderController : ControllerBase
 		if (entity is null) return NotFound();
 		if (string.IsNullOrWhiteSpace(entity.DslJson))
 			return BadRequest(new { errors = new[] { "草稿 DSL 为空，无法发布。" } });
+		if (await ValidateThemeAsync(tid, entity.ThemeKey, cancellationToken) is { } themeDenied) return themeDenied;
 
 		entity.PublishedDslJson = entity.DslJson;
 		entity.PublishedVersion += 1;
@@ -296,6 +317,7 @@ public sealed class AppBuilderController : ControllerBase
 			.FirstOrDefaultAsync(v => v.AppId == entity.Id && v.Version == version, cancellationToken);
 		if (target is null)
 			return NotFound(new { errors = new[] { $"版本 {version} 不存在。" } });
+		if (await ValidateThemeAsync(tid, target.ThemeKey, cancellationToken) is { } themeDenied) return themeDenied;
 
 		entity.PublishedDslJson = target.DslJson;
 		entity.PublishedVersion += 1;
@@ -423,7 +445,8 @@ public sealed class AppBuilderController : ControllerBase
 	public sealed record GenerateAppRequest(
 		long TenantId,
 		string Description,
-		string? Code = null);
+		string? Code = null,
+		string? ThemeKey = null);
 
 	/// <summary>更新应用请求体（Code 不可变，仅覆盖 DSL 文档）。</summary>
 	public sealed record UpdateAppRequest(

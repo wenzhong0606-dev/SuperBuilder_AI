@@ -12,6 +12,7 @@ using SuperBuilder_AI.Interfaces.Theme;
 using SuperBuilder_AI.Models.Dashboard;
 using SuperBuilder_AI.Models.Dashboard.Rendering;
 using SuperBuilder_AI.Models.Organization;
+using SuperBuilder_AI.Models.Theme;
 
 namespace SuperBuilder_AI.Controllers;
 
@@ -89,6 +90,14 @@ public sealed class DashboardController : ControllerBase
 		return (tenantId, context);
 	}
 
+	private async Task<IActionResult?> ValidateThemeAsync(long tenantId, string? themeKey, CancellationToken ct)
+	{
+		if (string.IsNullOrWhiteSpace(themeKey) || themeKey == BuiltInThemeKeys.Default) return null;
+		var accessible = await _db.Themes.IgnoreQueryFilters()
+			.AnyAsync(t => t.Key == themeKey && (t.TenantId == tenantId || t.TenantId == 0), ct);
+		return accessible ? null : BadRequest(new { errors = new[] { $"主题不可用或不属于当前租户：{themeKey}。" } });
+	}
+
 	/// <summary>创建仪表盘：反序列化+校验 DSL，落地冗余列与 DslJson。</summary>
 	[HttpPost]
 	public async Task<IActionResult> Create(
@@ -105,6 +114,7 @@ public sealed class DashboardController : ControllerBase
 		if (validationErrors.Count > 0) return BadRequest(new { errors = validationErrors });
 
 		var (tenantId, _) = ScopeTo(request.TenantId);
+		if (await ValidateThemeAsync(tenantId, dsl.ThemeKey, cancellationToken) is { } themeDenied) return themeDenied;
 
 		var status = string.IsNullOrWhiteSpace(request.Status) ? DashboardStatuses.Draft : request.Status;
 		if (!DashboardStatuses.Supported.Contains(status))
@@ -157,7 +167,7 @@ public sealed class DashboardController : ControllerBase
 			.FirstOrDefaultAsync(d => d.Id == id, cancellationToken);
 		if (entity is null) return NotFound();
 
-		return Ok(ToSummary(entity));
+		return Ok(ToDetail(entity));
 	}
 
 	/// <summary>更新仪表盘：重新校验 DSL 后覆盖冗余列与 DslJson。</summary>
@@ -177,9 +187,10 @@ public sealed class DashboardController : ControllerBase
 		var validationErrors = _serializer.Validate(dsl);
 		if (validationErrors.Count > 0) return BadRequest(new { errors = validationErrors });
 
-		ScopeTo(tenantId);
+		var (effectiveTenantId, _) = ScopeTo(tenantId);
 		var entity = await _db.Dashboards.FirstOrDefaultAsync(d => d.Id == id, cancellationToken);
 		if (entity is null) return NotFound();
+		if (await ValidateThemeAsync(effectiveTenantId, dsl.ThemeKey, cancellationToken) is { } themeDenied) return themeDenied;
 
 		var status = string.IsNullOrWhiteSpace(request.Status) ? entity.Status : request.Status;
 		if (!DashboardStatuses.Supported.Contains(status))
@@ -248,7 +259,7 @@ public sealed class DashboardController : ControllerBase
 
 		// P7.3：按仪表盘所属租户 + 仪表盘显式 ThemeKey 级联解析主题，注入渲染上下文。
 		// 解析失败（或租户/键未命中）时 ThemeResolver 自动兜底内置默认，渲染永不失败。
-		var themeContext = await _themeResolver.ResolveAsync(entity.TenantId, entity.ThemeKey, cancellationToken);
+		var themeContext = await _themeResolver.ResolveAsync(entity.TenantId, dsl.ThemeKey, cancellationToken);
 		var platformContext = (_accessor.Current ?? PlatformContext.System) with { Theme = themeContext };
 		var model = await _renderer.RenderAsync(dsl, platformContext, cancellationToken);
 		return Ok(model);
@@ -271,6 +282,7 @@ public sealed class DashboardController : ControllerBase
 		if (entity is null) return NotFound();
 		if (string.IsNullOrWhiteSpace(entity.DslJson))
 			return BadRequest(new { errors = new[] { "草稿 DSL 为空，无法发布。" } });
+		if (await ValidateThemeAsync(tid, entity.ThemeKey, cancellationToken) is { } themeDenied) return themeDenied;
 
 		entity.PublishedDslJson = entity.DslJson;
 		entity.PublishedVersion += 1;
@@ -319,6 +331,7 @@ public sealed class DashboardController : ControllerBase
 			.FirstOrDefaultAsync(v => v.DashboardId == id && v.Version == version, cancellationToken);
 		if (target is null)
 			return NotFound(new { errors = new[] { $"版本 {version} 不存在。" } });
+		if (await ValidateThemeAsync(tid, target.ThemeKey, cancellationToken) is { } themeDenied) return themeDenied;
 
 		entity.PublishedDslJson = target.DslJson;
 		entity.PublishedVersion += 1;
@@ -425,6 +438,9 @@ public sealed class DashboardController : ControllerBase
 
 	private static DashboardSummary ToSummary(Dashboard d) =>
 		new(d.Id, d.TenantId, d.Code, d.Title, d.Description, d.Status, d.DslVersion, d.ThemeKey, d.CreatedTime, d.PublishedVersion, d.PublishedAt);
+
+	private static DashboardDetail ToDetail(Dashboard d) =>
+		new(d.Id, d.TenantId, d.Code, d.Title, d.Description, d.Status, d.DslVersion, d.ThemeKey, d.DslJson, d.CreatedTime, d.PublishedVersion, d.PublishedAt);
 }
 
 /// <summary>创建/更新仪表盘请求体。</summary>
@@ -443,6 +459,20 @@ public sealed record DashboardSummary(
 	string Status,
 	string DslVersion,
 	string? ThemeKey,
+	DateTime CreatedTime,
+	int PublishedVersion,
+	DateTime? PublishedAt);
+
+public sealed record DashboardDetail(
+	long Id,
+	long TenantId,
+	string Code,
+	string Title,
+	string? Description,
+	string Status,
+	string DslVersion,
+	string? ThemeKey,
+	string DslJson,
 	DateTime CreatedTime,
 	int PublishedVersion,
 	DateTime? PublishedAt);

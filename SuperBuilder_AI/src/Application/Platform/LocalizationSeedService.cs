@@ -474,6 +474,9 @@ public sealed class LocalizationSeedService : ILocalizationSeedService
         ["Content.ThemeEditorSampleMetric"] = "示例指标", ["Content.ThemeEditorBtnPrimary"] = "主要按钮",
         ["Content.ThemeEditorBtnSecondary"] = "次要", ["Content.ThemeEditorBadgePublished"] = "已发布",
         ["Content.ThemeEditorBadgeDraft"] = "草稿", ["Content.ThemeEditorSavedToast"] = "主题已保存。", ["Content.ThemeEditorSelectTheme"] = "选择主题", ["Content.ThemeEditorNew"] = "新建主题", ["Content.ThemeEditorSaved"] = "主题已保存。", ["Content.ThemeEditorSaveFailed"] = "保存失败：{0}", ["Content.ThemeEditorKey"] = "主题键", ["Content.ThemeEditorName"] = "主题名称", ["Content.ThemeEditorKeyInvalid"] = "主题键仅允许小写字母、数字和连字符（-）。", ["Content.ThemeEditorDeleteConfirm"] = "确定要删除该主题吗？此操作不可撤销。", ["Content.ThemeEditorAssigned"] = "已指派为租户默认主题。",
+        ["Content.ThemeReuseLabel"] = "视觉主题", ["Content.ThemeReuseHint"] = "仅可选择当前租户可访问的主题。", ["Content.ThemeReuseTenantDefault"] = "跟随租户默认主题", ["Content.ThemeReuseSnapshotHint"] = "保存后进入草稿；发布时主题会随版本快照固化。",
+        ["Content.ThemeReuseEditDashboard"] = "编辑与主题", ["Content.ThemeReuseUpdate"] = "保存修改", ["Content.ThemeReuseUpdated"] = "仪表盘与主题已保存。",
+        ["Content.ThemeCopy"] = "复制主题", ["Content.ThemeCopyTitle"] = "复制为租户主题", ["Content.ThemeCopyKey"] = "新主题键", ["Content.ThemeCopyName"] = "新主题名称", ["Content.ThemeCopyKeyInvalid"] = "新主题键格式无效。", ["Content.ThemeCopyFailed"] = "主题复制失败。", ["Content.ThemeCopySuccess"] = "主题副本已创建。",
 
         ["Content.MetadataEntityLoading"] = "正在读取元数据实体…",
         ["Content.MetadataEntityIntro"] = "以下内容来自当前租户的实际元数据记录。",
