@@ -74,7 +74,7 @@ public sealed class TenantDataPlanePolicyTests
 	public async Task BusinessModel_CrossTenantQuery_Returns403WithoutCallingService()
 	{
 		var registry = new RegistryStub();
-		var controller = new BusinessModelController(registry, new MapperStub())
+		var controller = new BusinessModelController(registry, new MapperStub(), new EntityServiceStub())
 		{
 			ControllerContext = new ControllerContext { HttpContext = Context(7) }
 		};
@@ -90,7 +90,7 @@ public sealed class TenantDataPlanePolicyTests
 	public async Task BusinessModel_OmittedTenant_UsesAuthenticatedTenant()
 	{
 		var registry = new RegistryStub();
-		var controller = new BusinessModelController(registry, new MapperStub())
+		var controller = new BusinessModelController(registry, new MapperStub(), new EntityServiceStub())
 		{
 			ControllerContext = new ControllerContext { HttpContext = Context(7) }
 		};
@@ -134,5 +134,19 @@ public sealed class TenantDataPlanePolicyTests
 	{
 		public Task<BusinessSemanticResolutionResult> ResolveAsync(long tenantId, long dataSourceId, string query, int topPerDomain = 3, CancellationToken cancellationToken = default)
 			=> throw new InvalidOperationException("Mapper must not be called by these tests.");
+	}
+
+	private sealed class EntityServiceStub : IBusinessEntityService
+	{
+		public Task<BusinessEntity?> GetAsync(long tenantId, long id, CancellationToken cancellationToken = default)
+			=> Task.FromResult<BusinessEntity?>(null);
+		public Task<IReadOnlyList<BusinessEntity>> ListAsync(long tenantId, CancellationToken cancellationToken = default)
+			=> Task.FromResult<IReadOnlyList<BusinessEntity>>(Array.Empty<BusinessEntity>());
+		public Task<BusinessEntity> CreateAsync(BusinessEntity entity, CancellationToken cancellationToken = default)
+			=> Task.FromResult(entity);
+		public Task<BusinessEntity> UpdateAsync(BusinessEntity entity, CancellationToken cancellationToken = default)
+			=> Task.FromResult(entity);
+		public Task DeleteAsync(long tenantId, long id, CancellationToken cancellationToken = default)
+			=> Task.CompletedTask;
 	}
 }

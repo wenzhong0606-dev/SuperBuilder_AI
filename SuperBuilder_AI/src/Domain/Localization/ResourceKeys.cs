@@ -241,6 +241,13 @@ public static class ResourceKeys
         public const string BusinessModelEntityPanelInfo = "Content.BusinessModelEntityPanelInfo";
         public const string BusinessModelEntityBack = "Content.BusinessModelEntityBack";
 
+        // BusinessModel 实体 CRUD 模态框（M7-05）
+        public const string BusinessModelStatusActive = "Content.BusinessModelStatusActive";
+        public const string BusinessModelStatusDraft = "Content.BusinessModelStatusDraft";
+        public const string BusinessModelStatusUnresolved = "Content.BusinessModelStatusUnresolved";
+        public const string BusinessModelStatusDeprecated = "Content.BusinessModelStatusDeprecated";
+        public const string BusinessModelDeleteConfirm = "Content.BusinessModelDeleteConfirm";
+
         // DataSources（数据源列表）
         public const string DataSourcesNew = "Content.DataSourcesNew";
         public const string DataSourcesMetricTotal = "Content.DataSourcesMetricTotal";
@@ -1485,6 +1492,12 @@ public static class ResourceKeys
         [Content.BusinessModelEntityEmptyText] = new("Content", Page: "BusinessModelEntityDetail", DefaultValue: "The entity may have been deleted, or the backend detail endpoint is not yet connected."),
         [Content.BusinessModelEntityPanelInfo] = new("Content", Page: "BusinessModelEntityDetail", DefaultValue: "Entity information"),
         [Content.BusinessModelEntityBack] = new("Content", Page: "BusinessModelEntityDetail", DefaultValue: "Back to semantic model"),
+
+        [Content.BusinessModelStatusActive] = new("Content", Page: "BusinessModel", DefaultValue: "Active"),
+        [Content.BusinessModelStatusDraft] = new("Content", Page: "BusinessModel", DefaultValue: "Draft"),
+        [Content.BusinessModelStatusUnresolved] = new("Content", Page: "BusinessModel", DefaultValue: "Unresolved"),
+        [Content.BusinessModelStatusDeprecated] = new("Content", Page: "BusinessModel", DefaultValue: "Deprecated"),
+        [Content.BusinessModelDeleteConfirm] = new("Content", Page: "BusinessModelEntityDetail", DefaultValue: "Delete this entity? This action cannot be undone; only entity-level metadata is removed (sub-aggregation editing is deferred to a later milestone)."),
 
         [Content.DataSourcesNew] = new("Content", Page: "DataSources", DefaultValue: "Add data source"),
         [Content.DataSourcesMetricTotal] = new("Content", Page: "DataSources", DefaultValue: "Total data sources"),

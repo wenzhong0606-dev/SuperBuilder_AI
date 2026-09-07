@@ -290,6 +290,9 @@ public sealed class LocalizationSeedService : ILocalizationSeedService
         ["Content.BusinessModelEntityEmptyText"] = "实体可能已被删除，或后端详情端点尚未接入。",
         ["Content.BusinessModelEntityPanelInfo"] = "实体信息",
         ["Content.BusinessModelEntityBack"] = "返回语义模型",
+        ["Content.BusinessModelStatusActive"] = "已激活", ["Content.BusinessModelStatusDraft"] = "草稿",
+        ["Content.BusinessModelStatusUnresolved"] = "未解析", ["Content.BusinessModelStatusDeprecated"] = "已弃用",
+        ["Content.BusinessModelDeleteConfirm"] = "确定要删除该实体吗？此操作不可撤销，仅删除实体级元数据（子聚合的编辑留待后续里程碑）。",
 
         ["Content.DataSourcesNew"] = "新增数据源",
         ["Content.DataSourcesMetricTotal"] = "数据源总数", ["Content.DataSourcesMetricOnline"] = "在线连接",

@@ -36,7 +36,49 @@
 
     <div class="toolbar" style="margin-bottom:0">
         <button class="btn btn-outline-secondary btn-sm" @onclick="Back">@L10n.T(Keys.Content.BusinessModelEntityBack, "返回语义模型")</button>
+        @if (_obj is not null)
+        {
+            <button class="btn btn-outline-primary btn-sm" @onclick="OpenEdit">@L10n.T(Keys.Action.Edit, "编辑")</button>
+            <button class="btn btn-outline-danger btn-sm" @onclick="OpenDelete">@L10n.T(Keys.Action.Delete, "删除")</button>
+        }
     </div>
+
+    <SbModal Visible="@EditVisible" VisibleChanged="v => EditVisible = v" Title="编辑实体" Size="lg">
+        <Body>
+            <div class="field-grid ds-create-fields">
+                <SbField Label="业务键（BusinessKey）" Required="true"><input @bind="EditBusinessKey" /></SbField>
+                <SbField Label="实体名称（Name）" Required="true"><input @bind="EditName" /></SbField>
+                <SbField Label="展示名（DisplayName）"><input @bind="EditDisplayName" /></SbField>
+                <SbField Label="所属业务域（BusinessDomain）"><input @bind="EditBusinessDomain" /></SbField>
+            </div>
+            <SbField Label="描述（Description）" Full="true"><input @bind="EditDescription" /></SbField>
+            <SbField Label="语义口径（SemanticText）" Full="true"><textarea @bind="EditSemanticText"></textarea></SbField>
+            <SbField Label="状态（Status）">
+                <select @bind="EditStatus">
+                    <option value="Active">@L10n.T(Keys.Content.BusinessModelStatusActive, "已激活")</option>
+                    <option value="Draft">@L10n.T(Keys.Content.BusinessModelStatusDraft, "草稿")</option>
+                    <option value="Unresolved">@L10n.T(Keys.Content.BusinessModelStatusUnresolved, "未解析")</option>
+                    <option value="Deprecated">@L10n.T(Keys.Content.BusinessModelStatusDeprecated, "已弃用")</option>
+                </select>
+            </SbField>
+            @if (!string.IsNullOrWhiteSpace(EditError)) { <div class="alert alert-danger tiny" style="margin-top:12px">@EditError</div> }
+        </Body>
+        <Footer>
+            <button class="btn btn-outline-secondary" @onclick='() => EditVisible = false'>@L10n.T(Keys.Action.Cancel, "取消")</button>
+            <button class="btn btn-primary" @onclick="SaveEdit" disabled="@SavingEdit">@(SavingEdit ? "正在保存…" : "保存")</button>
+        </Footer>
+    </SbModal>
+
+    <SbModal Visible="@DeleteVisible" VisibleChanged="v => DeleteVisible = v" Title="确认删除实体" Size="sm">
+        <Body>
+            <p>@L10n.T(Keys.Content.BusinessModelDeleteConfirm, "确定要删除该实体吗？此操作不可撤销，仅删除实体级元数据（子聚合的编辑留待后续里程碑）。")</p>
+            @if (!string.IsNullOrWhiteSpace(DeleteError)) { <div class="alert alert-danger tiny">@DeleteError</div> }
+        </Body>
+        <Footer>
+            <button class="btn btn-outline-secondary" @onclick='() => DeleteVisible = false'>@L10n.T(Keys.Action.Cancel, "取消")</button>
+            <button class="btn btn-danger" @onclick="ConfirmDelete" disabled="@Deleting">@(Deleting ? "正在删除…" : "确认删除")</button>
+        </Footer>
+    </SbModal>
 </AuthGuard>
 
 @code {
@@ -65,4 +107,72 @@
     }
 
     private void Back() => Nav.NavigateTo("business-model");
+
+    private bool EditVisible;
+    private string EditBusinessKey = "", EditName = "", EditDisplayName = "", EditDescription = "", EditBusinessDomain = "", EditSemanticText = "", EditStatus = "Active";
+    private bool SavingEdit;
+    private string EditError = "";
+
+    private bool DeleteVisible;
+    private bool Deleting;
+    private string DeleteError = "";
+
+    private static string Prop(JsonElement? obj, string key)
+        => obj is { ValueKind: JsonValueKind.Object } ? TablePresenter.Cell(obj.Value, key) : "";
+
+    private void OpenEdit()
+    {
+        EditBusinessKey = Prop(_obj, "businessKey");
+        EditName = Prop(_obj, "name");
+        EditDisplayName = Prop(_obj, "displayName");
+        EditDescription = Prop(_obj, "description");
+        EditBusinessDomain = Prop(_obj, "businessDomain");
+        EditSemanticText = Prop(_obj, "semanticText");
+        EditStatus = Prop(_obj, "status");
+        if (string.IsNullOrWhiteSpace(EditStatus)) EditStatus = "Active";
+        EditError = ""; EditVisible = true;
+    }
+
+    private async Task SaveEdit()
+    {
+        EditError = "";
+        if (string.IsNullOrWhiteSpace(EditBusinessKey) || string.IsNullOrWhiteSpace(EditName))
+        {
+            EditError = "业务键（BusinessKey）与实体名称（Name）为必填。";
+            return;
+        }
+        SavingEdit = true;
+        var tid = State.TenantId;
+        var (ok, _, err, _) = await Api.PutAsync($"api/business-model/entities/{Id}?tenantId={tid}", new
+        {
+            businessKey = EditBusinessKey.Trim(),
+            name = EditName.Trim(),
+            displayName = EditDisplayName.Trim(),
+            description = EditDescription.Trim(),
+            businessDomain = EditBusinessDomain.Trim(),
+            semanticText = EditSemanticText.Trim(),
+            status = EditStatus,
+        });
+        SavingEdit = false;
+        if (!ok) { EditError = err ?? "保存失败。"; return; }
+        EditVisible = false;
+        Toast.Success("实体已保存。");
+        await Reload();
+    }
+
+    private void OpenDelete()
+    {
+        DeleteError = ""; DeleteVisible = true;
+    }
+
+    private async Task ConfirmDelete()
+    {
+        Deleting = true;
+        var tid = State.TenantId;
+        var (ok, _, err, _) = await Api.DeleteAsync($"api/business-model/entities/{Id}?tenantId={tid}");
+        Deleting = false;
+        if (!ok) { DeleteError = err ?? "删除失败。"; return; }
+        Toast.Success("实体已删除。");
+        Nav.NavigateTo("business-model");
+    }
 }

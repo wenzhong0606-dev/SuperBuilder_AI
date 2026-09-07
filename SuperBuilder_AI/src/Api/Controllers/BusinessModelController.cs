@@ -2,13 +2,14 @@ using Microsoft.AspNetCore.Mvc;
 using SuperBuilder_AI.Api.Errors;
 using SuperBuilder_AI.Api.Security;
 using SuperBuilder_AI.Interfaces.BI.Entity;
+using SuperBuilder_AI.Models.BI.Entity;
 
 namespace SuperBuilder_AI.Controllers;
 
 /// <summary>
-/// 业务模型（P3 Business Semantic Model）只读 API：
-/// 暴露业务实体 / 业务域列举，以及自然语言 → 业务实体语义解析。
-/// 不修改任何运行时查询链路，仅提供业务语义层的可观测能力。
+/// 业务模型（P3 Business Semantic Model）API：
+/// 暴露业务实体 / 业务域列举，自然语言 → 业务实体语义解析，以及业务实体的新建/编辑/删除（M7-05 CRUD 真实持久化）。
+/// 不修改任何运行时查询链路，仅提供业务语义层的可观测与可编辑能力。
 /// </summary>
 [ApiController]
 [Route("api/business-model")]
@@ -16,11 +17,13 @@ public sealed class BusinessModelController : ControllerBase
 {
     private readonly IBusinessEntityRegistryService _registry;
     private readonly IBusinessSemanticMappingService _mapper;
+    private readonly IBusinessEntityService _entities;
 
-    public BusinessModelController(IBusinessEntityRegistryService registry, IBusinessSemanticMappingService mapper)
+    public BusinessModelController(IBusinessEntityRegistryService registry, IBusinessSemanticMappingService mapper, IBusinessEntityService entities)
     {
         _registry = registry;
         _mapper = mapper;
+        _entities = entities;
     }
 
     [HttpGet("entities")]
@@ -61,6 +64,76 @@ public sealed class BusinessModelController : ControllerBase
 		var entity = await _registry.GetAsync(resolution.EffectiveTenantId, id, cancellationToken);
 		if (entity is null) return NotFound(new ApiError { Code = ErrorCodes.NotFound, Message = "实体不存在或不属于当前租户。" });
 		return Ok(entity);
+	}
+
+	/// <summary>M7-05：新建业务实体（真实持久化）。租户隔离由数据面策略保证，实体 TenantId 固定为解析租户。</summary>
+	[HttpPost("entities")]
+	public async Task<IActionResult> CreateEntity([FromBody] BusinessEntityUpsertRequest dto, [FromQuery] long? tenantId, CancellationToken cancellationToken = default)
+	{
+		var resolution = TenantDataPlanePolicy.Resolve(User, tenantId);
+		if (!resolution.Authorized) return TenantMismatch();
+		if (dto is null || string.IsNullOrWhiteSpace(dto.Name) || string.IsNullOrWhiteSpace(dto.BusinessKey))
+			return BadRequest(new ApiError { Code = ErrorCodes.BadRequest, Message = "BusinessKey 与 Name 为必填。" });
+		var entity = ToEntity(resolution.EffectiveTenantId, dto);
+		var created = await _entities.CreateAsync(entity, cancellationToken);
+		return CreatedAtAction(nameof(GetEntity), new { id = created.Id }, created);
+	}
+
+	/// <summary>M7-05：编辑业务实体（真实持久化）。Id 与租户隔离由数据面策略保证；先取回带正确 RowVersion 的实体再映射，避免乐观并发冲突。</summary>
+	[HttpPut("entities/{id:long}")]
+	public async Task<IActionResult> UpdateEntity(long id, [FromBody] BusinessEntityUpsertRequest dto, [FromQuery] long? tenantId, CancellationToken cancellationToken = default)
+	{
+		var resolution = TenantDataPlanePolicy.Resolve(User, tenantId);
+		if (!resolution.Authorized) return TenantMismatch();
+		if (dto is null || string.IsNullOrWhiteSpace(dto.Name) || string.IsNullOrWhiteSpace(dto.BusinessKey))
+			return BadRequest(new ApiError { Code = ErrorCodes.BadRequest, Message = "BusinessKey 与 Name 为必填。" });
+		var existing = await _entities.GetAsync(resolution.EffectiveTenantId, id, cancellationToken);
+		if (existing is null) return NotFound(new ApiError { Code = ErrorCodes.NotFound, Message = "实体不存在或不属于当前租户。" });
+		MapDto(existing, dto);
+		existing.TenantId = resolution.EffectiveTenantId;
+		try
+		{
+			var updated = await _entities.UpdateAsync(existing, cancellationToken);
+			return Ok(updated);
+		}
+		catch (KeyNotFoundException)
+		{
+			return NotFound(new ApiError { Code = ErrorCodes.NotFound, Message = "实体不存在或不属于当前租户。" });
+		}
+	}
+
+	/// <summary>M7-05：删除业务实体（真实持久化）。幂等：不存在亦返回 204。</summary>
+	[HttpDelete("entities/{id:long}")]
+	public async Task<IActionResult> DeleteEntity(long id, [FromQuery] long? tenantId, CancellationToken cancellationToken = default)
+	{
+		var resolution = TenantDataPlanePolicy.Resolve(User, tenantId);
+		if (!resolution.Authorized) return TenantMismatch();
+		await _entities.DeleteAsync(resolution.EffectiveTenantId, id, cancellationToken);
+		return NoContent();
+	}
+
+	private static BusinessEntity ToEntity(long tenantId, BusinessEntityUpsertRequest dto)
+		=> new BusinessEntity
+		{
+			TenantId = tenantId,
+			BusinessKey = dto.BusinessKey.Trim(),
+			Name = dto.Name.Trim(),
+			DisplayName = string.IsNullOrWhiteSpace(dto.DisplayName) ? null : dto.DisplayName.Trim(),
+			Description = string.IsNullOrWhiteSpace(dto.Description) ? null : dto.Description.Trim(),
+			BusinessDomain = string.IsNullOrWhiteSpace(dto.BusinessDomain) ? null : dto.BusinessDomain.Trim(),
+			SemanticText = string.IsNullOrWhiteSpace(dto.SemanticText) ? null : dto.SemanticText.Trim(),
+			Status = string.IsNullOrWhiteSpace(dto.Status) ? "Active" : dto.Status.Trim(),
+		};
+
+	private static void MapDto(BusinessEntity entity, BusinessEntityUpsertRequest dto)
+	{
+		entity.BusinessKey = dto.BusinessKey.Trim();
+		entity.Name = dto.Name.Trim();
+		entity.DisplayName = string.IsNullOrWhiteSpace(dto.DisplayName) ? null : dto.DisplayName.Trim();
+		entity.Description = string.IsNullOrWhiteSpace(dto.Description) ? null : dto.Description.Trim();
+		entity.BusinessDomain = string.IsNullOrWhiteSpace(dto.BusinessDomain) ? null : dto.BusinessDomain.Trim();
+		entity.SemanticText = string.IsNullOrWhiteSpace(dto.SemanticText) ? null : dto.SemanticText.Trim();
+		entity.Status = string.IsNullOrWhiteSpace(dto.Status) ? "Active" : dto.Status.Trim();
 	}
 
 	private ObjectResult TenantMismatch() => StatusCode(403,

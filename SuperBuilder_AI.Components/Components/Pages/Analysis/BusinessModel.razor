@@ -8,7 +8,7 @@
 
 <AuthGuard>
     <PageHead Icon="sb-ico-model" Key="BusinessModel" Title="语义模型" Desc="把物理表结构映射为业务语言：实体、业务域与字段同义词，让自然语言问数更精准。">
-        <button class="btn btn-primary btn-sm" @onclick="Create">
+        <button class="btn btn-primary btn-sm" @onclick="OpenCreate">
             <svg class="btn-ico"><use href="#sb-ico-plus" /></svg> @L10n.T(Keys.Action.New, "新建") @L10n.T(Keys.Content.BusinessModelEntities, "实体")
         </button>
     </PageHead>
@@ -69,6 +69,32 @@
             </SbPanel>
         </SbTab>
     </SbTabs>
+
+    <SbModal Visible="@CreateVisible" VisibleChanged="v => CreateVisible = v" Title="新建实体" Size="lg">
+        <Body>
+            <div class="field-grid ds-create-fields">
+                <SbField Label="业务键（BusinessKey）" Required="true" Hint="租户内唯一、稳定的业务标识，如 customer、order"><input @bind="NewBusinessKey" placeholder="customer" /></SbField>
+                <SbField Label="实体名称（Name）" Required="true" Hint="对应业务表的名称"><input @bind="NewName" placeholder="e.g. customer" /></SbField>
+                <SbField Label="展示名（DisplayName）"><input @bind="NewDisplayName" placeholder="e.g. Customer table" /></SbField>
+                <SbField Label="所属业务域（BusinessDomain）"><input @bind="NewBusinessDomain" placeholder="e.g. Sales" /></SbField>
+            </div>
+            <SbField Label="描述（Description）" Full="true"><input @bind="NewDescription" placeholder="Entity meaning and usage" /></SbField>
+            <SbField Label="语义口径（SemanticText）" Full="true"><textarea @bind="NewSemanticText" placeholder="Field synonyms, business definitions"></textarea></SbField>
+            <SbField Label="状态（Status）">
+                <select @bind="NewStatus">
+                    <option value="Active">@L10n.T(Keys.Content.BusinessModelStatusActive, "已激活")</option>
+                    <option value="Draft">@L10n.T(Keys.Content.BusinessModelStatusDraft, "草稿")</option>
+                    <option value="Unresolved">@L10n.T(Keys.Content.BusinessModelStatusUnresolved, "未解析")</option>
+                    <option value="Deprecated">@L10n.T(Keys.Content.BusinessModelStatusDeprecated, "已弃用")</option>
+                </select>
+            </SbField>
+            @if (!string.IsNullOrWhiteSpace(Error)) { <div class="alert alert-danger tiny" style="margin-top:12px">@Error</div> }
+        </Body>
+        <Footer>
+            <button class="btn btn-outline-secondary" @onclick='() => CreateVisible = false'>@L10n.T(Keys.Action.Cancel, "取消")</button>
+            <button class="btn btn-primary" @onclick="Save" disabled="@Saving">@(Saving ? "正在保存…" : "保存")</button>
+        </Footer>
+    </SbModal>
 </AuthGuard>
 
 @code {
@@ -123,7 +149,43 @@
             }
         };
 
-    private void Create() => Toast.Info(L10n.T(Keys.Content.BusinessModelEditorNotReady, "实体编辑器将在 S2 阶段接入。"));
+    private bool CreateVisible;
+    private string NewBusinessKey = "", NewName = "", NewDisplayName = "", NewDescription = "", NewBusinessDomain = "", NewSemanticText = "", NewStatus = "Active";
+    private bool Saving;
+    private string Error = "";
+
+    private void OpenCreate()
+    {
+        NewBusinessKey = ""; NewName = ""; NewDisplayName = ""; NewDescription = ""; NewBusinessDomain = ""; NewSemanticText = ""; NewStatus = "Active";
+        Error = ""; CreateVisible = true;
+    }
+
+    private async Task Save()
+    {
+        Error = "";
+        if (string.IsNullOrWhiteSpace(NewBusinessKey) || string.IsNullOrWhiteSpace(NewName))
+        {
+            Error = "业务键（BusinessKey）与实体名称（Name）为必填。";
+            return;
+        }
+        Saving = true;
+        var tid = State.TenantId;
+        var (ok, _, err, _) = await Api.PostAsync($"api/business-model/entities?tenantId={tid}", new
+        {
+            businessKey = NewBusinessKey.Trim(),
+            name = NewName.Trim(),
+            displayName = NewDisplayName.Trim(),
+            description = NewDescription.Trim(),
+            businessDomain = NewBusinessDomain.Trim(),
+            semanticText = NewSemanticText.Trim(),
+            status = NewStatus,
+        });
+        Saving = false;
+        if (!ok) { Error = err ?? "保存失败。"; return; }
+        CreateVisible = false;
+        Toast.Success("实体已创建。");
+        await Reload();
+    }
 
     private static bool IsResolved(JsonElement row)
     {

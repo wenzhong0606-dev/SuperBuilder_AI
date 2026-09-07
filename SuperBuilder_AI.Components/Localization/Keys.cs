@@ -273,6 +273,13 @@ public static class Keys
         public const string BusinessModelEntityPanelInfo = "Content.BusinessModelEntityPanelInfo";
         public const string BusinessModelEntityBack = "Content.BusinessModelEntityBack";
 
+        // BusinessModel 实体 CRUD 模态框（M7-05）
+        public const string BusinessModelStatusActive = "Content.BusinessModelStatusActive";
+        public const string BusinessModelStatusDraft = "Content.BusinessModelStatusDraft";
+        public const string BusinessModelStatusUnresolved = "Content.BusinessModelStatusUnresolved";
+        public const string BusinessModelStatusDeprecated = "Content.BusinessModelStatusDeprecated";
+        public const string BusinessModelDeleteConfirm = "Content.BusinessModelDeleteConfirm";
+
         // DataSources（数据源列表）
         public const string DataSourcesNew = "Content.DataSourcesNew";
         public const string DataSourcesMetricTotal = "Content.DataSourcesMetricTotal";
@@ -1493,6 +1500,12 @@ public static class Keys
         [Content.BusinessModelEntityEmptyText] = new("实体可能已被删除，或后端详情端点尚未接入。", "The entity may have been deleted, or the backend detail endpoint is not yet connected."),
         [Content.BusinessModelEntityPanelInfo] = new("实体信息", "Entity information"),
         [Content.BusinessModelEntityBack] = new("返回语义模型", "Back to semantic model"),
+
+        [Content.BusinessModelStatusActive] = new("已激活", "Active"),
+        [Content.BusinessModelStatusDraft] = new("草稿", "Draft"),
+        [Content.BusinessModelStatusUnresolved] = new("未解析", "Unresolved"),
+        [Content.BusinessModelStatusDeprecated] = new("已弃用", "Deprecated"),
+        [Content.BusinessModelDeleteConfirm] = new("确定要删除该实体吗？此操作不可撤销，仅删除实体级元数据（子聚合的编辑留待后续里程碑）。", "Delete this entity? This action cannot be undone; only entity-level metadata is removed (sub-aggregation editing is deferred to a later milestone)."),
 
         [Content.DataSourcesNew] = new("新增数据源", "Add data source"),
         [Content.DataSourcesMetricTotal] = new("数据源总数", "Total data sources"),
