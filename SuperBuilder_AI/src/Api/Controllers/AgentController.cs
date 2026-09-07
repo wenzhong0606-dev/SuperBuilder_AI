@@ -8,8 +8,10 @@ using Microsoft.EntityFrameworkCore;
 using SuperBuilder_AI.Data;
 using SuperBuilder_AI.Api.Security;
 using SuperBuilder_AI.Interfaces.Agent;
+using SuperBuilder_AI.Interfaces.Agent.Runtime;
 using SuperBuilder_AI.Models.Agent;
 using SuperBuilder_AI.Services.Agent;
+using SuperBuilder_AI.Services.Agent.Runtime;
 
 namespace SuperBuilder_AI.Controllers;
 
@@ -54,12 +56,14 @@ public sealed class AgentController : ControllerBase
 	private readonly SuperBIContext _db;
 	private readonly IAgentDslSerializer _dslSerializer;
 	private readonly IAgentPlanner _planner;
+	private readonly IAgentRuntime _runtime;
 
-	public AgentController(SuperBIContext db, IAgentDslSerializer dslSerializer, IAgentPlanner planner)
+	public AgentController(SuperBIContext db, IAgentDslSerializer dslSerializer, IAgentPlanner planner, IAgentRuntime runtime)
 	{
 		_db = db;
 		_dslSerializer = dslSerializer;
 		_planner = planner;
+		_runtime = runtime;
 	}
 
 	/// <summary>在当前请求作用域内开启租户隔离，返回解析出的租户 Id。</summary>
@@ -289,6 +293,95 @@ public sealed class AgentController : ControllerBase
 	private static AgentDetail ToDetail(AgentPlan p) =>
 		new(p.Id, p.TenantId, p.Code, p.Name, p.Description, p.Status, p.DslVersion, p.DslJson);
 
+	/// <summary>
+	/// 触发一次 Agent 运行（M7-03 Agent Runtime）：按 DSL 顺序执行受控工具，返回运行状态。
+	/// 遇需审批工具时运行进入 <c>approval_pending</c> 并返回 202 Accepted；其余返回 200 OK。
+	/// </summary>
+	[HttpPost("plans/{code}/run")]
+	public async Task<IActionResult> Run(
+		string code,
+		[FromBody] RunAgentRequest request,
+		CancellationToken cancellationToken = default)
+	{
+		if (request is null) return BadRequest("请求体不能为空。");
+		if (request.TenantId <= 0) return BadRequest("运行 Agent 需要 tenantId > 0。");
+		if (string.IsNullOrWhiteSpace(code)) return BadRequest("Agent 编码不能为空。");
+
+		var tenantId = ScopeTo(request.TenantId);
+		var granted = request.GrantedTools is { Count: > 0 }
+			? new HashSet<string>(request.GrantedTools, StringComparer.OrdinalIgnoreCase)
+			: null;
+
+		try
+		{
+			var run = await _runtime.StartRunAsync(tenantId, code, CurrentActor(), granted, cancellationToken);
+			return run.Status == AgentRunStatuses.ApprovalPending
+				? AcceptedAtAction(nameof(GetRun), new { id = run.Id, tenantId }, ToRunDetail(run))
+				: Ok(ToRunDetail(run));
+		}
+		catch (AgentRuntimeException ex)
+		{
+			return StatusCode(ex.StatusCode, new { errors = new[] { ex.Message } });
+		}
+	}
+
+	/// <summary>获取运行状态与每步执行信封（M7-03）。</summary>
+	[HttpGet("runs/{id}")]
+	public async Task<IActionResult> GetRun(
+		long id,
+		[FromQuery] long tenantId = 0,
+		CancellationToken cancellationToken = default)
+	{
+		ScopeTo(tenantId);
+		var run = await _db.AgentRuns.FirstOrDefaultAsync(r => r.Id == id, cancellationToken);
+		if (run is null) return NotFound();
+		return Ok(ToRunDetail(run));
+	}
+
+	/// <summary>审批通过挂起的运行，恢复执行剩余步骤（M7-03）。</summary>
+	[HttpPost("runs/{id}/approve")]
+	public async Task<IActionResult> ApproveRun(
+		long id,
+		[FromQuery] long tenantId = 0,
+		CancellationToken cancellationToken = default)
+	{
+		var tid = ScopeTo(tenantId);
+		try
+		{
+			var run = await _runtime.ApproveAsync(tid, id, cancellationToken);
+			return Ok(ToRunDetail(run));
+		}
+		catch (AgentRuntimeException ex)
+		{
+			return StatusCode(ex.StatusCode, new { errors = new[] { ex.Message } });
+		}
+	}
+
+	/// <summary>拒绝挂起的运行，终止（M7-03）。</summary>
+	[HttpPost("runs/{id}/reject")]
+	public async Task<IActionResult> RejectRun(
+		long id,
+		[FromQuery] long tenantId = 0,
+		CancellationToken cancellationToken = default)
+	{
+		var tid = ScopeTo(tenantId);
+		try
+		{
+			var run = await _runtime.RejectAsync(tid, id, cancellationToken);
+			return Ok(ToRunDetail(run));
+		}
+		catch (AgentRuntimeException ex)
+		{
+			return StatusCode(ex.StatusCode, new { errors = new[] { ex.Message } });
+		}
+	}
+
+	private static string CurrentActor()
+		=> "system"; // 无认证上下文时回退；真实认证主体见 P10.1，M7-03 仅作审计占位。
+
+	private static AgentRunDetail ToRunDetail(AgentRun r) =>
+		new(r.Id, r.TenantId, r.PlanCode, r.Status, r.CurrentStepOrder, r.Actor, r.StartedAt, r.FinishedAt, r.ResultSummary, r.GetStepLog().ToList());
+
 	#region Request / Response DTOs
 	/// <summary>从意图创建 Agent 请求体（默认路径，确定性、不调 LLM）。</summary>
 	public sealed record CreateAgentPlanRequest(
@@ -342,5 +435,23 @@ public sealed class AgentController : ControllerBase
 		IReadOnlyList<string> Directions,
 		IReadOnlyList<AgentToolDescriptor> ToolCatalog,
 		string Skeleton);
+
+	/// <summary>触发 Agent 运行请求体（M7-03）。</summary>
+	public sealed record RunAgentRequest(
+		long TenantId,
+		IReadOnlyList<string>? GrantedTools = null);
+
+	/// <summary>运行详情 DTO（M7-03）：含状态与每步执行信封。</summary>
+	public sealed record AgentRunDetail(
+		long Id,
+		long TenantId,
+		string PlanCode,
+		string Status,
+		int CurrentStepOrder,
+		string? Actor,
+		DateTime? StartedAt,
+		DateTime? FinishedAt,
+		string? ResultSummary,
+		IReadOnlyList<AgentRunStepRecord> Steps);
 	#endregion
 }

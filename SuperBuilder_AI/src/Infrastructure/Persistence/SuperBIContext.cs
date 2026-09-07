@@ -132,6 +132,7 @@ public class SuperBIContext : DbContext
 
         #region P9 AI Agent / Copilot
         public DbSet<AgentPlan> AgentPlans { get; set; }
+        public DbSet<AgentRun> AgentRuns { get; set; }
         #endregion
 
         #region P10.1 Identity
@@ -506,6 +507,19 @@ public class SuperBIContext : DbContext
         builder.Entity<AgentPlan>().Property(x => x.Status).IsRequired().HasMaxLength(32).HasComment("状态");
         builder.Entity<AgentPlan>().Property(x => x.DslVersion).IsRequired().HasMaxLength(16).HasComment("DSL版本");
         builder.Entity<AgentPlan>().Property(x => x.DslJson).IsRequired().HasComment("DSL文档（结构化，非裸HTML）");
+
+        #region M7.3 AgentRun
+        builder.Entity<AgentRun>().ToTable(tb => tb.HasComment("Agent运行记录（M7-03 Agent Runtime）"));
+        builder.Entity<AgentRun>().HasIndex(x => new { x.TenantId, x.PlanCode });
+        builder.Entity<AgentRun>().HasIndex(x => x.Status);
+        builder.Entity<AgentRun>().Property(x => x.TenantId).HasComment("所属租户（运行恒归属某一租户）");
+        builder.Entity<AgentRun>().Property(x => x.PlanCode).IsRequired().HasMaxLength(128).HasComment("Agent编码");
+        builder.Entity<AgentRun>().Property(x => x.Status).IsRequired().HasMaxLength(32).HasComment("运行状态");
+        builder.Entity<AgentRun>().Property(x => x.Actor).HasMaxLength(256).HasComment("触发者");
+        builder.Entity<AgentRun>().Property(x => x.ResultSummary).HasMaxLength(1024).HasComment("结果摘要");
+        builder.Entity<AgentRun>().Property(x => x.StepLogJson).HasComment("每步执行结果（JSON 信封）");
+        builder.Entity<AgentRun>().Property(x => x.GrantedToolsJson).HasComment("授权工具集合（JSON）");
+        #endregion
         #endregion
 
         #region P10.1 Identity
@@ -687,6 +701,9 @@ public class SuperBIContext : DbContext
 
         // AgentPlan：同 Dashboard/Theme/AppPlan，放行 TenantId == 0 的全局模板。
         builder.Entity<AgentPlan>().HasQueryFilter(e => !_tenantFilterEnabled || e.TenantId == _scopedTenantId || e.TenantId == 0);
+
+        // AgentRun：租户专属运行记录，不放行 TenantId == 0（运行恒归属某一租户，不存在全局运行）。
+        builder.Entity<AgentRun>().HasQueryFilter(e => !_tenantFilterEnabled || e.TenantId == _scopedTenantId);
 
         // User：租户作用域，不放行 TenantId == 0（用户恒归属某一租户）。
         builder.Entity<User>().HasQueryFilter(e => !_tenantFilterEnabled || e.TenantId == _scopedTenantId);

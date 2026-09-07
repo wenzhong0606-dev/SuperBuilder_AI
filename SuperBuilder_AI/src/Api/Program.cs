@@ -26,6 +26,8 @@ using SuperBuilder_AI.Interfaces.AppBuilder;
 using SuperBuilder_AI.Services.AppBuilder;
 using SuperBuilder_AI.Interfaces.Agent;
 using SuperBuilder_AI.Services.Agent;
+using SuperBuilder_AI.Interfaces.Agent.Runtime;
+using SuperBuilder_AI.Services.Agent.Runtime;
 using SuperBuilder_AI.Interfaces.Identity;
 using SuperBuilder_AI.Services.Identity;
 using SuperBuilder_AI.Interfaces.Audit;
@@ -266,6 +268,20 @@ builder.Services.AddScoped<IAppBuilderAgent, AppBuilderAgent>();
 
 // P9.2 Agent 编排端口（默认路径确定性、非默认路径启用 LLM）
 builder.Services.AddScoped<IAgentPlanner, AgentPlanner>();
+
+// M7-03 Agent 运行时（受控工具执行 + 权限 deny-by-default + 状态机 + 重试 + 审批闸门）
+builder.Services.AddScoped<IToolPermissionPolicy, ToolPermissionPolicy>();
+builder.Services.AddScoped<IRetryPolicy, RetryPolicy>();
+builder.Services.AddScoped<ITool, MetadataTool>();
+builder.Services.AddScoped<ITool, SemanticTool>();
+builder.Services.AddScoped<ITool, QueryTool>();
+builder.Services.AddScoped<ITool, DashboardTool>();
+builder.Services.AddScoped<ITool, ForecastTool>();
+builder.Services.AddScoped<ITool, ReportTool>();
+builder.Services.AddScoped<ITool, AlertTool>();
+builder.Services.AddScoped<ITool, WorkflowTool>();
+builder.Services.AddScoped<IToolCatalog, ControlledToolCatalog>();
+builder.Services.AddScoped<IAgentRuntime, AgentRuntime>();
 
 // P10.1 Identity / RBAC（确定性，不调 LLM）
 builder.Services.AddScoped<IIdentityService, IdentityService>();

@@ -8,6 +8,7 @@ using SuperBuilder_AI.Controllers;
 using SuperBuilder_AI.Data;
 using SuperBuilder_AI.Interfaces;
 using SuperBuilder_AI.Interfaces.Agent;
+using SuperBuilder_AI.Interfaces.Agent.Runtime;
 using SuperBuilder_AI.Models.Agent;
 using SuperBuilder_AI.Services.Agent;
 using Xunit;
@@ -42,7 +43,18 @@ public class AgentControllerTests
 	}
 
 	private static AgentController Build(SuperBIContext db, string qwenResponse = "ignored") =>
-		new(db, new AgentDslSerializer(), new AgentPlanner(new AgentDslSerializer(), new FakeQwen(qwenResponse)));
+		new(db, new AgentDslSerializer(), new AgentPlanner(new AgentDslSerializer(), new FakeQwen(qwenResponse)), new NullAgentRuntime());
+
+	/// <summary>运行时桩：现有 CRUD/目录测试不触达运行端点，返回占位运行即可。</summary>
+	private sealed class NullAgentRuntime : IAgentRuntime
+	{
+		public Task<AgentRun> StartRunAsync(long tenantId, string planCode, string? actor = null, IReadOnlySet<string>? grantedTools = null, CancellationToken cancellationToken = default)
+			=> Task.FromResult(new AgentRun { TenantId = tenantId, PlanCode = planCode, Status = AgentRunStatuses.Queued });
+		public Task<AgentRun> ApproveAsync(long tenantId, long runId, CancellationToken cancellationToken = default)
+			=> Task.FromResult(new AgentRun { Id = runId, TenantId = tenantId, Status = AgentRunStatuses.Approved });
+		public Task<AgentRun> RejectAsync(long tenantId, long runId, CancellationToken cancellationToken = default)
+			=> Task.FromResult(new AgentRun { Id = runId, TenantId = tenantId, Status = AgentRunStatuses.Rejected });
+	}
 
 	[Fact]
 	public async Task Create_Then_Get_Returns_Dsl()
