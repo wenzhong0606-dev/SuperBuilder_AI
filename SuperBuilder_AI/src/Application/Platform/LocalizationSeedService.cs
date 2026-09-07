@@ -384,7 +384,10 @@ public sealed class LocalizationSeedService : ILocalizationSeedService
         ["Content.ModelAccountsFieldApiKey"] = "API Key", ["Content.ModelAccountsApiKeyPlaceholder"] = "sk-••••••",
         ["Content.ModelAccountsFieldNote"] = "备注", ["Content.ModelAccountsNotePlaceholder"] = "如：生产环境专用",
         ["Content.ModelAccountsSaveBind"] = "保存绑定", ["Content.ModelAccountsSetDefaultToast"] = "已将 {0} 设为默认模型",
-        ["Content.ModelAccountsBindSubmitted"] = "绑定已提交（ILLMProvider + UserModelBinding 计划于 P13 实现，密钥将以掩码存储）。",
+        ["Content.ModelAccountsBindSubmitted"] = "绑定已保存。",
+        ["Content.ModelAccountsDeleted"] = "已删除绑定。",
+        ["Content.ModelAccountsDeleteConfirm"] = "确认删除该模型绑定？密钥将从库中移除。",
+        ["Content.ModelAccountsBindFailed"] = "绑定失败：{0}",
 
         ["Content.SemanticLabelLoading"] = "正在加载标签详情…",
         ["Content.SemanticLabelPanelDetail"] = "详情",

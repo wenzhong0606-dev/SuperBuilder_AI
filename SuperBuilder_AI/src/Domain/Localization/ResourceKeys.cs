@@ -389,6 +389,9 @@ public static class ResourceKeys
         public const string ModelAccountsSaveBind = "Content.ModelAccountsSaveBind";
         public const string ModelAccountsSetDefaultToast = "Content.ModelAccountsSetDefaultToast";
         public const string ModelAccountsBindSubmitted = "Content.ModelAccountsBindSubmitted";
+        public const string ModelAccountsDeleted = "Content.ModelAccountsDeleted";
+        public const string ModelAccountsDeleteConfirm = "Content.ModelAccountsDeleteConfirm";
+        public const string ModelAccountsBindFailed = "Content.ModelAccountsBindFailed";
 
         // SemanticLabelDetail（语义标签详情）
         public const string SemanticLabelLoading = "Content.SemanticLabelLoading";
@@ -1676,7 +1679,10 @@ public static class ResourceKeys
         [Content.ModelAccountsNotePlaceholder] = new("Content", Page: "ModelAccounts", DefaultValue: "e.g. Production only"),
         [Content.ModelAccountsSaveBind] = new("Content", Page: "ModelAccounts", DefaultValue: "Save binding"),
         [Content.ModelAccountsSetDefaultToast] = new("Content", Page: "ModelAccounts", DefaultValue: "Set {0} as default model"),
-        [Content.ModelAccountsBindSubmitted] = new("Content", Page: "ModelAccounts", DefaultValue: "Binding submitted (ILLMProvider + UserModelBinding planned for P13; key will be stored masked)."),
+        [Content.ModelAccountsBindSubmitted] = new("Content", Page: "ModelAccounts", DefaultValue: "Binding saved."),
+        [Content.ModelAccountsDeleted] = new("Content", Page: "ModelAccounts", DefaultValue: "Binding deleted."),
+        [Content.ModelAccountsDeleteConfirm] = new("Content", Page: "ModelAccounts", DefaultValue: "Delete this model binding? The key will be removed from the store."),
+        [Content.ModelAccountsBindFailed] = new("Content", Page: "ModelAccounts", DefaultValue: "Binding failed: {0}"),
 
         [Content.SemanticLabelLoading] = new("Content", Page: "SemanticLabelDetail", DefaultValue: "Loading label details…"),
         [Content.SemanticLabelPanelDetail] = new("Content", Page: "SemanticLabelDetail", DefaultValue: "Details"),

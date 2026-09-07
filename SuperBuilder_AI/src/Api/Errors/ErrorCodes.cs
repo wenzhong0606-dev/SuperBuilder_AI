@@ -13,6 +13,7 @@ public static class ErrorCodes
     public const string Unauthorized = "SB_UNAUTHORIZED";
     public const string Forbidden = "SB_FORBIDDEN";
     public const string NotFound = "SB_NOT_FOUND";
+    public const string Conflict = "SB_CONFLICT";
     public const string Unsupported = "SB_UNSUPPORTED";
     public const string Internal = "SB_INTERNAL";
     public const string ServiceUnavailable = "SB_SERVICE_UNAVAILABLE";
@@ -48,6 +49,7 @@ public static class ErrorCodes
         [Unauthorized] = "鉴权失败，请重新登录后再试。",
         [Forbidden] = "权限不足，当前账号无权执行该操作。",
         [NotFound] = "请求的资源不存在或已被删除。",
+        [Conflict] = "资源已存在或状态冲突，请刷新后重试。",
         [Unsupported] = "当前操作不被支持。",
         [Internal] = "服务暂时不可用，请稍后重试；如持续出现，可凭错误码联系管理员。",
         [ServiceUnavailable] = "平台尚未就绪（数据库不可达或尚未完成初始化），请稍后重试或联系管理员。",

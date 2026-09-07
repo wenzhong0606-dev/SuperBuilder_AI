@@ -75,6 +75,18 @@ builder.Services.AddDbContext<SuperBIContext>(options =>
 
 builder.Services.Configure<QdrantOptions>(builder.Configuration.GetSection("Qdrant"));
 builder.Services.Configure<EmbeddingOptions>(builder.Configuration.GetSection("Embedding"));
+
+// M7-07：机密存储（AES-256-GCM 信封加密）。主密钥须来自环境变量 SecretStore__MasterKey 或 gitignored 的 appsettings.Local.json；
+// 缺失即解析失败（fail-fast，M9-07）——绝不回退到代码内硬编码密钥。
+// 注意：校验延迟到解析期执行，避免在 dotnet ef 生成迁移（不解析 ISecretStore）时误触发启动失败。
+builder.Services.AddSingleton<SuperBuilder_AI.Infrastructure.Security.ISecretStore>(sp =>
+{
+    var masterKey = builder.Configuration["SecretStore:MasterKey"];
+    if (string.IsNullOrWhiteSpace(masterKey))
+        throw new InvalidOperationException(
+            "缺少 SecretStore:MasterKey（base64 编码的 32 字节 AES-256 主密钥）；生产环境须通过环境变量 SecretStore__MasterKey 注入。");
+    return new SuperBuilder_AI.Infrastructure.Security.AesGcmSecretStore(Convert.FromBase64String(masterKey));
+});
 // M2-06：自助注册配置（默认关闭，平台按环境开启；审批/验证码待裁决）。
 builder.Services.Configure<SelfRegistrationOptions>(builder.Configuration.GetSection(SelfRegistrationOptions.SectionName));
 builder.Services.Configure<CostGovernanceOptions>(builder.Configuration.GetSection(CostGovernanceOptions.SectionName));
@@ -308,6 +320,9 @@ builder.Services.AddScoped<IWidgetDataResolver, QueryPlanWidgetDataResolver>();
 
 // P7.2 Theme 级联解析端口（仪表盘显式键 → 租户默认 → 内置默认）
 builder.Services.AddScoped<IThemeResolver, ThemeResolver>();
+
+// M7-07：模型账号（BYO）服务——加密绑定 / 租户隔离 / 服务端解密（绝不下发明文）。
+builder.Services.AddScoped<SuperBuilder_AI.Application.ModelAccounts.ModelAccountService>();
 
 // ── BIConversationService 依赖链补充注册 ──────────────────
 builder.Services.AddScoped<IQueryPlanExplainabilityService>(sp => sp.GetRequiredService<QueryPlanExplainabilityService>());

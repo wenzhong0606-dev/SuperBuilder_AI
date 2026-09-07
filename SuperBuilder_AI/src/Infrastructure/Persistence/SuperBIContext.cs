@@ -11,6 +11,7 @@ using SuperBuilder_AI.Models.Localization;
 using SuperBuilder_AI.Models.Metadata;
 using SuperBuilder_AI.Models.Organization;
 using SuperBuilder_AI.Models.Theme;
+using SuperBuilder_AI.Models.ModelAccount;
 using SuperBuilder_AI.Models;
 using SuperBuilder_AI.Data.Configurations;
 
@@ -121,9 +122,13 @@ public class SuperBIContext : DbContext
     public DbSet<DashboardVersion> DashboardVersions { get; set; }
     #endregion
 
-    #region P7 Multi-Theme / Style Engine
-    public DbSet<Theme> Themes { get; set; }
-    #endregion
+        #region P7 Multi-Theme / Style Engine
+        public DbSet<Theme> Themes { get; set; }
+        #endregion
+
+        #region P7.3 Model Accounts (BYO)
+        public DbSet<ModelAccount> ModelAccounts { get; set; }
+        #endregion
 
     #region P8 AI App Builder
     public DbSet<AppPlan> AppPlans { get; set; }
@@ -455,6 +460,23 @@ public class SuperBIContext : DbContext
         builder.Entity<Theme>().Property(x => x.DslJson).IsRequired().HasComment("主题DSL文档（结构化令牌，非CSS/HTML）");
         #endregion
 
+        #region P7.3 ModelAccount (BYO, M7-07)
+        // 租户级模型账号绑定；密钥仅密文存储。TenantId 恒 > 0，无全局行，故不建指向 Tenant 的外键（同 AgentRun）。
+        builder.Entity<ModelAccount>().ToTable(tb => tb.HasComment("模型账号绑定（BYO 加密存储）"));
+        builder.Entity<ModelAccount>().HasIndex(x => x.TenantId).HasDatabaseName("IX_ModelAccounts_TenantId");
+        // 同一租户内 (Provider, ModelId) 唯一：一个模型仅一个绑定；写入路径与数据库双重强制。
+        builder.Entity<ModelAccount>().HasIndex(x => new { x.TenantId, x.Provider, x.ModelId }).IsUnique()
+            .HasDatabaseName("IX_ModelAccounts_TenantId_Provider_ModelId");
+        builder.Entity<ModelAccount>().Property(x => x.TenantId).HasComment("所属租户（>0）");
+        builder.Entity<ModelAccount>().Property(x => x.Provider).IsRequired().HasMaxLength(64).HasComment("供应商标识(Qwen/OpenAI/...)");
+        builder.Entity<ModelAccount>().Property(x => x.ModelId).IsRequired().HasMaxLength(128).HasComment("模型标识(qwen-plus/gpt-4o/...)");
+        builder.Entity<ModelAccount>().Property(x => x.DisplayName).IsRequired().HasMaxLength(128).HasComment("展示名");
+        builder.Entity<ModelAccount>().Property(x => x.EncryptedKey).IsRequired().HasMaxLength(2048).HasComment("AES-GCM 密文(禁止日志记录/明文下发)");
+        builder.Entity<ModelAccount>().Property(x => x.MaskedKey).IsRequired().HasMaxLength(64).HasComment("展示掩码(如 sk-***1234)");
+        builder.Entity<ModelAccount>().Property(x => x.Note).HasMaxLength(512).HasComment("备注");
+        builder.Entity<ModelAccount>().Property(x => x.IsDefault).IsRequired().HasDefaultValue(false).HasComment("是否为租户默认模型(每租户至多一个)");
+        #endregion
+
         #region P8.1 AppPlan
         // 与 Dashboard/Theme 一致：TenantId=0 表示全局模板，不建指向 Tenant 的外键（Tenant 表无 Id=0 行）。
         builder.Entity<AppPlan>().ToTable(tb => tb.HasComment("应用"));
@@ -695,6 +717,9 @@ public class SuperBIContext : DbContext
 
         // Theme：同 Dashboard，放行 TenantId == 0 的内置/全局主题（租户可继承平台默认主题）。
         builder.Entity<Theme>().HasQueryFilter(e => !_tenantFilterEnabled || e.TenantId == _scopedTenantId || e.TenantId == 0);
+
+        // ModelAccount：租户专属绑定，不放行 TenantId == 0（绑定恒归属某一租户，无全局绑定）。
+        builder.Entity<ModelAccount>().HasQueryFilter(e => !_tenantFilterEnabled || e.TenantId == _scopedTenantId);
 
         // AppPlan：同 Dashboard/Theme，放行 TenantId == 0 的全局模板（租户可继承平台默认应用）。
         builder.Entity<AppPlan>().HasQueryFilter(e => !_tenantFilterEnabled || e.TenantId == _scopedTenantId || e.TenantId == 0);

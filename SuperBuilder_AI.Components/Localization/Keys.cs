@@ -421,6 +421,9 @@ public static class Keys
         public const string ModelAccountsSaveBind = "Content.ModelAccountsSaveBind";
         public const string ModelAccountsSetDefaultToast = "Content.ModelAccountsSetDefaultToast";
         public const string ModelAccountsBindSubmitted = "Content.ModelAccountsBindSubmitted";
+        public const string ModelAccountsDeleted = "Content.ModelAccountsDeleted";
+        public const string ModelAccountsDeleteConfirm = "Content.ModelAccountsDeleteConfirm";
+        public const string ModelAccountsBindFailed = "Content.ModelAccountsBindFailed";
 
         // SemanticLabelDetail（语义标签详情）
         public const string SemanticLabelLoading = "Content.SemanticLabelLoading";
@@ -1654,7 +1657,10 @@ public static class Keys
         [Content.ModelAccountsNotePlaceholder] = new("如：生产环境专用", "e.g. Production only"),
         [Content.ModelAccountsSaveBind] = new("保存绑定", "Save binding"),
         [Content.ModelAccountsSetDefaultToast] = new("已将 {0} 设为默认模型", "Set {0} as default model"),
-        [Content.ModelAccountsBindSubmitted] = new("绑定已提交（ILLMProvider + UserModelBinding 计划于 P13 实现，密钥将以掩码存储）。", "Binding submitted (ILLMProvider + UserModelBinding planned for P13; key will be stored masked)."),
+        [Content.ModelAccountsBindSubmitted] = new("绑定已保存。", "Binding saved."),
+        [Content.ModelAccountsDeleted] = new("已删除绑定。", "Binding deleted."),
+        [Content.ModelAccountsDeleteConfirm] = new("确认删除该模型绑定？密钥将从库中移除。", "Delete this model binding? The key will be removed from the store."),
+        [Content.ModelAccountsBindFailed] = new("绑定失败：{0}", "Binding failed: {0}"),
 
         [Content.SemanticLabelLoading] = new("正在加载标签详情…", "Loading label details…"),
         [Content.SemanticLabelPanelDetail] = new("详情", "Details"),

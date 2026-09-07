@@ -1,72 +1,282 @@
 @page "/model-accounts"
+@inject IApiClient Api
+@inject AppState State
 @inject ToastService Toast
+@using System.Text.Json
 @using SuperBuilder_AI.Components.Shared
 
 <AuthGuard>
     <PageHead Icon="sb-ico-key" Key="ModelAccounts" Title="模型与账号（BYO）" Desc="选择当前 AI 模型，或绑定你自有的模型 API Key（BYO），按租户隔离、密钥掩码存储。" />
 
-    <div class="card-grid">
-        @foreach (var m in _models)
-        {
-            <div class="feature-card">
-                <div class="fc-ico"><svg><use href="#sb-ico-key" /></svg></div>
-                <div class="fc-title">@m.Name</div>
-                <div class="fc-desc">@m.Desc</div>
-                <div style="display:flex;gap:6px;align-items:center">
-                    <span class="badge @(m.Bound ? "badge-success" : "badge-muted")">@(m.Bound ? L10n.T(Keys.Content.ModelAccountsBound, "已绑定") : L10n.T(Keys.Content.ModelAccountsUnbound, "未绑定"))</span>
-                    @if (m.Default) { <span class="badge badge-primary">@L10n.T(Keys.Content.ModelAccountsDefault, "默认")</span> }
-                    <div class="spacer" style="flex:1"></div>
-                    <button class="btn btn-outline-secondary btn-sm" @onclick="() => SetDefault(m.Name)">@L10n.T(Keys.Content.ModelAccountsSetDefault, "设为默认")</button>
+    @if (_loading)
+    {
+        <LoadingState Text="@L10n.T(Keys.Common.Loading, "加载中…")" />
+    }
+    else
+    {
+        <div class="card-grid">
+            @foreach (var m in _rows)
+            {
+                <div class="feature-card">
+                    <div class="fc-ico"><svg><use href="#sb-ico-key" /></svg></div>
+                    <div class="fc-title">@m.DisplayName</div>
+                    <div class="fc-desc">@m.Desc</div>
+                    <div class="fc-sub">@($"{m.Provider}/{m.ModelId}")</div>
+                    @if (m.Bound)
+                    {
+                        <div style="margin:8px 0;font-family:var(--sb-mono,monospace);font-size:12px;color:var(--sb-text-soft)">@m.MaskedKey</div>
+                    }
+                    <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+                        <span class="badge @(m.Bound ? "badge-success" : "badge-muted")">@(m.Bound ? L10n.T(Keys.Content.ModelAccountsBound, "已绑定") : L10n.T(Keys.Content.ModelAccountsUnbound, "未绑定"))</span>
+                        @if (m.Default) { <span class="badge badge-primary">@L10n.T(Keys.Content.ModelAccountsDefault, "默认")</span> }
+                        <div class="spacer" style="flex:1"></div>
+                        @if (m.Bound)
+                        {
+                            <button class="btn btn-outline-secondary btn-sm" disabled="@m.Default" @onclick="() => SetDefault(m)">@L10n.T(Keys.Content.ModelAccountsSetDefault, "设为默认")</button>
+                            <button class="btn btn-outline-danger btn-sm" @onclick="() => OpenDelete(m)">@L10n.T(Keys.Action.Delete, "删除")</button>
+                        }
+                        else
+                        {
+                            <button class="btn btn-outline-primary btn-sm" @onclick="() => ScrollToBind(m.Provider, m.ModelId)">@L10n.T(Keys.Content.ModelAccountsSaveBind, "绑定")</button>
+                        }
+                    </div>
                 </div>
-            </div>
-        }
-    </div>
+            }
+        </div>
 
-    <SbPanel Icon="sb-ico-key" Title="@L10n.T(Keys.Content.ModelAccountsBindPanel, "绑定自有 API Key")">
-        <Body>
-            <div class="field-grid">
-                <SbField Label="@L10n.T(Keys.Content.ModelAccountsFieldModel, "模型")">
-                    <select @bind="SelModel">
-                        @foreach (var m in _models) { <option value="@m.Name">@m.Name</option> }
-                    </select>
-                </SbField>
-                <SbField Label="@L10n.T(Keys.Content.ModelAccountsFieldApiKey, "API Key")"><input type="password" @bind="Key" placeholder="@L10n.T(Keys.Content.ModelAccountsApiKeyPlaceholder, "sk-••••••")" /></SbField>
-                <SbField Label="@L10n.T(Keys.Content.ModelAccountsFieldNote, "备注")" Full="true"><input @bind="Note" placeholder="@L10n.T(Keys.Content.ModelAccountsNotePlaceholder, "如：生产环境专用")" /></SbField>
-            </div>
-            <div class="toolbar" style="margin-top:16px;margin-bottom:0">
-                <button class="btn btn-primary btn-sm" @onclick="Bind">@L10n.T(Keys.Content.ModelAccountsSaveBind, "保存绑定")</button>
-            </div>
-        </Body>
-    </SbPanel>
+        <SbPanel Icon="sb-ico-key" Title="@L10n.T(Keys.Content.ModelAccountsBindPanel, "绑定自有 API Key")">
+            <Body>
+                <div class="field-grid">
+                    <SbField Label="@L10n.T(Keys.Content.ModelAccountsFieldModel, "模型")">
+                        <select @bind="SelKey">
+                            @foreach (var c in _catalog)
+                            {
+                                <option value="@($"{c.Provider}|{c.ModelId}")">@c.DisplayName</option>
+                            }
+                        </select>
+                    </SbField>
+                    <SbField Label="@L10n.T(Keys.Content.ModelAccountsFieldApiKey, "API Key")"><input type="password" @bind="Key" placeholder="@L10n.T(Keys.Content.ModelAccountsApiKeyPlaceholder, "sk-••••••")" /></SbField>
+                    <SbField Label="@L10n.T(Keys.Content.ModelAccountsFieldNote, "备注")" Full="true"><input @bind="Note" placeholder="@L10n.T(Keys.Content.ModelAccountsNotePlaceholder, "如：生产环境专用")" /></SbField>
+                </div>
+                @if (!string.IsNullOrWhiteSpace(_error))
+                {
+                    <div class="alert alert-danger tiny" style="margin-top:12px">@_error</div>
+                }
+                <div class="toolbar" style="margin-top:16px;margin-bottom:0">
+                    <button class="btn btn-primary btn-sm" @onclick="Bind" disabled="@_saving">@(_saving ? "正在保存…" : L10n.T(Keys.Content.ModelAccountsSaveBind, "保存绑定"))</button>
+                </div>
+            </Body>
+        </SbPanel>
+    }
 </AuthGuard>
 
+<SbModal Visible="@DeleteVisible" VisibleChanged="v => DeleteVisible = v" Title="@L10n.T(Keys.Action.Delete, "删除")" Size="sm">
+    <Body>
+        <p>@L10n.T(Keys.Content.ModelAccountsDeleteConfirm, "确认删除该模型绑定？密钥将从库中移除。")</p>
+        @if (!string.IsNullOrWhiteSpace(_deleteError)) { <div class="alert alert-danger tiny">@_deleteError</div> }
+    </Body>
+    <Footer>
+        <button class="btn btn-outline-secondary" @onclick="() => DeleteVisible = false">@L10n.T(Keys.Action.Cancel, "取消")</button>
+        <button class="btn btn-danger" @onclick="ConfirmDelete" disabled="@Deleting">@(Deleting ? "正在删除…" : L10n.T(Keys.Action.Delete, "删除"))</button>
+    </Footer>
+</SbModal>
+
 @code {
-    private class Model
-    {
-        public string Name { get; set; } = "";
-        public string Desc { get; set; } = "";
-        public bool Bound { get; set; }
-        public bool Default { get; set; }
-    }
-    private List<Model> _models = new();
+    private sealed record CatalogRow(
+        string Provider, string ModelId, string DisplayName, string Desc,
+        bool Bound, bool Default, long? AccountId, string? MaskedKey, string? Note);
 
-    protected override void OnInitialized()
+    private sealed record CatalogItem(string Provider, string ModelId, string DisplayName, string Desc);
+
+    private List<CatalogRow> _rows = new();
+    private List<CatalogItem> _catalog = new();
+    private bool _loading = true;
+    private bool _saving;
+    private string? _error;
+
+    private string SelKey = "";
+    private string Key = "";
+    private string Note = "";
+
+    private bool DeleteVisible;
+    private bool Deleting;
+    private string? _deleteError;
+    private CatalogRow? _pendingDelete;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        _models = new()
+        if (!firstRender) return;
+        _loading = true;
+        StateHasChanged();
+        try
         {
-            new() { Name = "Qwen-Plus", Desc = L10n.T(Keys.Content.ModelAccountsDescQwenPlus, "通义千问，中文业务理解强"), Bound = true, Default = true },
-            new() { Name = "Qwen-Max", Desc = L10n.T(Keys.Content.ModelAccountsDescQwenMax, "通义千问旗舰，复杂推理"), Bound = true },
-            new() { Name = "OpenAI GPT-4o", Desc = L10n.T(Keys.Content.ModelAccountsDescGpt4o, "通用能力强"), Bound = false },
-            new() { Name = "Azure OpenAI", Desc = L10n.T(Keys.Content.ModelAccountsDescAzureOpenAI, "企业合规部署"), Bound = false },
-            new() { Name = "DeepSeek", Desc = L10n.T(Keys.Content.ModelAccountsDescDeepSeek, "高性价比推理"), Bound = false },
-        };
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        _loading = false;
+        StateHasChanged();
     }
-    private string SelModel = "Qwen-Plus", Key = "", Note = "";
 
-    private void SetDefault(string n)
+    private async Task LoadAsync()
     {
-        foreach (var m in _models) m.Default = m.Name == n;
-        Toast.Success(string.Format(L10n.T(Keys.Content.ModelAccountsSetDefaultToast, "已将 {0} 设为默认模型"), n));
+        _rows = new();
+        _catalog = new();
+
+        var (cat, _, catErr, _) = await Api.GetJsonAsync("api/model-catalog");
+        if (cat is { ValueKind: JsonValueKind.Array })
+        {
+            foreach (var e in cat.Value.EnumerateArray())
+            {
+                var provider = e.GetProperty("provider").GetString() ?? "";
+                var modelId = e.GetProperty("modelId").GetString() ?? "";
+                var displayName = e.GetProperty("displayName").GetString() ?? $"{provider}/{modelId}";
+                _catalog.Add(new CatalogItem(provider, modelId, displayName, ""));
+            }
+        }
+        else if (!string.IsNullOrEmpty(catErr))
+        {
+            _error = catErr;
+        }
+
+        var tenantId = State.TenantId;
+        var accounts = new List<(long Id, string Provider, string ModelId, bool IsDefault, string MaskedKey, string? Note)>();
+        if (tenantId > 0)
+        {
+            var (data, _, err, _) = await Api.GetJsonAsync($"api/model-accounts?tenantId={tenantId}");
+            if (data is { ValueKind: JsonValueKind.Array })
+            {
+                foreach (var e in data.Value.EnumerateArray())
+                {
+                    accounts.Add((
+                        Id: e.GetProperty("id").GetInt64(),
+                        Provider: e.GetProperty("provider").GetString() ?? "",
+                        ModelId: e.GetProperty("modelId").GetString() ?? "",
+                        IsDefault: e.GetProperty("isDefault").GetBoolean(),
+                        MaskedKey: e.GetProperty("maskedKey").GetString() ?? "",
+                        Note: e.TryGetProperty("note", out var n) ? n.GetString() : null));
+                }
+            }
+            else if (!string.IsNullOrEmpty(err))
+            {
+                _error = err;
+            }
+        }
+
+        foreach (var c in _catalog)
+        {
+            var acc = accounts.FirstOrDefault(a => a.Provider == c.Provider && a.ModelId == c.ModelId);
+            _rows.Add(new CatalogRow(
+                c.Provider, c.ModelId, c.DisplayName, c.Desc,
+                Bound: acc.Id != 0,
+                Default: acc.IsDefault,
+                AccountId: acc.Id == 0 ? null : acc.Id,
+                MaskedKey: acc.Id == 0 ? null : acc.MaskedKey,
+                Note: acc.Id == 0 ? null : acc.Note));
+        }
+
+        if (string.IsNullOrEmpty(SelKey) && _catalog.Count > 0)
+            SelKey = $"{_catalog[0].Provider}|{_catalog[0].ModelId}";
     }
-    private void Bind() => Toast.Info(L10n.T(Keys.Content.ModelAccountsBindSubmitted, "绑定已提交（ILLMProvider + UserModelBinding 计划于 P13 实现，密钥将以掩码存储）。"));
+
+    private void ScrollToBind(string provider, string modelId)
+    {
+        SelKey = $"{provider}|{modelId}";
+        StateHasChanged();
+    }
+
+    private async Task Bind()
+    {
+        _error = null;
+        if (string.IsNullOrWhiteSpace(SelKey) || !SelKey.Contains('|'))
+        {
+            var msg = L10n.T(Keys.Content.ModelAccountsBindFailed, "绑定失败：请选择模型。");
+            _error = msg;
+            Toast.Error(msg);
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(Key))
+        {
+            var msg = L10n.T(Keys.Content.ModelAccountsBindFailed, "绑定失败：API Key 不能为空。");
+            _error = msg;
+            Toast.Error(msg);
+            return;
+        }
+        var parts = SelKey.Split('|');
+        var provider = parts[0];
+        var modelId = parts[1];
+
+        _saving = true;
+        try
+        {
+            var r = await Api.PostAsync("api/model-accounts", new
+            {
+                tenantId = State.TenantId,
+                provider,
+                modelId,
+                apiKey = Key,
+                displayName = (string?)null,
+                note = string.IsNullOrWhiteSpace(Note) ? null : Note
+            });
+            if (r.Ok)
+            {
+                Toast.Success(L10n.T(Keys.Content.ModelAccountsBindSubmitted, "绑定已保存。"));
+                Key = "";
+                Note = "";
+                await LoadAsync();
+                StateHasChanged();
+            }
+            else
+            {
+                var msg = string.Format(L10n.T(Keys.Content.ModelAccountsBindFailed, "绑定失败：{0}"), r.Error ?? "");
+                _error = msg;
+                Toast.Error(msg);
+            }
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private async Task SetDefault(CatalogRow row)
+    {
+        if (row.AccountId is null) return;
+        var r = await Api.PostAsync($"api/model-accounts/{row.AccountId}/set-default?tenantId={State.TenantId}", null);
+        if (r.Ok)
+        {
+            Toast.Success(string.Format(L10n.T(Keys.Content.ModelAccountsSetDefaultToast, "已将 {0} 设为默认模型"), row.DisplayName));
+            await LoadAsync();
+            StateHasChanged();
+        }
+        else
+        {
+            Toast.Error(r.Error ?? L10n.T(Keys.Content.ModelAccountsBindFailed, "操作失败。"));
+        }
+    }
+
+    private void OpenDelete(CatalogRow row) { _pendingDelete = row; DeleteVisible = true; }
+
+    private async Task ConfirmDelete()
+    {
+        if (_pendingDelete?.AccountId is null) { DeleteVisible = false; return; }
+        Deleting = true;
+        _deleteError = null;
+        var r = await Api.DeleteAsync($"api/model-accounts/{_pendingDelete.AccountId}?tenantId={State.TenantId}");
+        Deleting = false;
+        DeleteVisible = false;
+        if (r.Ok)
+        {
+            Toast.Success(L10n.T(Keys.Content.ModelAccountsDeleted, "已删除绑定。"));
+            await LoadAsync();
+            StateHasChanged();
+        }
+        else
+        {
+            _deleteError = r.Error ?? "删除失败。";
+            Toast.Error(_deleteError);
+        }
+    }
 }
