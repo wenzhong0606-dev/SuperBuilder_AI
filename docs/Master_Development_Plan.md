@@ -777,7 +777,7 @@ M3 退出：✅ 已达成当前跟踪页面范围。平台/租户视图严格分
 - `btn-primary`、`badge-primary` 等 `*-primary` 使用主题变量；统一 hover/active/focus/disabled/深色模式。
 - 避免浏览器默认控件和局部 Bootstrap 默认蓝色。
 
-> **计划 M8-01**（待实施，按「先计划后落地」节奏，用户确认切入点后执行）：
+> **交付 M8-01**（2026-09-07；纯前端 `app.css` 样式，零行为语义变更，双提交 feat+docs，未推送 origin）：
 > - **目标（保留原三原则）**：全平台统一视觉令牌；`btn-*`/`badge-*` 等 `*-primary` 全态（hover/active/focus/disabled/深色）映射品牌色；消除浏览器默认控件外观与局部 Bootstrap 默认蓝/灰蓝渗透。
 > - **现状盘点（基于 2026-09-07 实际勘察 `app.css` + 组件 grep）**：
 >   - **已具备**：`:root` 与 `[data-theme="dark"]` 完整 `--sb-*` 古风令牌（黛蓝/朱砂/黛绿/藤黄/石青 + 结构变量 `--sb-radius/-shadow*/-ring`）+ 全套 `--bs-*` 覆盖；`.btn-primary` 已全态 token 化（L163-177：hover 位移+阴影、active 下沉、disabled 复位、focus 用 `--bs-primary-rgb`）；`#0d6efd`（Bootstrap 默认蓝）仅存于 `bootstrap.min.css`，**应用层无硬编码默认蓝**。
@@ -809,6 +809,15 @@ M3 退出：✅ 已达成当前跟踪页面范围。平台/租户视图严格分
 >   - 仅样式与令牌，不改变任何组件行为语义；不新增假数据/占位。
 >   - 令牌定义全部集中在 `app.css` 的 `:root`/`[data-theme="dark"]`；禁止在 `.razor` 内联 `style` 写死颜色字面量（PR 评审须核对此项）。
 > - **范围外（本里程碑不做）**：间距/排版/图标字体细化为独立 redesign（仅做"无默认蓝/全令牌化"收口）；移动端 MAUI 原生控件深度定制（归 M8-07）；CSP/axe 深度治理（归 M8-05/M8-06）；全新组件视觉重构（仅统一既有组件色彩/状态令牌，不做布局重构）。
+>
+> **交付要点（M8-01 五阶段全落地，改动集中于 `SuperBuilder_AI.Components/wwwroot/css/app.css`）**：
+> - **阶段0 令牌契约固化**：`:root` 与 `[data-theme="dark"]` 新增 `--sb-btn-hover`/`--sb-btn-active` 派生令牌与全套 `--sb-badge-*` 语义令牌（bg/fg/bd 覆盖 primary/success/warning/danger/info/secondary/light/dark），编制「令牌→用途→浅/深值」单一映射；组件仅引用 `--sb-*` 而非 Bootstrap 内部 `--bs-btn-*`。
+> - **阶段1 按钮全态统一**：`.btn-primary` 改引用 `--sb-btn-*`；新增 `.btn-secondary`/`.btn-light`/`.btn-dark` 映射到品牌中性色（`--sb-surface-2`/`--sb-border`/`--sb-nav-*`），消除默认灰蓝渗透；`.btn-outline-*`/`btn-link`/`btn-danger`/`btn-success`/`btn-warning`/`btn-info` 沿用既有 `--bs-*` 覆盖，全态（hover 位移+阴影、active 下沉、disabled 复位）一致。
+> - **阶段2 徽标令牌化 + 深色对齐**：删除原重复的 `.badge-primary`（早期 L178 `color-mix` 与 L732 硬编码 RGBA 双定义，后者胜出致深色错位）；统一引用 `--sb-badge-*`；原 L732-737 五个硬编码 RGBA 全部改为 token 驱动的 `color-mix(in srgb, var(--sb-*) X%, transparent)`，浅/深自动适应；`badge-warning`/`badge-info` 文字色在深色模式切换为品牌亮色（`--sb-warning`/`--sb-info`）以保对比度；补 `badge-secondary`/`-light`/`-dark` 映射。
+> - **阶段3 原生控件令牌化**：`select`（`appearance:none` + 内联 SVG 箭头，浅/深各态）、`checkbox`/`radio`（`appearance:none` + 品牌勾选/圆点填充、`:checked` 品牌色、`:disabled` 降透明）、`range`（品牌轨道 + 滑块）全部令牌化，焦点态复用 `--sb-ring`；**日期类输入保留原生选择器**（不 `appearance:none`）以维持日历拾取器可用，仅沿用既有边框/圆角令牌——此为对计划的刻意安全偏差。
+> - **阶段4 焦点/深色收口与默认蓝扫描**：`:focus-visible` 统一改用 `--sb-ring`（原 `outline: 2px solid var(--sb-primary)` → `box-shadow: var(--sb-ring)`）；`[data-theme="dark"]` 复核 `--sb-*`/`--bs-*` 成对、对比度达标；全仓 `git grep` 确认应用层无 `#0d6efd`/Bootstrap 默认蓝/默认灰蓝字面量（仅 `bootstrap.min.css` 内含默认蓝，不改动）。
+> - **验收达成**：RCL build 0 error（130 预存 IL2xxx 裁剪告警，与本次无关）；`git grep` 应用层无硬编码默认蓝/灰蓝；`.badge-primary` 全局仅一处定义；原生控件浅/深外观与古风壳层一致；零回归（Golden 18/18 不变，无后端改动、无后端测试新增）；MAUI/Web 复用同一 RCL，样式随包生效。
+> - **红线遵守**：深色仅切 `data-theme` 属性、不落库、不新增端点；仅样式与令牌、未改任何组件行为语义；令牌集中 `:root`/`[data-theme="dark"]`，无 `.razor` 内联硬编码颜色（PR 评审项）。
 
 ### M8-02 列表、表格、菜单与响应式
 
