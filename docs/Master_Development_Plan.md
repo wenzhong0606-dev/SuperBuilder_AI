@@ -658,6 +658,16 @@ M3 退出：✅ 已达成当前跟踪页面范围。平台/租户视图严格分
 > - 迁移：`dotnet ef migrations remove` 回退快照后 `dotnet ef migrations add M7_02_AppVersion` 重建 Designer → `20260906141902_M7_02_AppVersion`（.cs + .Designer.cs）+ `SuperBIContextModelSnapshot` 校准（AppVersion + AppPlan 4 列）。
 > - 验证：`AppBuilderControllerVersioningTests`(7) 覆盖发布快照/草稿隔离/回滚恢复/版本列表/空草稿拒绝/未知版本 404/租户隔离，全绿；测试编译修复（`using static AppBuilderController` + `PublishResult` 限定）。
 
+> **进度 M7-03**：✅ 已交付（feat + 迁移 Designer + 测试；全量 **913/913** 零回归、含 Golden 18/18，预期 901→913）。
+> - Agent 运行时（受控执行框架）：新增 `AgentRun` 领域实体（7 状态机 queued→running→succeeded / approval_pending→approved→succeeded / rejected / failed）+ `AgentRunStepRecord` 受控信封（`StepLogJson` 持久化，不另建步骤关系表，沿用 DSL-as-JSON 哲学）。
+> - 权限 deny-by-default：`ToolPermissionPolicy.IsAllowed` 仅当授权集含该工具；运行级默认基线仅 Safe 级（metadata/semantic），Read/Write 须显式授予。
+> - 审批闸门：Write 工具（Risk==Write）默认 `RequiresApproval`，未通过人工审批 → `ApprovalPending` 挂起，等待 `Approve`/`Reject`；跨租户审批 → 403。
+> - 重试策略：`RetryPolicy` 仅对 `TransientToolException` 重试（零退避），其余异常直接穿透；瞬态重试成功路径带真实 Attempts 计数。
+> - 受控信封（红线）：`ControlledToolBase` + 8 个具体工具（metadata/semantic=Safe、query/dashboard/forecast=Read、report/alert/workflow=Write）统一产出 `Mode=controlled` 信封，诚实声明「真实后端将于 M7-04 接入」，杜绝假成功按钮。
+> - 端点（AgentController）：`POST plans/{code}/run`（approval_pending 返回 202，否则 200）、`GET runs/{id}`、`POST runs/{id}/approve`、`POST runs/{id}/reject`；DI 全部 `AddScoped` 注册。
+> - 迁移：`20260907004450_M7_03_AgentRuntime`（.cs + .Designer.cs）+ `SuperBIContext` 加 `AgentRuns` DbSet/查询过滤器（不放行 TenantId==0）；`SuperBIContextModelSnapshot` 校准。
+> - 验证：`AgentRuntimeTests`(12) 覆盖权限 deny-by-default、审批闸门（挂起/通过/拒绝）、瞬态重试至成功、非瞬态直接失败、状态机/隔离/诚实信封、持久化回读、跨租户审批拒绝，全绿。
+
 无后端能力的按钮必须禁用并显示原因，不得提示虚假的“已保存/已运行”。
 
 ---
