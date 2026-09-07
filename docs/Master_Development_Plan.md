@@ -668,6 +668,16 @@ M3 退出：✅ 已达成当前跟踪页面范围。平台/租户视图严格分
 > - 迁移：`20260907004450_M7_03_AgentRuntime`（.cs + .Designer.cs）+ `SuperBIContext` 加 `AgentRuns` DbSet/查询过滤器（不放行 TenantId==0）；`SuperBIContextModelSnapshot` 校准。
 > - 验证：`AgentRuntimeTests`(12) 覆盖权限 deny-by-default、审批闸门（挂起/通过/拒绝）、瞬态重试至成功、非瞬态直接失败、状态机/隔离/诚实信封、持久化回读、跨租户审批拒绝，全绿。
 
+> **进度 M7-04**：✅ 已交付（feat + 计划标记；全量 **916/916** 零回归、含 Golden 18/18，预期 913→916）。
+> - 接真实后端（M7-03 受控信封所声明的「M7-04 接入」落地）：把确定性、只读、无 LLM 的 Safe 工具翻为 `live` 模式——
+>   - `LiveMetadataTool`：真实查询 `SuperBIContext.MetadataTables`(+`Columns`)，返回真实表/字段结构；租户隔离（`ApplyTenantScope`）。
+>   - `LiveSemanticTool`：真实查询 `SuperBIContext.SemanticLabels`（租户+全局共享），返回真实概念→标签/同义词映射。
+> - 运行时框架零改动（M7-03 设计）：`AgentRuntime` 仅记录 `step.Mode`（controlled/live），工具自身翻 live 即可；`ControlledToolCatalog` 经 `IEnumerable<ITool>` 自动聚合。
+> - 诚实化受控信封（红线「无假成功按钮」）：`ControlledToolBase` 信封显式携带 `"connected":false` 与 `backendMilestone:"M7-05~M7-08"`，明确「未接真实后端、仅回执、不声称业务结果」；其余 Read/Write 工具（query/dashboard/forecast/report/alert/workflow）真实后端于 M7-05~M7-08 逐工具接入前继续诚实信封。
+> - 工具目录能力标注：`ToolRegistry.AgentToolDescriptor` 增 `BackendStatus`(live/pending) + `BackendMilestone`；`GET /api/agent/tools` 诚实反映 metadata/semantic=live(M7-04)，其余=pending；编辑器据此可知哪些工具真实可用。
+> - DI：`Program.cs` 将 `MetadataTool`/`SemanticTool` 注册替换为 `LiveMetadataTool`/`LiveSemanticTool`（其余 6 个保持受控）。
+> - 验证：`AgentRuntimeTests` 新增 3 例（live 元数据返回真实表/字段、live 语义返回真实标签、目录诚实状态 2 live/6 pending），全绿；全量 916/916 零回归。
+
 无后端能力的按钮必须禁用并显示原因，不得提示虚假的“已保存/已运行”。
 
 ---
