@@ -748,6 +748,15 @@ M3 退出：✅ 已达成当前跟踪页面范围。平台/租户视图严格分
 > - 验证：配额专项 + 多语言护栏 **35/35**；全量测试 **950/950**（含 Golden 18/18）零回归；API/RCL/Web/MAUI Windows 均 build 0 error（仅预存告警）；无需迁移（复用既有 `QuotaPolicies/QuotaUsages` 表）。
 > - 边界澄清：M7-08 按原表定义仅负责 Quota。M7-04 曾承诺的 6 个 pending Agent 工具并未因配额交付自动变为 live，现显式收口为 M7-12，禁止以 `controlled/connected:false` 回执冒充 M7 完成。
 
+> **交付 M7-09**（2026-09-07，提交 `a788254`）：租户自定义组件领域、持久化、API 与正式资产页闭环——全部验收达成。
+> - 领域与持久化：新增 `CustomComponentDefinition`（草稿/发布态物理隔离）和不可变 `CustomComponentVersion`；受控迁移 `20260907053931_M7_09_CustomComponents` 建立租户+Key 唯一索引、组件+版本唯一索引和级联版本关系；两表均启用严格租户查询过滤器，不放行 `TenantId=0`。
+> - 安全 DSL：`CustomComponentDslSerializer` 限制 64KB、版本和 Key 格式，将单组件包装为 `AppDsl` 复用既有组件类型、数据绑定、聚合、筛选白名单；名称/描述/标题中的 HTML、`javascript:` 和未知组件类型在落库前拒绝。
+> - API：新增 `api/components` 列表/详情/创建/编辑/删除、`publish`、`versions`、`rollback/{version}`、`render` 与 `editor/blueprint`；运行时 `render` 只读取已发布快照、重新校验并返回强类型 `ComponentPlan`，不返回或执行 HTML；回滚生成新版本并记录来源，不改写历史。
+> - 权限与隔离：数据面加入 `TenantDataPlanePolicy`；读/创建/编辑/删除/发布分别绑定 `app:view/create/edit/delete/publish`，跨租户请求拒绝；导航和页面也绑定同一权限常量。
+> - 前端：`/components` 从静态设计系统演示替换为真实租户资产列表；支持新增、编辑、安全 JSON 预览、发布、版本历史、回滚和删除；表格 100% 宽且窄屏横向滚动；所有成功/失败均由真实端点结果驱动，无假成功按钮。
+> - 多语言：新增 37 个组件资产中英文资源键并同步 RCL Defaults、后端 Catalog 与 zh-CN 种子；页面标题说明也由“设计系统巡展”改为真实组件生命周期说明。
+> - 验证：`CustomComponentsTests` 3 组覆盖脚本/HTML 与未知类型拒绝、CRUD、细粒度权限、跨租户隔离、草稿/发布隔离、回滚新版本链；组件/资源键专项 **13/13**；全量 **953/953**（含 Golden 18/18）零回归；API/RCL（net10.0/Android/iOS）/Web build 均 0 error（仅预存移动端裁剪与资源路径告警）。
+
 无后端能力的按钮必须禁用并显示原因，不得提示虚假的“已保存/已运行”。
 
 ---
