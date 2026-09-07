@@ -860,6 +860,20 @@ M3 退出：✅ 已达成当前跟踪页面范围。平台/租户视图严格分
 - Chart.js 使用增量 update，避免重复实例和内存泄漏。
 - 点击仅筛选时命名为“筛选”；称为“下钻”时必须进入下一层真实数据。
 
+> **交付 M8-04**（2026-09-07；真实行为修复，双提交 feat+docs，未推送 origin）：
+> - **现状盘点（基于 2026-09-07 实际勘察 `ChartView.razor` / `chart.js` / `AskTurnCard.razor` / `ResultTable.razor` / `SbDataTable.razor` / 后端 `QueryExecutionService.cs`）**：
+>   1. **Chart.js 内存泄漏**：`ChartView.razor` 未实现 `IAsyncDisposable`，组件卸载（导航/切换视图）时 canvas 移除但 `Chart.js` 实例未 `destroy`，实例残留导致内存泄漏；且每次数据变化 `renderChart` 均 `destroy()+new`（非增量 update）。
+>   2. **大表无分页**：`AskTurnCard.razor` 主结果表与 `ResultTable.razor`（DashboardDetail）均一次性渲染**全部行**；后端 `QueryExecutionService` 对结果行数**无封顶**（取决于生成 SQL，未聚合查询可返回 10k+ 行）→ 10k DOM 风险真实存在。复用组件 `SbDataTable` 已具备客户端分页（`PageSize=20` + `Skip/Take`）。
+>   3. **下钻误标**：`AskTurnCard` 的「下钻」实为对已在客户端的结果集按分类切片**过滤**（`resp.Data.Rows.Where(...)`），并未进入后端下一层真实数据；Agent 侧的 `drill`（异常分析多步下钻）属合法语义，予以保留。
+> - **实施（真实行为修复）**：
+>   1. `chart.js` `renderChart` 改为**增量 update**——同类型（bar/line/pie 不变）时直接替换 `chart.data/options` 后 `chart.update()`，避免整图重建；类型变化或首次才 `destroy()+new`（仍先销毁旧实例，杜绝重复实例）；`catch` 内补 `destroy` 兜底。
+>   2. `ChartView.razor` 实现 `IAsyncDisposable`，`DisposeAsync` 调用 `SuperBuilder.destroyChart` 释放实例（消除卸载泄漏），`OnAfterRenderAsync` 加 `_disposed` 守卫。
+>   3. `AskTurnCard.razor` 结果表加客户端分页（`_pageSize=100` + `Skip/Take`，复用 `SbPagination`），切换下钻重置页码；「下钻」标签改「筛选：」、清除按钮改「清除筛选」。
+>   4. `ResultTable.razor` 加客户端分页（`PageSize` 参数默认 100 + 越界夹紧），仅当行数超限显示分页器（小结果集 UX 不变）。
+>   5. **四向资源键对齐**：`AskTurnDrill`/`AskTurnClearDrill` 默认值由「下钻：/清除下钻」改为「筛选：/清除筛选」（zh-CN）与「Filter: /Clear filter」（en-US），同步 RCL `Keys.cs` + 后端 `ResourceKeys` Catalog + `LocalizationSeedService.ZhCnDefaults`。
+> - **验收达成**：RCL + 后端 build 0 error；全量 **959/959 零回归**（注：并行套件下 `RateLimitMiddlewareTests.Expired_Windows_Are_Evicted_To_Prevent_Unbounded_Growth` 偶发失败，隔离复跑 3/3 通过，属预存时序偶发、与本次无关，不计入回归）；`ResourceKeyRegistryTests` 四向一致全绿。
+> - **红线遵守**：Chart.js 不再重复实例、卸载即销毁；10k 行不再一次渲染全部 DOM（前端分页兜底，后端未聚合查询仍可能返回大结果集，属 S6 后续服务端分页议题）；无新增 `#0d6efd`/默认蓝；无 `.razor` 内联硬编码颜色；「下钻」仅用于真实下钻语义，纯筛选明确标「筛选」。
+
 ### M8-05 生命周期与前端安全（S6-8）
 
 - MainLayout 解除事件订阅，消除不受控 async void。
