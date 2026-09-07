@@ -34,6 +34,36 @@
     --sb-shadow-lg: 0 18px 48px rgba(43, 38, 32, .18);
     --sb-ring: 0 0 0 3px rgba(47, 79, 111, .22);
 
+    /* —— 派生：按钮态（M8-01 阶段0，统一 btn 全态映射品牌色） —— */
+    --sb-btn-hover: var(--sb-primary-ink);
+    --sb-btn-active: var(--sb-primary-ink);
+
+    /* —— 派生：徽标语义令牌（M8-01 阶段0，替代 L732-737 硬编码 RGBA，浅/深自动适应） —— */
+    --sb-badge-primary-bg: color-mix(in srgb, var(--sb-primary) 12%, transparent);
+    --sb-badge-primary-fg: var(--sb-primary);
+    --sb-badge-primary-bd: color-mix(in srgb, var(--sb-primary) 30%, transparent);
+    --sb-badge-success-bg: color-mix(in srgb, var(--sb-success) 12%, transparent);
+    --sb-badge-success-fg: var(--sb-success);
+    --sb-badge-success-bd: color-mix(in srgb, var(--sb-success) 30%, transparent);
+    --sb-badge-warning-bg: color-mix(in srgb, var(--sb-warning) 14%, transparent);
+    --sb-badge-warning-fg: #7a6110;
+    --sb-badge-warning-bd: color-mix(in srgb, var(--sb-warning) 40%, transparent);
+    --sb-badge-danger-bg: color-mix(in srgb, var(--sb-accent) 10%, transparent);
+    --sb-badge-danger-fg: var(--sb-accent);
+    --sb-badge-danger-bd: color-mix(in srgb, var(--sb-accent) 35%, transparent);
+    --sb-badge-info-bg: color-mix(in srgb, var(--sb-info) 12%, transparent);
+    --sb-badge-info-fg: #2f5563;
+    --sb-badge-info-bd: color-mix(in srgb, var(--sb-info) 35%, transparent);
+    --sb-badge-secondary-bg: var(--sb-surface-2);
+    --sb-badge-secondary-fg: var(--sb-muted);
+    --sb-badge-secondary-bd: var(--sb-border);
+    --sb-badge-light-bg: var(--sb-surface);
+    --sb-badge-light-fg: var(--sb-text);
+    --sb-badge-light-bd: var(--sb-border);
+    --sb-badge-dark-bg: var(--sb-nav-bg);
+    --sb-badge-dark-fg: var(--sb-nav-text);
+    --sb-badge-dark-bd: var(--sb-nav-bg);
+
     /* —— 覆盖 Bootstrap 主题变量，使 btn/card/table/alert 同古风 —— */
     --bs-body-bg: var(--sb-bg);
     --bs-body-color: var(--sb-text);
@@ -69,8 +99,8 @@ textarea:focus-visible,
 .sb-menu-item:focus-visible,
 .user-chip:focus-visible,
 .icon-btn:focus-visible {
-    outline: 2px solid var(--sb-primary);
-    outline-offset: 2px;
+    outline: none;
+    box-shadow: var(--sb-ring);
     border-radius: var(--sb-radius-sm);
 }
 /* 跳到主内容（默认隐藏，键盘聚焦时显现） */
@@ -155,6 +185,10 @@ textarea:focus-visible,
     --bs-danger-rgb: 194, 98, 88;
     --bs-success: var(--sb-success);
     --bs-success-rgb: 123, 163, 126;
+
+    /* —— 徽标 fg 在深色模式改用品牌亮色（M8-01 阶段2） —— */
+    --sb-badge-warning-fg: var(--sb-warning);
+    --sb-badge-info-fg: var(--sb-info);
 }
 
 * { box-sizing: border-box; }
@@ -165,17 +199,52 @@ textarea:focus-visible,
     --bs-btn-bg: var(--sb-primary);
     --bs-btn-border-color: var(--sb-primary);
     --bs-btn-hover-color: #fff;
-    --bs-btn-hover-bg: var(--sb-primary-ink);
-    --bs-btn-hover-border-color: var(--sb-primary-ink);
+    --bs-btn-hover-bg: var(--sb-btn-hover);
+    --bs-btn-hover-border-color: var(--sb-btn-hover);
     --bs-btn-active-color: #fff;
-    --bs-btn-active-bg: var(--sb-primary-ink);
-    --bs-btn-active-border-color: var(--sb-primary-ink);
+    --bs-btn-active-bg: var(--sb-btn-active);
+    --bs-btn-active-border-color: var(--sb-btn-active);
     --bs-btn-focus-shadow-rgb: var(--bs-primary-rgb);
     box-shadow: 0 5px 14px color-mix(in srgb, var(--sb-primary) 20%, transparent);
 }
 .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 8px 18px color-mix(in srgb, var(--sb-primary) 28%, transparent); }
 .btn-primary:disabled { transform: none; box-shadow: none; }
-.badge-primary { background: color-mix(in srgb, var(--sb-primary) 12%, transparent); color: var(--sb-primary); border-color: color-mix(in srgb, var(--sb-primary) 30%, transparent); }
+
+/* 按钮中性/浅/深变体：映射到品牌中性色，消除 Bootstrap 默认灰蓝（M8-01 阶段1） */
+.btn-secondary {
+    --bs-btn-color: var(--sb-text);
+    --bs-btn-bg: var(--sb-surface-2);
+    --bs-btn-border-color: var(--sb-border);
+    --bs-btn-hover-color: var(--sb-text);
+    --bs-btn-hover-bg: var(--sb-border);
+    --bs-btn-hover-border-color: var(--sb-border);
+    --bs-btn-active-color: var(--sb-text);
+    --bs-btn-active-bg: var(--sb-border);
+    --bs-btn-active-border-color: var(--sb-border);
+    --bs-btn-focus-shadow-rgb: var(--bs-primary-rgb);
+}
+.btn-light {
+    --bs-btn-color: var(--sb-text);
+    --bs-btn-bg: var(--sb-surface);
+    --bs-btn-border-color: var(--sb-border);
+    --bs-btn-hover-color: var(--sb-text);
+    --bs-btn-hover-bg: var(--sb-surface-2);
+    --bs-btn-hover-border-color: var(--sb-border);
+    --bs-btn-active-color: var(--sb-text);
+    --bs-btn-active-bg: var(--sb-surface-2);
+    --bs-btn-active-border-color: var(--sb-border);
+}
+.btn-dark {
+    --bs-btn-color: var(--sb-nav-text);
+    --bs-btn-bg: var(--sb-nav-bg);
+    --bs-btn-border-color: var(--sb-nav-bg);
+    --bs-btn-hover-color: var(--sb-nav-text);
+    --bs-btn-hover-bg: #3a342b;
+    --bs-btn-hover-border-color: #3a342b;
+    --bs-btn-active-color: var(--sb-nav-text);
+    --bs-btn-active-bg: #3a342b;
+    --bs-btn-active-border-color: #3a342b;
+}
 
 html, body { height: 100%; }
 
@@ -380,6 +449,39 @@ input, textarea, select {
 input:focus, textarea:focus, select:focus { outline: none; box-shadow: var(--sb-ring); border-color: var(--sb-primary); }
 textarea { min-height: 84px; resize: vertical; }
 
+/* —— 原生控件令牌化（M8-01 阶段3，消除浏览器默认外观割裂，焦点态复用 --sb-ring） —— */
+select {
+    appearance: none; -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='none' stroke='%238A7F6A' stroke-width='1.6' d='M1 1.5 6 6.5 11 1.5'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 12px center; padding-right: 32px;
+}
+select:focus { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='none' stroke='%232F4F6F' stroke-width='1.6' d='M1 1.5 6 6.5 11 1.5'/%3E%3C/svg%3E"); }
+[data-theme="dark"] select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='none' stroke='%23A89B86' stroke-width='1.6' d='M1 1.5 6 6.5 11 1.5'/%3E%3C/svg%3E"); }
+[data-theme="dark"] select:focus { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='none' stroke='%236E9BC4' stroke-width='1.6' d='M1 1.5 6 6.5 11 1.5'/%3E%3C/svg%3E"); }
+
+input[type="checkbox"], input[type="radio"] {
+    appearance: none; -webkit-appearance: none;
+    width: 18px; height: 18px; padding: 0; margin: 0;
+    display: inline-grid; place-content: center; align-self: center; flex: 0 0 auto;
+    border: 1.5px solid var(--sb-border); border-radius: 5px;
+    background: var(--sb-bg); color: var(--sb-text); cursor: pointer;
+}
+input[type="radio"] { border-radius: 50%; }
+input[type="checkbox"]:checked, input[type="radio"]:checked { background: var(--sb-primary); border-color: var(--sb-primary); }
+input[type="checkbox"]:checked::after { content: ""; width: 10px; height: 10px; background: #fff; clip-path: polygon(14% 47%, 0 62%, 39% 100%, 100% 22%, 86% 9%, 38% 68%); }
+input[type="radio"]:checked::after { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #fff; }
+input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { box-shadow: var(--sb-ring); outline: none; }
+input[type="checkbox"]:disabled, input[type="radio"]:disabled { opacity: .5; cursor: not-allowed; }
+
+input[type="range"] {
+    appearance: none; -webkit-appearance: none;
+    height: 6px; padding: 0; border: none; border-radius: 999px;
+    background: var(--sb-surface-2); cursor: pointer;
+}
+input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 16px; height: 16px; border-radius: 50%; background: var(--sb-primary); border: 2px solid var(--sb-surface); box-shadow: var(--sb-shadow-sm); }
+input[type="range"]::-moz-range-thumb { width: 16px; height: 16px; border-radius: 50%; background: var(--sb-primary); border: 2px solid var(--sb-surface); }
+input[type="range"]:focus-visible { box-shadow: var(--sb-ring); outline: none; }
+
 /* 按钮兜底（页面优先用 Bootstrap .btn） */
 button {
     align-self: flex-start;
@@ -397,7 +499,7 @@ button:hover { background: var(--sb-primary-ink); }
 button:active { transform: translateY(1px); }
 button:disabled { opacity: .5; cursor: default; }
 button.ghost { background: transparent; color: var(--sb-primary); border: 1px solid var(--sb-primary); }
-button.ghost:hover { background: rgba(47, 79, 111, .08); }
+button.ghost:hover { background: color-mix(in srgb, var(--sb-primary) 8%, transparent); }
 button.mini { padding: 4px 10px; font-size: 12px; border-radius: var(--sb-radius-sm); }
 
 /* 按钮内图标 */
@@ -729,11 +831,14 @@ button.mini { padding: 4px 10px; font-size: 12px; border-radius: var(--sb-radius
     padding: 3px 10px; border-radius: 999px;
     border: 1px solid transparent; white-space: nowrap;
 }
-.badge-primary { background: rgba(47, 79, 111, .12); color: var(--sb-primary); border-color: rgba(47, 79, 111, .3); }
-.badge-success { background: rgba(79, 111, 82, .12); color: var(--sb-success); border-color: rgba(79, 111, 82, .3); }
-.badge-warning { background: rgba(201, 162, 39, .14); color: #7a6110; border-color: rgba(201, 162, 39, .4); }
-.badge-danger { background: rgba(158, 61, 52, .1); color: var(--sb-accent); border-color: rgba(158, 61, 52, .35); }
-.badge-info { background: rgba(74, 122, 140, .12); color: #2f5563; border-color: rgba(74, 122, 140, .35); }
+.badge-primary { background: var(--sb-badge-primary-bg); color: var(--sb-badge-primary-fg); border-color: var(--sb-badge-primary-bd); }
+.badge-success { background: var(--sb-badge-success-bg); color: var(--sb-badge-success-fg); border-color: var(--sb-badge-success-bd); }
+.badge-warning { background: var(--sb-badge-warning-bg); color: var(--sb-badge-warning-fg); border-color: var(--sb-badge-warning-bd); }
+.badge-danger { background: var(--sb-badge-danger-bg); color: var(--sb-badge-danger-fg); border-color: var(--sb-badge-danger-bd); }
+.badge-info { background: var(--sb-badge-info-bg); color: var(--sb-badge-info-fg); border-color: var(--sb-badge-info-bd); }
+.badge-secondary { background: var(--sb-badge-secondary-bg); color: var(--sb-badge-secondary-fg); border-color: var(--sb-badge-secondary-bd); }
+.badge-light { background: var(--sb-badge-light-bg); color: var(--sb-badge-light-fg); border-color: var(--sb-badge-light-bd); }
+.badge-dark { background: var(--sb-badge-dark-bg); color: var(--sb-badge-dark-fg); border-color: var(--sb-badge-dark-bd); }
 .badge-muted { background: var(--sb-surface-2); color: var(--sb-muted); border-color: var(--sb-border); }
 
 /* —— 空状态 —— */
@@ -830,7 +935,7 @@ button.mini { padding: 4px 10px; font-size: 12px; border-radius: var(--sb-radius
 .feature-card .fc-ico {
     width: 42px; height: 42px; border-radius: 12px;
     display: inline-flex; align-items: center; justify-content: center;
-    background: rgba(47, 79, 111, .1); color: var(--sb-primary);
+    background: color-mix(in srgb, var(--sb-primary) 10%, transparent); color: var(--sb-primary);
 }
 .feature-card .fc-ico svg { width: 22px; height: 22px; }
 .feature-card .fc-title { font-size: 15px; font-weight: 700; }
