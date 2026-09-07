@@ -899,6 +899,14 @@ M3 退出：✅ 已达成当前跟踪页面范围。平台/租户视图严格分
 - axe 无严重问题；键盘、焦点、对比度通过。
 - 建立桌面、991px、560px 和移动端截图基线。
 
+> **交付 M8-06**（2026-09-07；E2E / 无障碍 / 视觉回归基建，双提交 feat+docs，未推送 origin）：
+> - **现状盘点**：M8-06 起点为 0——无 Playwright 引用、无 E2E 工程、无 axe 集成、无视觉基线。组件已有基础无障碍结构（MainLayout 的 skip-link 与 `main#main-content`、`<nav>`+NavLink `aria-label`、错误边界 `role="alert"`、`_Host.cshtml` 的 `<html lang="zh">`）。
+> - **实施（E2E 基建）**：新建 `tests/SuperBuilder_AI.E2E`（Playwright + xunit + Xunit.SkippableFact），共享 `PlaywrightFixture` 集合夹具，读取 `SB_E2E_*` 环境变量；`E2EConfig.Require` 在集成环境未配置时经 `Skip.If` 跳过（非失败）。用例覆盖：未登录 `/ask`→`/login` 重定向、有效登录进 `/ask`、无效登录显错（`role="alert"`）、低权限访问 `/admin/tenants`→`/forbidden`、语言切换持久化到 `sb_culture_{tenant}_{user}`、登录页 axe 无 critical/serious、四断点（1280/991/560/375）视觉基线截图。工程已挂接 `SuperBulider_AI.slnx`，附 README（前置、环境变量、axe vendoring、CI 接入归 M9-08）。
+> - **实施（组件无障碍加固）**：`Login.razor` 显式 `for/id` 关联 + `data-testid` + `autocomplete` + `aria-invalid` + 错误 `role="alert"`；`MainLayout` 用户菜单/登出 `data-testid`；`LanguageSwitcher` 加 `data-testid`。均为真实标记增强，无占位。
+> - **验收**：RCL 构建 0 错误；E2E 工程 0 警告 0 错误（产出 `SuperBuilder_AI.E2E.dll`）；单元套件 959/959 全绿、0 回归。
+> - **红线/诚实声明**：E2E、axe、视觉截图在本环境**未实际执行**——需 `playwright install chromium` + 运行中的 Web/API 实例。测试以 `SkippableFact` + 环境变量守卫在未配置时**自动跳过**，杜绝"假成功"；完整执行与浏览器矩阵归 M9-08。
+> - **覆盖范围与后续**：已覆盖登录/租户/语言/身份/权限拒绝/登录页无障碍/四断点基线；计划后续补齐数据源授权、元数据、Ask 对话、CRUD 的端到端用例（README 已登记，不做占位页）。
+
 ### M8-07 多端发布（S6-5）
 
 - API/RCL/Web/MAUI Windows 构建通过；Android 模拟器/真机不使用设备自身 localhost 访问宿主 API。
