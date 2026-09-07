@@ -732,6 +732,8 @@ public static class Keys
         public const string AskTurnClearDrill = "Content.AskTurnClearDrill";
         public const string AskTurnExportCsv = "Content.AskTurnExportCsv";
         public const string AskTurnExportExcel = "Content.AskTurnExportExcel";
+        public const string ExportFailed = "Content.ExportFailed";
+        public const string ExportNoData = "Content.ExportNoData";
         public const string AskTurnQueryFailed = "Content.AskTurnQueryFailed";
         public const string AskTurnViewSql = "Content.AskTurnViewSql";
         public const string AskTurnHideCompare = "Content.AskTurnHideCompare";
@@ -2049,7 +2051,9 @@ public static class Keys
         [Content.AskTurnDrill] = new("下钻：", "Drill down: "),
         [Content.AskTurnClearDrill] = new("清除下钻", "Clear drill"),
         [Content.AskTurnExportCsv] = new("导出 CSV", "Export CSV"),
-        [Content.AskTurnExportExcel] = new("导出 Excel", "Export Excel"),
+        [Content.AskTurnExportExcel] = new("导出 Excel 兼容", "Export Excel (compatible)"),
+        [Content.ExportFailed] = new("导出失败，请重试。", "Export failed, please retry."),
+        [Content.ExportNoData] = new("没有可导出的数据。", "No data to export."),
         [Content.AskTurnQueryFailed] = new("查询失败：{0}", "Query failed: {0}"),
         [Content.AskTurnViewSql] = new("查看生成的 SQL", "View generated SQL"),
         [Content.AskTurnHideCompare] = new("隐藏对比", "Hide compare"),

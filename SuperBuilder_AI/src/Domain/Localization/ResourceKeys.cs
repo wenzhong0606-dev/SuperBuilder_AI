@@ -698,6 +698,8 @@ public static class ResourceKeys
         public const string AskTurnClearDrill = "Content.AskTurnClearDrill";
         public const string AskTurnExportCsv = "Content.AskTurnExportCsv";
         public const string AskTurnExportExcel = "Content.AskTurnExportExcel";
+        public const string ExportFailed = "Content.ExportFailed";
+        public const string ExportNoData = "Content.ExportNoData";
         public const string AskTurnQueryFailed = "Content.AskTurnQueryFailed";
         public const string AskTurnViewSql = "Content.AskTurnViewSql";
         public const string AskTurnHideCompare = "Content.AskTurnHideCompare";
@@ -2069,7 +2071,9 @@ public static class ResourceKeys
         [Content.AskTurnDrill] = new("Content", Page: "AskTurn", DefaultValue: "Drill down: "),
         [Content.AskTurnClearDrill] = new("Content", Page: "AskTurn", DefaultValue: "Clear drill"),
         [Content.AskTurnExportCsv] = new("Content", Page: "AskTurn", DefaultValue: "Export CSV"),
-        [Content.AskTurnExportExcel] = new("Content", Page: "AskTurn", DefaultValue: "Export Excel"),
+        [Content.AskTurnExportExcel] = new("Content", Page: "AskTurn", DefaultValue: "Export Excel (compatible)"),
+        [Content.ExportFailed] = new("Content", Page: "AskTurn", DefaultValue: "Export failed, please retry."),
+        [Content.ExportNoData] = new("Content", Page: "AskTurn", DefaultValue: "No data to export."),
         [Content.AskTurnQueryFailed] = new("Content", Page: "AskTurn", DefaultValue: "Query failed: {0}"),
         [Content.AskTurnViewSql] = new("Content", Page: "AskTurn", DefaultValue: "View generated SQL"),
         [Content.AskTurnHideCompare] = new("Content", Page: "AskTurn", DefaultValue: "Hide compare"),

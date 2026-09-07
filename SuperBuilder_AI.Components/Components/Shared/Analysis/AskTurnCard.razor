@@ -103,7 +103,7 @@
                     }
                     <span class="export-group">
                         <button class="btn btn-sm btn-outline-secondary" @onclick='() => OnExport.InvokeAsync(new AskTurnExport(Turn, "csv"))'>@L10n.T(Keys.Content.AskTurnExportCsv, "导出 CSV")</button>
-                        <button class="btn btn-sm btn-outline-secondary" @onclick='() => OnExport.InvokeAsync(new AskTurnExport(Turn, "excel"))'>@L10n.T(Keys.Content.AskTurnExportExcel, "导出 Excel")</button>
+                        <button class="btn btn-sm btn-outline-secondary" @onclick='() => OnExport.InvokeAsync(new AskTurnExport(Turn, "excel"))'>@L10n.T(Keys.Content.AskTurnExportExcel, "导出 Excel 兼容")</button>
                     </span>
                 </div>
                 <table class="data-table">

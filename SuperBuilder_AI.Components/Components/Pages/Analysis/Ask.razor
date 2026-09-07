@@ -8,6 +8,7 @@
 @inject NavigationManager Nav
 @inject AskSessionStore Session
 @inject FileDownloadService Download
+@inject ToastService Toast
 
 <h2>@L10n.T(Keys.Content.AskTitle, "Ask BI 智能问数（旗舰）")</h2>
 
@@ -210,12 +211,15 @@ else
     }
 
     // ===== 导出（S3-3，经 AskTurnCard 回调）=====
-    private Task Export(AskTurnCard.AskTurnExport e)
-        => e.Turn switch
+    private async Task Export(AskTurnCard.AskTurnExport e)
+    {
+        if (e.Turn is not { Response.Data.Rows.Count: > 0 })
         {
-            { Response.Data.Rows.Count: > 0 } => ExportRows(e.Turn.Response!.Data.Rows, e.Format, e.Turn.Question),
-            _ => Task.CompletedTask
-        };
+            Toast.Warning(L10n.T(Keys.Content.ExportNoData, "没有可导出的数据。"));
+            return;
+        }
+        await ExportRows(e.Turn.Response!.Data.Rows, e.Format, e.Turn.Question);
+    }
 
     private static List<string> CollectColumns(List<Dictionary<string, object?>> rows)
     {
@@ -229,16 +233,18 @@ else
     private async Task ExportRows(List<Dictionary<string, object?>> rows, string format, string title)
     {
         var cols = CollectColumns(rows);
+        bool ok;
         if (format == "excel")
         {
             var html = BuildExcel(rows, cols, title);
-            await Download.DownloadTextAsync(SafeName(title) + ".xls", "application/vnd.ms-excel", html);
+            ok = await Download.DownloadTextAsync(SafeName(title) + ".xls", "application/vnd.ms-excel", html);
         }
         else
         {
             var csv = BuildCsv(rows, cols);
-            await Download.DownloadTextAsync(SafeName(title) + ".csv", "text/csv", csv);
+            ok = await Download.DownloadTextAsync(SafeName(title) + ".csv", "text/csv", csv);
         }
+        if (!ok) Toast.Error(L10n.T(Keys.Content.ExportFailed, "导出失败，请重试。"));
     }
 
     private static string SafeName(string s)

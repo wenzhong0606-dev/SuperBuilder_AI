@@ -129,7 +129,12 @@
                 var v = TablePresenter.Cell(r, c).Replace("\"", "\"\"");
                 return v.Contains(',') || v.Contains('"') || v.Contains('\n') ? $"\"{v}\"" : v;
             })));
-        await File.DownloadTextAsync($"audit_{DateTime.Now:yyyyMMdd}.csv", "text/csv;charset=utf-8", sb.ToString());
+        var ok = await File.DownloadTextAsync($"audit_{DateTime.Now:yyyyMMdd}.csv", "text/csv;charset=utf-8", sb.ToString());
+        if (!ok)
+        {
+            Toast.Error(L10n.T(Keys.Content.ExportFailed, "导出失败，请重试。"));
+            return;
+        }
         Toast.Success(string.Format(L10n.T(Keys.Content.AuditExported, "已导出 {0} 条审计记录。"), _rows.Count));
     }
 }
