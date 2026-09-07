@@ -678,6 +678,18 @@ M3 退出：✅ 已达成当前跟踪页面范围。平台/租户视图严格分
 > - DI：`Program.cs` 将 `MetadataTool`/`SemanticTool` 注册替换为 `LiveMetadataTool`/`LiveSemanticTool`（其余 6 个保持受控）。
 > - 验证：`AgentRuntimeTests` 新增 3 例（live 元数据返回真实表/字段、live 语义返回真实标签、目录诚实状态 2 live/6 pending），全绿；全量 916/916 零回归。
 
+> **进度 M7-05**：✅ 已交付（feat + 计划标记；全量零回归、含 Golden 18/18；前端三端 build 0 error）。
+> - 后端：`BusinessEntityUpsertRequest`（标量 DTO，BusinessKey/Name 必填）+ `BusinessModelController` 增 `POST/PUT/DELETE api/business-model/entities`（注入 `IBusinessEntityService`，沿用 `TenantDataPlanePolicy.Resolve` 租户隔离；PUT 先取回带正确 `RowVersion` 的实体再映射，规避乐观并发冲突）。
+> - 前端（RCL）：`BusinessModel.razor` 占位 Toast 替换为 `SbModal` 创建表单（BusinessKey/Name/DisplayName/Description/BusinessDomain/SemanticText/Status），提交后刷新列表；`BusinessModelEntityDetail.razor` 增“编辑”（预填 `SbModal` → `PUT`）与“删除”（`DELETE` → 返回列表），均复用 `IApiClient`。中文标签用字面串，未触碰本地化 `Keys.cs` 以保持提交隔离。
+> - 测试：`BusinessModelControllerTests` 10/10（3 读 + 7 写：创建持久化/必填 400/编辑持久化/编辑 404/删除 204/跨租户创建 403/跨租户编辑 403），`TenantDataPlanePolicyTests` 因第三构造函数参数补 `EntityServiceStub` 修复；真实 SQLite 内存持久化 + 租户隔离。
+> - 现状盘点：实体模型 `BusinessEntity` 及聚合（Keys/Attributes/Metrics/Relationships/PhysicalBindings/Domain/Dimension）已于 Phase 3.1 落地为 `SuperBIContext` 的 DbSet；`IBusinessEntityService`（Program.cs:95 注册）已具备 `CreateAsync/UpdateAsync/DeleteAsync`——真实 EF 持久化 + 租户隔离（按 `TenantId` 校验 + `EnsureTenantAsync`）+ `ValidateBindingsAsync` 跨租户物理绑定校验。`BusinessModelController` 当前仅只读（entities/domains/resolve/entities/{id}）。缺口：无写端点、前端“新建”为占位 Toast、无 CRUD 测试。
+> - 后端端点（控制器注入 `IBusinessEntityService`，沿用 `TenantDataPlanePolicy.Resolve` 租户隔离）：`POST api/business-model/entities`（请求 DTO 标量字段 → 置 `entity.TenantId`=解析租户 → `CreateAsync` → 201 + 实体）、`PUT api/business-model/entities/{id}`（`entity.Id=id; TenantId=解析租户` → `UpdateAsync` → 200）、`DELETE api/business-model/entities/{id}`（`DeleteAsync` → 204）；跨租户 403、必填（BusinessKey/Name）400、空聚合创建直接通过校验。
+> - 前端闭环（RCL/Web，复用 `SbModal` + `IApiClient.Post/Put/Delete`）：`BusinessModel.razor` 的“新建”占位 Toast 替换为打开 `SbModal` 创建表单（Name/DisplayName/Description/BusinessDomain/SemanticText/Status），提交后刷新列表；`BusinessModelEntityDetail.razor` 增“编辑”（预填 `SbModal` → `PUT`）与“删除”（`DELETE` → 返回列表）。遵循 Blazor 约束：事件单引号属性、`OnAfterRenderAsync` 取数、modal 双向 `VisibleChanged`。
+> - 测试（真实持久化，沿用 M7-03/M7-04 SQLite 内存 + `IBusinessEntityService`）：新建→详情往返、编辑往返、删除→404、跨租户创建/编辑/删除 403、必填 400；预期 916 → +N 零回归。
+> - 零回归门禁：全量绿、build 0 error、Golden 18/18 不变；双提交 `feat` + `docs`，不推送 origin。
+> - 红线：「无后端能力按钮禁用」——本里程碑补全真实写能力，移除占位 Toast；写操作失败明确返回错误，不伪造成功。
+> - 范围外（本里程碑不做）：子聚合（Keys/Attributes/Metrics/Dimensions/Relationships/PhysicalBindings）逐字段编辑 UI 与 `resolve` 自然语言映射（依赖 LLM），留待后续里程碑；M7-05 仅保证核心实体 CRUD 闭环与租户隔离。
+
 无后端能力的按钮必须禁用并显示原因，不得提示虚假的“已保存/已运行”。
 
 ---
