@@ -690,6 +690,29 @@ M3 退出：✅ 已达成当前跟踪页面范围。平台/租户视图严格分
 > - 红线：「无后端能力按钮禁用」——本里程碑补全真实写能力，移除占位 Toast；写操作失败明确返回错误，不伪造成功。
 > - 范围外（本里程碑不做）：子聚合（Keys/Attributes/Metrics/Dimensions/Relationships/PhysicalBindings）逐字段编辑 UI 与 `resolve` 自然语言映射（依赖 LLM），留待后续里程碑；M7-05 仅保证核心实体 CRUD 闭环与租户隔离。
 
+> **进度 M7-06**：✅ 已交付（feat + 计划标记；全量零回归、含 Golden 18/18；前端三端 build 0 error）。
+> - 验收：保存（POST 新建 / PUT 编辑）真实持久化、预览实时、发布一致（assign-default 级联 Dashboard/App 取用）；保存/指派成功给出真实反馈，移除占位 Toast；跨租户隔离沿用 `TenantDataPlanePolicy.ResolvePlatformScope`；全量零回归、含 Golden 18/18 不变；前端三端 build 0 error。
+> - 现状盘点：
+>   - 后端 `api/themes` 已完整可用（迁移 `20260830034528_P7_1_Theme` + `SuperBIContext.Themes` + `Theme` 实体）：`POST /api/themes`（`CreateThemeRequest{TenantId,Key,DslJson,Name}`→201 `ThemeDetail`）、`GET /api/themes?tenantId`、`GET /api/themes/{key}?tenantId`、`PUT /api/themes/{key}?tenantId`（`UpdateThemeRequest{DslJson,Name}`→200）、`DELETE /api/themes/{key}?tenantId`、`POST /api/themes/{key}/assign-default?tenantId`（写 `TenantSetting "theme:defaultKey"`）、`POST /api/themes/{key}/copy`（`CopyThemeRequest`）、`GET /api/themes/editor/blueprint`（`ThemeEditorBlueprint{DslVersion,BuiltInKeys,Skeleton}`）。所有写端点经 `TenantDataPlanePolicy.ResolvePlatformScope` 隔离、DSL 经 `ThemeDslSerializer.TryDeserialize` 校验（版本白名单），内置主题不可改/删。
+>   - `ThemeDsl` 语义键：`Brand{Primary,Accent}`、`Color{Primary,Success,Warning,Danger,Neutral,Background,Surface,Text,TextMuted,Border}`、`Typography/Layout/Border/Radius/Shadow/ChartPalette/Component/DashboardTemplate`；`ThemeResolver` 级联：显式 Key → 租户默认（TenantSetting）→ 内置 `default`。
+>   - 前端 `ThemeEditor.razor` 当前仅硬编码 `Presets`（8 键：primary/accent/success/warning/info/bg/text/border）+ `Save()` 占位 `Toast.Info("…P11.3 收口")`；未注入 `IApiClient`、无 `ThemeDsl` 映射、无序列化、无发布一致性。本地化已注册 `Theme.Light/Dark`、`Action.Reset/Save`、`Content.ThemeEditor*` 等约 12 键；`ThemeEditorSavedToast` 仍含 "P11.3 收口" 占位文案需替换。
+>   - 键错位（需映射）：前端 `Presets` 8 键 ↔ `ThemeDsl.Color/Brand` 10 键——`primary→Color.Primary`、`accent→Brand.Accent`、`success→Color.Success`、`warning→Color.Warning`、`info→Color.Neutral`、`bg→Color.Background`、`text→Color.Text`、`border→Color.Border`；DSL 的 `Danger/Surface/TextMuted` 前端未编辑，保存时用蓝图默认填充。
+> - 实施（前端 RCL，复用 `IApiClient` + 既有 `ToastService`）：
+>   1. 注入 `@inject ApiClient Api`（经 `IApiClient`）；初始化 `OnAfterRenderAsync(firstRender)` 内 `GET /api/themes/editor/blueprint` 取 `Skeleton` 与 `BuiltInKeys`，`GET /api/themes?tenantId={State.TenantId}` 取主题清单填充下拉。
+>   2. 主题清单下拉（新增键 `Content.ThemeEditorSelectTheme`）：选“新建”→清空 Key/Name、按蓝图骨架初始化 8 个色板；选已有非内置主题→`GET /api/themes/{key}` 取 `DslJson`，用 `System.Text.Json.JsonNode` 解析并把 `color.*`/`brand.*` 回填到 `_tokens`（保留其余令牌）。
+>   3. 新增「主题键 / 名称」输入（Key 正则 `^[a-z0-9-]+$`、必填；Name 可选）；Key 冲突由后端 409 诚实返回。
+>   4. `Save()`：`_tokens` → `JsonNode` 改写 `color.*`/`brand.*`（新建自蓝图骨架，编辑自已取回 DSL）→ camelCase 序列化 → 新建 `POST /api/themes`（`{tenantId,key,dslJson,name}`）、已有非内置 `PUT /api/themes/{key}?tenantId`；失败显示错误 alert + `Toast.Error`（新增键 `Content.ThemeEditorSaveFailed`），成功 `Toast.Success`（替换占位 `ThemeEditorSavedToast` 为真实文案，新增 `Content.ThemeEditorSaved`）。
+>   5. 「指派为默认」按钮（新增键 `Action.ThemeAssignDefault` / `Content.ThemeEditorAssigned`）：`POST /api/themes/{key}/assign-default?tenantId={State.TenantId}` → 写 `TenantSetting "theme:defaultKey"`，级联 `ThemeResolver` 被 Dashboard/App 取用；内置主题亦可指派（后端允许 default 不存在时合成）。
+>   6. 内置主题只读：下拉中标灰、禁用编辑/删除（后端亦拒绝）；「删除」按钮仅对非内置主题可用（`DELETE`）。
+>   7. 预览 `_previewStyle` 继续用 `--sb-{key}` 变量驱动，色板改动实时反映；`TokenLabel` 沿用 `Presets` 中文标签。
+> - 本地化 4 向新增/修订（与 M7-05 同护栏）：`Keys.cs`(const+Defaults)、`ResourceKeys.cs`(const+Catalog)、`LocalizationSeedService.ZhCnDefaults`、`All()` 反射；新增 `Content.ThemeEditorSelectTheme`、`Action.ThemeAssignDefault`、`Content.ThemeEditorAssigned`、`Content.ThemeEditorSaved`、`Content.ThemeEditorSaveFailed`、`Content.ThemeEditorKey`/`ThemeEditorName`/`ThemeEditorDeleteConfirm`/`ThemeEditorBuiltInReadOnly`；将 `ThemeEditorSavedToast` 文案由占位改为真实“主题已保存。”并标记旧键可废弃。护栏 `Razor_Markup_ContainsNo_Unlocalized_Cjk_TextNodes_Or_Placeholders` 约束：字面中文仅限占位 `placeholder="…"` 与 `>中文<` 文本节点，Label/Title/Desc 与 `@code` 字面量豁免——新增 UI 文案一律走 `L10n.T(Keys.*,"…")`。
+> - 测试与零回归门禁：后端 `ThemeControllerTests`(11) 已覆盖，本里程碑不新增后端测试；前端以既有 `ResourceKeyRegistryTests` 护栏 + 手动 E2E（新建→列表出现→刷新后仍在→指派默认→Dashboard 取用）验证；预期基线 923 → 零回归（仅文案/UI 改动，不计新增后端测试）。全量绿、build 0 error、Golden 18/18 不变。
+> - 红线「无假成功按钮」：移除 `Save()` 占位 Toast；保存/指派失败必须明确报错（错误 alert + `Toast.Error`），不得伪造成功；无后端能力时按钮禁用并显示原因。
+> - 范围外（本里程碑不做）：`copy` 端点前端入口（蓝图复制，留待 M7-10 复用主题时一并做）、`Typography/Layout/Radius/Shadow/ChartPalette/Component` 逐令牌编辑 UI（仅做 Color/Brand 8 键映射，其余令牌保持蓝图默认）、多租户管理面（治理角色改他租户主题）、深色模式持久化（当前 `_mode` 仅切预览，不落库）。
+> - 交付要点（2026-09-07）：前端 `ThemeEditor.razor` 注入 `IApiClient`+`AppState`，`OnAfterRenderAsync` 加载 `editor/blueprint` 与主题清单；色板 8 键经 `JsonNode` 映射为 `ThemeDsl.Color/Brand`（primary→color.primary、accent→brand.accent、success→color.success、warning→color.warning、info→color.neutral、bg→color.background、text→color.text、border→color.border）后 camelCase 序列化；新建 `POST /api/themes`、编辑 `PUT /api/themes/{key}`、指派 `POST /api/themes/{key}/assign-default`（级联 `TenantSetting "theme:defaultKey"`）、删除 `DELETE`；内置主题下拉标灰只读、删除/指派仅限非内置；深色预览为本地 `filter` 反相辅助（不落库）。
+> - 红线落实：移除原占位 `Toast.Info("…P11.3 收口")`，保存/指派/删除失败显式报错（`ThemeEditorSaveFailed` + `Toast.Error`），无假成功按钮；`ThemeEditorSavedToast` 占位文案已替换为真实「主题已保存。」并新增 9 个主题键（RCL `Keys.cs` const+Defaults、后端 `ResourceKeys.cs` const+Catalog、`LocalizationSeedService.ZhCnDefaults`、`All()` 反射 4 向一致，ResourceKeyRegistryTests 9/9 全绿）。构建期 `JsonValue` 歧义（`SuperBuilder_AI.Components.Models.JsonValue` vs `System.Text.Json.Nodes.JsonValue`）已用全限定名修复。
+> - 验证：RCL（net10.0/android/ios）、API build 0 error；全量测试零回归（含 Golden 18/18）。
+
 无后端能力的按钮必须禁用并显示原因，不得提示虚假的“已保存/已运行”。
 
 ---
