@@ -324,6 +324,9 @@ builder.Services.AddScoped<IThemeResolver, ThemeResolver>();
 // M7-07：模型账号（BYO）服务——加密绑定 / 租户隔离 / 服务端解密（绝不下发明文）。
 builder.Services.AddScoped<SuperBuilder_AI.Application.ModelAccounts.ModelAccountService>();
 
+// M7-09：租户自定义组件 DSL 白名单与安全校验。
+builder.Services.AddScoped<SuperBuilder_AI.Services.Components.CustomComponentDslSerializer>();
+
 // ── BIConversationService 依赖链补充注册 ──────────────────
 builder.Services.AddScoped<IQueryPlanExplainabilityService>(sp => sp.GetRequiredService<QueryPlanExplainabilityService>());
 builder.Services.AddScoped<IMetadataPromptBuilder>(sp => sp.GetRequiredService<MetadataPromptBuilder>());

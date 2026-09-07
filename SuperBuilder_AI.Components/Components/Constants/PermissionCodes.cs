@@ -26,4 +26,11 @@ public static class PermissionCodes
     public const string AuditView = "audit:view";
     public const string ThemeView = "theme:view";
     public const string BillingView = "billing:view";
+
+    // —— 应用与自定义组件 ——
+    public const string AppView = "app:view";
+    public const string AppCreate = "app:create";
+    public const string AppEdit = "app:edit";
+    public const string AppDelete = "app:delete";
+    public const string AppPublish = "app:publish";
 }

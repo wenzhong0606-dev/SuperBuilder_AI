@@ -12,6 +12,7 @@ using SuperBuilder_AI.Models.Metadata;
 using SuperBuilder_AI.Models.Organization;
 using SuperBuilder_AI.Models.Theme;
 using SuperBuilder_AI.Models.ModelAccount;
+using SuperBuilder_AI.Models.Components;
 using SuperBuilder_AI.Models;
 using SuperBuilder_AI.Data.Configurations;
 
@@ -128,6 +129,11 @@ public class SuperBIContext : DbContext
 
         #region P7.3 Model Accounts (BYO)
         public DbSet<ModelAccount> ModelAccounts { get; set; }
+        #endregion
+
+        #region M7-09 Custom Component Library
+        public DbSet<CustomComponentDefinition> CustomComponents { get; set; }
+        public DbSet<CustomComponentVersion> CustomComponentVersions { get; set; }
         #endregion
 
     #region P8 AI App Builder
@@ -477,6 +483,36 @@ public class SuperBIContext : DbContext
         builder.Entity<ModelAccount>().Property(x => x.IsDefault).IsRequired().HasDefaultValue(false).HasComment("是否为租户默认模型(每租户至多一个)");
         #endregion
 
+        #region M7-09 Custom Component Library
+        builder.Entity<CustomComponentDefinition>().ToTable(tb => tb.HasComment("租户自定义组件定义"));
+        builder.Entity<CustomComponentDefinition>().HasIndex(x => new { x.TenantId, x.Key }).IsUnique();
+        builder.Entity<CustomComponentDefinition>().HasIndex(x => new { x.TenantId, x.ComponentType });
+        builder.Entity<CustomComponentDefinition>().Property(x => x.Key).IsRequired().HasMaxLength(64);
+        builder.Entity<CustomComponentDefinition>().Property(x => x.Name).IsRequired().HasMaxLength(128);
+        builder.Entity<CustomComponentDefinition>().Property(x => x.Description).HasMaxLength(1024);
+        builder.Entity<CustomComponentDefinition>().Property(x => x.ComponentType).IsRequired().HasMaxLength(32);
+        builder.Entity<CustomComponentDefinition>().Property(x => x.DslVersion).IsRequired().HasMaxLength(16);
+        builder.Entity<CustomComponentDefinition>().Property(x => x.DslJson).IsRequired().HasComment("结构化组件草稿DSL（禁止HTML/脚本）");
+        builder.Entity<CustomComponentDefinition>().Property(x => x.PublishedDslJson).HasComment("已发布组件DSL快照");
+        builder.Entity<CustomComponentDefinition>().Property(x => x.PublishedBy).HasMaxLength(128);
+
+        builder.Entity<CustomComponentVersion>().ToTable(tb => tb.HasComment("自定义组件发布版本快照"));
+        builder.Entity<CustomComponentVersion>().HasIndex(x => new { x.ComponentId, x.Version }).IsUnique();
+        builder.Entity<CustomComponentVersion>().HasIndex(x => new { x.TenantId, x.ComponentId });
+        builder.Entity<CustomComponentVersion>().Property(x => x.Key).IsRequired().HasMaxLength(64);
+        builder.Entity<CustomComponentVersion>().Property(x => x.Name).IsRequired().HasMaxLength(128);
+        builder.Entity<CustomComponentVersion>().Property(x => x.Description).HasMaxLength(1024);
+        builder.Entity<CustomComponentVersion>().Property(x => x.ComponentType).IsRequired().HasMaxLength(32);
+        builder.Entity<CustomComponentVersion>().Property(x => x.DslVersion).IsRequired().HasMaxLength(16);
+        builder.Entity<CustomComponentVersion>().Property(x => x.DslJson).IsRequired();
+        builder.Entity<CustomComponentVersion>().Property(x => x.PublishedBy).HasMaxLength(128);
+        builder.Entity<CustomComponentVersion>()
+            .HasOne(x => x.Component)
+            .WithMany(x => x.Versions)
+            .HasForeignKey(x => x.ComponentId)
+            .OnDelete(DeleteBehavior.Cascade);
+        #endregion
+
         #region P8.1 AppPlan
         // 与 Dashboard/Theme 一致：TenantId=0 表示全局模板，不建指向 Tenant 的外键（Tenant 表无 Id=0 行）。
         builder.Entity<AppPlan>().ToTable(tb => tb.HasComment("应用"));
@@ -720,6 +756,9 @@ public class SuperBIContext : DbContext
 
         // ModelAccount：租户专属绑定，不放行 TenantId == 0（绑定恒归属某一租户，无全局绑定）。
         builder.Entity<ModelAccount>().HasQueryFilter(e => !_tenantFilterEnabled || e.TenantId == _scopedTenantId);
+
+        builder.Entity<CustomComponentDefinition>().HasQueryFilter(e => !_tenantFilterEnabled || e.TenantId == _scopedTenantId);
+        builder.Entity<CustomComponentVersion>().HasQueryFilter(e => !_tenantFilterEnabled || e.TenantId == _scopedTenantId);
 
         // AppPlan：同 Dashboard/Theme，放行 TenantId == 0 的全局模板（租户可继承平台默认应用）。
         builder.Entity<AppPlan>().HasQueryFilter(e => !_tenantFilterEnabled || e.TenantId == _scopedTenantId || e.TenantId == 0);

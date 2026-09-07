@@ -158,6 +158,7 @@ public static class TenantDataPlanePolicy
 	public static bool IsDataPlanePath(PathString path) =>
 		path.StartsWithSegments("/api/ask", StringComparison.OrdinalIgnoreCase) ||
 		path.StartsWithSegments("/api/business-model", StringComparison.OrdinalIgnoreCase) ||
+		path.StartsWithSegments("/api/components", StringComparison.OrdinalIgnoreCase) ||
 		path.StartsWithSegments("/api/semantic-labels", StringComparison.OrdinalIgnoreCase) ||
 		path.StartsWithSegments("/metadata", StringComparison.OrdinalIgnoreCase);
 

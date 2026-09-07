@@ -1,163 +1,139 @@
 @page "/components"
+@inject IApiClient Api
+@inject AppState State
 @inject ToastService Toast
 @using System.Text.Json
-@using SuperBuilder_AI.Components.Shared
-<PageHead Icon="sb-ico-comp" Key="ComponentGallery" Title="组件库" Desc="SuperBuilder 设计系统一览：基于中国古风色板与 Bootstrap 的通用组件，全站统一复用。" />
+@using System.Text.Json.Nodes
+@using System.Text.RegularExpressions
 
-<div class="showcase">
-    <div class="demo">
-        <div class="d-label">@L10n.T(Keys.Content.ComponentGallerySecButtons, "按钮")</div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-            <button class="btn btn-primary btn-sm">@L10n.T(Keys.Content.ComponentGalleryBtnPrimary, "主要")</button>
-            <button class="btn btn-outline-secondary btn-sm">@L10n.T(Keys.Content.ComponentGalleryBtnSecondary, "次要")</button>
-            <button class="btn btn-ghost btn-sm">@L10n.T(Keys.Content.ComponentGalleryBtnGhost, "幽灵")</button>
-            <button class="btn btn-danger btn-sm">@L10n.T(Keys.Content.ComponentGalleryBtnDanger, "危险")</button>
-            <button class="btn btn-primary" disabled>@L10n.T(Keys.Content.ComponentGalleryBtnDisabled, "禁用")</button>
-        </div>
-    </div>
-    <div class="demo">
-        <div class="d-label">@L10n.T(Keys.Content.ComponentGallerySecBadges, "徽标")</div>
-        <div style="display:flex;gap:6px;flex-wrap:wrap">
-            <span class="badge badge-primary">@L10n.T(Keys.Content.ComponentGalleryBadgePrimary, "主要")</span>
-            <span class="badge badge-success">@L10n.T(Keys.Content.ComponentGalleryBadgePublished, "已发布")</span>
-            <span class="badge badge-warning">@L10n.T(Keys.Content.ComponentGalleryBadgeDraft, "草稿")</span>
-            <span class="badge badge-danger">@L10n.T(Keys.Content.ComponentGalleryBadgeFailed, "失败")</span>
-            <span class="badge badge-info">@L10n.T(Keys.Content.ComponentGalleryBadgeGlobal, "全局")</span>
-            <span class="badge badge-muted">@L10n.T(Keys.Content.ComponentGalleryBadgeDefault, "默认")</span>
-        </div>
-    </div>
-    <div class="demo">
-        <div class="d-label">@L10n.T(Keys.Content.ComponentGallerySecForms, "表单控件")</div>
-        <label>@L10n.T(Keys.Content.ComponentGalleryFormTextbox, "文本框")<input value="示例文本" /></label>
-        <label>@L10n.T(Keys.Content.ComponentGalleryFormDropdown, "下拉")<select><option>@L10n.T(Keys.Content.ComponentGalleryOptA, "选项 A")</option><option>@L10n.T(Keys.Content.ComponentGalleryOptB, "选项 B")</option></select></label>
-    </div>
-    <div class="demo">
-        <div class="d-label">@L10n.T(Keys.Content.ComponentGallerySecProgress, "进度条")</div>
-        <div class="progress"><span style="width:68%"></span></div>
-        <div style="margin-top:8px" class="muted tiny">@string.Format(L10n.T(Keys.Content.ComponentGalleryProgressUsed, "已用 {0}"), "68%")</div>
-    </div>
-    <div class="demo">
-        <div class="d-label">@L10n.T(Keys.Content.ComponentGallerySecSegmented, "分段控件")</div>
-        <div class="seg">
-            <button class="active">@L10n.T(Keys.Content.ComponentGallerySegDay, "日")</button><button>@L10n.T(Keys.Content.ComponentGallerySegWeek, "周")</button><button>@L10n.T(Keys.Content.ComponentGallerySegMonth, "月")</button>
-        </div>
-    </div>
-    <div class="demo">
-        <div class="d-label">@L10n.T(Keys.Content.ComponentGallerySecAlerts, "告警")</div>
-        <div class="alert alert-info tiny" style="padding:8px 12px">@L10n.T(Keys.Content.ComponentGalleryAlertInfo, "信息提示")</div>
-        <div class="alert alert-warning tiny" style="padding:8px 12px">@L10n.T(Keys.Content.ComponentGalleryAlertWarning, "注意提示")</div>
-    </div>
-</div>
+<PageHead Icon="sb-ico-comp" Key="ComponentGallery" Title="组件库" Desc="以安全的结构化 DSL 创建、发布和复用租户组件。" />
 
-<div class="stat-grid">
-    <div class="stat-tile"><div class="st-label">@L10n.T(Keys.Content.ComponentGalleryStatQuestions, "今日问数")</div><div class="st-value">1,284</div><div class="st-delta up">↑ 12.4%</div></div>
-    <div class="stat-tile accent-success"><div class="st-label">@L10n.T(Keys.Content.ComponentGalleryStatHitRate, "命中率")</div><div class="st-value">93.6%</div><div class="st-delta up">↑ 2.1%</div></div>
-    <div class="stat-tile accent-warning"><div class="st-label">@L10n.T(Keys.Content.ComponentGalleryStatPending, "待复核")</div><div class="st-value">17</div><div class="st-delta down">↓ 3</div></div>
-    <div class="stat-tile accent-info"><div class="st-label">@L10n.T(Keys.Content.ComponentGalleryStatActiveTenants, "活跃租户")</div><div class="st-value">42</div></div>
-</div>
-
-<div class="panel">
-    <div class="panel-head"><div class="panel-title"><svg class="pt-ico"><use href="#sb-ico-db" /></svg> @L10n.T(Keys.Content.ComponentGallerySampleTable, "示例表格")</div></div>
-    <div class="panel-body flush">
-        <div class="table-wrap">
-            <table class="data-table">
-                <thead><tr><th>@L10n.T(Keys.Content.ComponentGalleryColCode, "编码")</th><th>@L10n.T(Keys.Content.ComponentGalleryColName, "名称")</th><th>@L10n.T(Keys.Content.ComponentGalleryColStatus, "状态")</th><th>@L10n.T(Keys.Content.ComponentGalleryColTenant, "租户")</th></tr></thead>
-                <tbody>
-                    <tr><td>demo-sales</td><td>@L10n.T(Keys.Content.ComponentGalleryDemoSales, "销售看板")</td><td><span class="badge badge-success">@L10n.T(Keys.Content.ComponentGalleryBadgePublished, "已发布")</span></td><td>@L10n.T(Keys.Content.ComponentGalleryBadgeGlobal, "全局")</td></tr>
-                    <tr><td>demo-stock</td><td>@L10n.T(Keys.Content.ComponentGalleryDemoStock, "库存预警")</td><td><span class="badge badge-warning">@L10n.T(Keys.Content.ComponentGalleryBadgeDraft, "草稿")</span></td><td>@L10n.T(Keys.Content.ComponentGalleryBadgeGlobal, "全局")</td></tr>
-                    <tr><td>demo-fin</td><td>@L10n.T(Keys.Content.ComponentGalleryDemoFinance, "财务月报")</td><td><span class="badge badge-info">@L10n.T(Keys.Content.ComponentGalleryBadgeGlobal, "全局")</span></td><td>@L10n.T(Keys.Content.ComponentGalleryBadgeGlobal, "全局")</td></tr>
-                </tbody>
-            </table>
-        </div>
-    </div>
-</div>
-
-<div class="card-grid">
-    <div class="feature-card"><div class="fc-ico"><svg><use href="#sb-ico-ask" /></svg></div><div class="fc-title">@L10n.T(Keys.Content.ComponentGalleryCardAskTitle, "Ask BI")</div><div class="fc-desc">@L10n.T(Keys.Content.ComponentGalleryCardAskDesc, "自然语言问数的旗舰入口。")</div></div>
-    <div class="feature-card"><div class="fc-ico"><svg><use href="#sb-ico-dash" /></svg></div><div class="fc-title">@L10n.T(Keys.Content.ComponentGalleryCardDashTitle, "仪表盘")</div><div class="fc-desc">@L10n.T(Keys.Content.ComponentGalleryCardDashDesc, "固化可复用的可视化看板。")</div></div>
-    <div class="feature-card"><div class="fc-ico"><svg><use href="#sb-ico-app" /></svg></div><div class="fc-title">@L10n.T(Keys.Content.ComponentGalleryCardAppTitle, "应用工厂")</div><div class="fc-desc">@L10n.T(Keys.Content.ComponentGalleryCardAppDesc, "把会话沉淀为 BI 应用。")</div></div>
-</div>
-
-<div class="showcase">
-    <div class="demo">
-        <div class="d-label">@L10n.T(Keys.Content.ComponentGallerySecTabs, "标签页 SbTabs")</div>
-        <SbTabs>
-            <SbTab Title="@L10n.T(Keys.Content.ComponentGalleryTabOverview, "概览")"><div class="tiny muted" style="padding:8px 2px">@(L10n.T(Keys.Content.ComponentGalleryTabOverview, "概览"))内容区，用于聚合多视图。</div></SbTab>
-            <SbTab Title="@L10n.T(Keys.Content.ComponentGalleryTabDetail, "明细")"><div class="tiny muted" style="padding:8px 2px">@(L10n.T(Keys.Content.ComponentGalleryTabDetail, "明细"))内容区。</div></SbTab>
-            <SbTab Title="@L10n.T(Keys.Content.ComponentGalleryTabSettings, "设置")"><div class="tiny muted" style="padding:8px 2px">@(L10n.T(Keys.Content.ComponentGalleryTabSettings, "设置"))内容区。</div></SbTab>
-        </SbTabs>
-    </div>
-
-    <div class="demo">
-        <div class="d-label">@L10n.T(Keys.Content.ComponentGallerySecDataTable, "数据表格 SbDataTable")</div>
-        <SbDataTable Items="@_rows" Columns="@_cols" PageSize="3" EmptyTitle="@L10n.T(Keys.Content.ComponentGalleryDataEmpty, "无数据")" />
-    </div>
-
-    <div class="demo">
-        <div class="d-label">@L10n.T(Keys.Content.ComponentGallerySecModal, "弹窗 SbModal / SbConfirm")</div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap">
-            <button class="btn btn-outline-secondary btn-sm" @onclick="() => _modal = true">@L10n.T(Keys.Content.ComponentGalleryOpenModal, "打开弹窗")</button>
-            <button class="btn btn-danger btn-sm" @onclick="() => _confirm = true">@L10n.T(Keys.Content.ComponentGalleryConfirmTitle, "删除确认")</button>
-        </div>
-        <SbModal Visible="@_modal" VisibleChanged="v => _modal = v" Title="@L10n.T(Keys.Content.ComponentGalleryModalTitle, "示例弹窗")">
-            <Body><p class="tiny">@L10n.T(Keys.Content.ComponentGalleryModalBody, "弹窗用于承载表单或详情，支持遮罩点击关闭与自定义底部操作。")</p></Body>
-            <Footer><button class="btn btn-primary btn-sm" @onclick="() => _modal = false">@L10n.T(Keys.Content.ComponentGalleryModalOk, "知道了")</button></Footer>
-        </SbModal>
-        <SbConfirm Visible="@_confirm" VisibleChanged="v => _confirm = v" Title="@L10n.T(Keys.Content.ComponentGalleryConfirmTitle, "删除确认")"
-                   Message="@L10n.T(Keys.Content.ComponentGalleryConfirmMsg, "此操作不可撤销，确定要删除该记录吗？")" ConfirmText="@L10n.T(Keys.Content.ComponentGalleryConfirmText, "删除")"
-                   Tone="danger" OnConfirm="OnConfirmDelete" />
-    </div>
-
-    <div class="demo">
-        <div class="d-label">@L10n.T(Keys.Content.ComponentGallerySecToast, "轻提示 Toast")</div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap">
-            <button class="btn btn-outline-secondary btn-sm" @onclick='() => Toast.Info(L10n.T(Keys.Content.ComponentGalleryToastInfo, "信息提示"))'>Info</button>
-            <button class="btn btn-outline-secondary btn-sm" @onclick='() => Toast.Success(L10n.T(Keys.Content.ComponentGalleryToastSuccess, "操作成功"))'>Success</button>
-            <button class="btn btn-outline-secondary btn-sm" @onclick='() => Toast.Warning(L10n.T(Keys.Content.ComponentGalleryToastWarning, "请注意"))'>Warning</button>
-            <button class="btn btn-outline-secondary btn-sm" @onclick='() => Toast.Error(L10n.T(Keys.Content.ComponentGalleryToastError, "出错了"))'>Error</button>
-        </div>
-    </div>
-
-    <div class="demo">
-        <div class="d-label">@L10n.T(Keys.Content.ComponentGallerySecGuard, "守卫 Guard")</div>
-        <div class="tiny muted">@L10n.T(Keys.Content.ComponentGalleryGuardDesc, "AuthGuard 等待会话自举完成后渲染子内容；PermissionGuard 按权限码门控（当前未强制，见 NavMenuItems.EnforcePermissions）。")</div>
-        <div style="margin-top:8px">
-            <PermissionGuard Require="@(new[] { "demo:write" })" Mode="Any">
-                <span class="badge badge-success">@L10n.T(Keys.Content.ComponentGalleryGuardHasPerm, "你拥有 demo:write 权限")</span>
+<AuthGuard>
+    <PermissionGuard Require="@(new[] { PermissionCodes.AppView })">
+        <div class="toolbar">
+            <div>
+                <div class="panel-title"><svg class="pt-ico"><use href="#sb-ico-comp" /></svg> @L10n.T(Keys.Content.ComponentLibraryAssets, "组件资产")</div>
+                <div class="tiny muted">@L10n.T(Keys.Content.ComponentLibraryLifecycleHint, "草稿与发布态隔离；回滚会创建新版本，不覆盖历史。")</div>
+            </div>
+            <div class="spacer"></div>
+            <button class="btn btn-outline-secondary btn-sm" @onclick="LoadAsync" disabled="@_loading">@L10n.T(Keys.Action.Refresh, "刷新")</button>
+            <PermissionGuard Require="@(new[] { PermissionCodes.AppCreate })">
+                <button class="btn btn-primary btn-sm" @onclick="OpenCreate" disabled="@(_loading || string.IsNullOrWhiteSpace(_blueprint))">@L10n.T(Keys.Content.ComponentLibraryNew, "新增组件")</button>
             </PermissionGuard>
         </div>
-    </div>
-</div>
+
+        @if (_loading)
+        {
+            <LoadingState Text="@L10n.T(Keys.Common.Loading, "加载中…")" />
+        }
+        else if (!string.IsNullOrWhiteSpace(_error))
+        {
+            <div class="alert alert-danger">@_error</div>
+        }
+        else if (_items.Count == 0)
+        {
+            <SbEmptyState Icon="sb-ico-comp" Title="@L10n.T(Keys.Content.ComponentLibraryEmptyTitle, "暂无自定义组件")" Text="@L10n.T(Keys.Content.ComponentLibraryEmptyText, "创建第一个组件，发布后即可被应用和仪表盘安全复用。")" />
+        }
+        else
+        {
+            <div class="panel component-library-panel">
+                <div class="panel-body flush">
+                    <div class="table-wrap">
+                        <table class="data-table component-library-table">
+                            <thead><tr><th>@L10n.T(Keys.Content.ComponentGalleryColName, "名称")</th><th>@L10n.T(Keys.Content.ComponentGalleryColCode, "编码")</th><th>@L10n.T(Keys.Content.ComponentLibraryType, "类型")</th><th>@L10n.T(Keys.Content.ComponentGalleryColStatus, "状态")</th><th>@L10n.T(Keys.Content.ComponentLibraryVersion, "发布版本")</th><th>@L10n.T(Keys.Content.ComponentLibraryPublishedAt, "发布时间")</th><th class="text-end">@L10n.T(Keys.Content.ComponentLibraryActions, "操作")</th></tr></thead>
+                            <tbody>
+                                @foreach (var row in _items)
+                                {
+                                    <tr>
+                                        <td><div class="cell-title">@row.Name</div><div class="tiny muted">@row.Description</div></td>
+                                        <td><code>@row.Key</code></td>
+                                        <td><span class="badge badge-info">@row.ComponentType</span></td>
+                                        <td>@if (row.PublishedVersion > 0) { <span class="badge badge-success">@L10n.T(Keys.Content.ComponentGalleryBadgePublished, "已发布")</span> } else { <span class="badge badge-warning">@L10n.T(Keys.Content.ComponentGalleryBadgeDraft, "草稿")</span> }</td>
+                                        <td>@(row.PublishedVersion > 0 ? $"v{row.PublishedVersion}" : "—")</td>
+                                        <td>@FormatDate(row.PublishedAt)</td>
+                                        <td><div class="row-actions">
+                                            <button class="btn btn-ghost btn-sm" @onclick="() => OpenPreviewAsync(row)">@L10n.T(Keys.Content.ComponentLibraryPreview, "预览")</button>
+                                            <button class="btn btn-ghost btn-sm" @onclick="() => OpenVersionsAsync(row)">@L10n.T(Keys.Content.ComponentLibraryVersions, "版本")</button>
+                                            <PermissionGuard Require="@(new[] { PermissionCodes.AppEdit })"><button class="btn btn-ghost btn-sm" @onclick="() => OpenEditAsync(row)">@L10n.T(Keys.Action.Edit, "编辑")</button></PermissionGuard>
+                                            <PermissionGuard Require="@(new[] { PermissionCodes.AppPublish })"><button class="btn btn-outline-primary btn-sm" @onclick="() => PublishAsync(row)" disabled="@_working">@L10n.T(Keys.Content.ComponentLibraryPublish, "发布")</button></PermissionGuard>
+                                            <PermissionGuard Require="@(new[] { PermissionCodes.AppDelete })"><button class="btn btn-outline-danger btn-sm" @onclick="() => OpenDelete(row)">@L10n.T(Keys.Action.Delete, "删除")</button></PermissionGuard>
+                                        </div></td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        }
+
+        <SbModal Visible="@_editorVisible" VisibleChanged="v => _editorVisible = v" Title="@(_editingKey is null ? L10n.T(Keys.Content.ComponentLibraryNew, "新增组件") : L10n.T(Keys.Content.ComponentLibraryEditTitle, "编辑组件"))" Size="lg">
+            <Body>
+                <div class="field-grid">
+                    <SbField Label="@L10n.T(Keys.Content.ComponentLibraryKey, "组件键")" Required="true" Hint="@L10n.T(Keys.Content.ComponentLibraryKeyHint, "小写字母开头，仅允许小写字母、数字和连字符；创建后不可修改。")"><input @bind="_formKey" disabled="@(_editingKey is not null)" placeholder="inventory-card" /></SbField>
+                    <SbField Label="@L10n.T(Keys.Content.ComponentGalleryColName, "名称")" Required="true"><input @bind="_formName" /></SbField>
+                    <SbField Label="@L10n.T(Keys.Content.ComponentLibraryType, "类型")" Required="true"><select @bind="_formType">@foreach (var type in _types) { <option value="@type">@type</option> }</select></SbField>
+                    <SbField Label="@L10n.T(Keys.Content.ComponentLibraryDescription, "描述")"><input @bind="_formDescription" /></SbField>
+                    <SbField Label="@L10n.T(Keys.Content.ComponentLibraryDsl, "结构化 DSL")" Full="true" Hint="@L10n.T(Keys.Content.ComponentLibraryDslHint, "仅支持白名单结构，不接受 HTML、CSS 或 JavaScript。")"><textarea @bind="_dslJson" rows="14" class="dsl-editor" spellcheck="false"></textarea></SbField>
+                </div>
+                @if (!string.IsNullOrWhiteSpace(_editorError)) { <div class="alert alert-danger tiny">@_editorError</div> }
+            </Body>
+            <Footer><button class="btn btn-outline-secondary" @onclick="() => _editorVisible = false">@L10n.T(Keys.Action.Cancel, "取消")</button><button class="btn btn-primary" @onclick="SaveAsync" disabled="@_working">@(_working ? L10n.T(Keys.Content.ComponentLibrarySaving, "保存中…") : L10n.T(Keys.Action.Save, "保存"))</button></Footer>
+        </SbModal>
+
+        <SbModal Visible="@_previewVisible" VisibleChanged="v => _previewVisible = v" Title="@L10n.T(Keys.Content.ComponentLibraryPreviewTitle, "已发布组件预览")" Size="lg">
+            <Body>@if (_previewLoading) { <LoadingState Text="@L10n.T(Keys.Common.Loading, "加载中…")" /> } else if (!string.IsNullOrWhiteSpace(_previewError)) { <div class="alert alert-warning">@_previewError</div> } else { <pre class="safe-preview">@_previewJson</pre> }</Body>
+        </SbModal>
+
+        <SbModal Visible="@_versionsVisible" VisibleChanged="v => _versionsVisible = v" Title="@L10n.T(Keys.Content.ComponentLibraryVersionHistory, "发布版本历史")" Size="md">
+            <Body>
+                @if (_versionsLoading) { <LoadingState Text="@L10n.T(Keys.Common.Loading, "加载中…")" /> }
+                else if (_versions.Count == 0) { <div class="muted">@L10n.T(Keys.Content.ComponentLibraryNoVersions, "该组件尚未发布。")</div> }
+                else { <div class="version-list">@foreach (var version in _versions) { <div class="version-row"><div><strong>v@version.Version</strong> @if (version.IsCurrent) { <span class="badge badge-success">@L10n.T(Keys.Content.ComponentLibraryCurrent, "当前")</span> } @if (version.RolledBackFromVersion is not null) { <span class="tiny muted">← v@version.RolledBackFromVersion</span> }<div class="tiny muted">@FormatDate(version.PublishedAt) · @version.PublishedBy</div></div>@if (!version.IsCurrent) { <PermissionGuard Require="@(new[] { PermissionCodes.AppPublish })"><button class="btn btn-outline-secondary btn-sm" @onclick="() => RollbackAsync(version.Version)" disabled="@_working">@L10n.T(Keys.Content.ComponentLibraryRollback, "回滚至此版本")</button></PermissionGuard> }</div> }</div> }
+            </Body>
+        </SbModal>
+
+        <SbConfirm Visible="@_deleteVisible" VisibleChanged="v => _deleteVisible = v" Title="@L10n.T(Keys.Content.ComponentGalleryConfirmTitle, "删除确认")" Message="@L10n.T(Keys.Content.ComponentLibraryDeleteConfirm, "删除组件将同时删除其全部版本，确定继续吗？")" ConfirmText="@L10n.T(Keys.Action.Delete, "删除")" Tone="danger" OnConfirm="DeleteAsync" />
+    </PermissionGuard>
+</AuthGuard>
+
+<style>
+    .component-library-panel { margin-top: 12px; overflow: hidden; }
+    .component-library-table { width: 100%; min-width: 1040px; }
+    .component-library-table td:last-child { width: 1%; white-space: nowrap; }
+    .cell-title { font-weight: 700; color: var(--sb-text); }
+    .row-actions { display: flex; justify-content: flex-end; gap: 6px; align-items: center; }
+    .dsl-editor, .safe-preview { width: 100%; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; line-height: 1.55; }
+    .safe-preview { max-height: 520px; overflow: auto; padding: 16px; border: 1px solid var(--sb-border); border-radius: var(--sb-radius-md); background: color-mix(in srgb, var(--sb-bg) 88%, var(--sb-primary) 12%); white-space: pre-wrap; word-break: break-word; }
+    .version-list { display: grid; gap: 8px; }
+    .version-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px; border: 1px solid var(--sb-border); border-radius: var(--sb-radius-md); }
+</style>
 
 @code {
-    private bool _modal = false;
-    private bool _confirm = false;
+    private sealed record ComponentItem(long Id, string Key, string Name, string? Description, string ComponentType, int PublishedVersion, DateTime? PublishedAt);
+    private sealed record VersionItem(int Version, DateTime PublishedAt, string? PublishedBy, int? RolledBackFromVersion, bool IsCurrent);
+    private readonly List<ComponentItem> _items = new();
+    private readonly List<string> _types = new();
+    private readonly List<VersionItem> _versions = new();
+    private bool _loading = true, _working, _editorVisible, _previewVisible, _previewLoading, _versionsVisible, _versionsLoading, _deleteVisible;
+    private string? _error, _blueprint, _editingKey, _selectedKey, _editorError, _previewError, _previewJson;
+    private string _formKey = "", _formName = "", _formDescription = "", _formType = "chart", _dslJson = "";
 
-    private record DemoRow(string Code, string Name, string Status);
-    private List<DemoRow> _rows = new();
-    private List<SbColumn<DemoRow>> _cols = new();
-
-    protected override void OnInitialized()
-    {
-        _rows = new()
-        {
-            new("demo-sales", "销售看板", L10n.T(Keys.Content.ComponentGalleryBadgePublished, "已发布")),
-            new("demo-stock", "库存预警", L10n.T(Keys.Content.ComponentGalleryBadgeDraft, "草稿")),
-            new("demo-fin", "财务月报", L10n.T(Keys.Content.ComponentGalleryBadgeGlobal, "全局")),
-            new("demo-hr", "人力看板", L10n.T(Keys.Content.ComponentGalleryBadgePublished, "已发布")),
-            new("demo-ops", "运维大盘", L10n.T(Keys.Content.ComponentGalleryBadgeDraft, "草稿")),
-        };
-        _cols = new()
-        {
-            SbCol.Of<DemoRow>(L10n.T(Keys.Content.ComponentGalleryColCode, "编码"), r => r.Code),
-            SbCol.Of<DemoRow>(L10n.T(Keys.Content.ComponentGalleryColName, "名称"), r => r.Name),
-            SbCol.Of<DemoRow>(L10n.T(Keys.Content.ComponentGalleryColStatus, "状态"), r => r.Status, isStatus: true),
-        };
-    }
-
-    private void OnConfirmDelete()
-    {
-        _confirm = false;
-        Toast.Success(L10n.T(Keys.Content.ComponentGalleryToastDeleted, "已确认删除（演示）。"));
-    }
+    protected override async Task OnAfterRenderAsync(bool firstRender) { if (!firstRender) return; await LoadBlueprintAsync(); await LoadAsync(); StateHasChanged(); }
+    private async Task LoadBlueprintAsync() { var (data, _, _, _) = await Api.GetJsonAsync("api/components/editor/blueprint"); if (data is not { ValueKind: JsonValueKind.Object }) return; _blueprint = data.Value.GetProperty("skeleton").GetString(); _types.Clear(); if (data.Value.TryGetProperty("componentTypes", out var types)) _types.AddRange(types.EnumerateArray().Select(x => x.GetString()).Where(x => !string.IsNullOrWhiteSpace(x))!); }
+    private async Task LoadAsync() { _loading = true; _error = null; var (data, _, err, code) = await Api.GetJsonAsync($"api/components?tenantId={State.TenantId}"); _items.Clear(); if (data is { ValueKind: JsonValueKind.Array }) { foreach (var e in data.Value.EnumerateArray()) _items.Add(new(e.GetProperty("id").GetInt64(), Text(e, "key"), Text(e, "name"), Optional(e, "description"), Text(e, "componentType"), e.GetProperty("publishedVersion").GetInt32(), Date(e, "publishedAt"))); } else if (!string.IsNullOrWhiteSpace(err)) _error = L10n.T(code is null ? "" : "Error." + code, err); _loading = false; }
+    private void OpenCreate() { _editingKey = null; _editorError = null; _formKey = ""; _formName = ""; _formDescription = ""; _dslJson = _blueprint ?? ""; _formType = _types.FirstOrDefault() ?? "chart"; _editorVisible = true; }
+    private async Task OpenEditAsync(ComponentItem row) { var (data, _, err, _) = await Api.GetJsonAsync($"api/components/{Uri.EscapeDataString(row.Key)}?tenantId={State.TenantId}"); if (data is not { ValueKind: JsonValueKind.Object }) { Toast.Error(err ?? L10n.T(Keys.Content.ComponentLibraryLoadFailed, "组件加载失败。")); return; } _editingKey = row.Key; _formKey = row.Key; _formName = Text(data.Value, "name"); _formDescription = Optional(data.Value, "description") ?? ""; _formType = Text(data.Value, "componentType"); _dslJson = Text(data.Value, "dslJson"); _editorError = null; _editorVisible = true; }
+    private async Task SaveAsync() { _editorError = null; if (!Regex.IsMatch(_formKey, "^[a-z][a-z0-9-]{1,63}$") || string.IsNullOrWhiteSpace(_formName)) { _editorError = L10n.T(Keys.Content.ComponentLibraryInvalidForm, "请填写名称，并使用合法的组件键。"); return; } try { SyncDsl(); JsonNode.Parse(_dslJson); } catch (Exception ex) { _editorError = string.Format(L10n.T(Keys.Content.ComponentLibraryInvalidDsl, "DSL 无效：{0}"), ex.Message); return; } _working = true; var result = _editingKey is null ? await Api.PostAsync("api/components", new { tenantId = State.TenantId, dslJson = _dslJson }) : await Api.PutAsync($"api/components/{Uri.EscapeDataString(_editingKey)}?tenantId={State.TenantId}", new { tenantId = State.TenantId, dslJson = _dslJson }); _working = false; if (!result.Ok) { _editorError = result.Error ?? L10n.T(Keys.Content.ComponentLibrarySaveFailed, "组件保存失败。"); return; } _editorVisible = false; Toast.Success(L10n.T(Keys.Content.ComponentLibrarySaved, "组件已保存。")); await LoadAsync(); }
+    private void SyncDsl() { var node = JsonNode.Parse(_dslJson)!.AsObject(); node["key"] = _formKey.Trim(); node["name"] = _formName.Trim(); node["description"] = string.IsNullOrWhiteSpace(_formDescription) ? null : _formDescription.Trim(); var root = node["root"]!.AsObject(); root["type"] = _formType; root["title"] = _formName.Trim(); _dslJson = node.ToJsonString(new JsonSerializerOptions { WriteIndented = true }); }
+    private async Task PublishAsync(ComponentItem row) { _working = true; var (ok, _, err, _) = await Api.PostAsync($"api/components/{Uri.EscapeDataString(row.Key)}/publish?tenantId={State.TenantId}"); _working = false; if (!ok) Toast.Error(err ?? L10n.T(Keys.Content.ComponentLibraryPublishFailed, "组件发布失败。")); else { Toast.Success(L10n.T(Keys.Content.ComponentLibraryPublished, "组件已发布。")); await LoadAsync(); } }
+    private async Task OpenPreviewAsync(ComponentItem row) { _previewVisible = true; _previewLoading = true; _previewError = null; _previewJson = null; var (data, _, err, _) = await Api.GetJsonAsync($"api/components/{Uri.EscapeDataString(row.Key)}/render?tenantId={State.TenantId}"); if (data is null) _previewError = err ?? L10n.T(Keys.Content.ComponentLibraryUnpublished, "组件尚未发布，暂无运行时预览。"); else _previewJson = JsonSerializer.Serialize(data.Value, new JsonSerializerOptions { WriteIndented = true }); _previewLoading = false; }
+    private async Task OpenVersionsAsync(ComponentItem row) { _selectedKey = row.Key; _versionsVisible = true; _versionsLoading = true; _versions.Clear(); var (data, _, err, _) = await Api.GetJsonAsync($"api/components/{Uri.EscapeDataString(row.Key)}/versions?tenantId={State.TenantId}"); if (data is { ValueKind: JsonValueKind.Array }) foreach (var e in data.Value.EnumerateArray()) _versions.Add(new(e.GetProperty("version").GetInt32(), Date(e, "publishedAt") ?? DateTime.MinValue, Optional(e, "publishedBy"), e.TryGetProperty("rolledBackFromVersion", out var rb) && rb.ValueKind == JsonValueKind.Number ? rb.GetInt32() : null, e.GetProperty("isCurrent").GetBoolean())); else if (!string.IsNullOrWhiteSpace(err)) Toast.Error(err); _versionsLoading = false; }
+    private async Task RollbackAsync(int version) { if (string.IsNullOrWhiteSpace(_selectedKey)) return; _working = true; var (ok, _, err, _) = await Api.PostAsync($"api/components/{Uri.EscapeDataString(_selectedKey)}/rollback/{version}?tenantId={State.TenantId}"); _working = false; if (!ok) Toast.Error(err ?? L10n.T(Keys.Content.ComponentLibraryRollbackFailed, "组件回滚失败。")); else { Toast.Success(L10n.T(Keys.Content.ComponentLibraryRollbackDone, "已回滚并生成新的发布版本。")); var row = _items.First(x => x.Key == _selectedKey); await OpenVersionsAsync(row); await LoadAsync(); } }
+    private void OpenDelete(ComponentItem row) { _selectedKey = row.Key; _deleteVisible = true; }
+    private async Task DeleteAsync() { if (string.IsNullOrWhiteSpace(_selectedKey)) return; var (ok, _, err, _) = await Api.DeleteAsync($"api/components/{Uri.EscapeDataString(_selectedKey)}?tenantId={State.TenantId}"); _deleteVisible = false; if (!ok) Toast.Error(err ?? L10n.T(Keys.Content.ComponentLibraryDeleteFailed, "组件删除失败。")); else { Toast.Success(L10n.T(Keys.Content.ComponentLibraryDeleted, "组件已删除。")); await LoadAsync(); } }
+    private static string Text(JsonElement e, string name) => e.TryGetProperty(name, out var p) ? p.GetString() ?? "" : "";
+    private static string? Optional(JsonElement e, string name) => e.TryGetProperty(name, out var p) && p.ValueKind != JsonValueKind.Null ? p.GetString() : null;
+    private static DateTime? Date(JsonElement e, string name) => e.TryGetProperty(name, out var p) && p.ValueKind == JsonValueKind.String && p.TryGetDateTime(out var dt) ? dt : null;
+    private static string FormatDate(DateTime? date) => date is null ? "—" : date.Value.ToLocalTime().ToString("yyyy-MM-dd HH:mm");
 }

@@ -73,7 +73,7 @@ public static class NavMenuItems
             Key = Keys.Nav.GroupCustom,
             Items = new[]
             {
-                new NavItem { Href = "components", Title = "组件库", Key = Keys.Nav.Components, Icon = "sb-ico-comp" },
+                new NavItem { Href = "components", Title = "组件库", Key = Keys.Nav.Components, Icon = "sb-ico-comp", Permission = PermissionCodes.AppView },
                 new NavItem { Href = "themes", Title = "主题编辑器", Key = Keys.Nav.ThemeEditor, Icon = "sb-ico-theme" }
             }
         },
