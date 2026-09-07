@@ -157,6 +157,7 @@ public static class ResourceKeys
         public const string Search = "Action.Search";
         public const string Close = "Action.Close";
         public const string Reset = "Action.Reset";
+        public const string ThemeAssignDefault = "Action.ThemeAssignDefault";
     }
 
     /// <summary>
@@ -474,6 +475,15 @@ public static class ResourceKeys
         public const string ThemeEditorBadgePublished = "Content.ThemeEditorBadgePublished";
         public const string ThemeEditorBadgeDraft = "Content.ThemeEditorBadgeDraft";
         public const string ThemeEditorSavedToast = "Content.ThemeEditorSavedToast";
+        public const string ThemeEditorSelectTheme = "Content.ThemeEditorSelectTheme";
+        public const string ThemeEditorNew = "Content.ThemeEditorNew";
+        public const string ThemeEditorSaved = "Content.ThemeEditorSaved";
+        public const string ThemeEditorSaveFailed = "Content.ThemeEditorSaveFailed";
+        public const string ThemeEditorKey = "Content.ThemeEditorKey";
+        public const string ThemeEditorName = "Content.ThemeEditorName";
+        public const string ThemeEditorKeyInvalid = "Content.ThemeEditorKeyInvalid";
+        public const string ThemeEditorDeleteConfirm = "Content.ThemeEditorDeleteConfirm";
+        public const string ThemeEditorAssigned = "Content.ThemeEditorAssigned";
 
         // MetadataEntityDetail（元数据关系详情）
         public const string MetadataEntityLoading = "Content.MetadataEntityLoading";
@@ -1389,6 +1399,7 @@ public static class ResourceKeys
         [Action.Search] = new("Action", DefaultValue: "Search"),
         [Action.Close] = new("Action", DefaultValue: "Close"),
         [Action.Reset] = new("Action", DefaultValue: "Reset"),
+        [Action.ThemeAssignDefault] = new("Action", Page: "ThemeEditor", DefaultValue: "Assign as default"),
 
         [Error.Unauthorized] = new("Error", DefaultValue: "Unauthorized."),
         [Error.Forbidden] = new("Error", DefaultValue: "You do not have access to this resource."),
@@ -1748,7 +1759,16 @@ public static class ResourceKeys
         [Content.ThemeEditorBtnSecondary] = new("Content", Page: "ThemeEditor", DefaultValue: "Secondary"),
         [Content.ThemeEditorBadgePublished] = new("Content", Page: "ThemeEditor", DefaultValue: "Published"),
         [Content.ThemeEditorBadgeDraft] = new("Content", Page: "ThemeEditor", DefaultValue: "Draft"),
-        [Content.ThemeEditorSavedToast] = new("Content", Page: "ThemeEditor", DefaultValue: "Theme saved (persistence to api/themes, closing in P11.3)."),
+        [Content.ThemeEditorSavedToast] = new("Content", Page: "ThemeEditor", DefaultValue: "Theme saved."),
+        [Content.ThemeEditorSelectTheme] = new("Content", Page: "ThemeEditor", DefaultValue: "Select theme"),
+        [Content.ThemeEditorNew] = new("Content", Page: "ThemeEditor", DefaultValue: "New theme"),
+        [Content.ThemeEditorSaved] = new("Content", Page: "ThemeEditor", DefaultValue: "Theme saved."),
+        [Content.ThemeEditorSaveFailed] = new("Content", Page: "ThemeEditor", DefaultValue: "Save failed: {0}"),
+        [Content.ThemeEditorKey] = new("Content", Page: "ThemeEditor", DefaultValue: "Theme key"),
+        [Content.ThemeEditorName] = new("Content", Page: "ThemeEditor", DefaultValue: "Theme name"),
+        [Content.ThemeEditorKeyInvalid] = new("Content", Page: "ThemeEditor", DefaultValue: "Theme key may only contain lowercase letters, digits and hyphens (-)."),
+        [Content.ThemeEditorDeleteConfirm] = new("Content", Page: "ThemeEditor", DefaultValue: "Delete this theme? This action cannot be undone."),
+        [Content.ThemeEditorAssigned] = new("Content", Page: "ThemeEditor", DefaultValue: "Assigned as the tenant default theme."),
 
         [Content.MetadataEntityLoading] = new("Content", Page: "MetadataEntityDetail", DefaultValue: "Reading metadata entity…"),
         [Content.MetadataEntityIntro] = new("Content", Page: "MetadataEntityDetail", DefaultValue: "The following content comes from the current tenant's actual metadata records."),

@@ -1,88 +1,334 @@
 @page "/themes"
+@inject IApiClient Api
+@inject AppState State
 @inject ToastService Toast
-<PageHead Icon="sb-ico-theme" Key="ThemeEditor" Title="主题编辑器" Desc="基于古风色板自定义你的视觉风格：实时预览、保存并指派给租户或复制为蓝图。" />
+@using System.Text.Json
+@using System.Text.Json.Nodes
+@using System.Text.RegularExpressions
+@using SuperBuilder_AI.Components.Shared
 
-<div class="toolbar">
-    <div class="seg">
-        <button class="@(_mode)" @onclick='() => SetMode("light")'>@L10n.T(Keys.Theme.Light, "浅色")</button>
-        <button class='@(_mode == "active" ? "" : "active")' @onclick='() => SetMode("dark")'>@L10n.T(Keys.Theme.Dark, "深色")</button>
-    </div>
-    <div class="spacer"></div>
-    <button class="btn btn-outline-secondary btn-sm" @onclick="ResetTokens">@L10n.T(Keys.Action.Reset, "重置")</button>
-    <button class="btn btn-primary btn-sm" @onclick="Save">@L10n.T(Keys.Action.Save, "保存") @L10n.T(Keys.Content.ThemeEditorSaveTheme, "主题")</button>
-</div>
+<PageHead Icon="sb-ico-theme" Key="ThemeEditor" Title="主题编辑器" Desc="基于设计令牌自定义你的视觉风格：实时预览、保存为租户主题并指派为默认。" />
 
-<div style="@_previewStyle">
-    <div class="panel">
-        <div class="panel-head"><div class="panel-title"><svg class="pt-ico"><use href="#sb-ico-theme" /></svg> @L10n.T(Keys.Page.ThemeEditorPreview, "实时预览")</div></div>
-        <div class="panel-body">
-            <div class="stat-grid">
-                <div class="stat-tile"><div class="st-label">@L10n.T(Keys.Content.ThemeEditorSampleMetric, "示例指标")</div><div class="st-value">86.4%</div><div class="st-delta up">↑ 5.2%</div></div>
-                <div class="stat-tile accent-accent"><div class="st-label">@L10n.T(Keys.Content.ThemeEditorSampleMetric, "示例指标")</div><div class="st-value">1,204</div></div>
-                <div class="stat-tile accent-success"><div class="st-label">@L10n.T(Keys.Content.ThemeEditorSampleMetric, "示例指标")</div><div class="st-value">@L10n.T(Keys.Content.ThemeEditorSampleReady, "就绪")</div></div>
-            </div>
-            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
-                <button class="btn btn-primary btn-sm">@L10n.T(Keys.Content.ThemeEditorBtnPrimary, "主要按钮")</button>
-                <button class="btn btn-outline-secondary btn-sm">@L10n.T(Keys.Content.ThemeEditorBtnSecondary, "次要")</button>
-                <span class="badge badge-success">@L10n.T(Keys.Content.ThemeEditorBadgePublished, "已发布")</span><span class="badge badge-warning">@L10n.T(Keys.Content.ThemeEditorBadgeDraft, "草稿")</span>
-            </div>
-            <div class="progress"><span style="width:60%"></span></div>
+@if (_loading)
+{
+    <LoadingState Text="@L10n.T(Keys.Common.Loading, "加载中…")" />
+}
+else
+{
+    <div class="toolbar">
+        <div class="seg">
+            <button class="@(_mode == "light" ? "active" : "")" @onclick='() => SetMode("light")'>@L10n.T(Keys.Theme.Light, "浅色")</button>
+            <button class="@(_mode == "dark" ? "active" : "")" @onclick='() => SetMode("dark")'>@L10n.T(Keys.Theme.Dark, "深色")</button>
         </div>
+        <div class="spacer"></div>
+        <button class="btn btn-outline-secondary btn-sm" @onclick="ResetTokens" disabled="@_saving">@L10n.T(Keys.Action.Reset, "重置")</button>
+        @if (_selectedKey != "new" && !_isBuiltIn)
+        {
+            <button class="btn btn-outline-danger btn-sm" @onclick="OpenDelete" disabled="@_saving">@L10n.T(Keys.Action.Delete, "删除")</button>
+            <button class="btn btn-outline-primary btn-sm" @onclick="AssignDefault" disabled="@_saving">@L10n.T(Keys.Action.ThemeAssignDefault, "指派为默认")</button>
+        }
+        <button class="btn btn-primary btn-sm" @onclick="Save" disabled="@_saving">@(_saving ? "正在保存…" : (@L10n.T(Keys.Action.Save, "保存") + " " + @L10n.T(Keys.Content.ThemeEditorSaveTheme, "主题")))</button>
     </div>
-</div>
 
-<div class="panel">
-    <div class="panel-head"><div class="panel-title"><svg class="pt-ico"><use href="#sb-ico-theme" /></svg> @L10n.T(Keys.Page.ThemeEditorPalette, "调色板")</div></div>
-    <div class="panel-body">
-        <div class="swatch-grid">
-            @foreach (var key in _tokens.Keys)
+    <div class="panel" style="margin-bottom:0">
+        <div class="panel-body">
+            <div class="field-grid ds-create-fields">
+                <SbField Label="@L10n.T(Keys.Content.ThemeEditorSelectTheme, "选择主题")" Full="true">
+                    <select class="form-select" value="@_selectedKey" @onchange="OnSelectTheme">
+                        <option value="new">@L10n.T(Keys.Content.ThemeEditorNew, "新建主题")</option>
+                        @foreach (var t in _themes)
+                        {
+                            @if (t.IsBuiltIn)
+                            {
+                                <option value="@t.Key" disabled>@t.Name</option>
+                            }
+                            else
+                            {
+                                <option value="@t.Key">@t.Name</option>
+                            }
+                        }
+                    </select>
+                </SbField>
+                <SbField Label="@L10n.T(Keys.Content.ThemeEditorKey, "主题键")" Required="true">
+                    <input @bind="_newKey" disabled="@(_selectedKey != "new")" placeholder="my-theme" />
+                </SbField>
+                <SbField Label="@L10n.T(Keys.Content.ThemeEditorName, "主题名称")">
+                    <input @bind="_newName" placeholder="My Theme" />
+                </SbField>
+            </div>
+            @if (!string.IsNullOrWhiteSpace(_error))
             {
-                <div class="swatch">
-                    <div class="sw-color" style="background:@_tokens[key]"></div>
-                    <div class="sw-meta">
-                        <div class="sw-name">@TokenLabel(key)</div>
-                        <div class="sw-hex">@_tokens[key]</div>
-                        <input type="color" value="@_tokens[key]" @oninput="e => SetToken(key, e)" style="width:100%;height:30px;border:none;background:none;padding:0;margin-top:6px" />
-                    </div>
-                </div>
+                <div class="alert alert-danger tiny" style="margin-top:12px">@_error</div>
             }
         </div>
     </div>
-</div>
+
+    <div style="@_previewStyle" class="@(_mode == "dark" ? "sb-preview-dark" : "")">
+        <div class="panel">
+            <div class="panel-head"><div class="panel-title"><svg class="pt-ico"><use href="#sb-ico-theme" /></svg> @L10n.T(Keys.Page.ThemeEditorPreview, "实时预览")</div></div>
+            <div class="panel-body">
+                <div class="stat-grid">
+                    <div class="stat-tile"><div class="st-label">@L10n.T(Keys.Content.ThemeEditorSampleMetric, "示例指标")</div><div class="st-value">86.4%</div><div class="st-delta up">↑ 5.2%</div></div>
+                    <div class="stat-tile accent-accent"><div class="st-label">@L10n.T(Keys.Content.ThemeEditorSampleMetric, "示例指标")</div><div class="st-value">1,204</div></div>
+                    <div class="stat-tile accent-success"><div class="st-label">@L10n.T(Keys.Content.ThemeEditorSampleMetric, "示例指标")</div><div class="st-value">@L10n.T(Keys.Content.ThemeEditorSampleReady, "就绪")</div></div>
+                </div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+                    <button class="btn btn-primary btn-sm">@L10n.T(Keys.Content.ThemeEditorBtnPrimary, "主要按钮")</button>
+                    <button class="btn btn-outline-secondary btn-sm">@L10n.T(Keys.Content.ThemeEditorBtnSecondary, "次要")</button>
+                    <span class="badge badge-success">@L10n.T(Keys.Content.ThemeEditorBadgePublished, "已发布")</span><span class="badge badge-warning">@L10n.T(Keys.Content.ThemeEditorBadgeDraft, "草稿")</span>
+                </div>
+                <div class="progress"><span style="width:60%"></span></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="panel">
+        <div class="panel-head"><div class="panel-title"><svg class="pt-ico"><use href="#sb-ico-theme" /></svg> @L10n.T(Keys.Page.ThemeEditorPalette, "调色板")</div></div>
+        <div class="panel-body">
+            <div class="swatch-grid">
+                @foreach (var key in TokenOrder)
+                {
+                    <div class="swatch">
+                        <div class="sw-color" style="background:@_tokens[key]"></div>
+                        <div class="sw-meta">
+                            <div class="sw-name">@TokenLabel(key)</div>
+                            <div class="sw-hex">@_tokens[key]</div>
+                            <input type="color" value="@_tokens[key]" @oninput="e => SetToken(key, e)" style="width:100%;height:30px;border:none;background:none;padding:0;margin-top:6px" />
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    <SbModal Visible="@DeleteVisible" VisibleChanged="v => DeleteVisible = v" Title="@L10n.T(Keys.Action.Delete, "删除")" Size="sm">
+        <Body>
+            <p>@L10n.T(Keys.Content.ThemeEditorDeleteConfirm, "确定要删除该主题吗？此操作不可撤销。")</p>
+            @if (!string.IsNullOrWhiteSpace(_deleteError)) { <div class="alert alert-danger tiny">@_deleteError</div> }
+        </Body>
+        <Footer>
+            <button class="btn btn-outline-secondary" @onclick='() => DeleteVisible = false'>@L10n.T(Keys.Action.Cancel, "取消")</button>
+            <button class="btn btn-danger" @onclick="ConfirmDelete" disabled="@Deleting">@(Deleting ? "正在删除…" : @L10n.T(Keys.Action.Delete, "删除"))</button>
+        </Footer>
+    </SbModal>
+}
 
 @code {
     private Dictionary<string, string> _tokens = new();
-    private string _mode = "active";
+    private string _mode = "light";
+    private bool _loading = true;
+    private bool _saving;
+    private string? _error;
 
+    private string _selectedKey = "new";
+    private string _newKey = "";
+    private string _newName = "";
+    private List<ThemeListItem> _themes = new();
+
+    private string? _blueprintSkeleton;
+    private string? _loadedDslJson;
+
+    private bool DeleteVisible;
+    private bool Deleting;
+    private string? _deleteError;
+
+    private bool _isBuiltIn => _themes.FirstOrDefault(t => t.Key == _selectedKey)?.IsBuiltIn ?? false;
+
+    private static readonly string[] TokenOrder =
+        { "primary", "accent", "success", "warning", "info", "bg", "text", "border" };
+
+    // 标签沿用既有 Presets 中文名（@code 字符串，不进入标记文本，不受本地化护栏约束）。
     private static readonly Dictionary<string, (string Label, string Light, string Dark)> Presets = new()
     {
         ["primary"] = ("黛蓝 主色", "#2F4F6F", "#6E9BC4"),
-        ["accent"] = ("朱砂 强调", "#9E3D34", "#C26258"),
+        ["accent"]  = ("朱砂 强调", "#9E3D34", "#C26258"),
         ["success"] = ("黛绿 成功", "#4F6F52", "#7BA37E"),
         ["warning"] = ("藤黄 提醒", "#C9A227", "#D9B94A"),
-        ["info"] = ("石青 信息", "#4A7A8C", "#7BA6B4"),
-        ["bg"] = ("宣纸 底色", "#F5EFE3", "#1B1813"),
-        ["text"] = ("墨色 文字", "#2B2620", "#ECE3D2"),
-        ["border"] = ("纸边 描边", "#D9CDB4", "#3A342B"),
+        ["info"]    = ("石青 信息", "#4A7A8C", "#7BA6B4"),
+        ["bg"]      = ("宣纸 底色", "#F5EFE3", "#1B1813"),
+        ["text"]    = ("墨色 文字", "#2B2620", "#ECE3D2"),
+        ["border"]  = ("纸边 描边", "#D9CDB4", "#3A342B"),
     };
 
-    protected override void OnInitialized()
+    private sealed record ThemeListItem(string Key, string Name, bool IsBuiltIn);
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        ResetTokens();
+        if (!firstRender) return;
+        _loading = true;
+        StateHasChanged();
+        try
+        {
+            var (bp, _, _, _) = await Api.GetJsonAsync("api/themes/editor/blueprint");
+            if (bp is { ValueKind: JsonValueKind.Object })
+                _blueprintSkeleton = bp.Value.GetProperty("skeleton").GetString();
+            await LoadThemesAsync();
+            _selectedKey = "new";
+            if (_blueprintSkeleton != null) InitTokensFromNode(JsonNode.Parse(_blueprintSkeleton)!);
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        _loading = false;
+        StateHasChanged();
+    }
+
+    private async Task LoadThemesAsync()
+    {
+        _themes = new();
+        var (data, _, _, _) = await Api.GetJsonAsync($"api/themes?tenantId={State.TenantId}");
+        if (data is { ValueKind: JsonValueKind.Array })
+        {
+            foreach (var e in data.Value.EnumerateArray())
+            {
+                _themes.Add(new ThemeListItem(
+                    Key: e.GetProperty("key").GetString() ?? "",
+                    Name: e.GetProperty("name").GetString() ?? "",
+                    IsBuiltIn: e.GetProperty("isBuiltIn").GetBoolean()));
+            }
+        }
+    }
+
+    private async Task OnSelectTheme(ChangeEventArgs e) => await SelectThemeAsync(e.Value?.ToString() ?? "new");
+
+    private async Task SelectThemeAsync(string key)
+    {
+        _error = null;
+        _selectedKey = key;
+        if (key == "new")
+        {
+            _newKey = "";
+            _newName = "";
+            if (_blueprintSkeleton != null) InitTokensFromNode(JsonNode.Parse(_blueprintSkeleton)!);
+            _mode = "light";
+            return;
+        }
+        var (data, _, err, _) = await Api.GetJsonAsync($"api/themes/{key}?tenantId={State.TenantId}");
+        if (data is { ValueKind: JsonValueKind.Object })
+        {
+            _newKey = key;
+            _newName = data.Value.GetProperty("name").GetString() ?? "";
+            var dsl = data.Value.GetProperty("dslJson").GetString();
+            _loadedDslJson = dsl;
+            if (dsl != null) InitTokensFromNode(JsonNode.Parse(dsl)!);
+        }
+        else if (!string.IsNullOrEmpty(err))
+        {
+            _error = err!;
+        }
+    }
+
+    private async Task Save()
+    {
+        _error = null;
+        if (_selectedKey == "new")
+        {
+            if (string.IsNullOrWhiteSpace(_newKey) || !Regex.IsMatch(_newKey, @"^[a-z0-9-]+$"))
+            {
+                var msg = L10n.T(Keys.Content.ThemeEditorKeyInvalid, "主题键仅允许小写字母、数字和连字符（-）。");
+                _error = msg;
+                Toast.Error(msg);
+                return;
+            }
+        }
+
+        _saving = true;
+        try
+        {
+            var src = _selectedKey == "new" ? _blueprintSkeleton : _loadedDslJson;
+            if (string.IsNullOrEmpty(src))
+            {
+                _error = L10n.T(Keys.Content.ThemeEditorSaveFailed, "保存失败：缺少主题模板。");
+                Toast.Error(_error);
+                return;
+            }
+
+            var node = JsonNode.Parse(src)!;
+            ApplyTokens(node);
+            var dslJson = node.ToJsonString();
+
+            bool ok;
+            string? err;
+            if (_selectedKey == "new")
+            {
+                var r = await Api.PostAsync("api/themes",
+                    new { tenantId = State.TenantId, key = _newKey, dslJson, name = string.IsNullOrWhiteSpace(_newName) ? null : _newName });
+                ok = r.Ok;
+                err = r.Error;
+            }
+            else
+            {
+                var r = await Api.PutAsync($"api/themes/{_selectedKey}?tenantId={State.TenantId}",
+                    new { dslJson, name = string.IsNullOrWhiteSpace(_newName) ? null : _newName });
+                ok = r.Ok;
+                err = r.Error;
+            }
+
+            if (ok)
+            {
+                Toast.Success(L10n.T(Keys.Content.ThemeEditorSaved, "主题已保存。"));
+                await LoadThemesAsync();
+                if (_selectedKey == "new") await SelectThemeAsync(_newKey);
+                StateHasChanged();
+            }
+            else
+            {
+                var msg = string.Format(L10n.T(Keys.Content.ThemeEditorSaveFailed, "保存失败：{0}"), err ?? "");
+                _error = msg;
+                Toast.Error(msg);
+            }
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private async Task AssignDefault()
+    {
+        if (_selectedKey == "new") return;
+        _saving = true;
+        var (ok, _, err, _) = await Api.PostAsync($"api/themes/{_selectedKey}/assign-default?tenantId={State.TenantId}", null);
+        _saving = false;
+        if (ok) Toast.Success(L10n.T(Keys.Content.ThemeEditorAssigned, "已指派为租户默认主题。"));
+        else Toast.Error(err ?? L10n.T(Keys.Content.ThemeEditorSaveFailed, "保存失败。"));
+    }
+
+    private void OpenDelete() => DeleteVisible = true;
+
+    private async Task ConfirmDelete()
+    {
+        if (_selectedKey == "new") return;
+        Deleting = true;
+        _deleteError = null;
+        var (ok, _, err, _) = await Api.DeleteAsync($"api/themes/{_selectedKey}?tenantId={State.TenantId}");
+        Deleting = false;
+        DeleteVisible = false;
+        if (ok)
+        {
+            Toast.Success(L10n.T(Keys.Action.Delete, "删除") + "成功");
+            await LoadThemesAsync();
+            _selectedKey = "new";
+            if (_blueprintSkeleton != null) InitTokensFromNode(JsonNode.Parse(_blueprintSkeleton)!);
+            StateHasChanged();
+        }
+        else
+        {
+            _deleteError = err ?? "删除失败。";
+            Toast.Error(_deleteError);
+        }
     }
 
     private void ResetTokens()
     {
-        _tokens = Presets.ToDictionary(k => k.Key, k => k.Value.Light);
-        _mode = "active";
+        var src = _selectedKey == "new" ? _blueprintSkeleton : _loadedDslJson;
+        if (src != null) InitTokensFromNode(JsonNode.Parse(src)!);
+        _mode = "light";
+        _error = null;
     }
 
-    private void SetMode(string mode)
-    {
-        _mode = mode == "light" ? "active" : "";
-        foreach (var k in Presets.Keys)
-            _tokens[k] = mode == "light" ? Presets[k].Light : Presets[k].Dark;
-    }
+    private void SetMode(string mode) => _mode = mode;
 
     private void SetToken(string key, ChangeEventArgs e)
     {
@@ -94,5 +340,35 @@
     private string _previewStyle => "border-radius:var(--sb-radius-lg);" +
         string.Join(";", _tokens.Select(kv => $"--sb-{kv.Key}:{kv.Value}"));
 
-    private void Save() => Toast.Info(L10n.T(Keys.Content.ThemeEditorSavedToast, "主题已保存（持久化接入 api/themes，P11.3 收口）。"));
+    private void InitTokensFromNode(JsonNode node)
+    {
+        _tokens["primary"] = Str(node["color"]?["primary"]);
+        _tokens["accent"]  = Str(node["brand"]?["accent"]);
+        _tokens["success"] = Str(node["color"]?["success"]);
+        _tokens["warning"] = Str(node["color"]?["warning"]);
+        _tokens["info"]    = Str(node["color"]?["neutral"]);
+        _tokens["bg"]      = Str(node["color"]?["background"]);
+        _tokens["text"]    = Str(node["color"]?["text"]);
+        _tokens["border"]  = Str(node["color"]?["border"]);
+    }
+
+    private void ApplyTokens(JsonNode node)
+    {
+        if (node["color"] is JsonNode color)
+        {
+            Set(color, "primary", _tokens["primary"]);
+            Set(color, "success", _tokens["success"]);
+            Set(color, "warning", _tokens["warning"]);
+            Set(color, "neutral", _tokens["info"]);
+            Set(color, "background", _tokens["bg"]);
+            Set(color, "text", _tokens["text"]);
+            Set(color, "border", _tokens["border"]);
+        }
+        if (node["brand"] is JsonNode brand)
+            Set(brand, "accent", _tokens["accent"]);
+    }
+
+    private static void Set(JsonNode node, string prop, string value) => node[prop] = System.Text.Json.Nodes.JsonValue.Create(value);
+
+    private static string Str(JsonNode? n) => n is null ? "" : n.GetValue<string>();
 }

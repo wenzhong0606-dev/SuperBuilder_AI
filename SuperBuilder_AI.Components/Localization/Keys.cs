@@ -160,6 +160,7 @@ public static class Keys
         public const string Search = "Action.Search";
         public const string Close = "Action.Close";
         public const string Reset = "Action.Reset";
+        public const string ThemeAssignDefault = "Action.ThemeAssignDefault";
     }
 
     /// <summary>导航菜单文本。</summary>
@@ -506,6 +507,15 @@ public static class Keys
         public const string ThemeEditorBadgePublished = "Content.ThemeEditorBadgePublished";
         public const string ThemeEditorBadgeDraft = "Content.ThemeEditorBadgeDraft";
         public const string ThemeEditorSavedToast = "Content.ThemeEditorSavedToast";
+        public const string ThemeEditorSelectTheme = "Content.ThemeEditorSelectTheme";
+        public const string ThemeEditorNew = "Content.ThemeEditorNew";
+        public const string ThemeEditorSaved = "Content.ThemeEditorSaved";
+        public const string ThemeEditorSaveFailed = "Content.ThemeEditorSaveFailed";
+        public const string ThemeEditorKey = "Content.ThemeEditorKey";
+        public const string ThemeEditorName = "Content.ThemeEditorName";
+        public const string ThemeEditorKeyInvalid = "Content.ThemeEditorKeyInvalid";
+        public const string ThemeEditorDeleteConfirm = "Content.ThemeEditorDeleteConfirm";
+        public const string ThemeEditorAssigned = "Content.ThemeEditorAssigned";
 
         // MetadataEntityDetail（元数据关系详情）
         public const string MetadataEntityLoading = "Content.MetadataEntityLoading";
@@ -1403,6 +1413,7 @@ public static class Keys
         [Action.Search] = new("搜索", "Search"),
         [Action.Close] = new("关闭", "Close"),
         [Action.Reset] = new("重置", "Reset"),
+        [Action.ThemeAssignDefault] = new("指派为默认", "Assign as default"),
 
         [Nav.Home] = new("首页", "Home"),
         [Nav.Ask] = new("Ask BI 智能问数", "Ask BI"),
@@ -1726,7 +1737,16 @@ public static class Keys
         [Content.ThemeEditorBtnSecondary] = new("次要", "Secondary"),
         [Content.ThemeEditorBadgePublished] = new("已发布", "Published"),
         [Content.ThemeEditorBadgeDraft] = new("草稿", "Draft"),
-        [Content.ThemeEditorSavedToast] = new("主题已保存（持久化接入 api/themes，P11.3 收口）。", "Theme saved (persistence to api/themes, closing in P11.3)."),
+        [Content.ThemeEditorSavedToast] = new("主题已保存。", "Theme saved."),
+        [Content.ThemeEditorSelectTheme] = new("选择主题", "Select theme"),
+        [Content.ThemeEditorNew] = new("新建主题", "New theme"),
+        [Content.ThemeEditorSaved] = new("主题已保存。", "Theme saved."),
+        [Content.ThemeEditorSaveFailed] = new("保存失败：{0}", "Save failed: {0}"),
+        [Content.ThemeEditorKey] = new("主题键", "Theme key"),
+        [Content.ThemeEditorName] = new("主题名称", "Theme name"),
+        [Content.ThemeEditorKeyInvalid] = new("主题键仅允许小写字母、数字和连字符（-）。", "Theme key may only contain lowercase letters, digits and hyphens (-)."),
+        [Content.ThemeEditorDeleteConfirm] = new("确定要删除该主题吗？此操作不可撤销。", "Delete this theme? This action cannot be undone."),
+        [Content.ThemeEditorAssigned] = new("已指派为租户默认主题。", "Assigned as the tenant default theme."),
 
         [Content.MetadataEntityLoading] = new("正在读取元数据实体…", "Reading metadata entity…"),
         [Content.MetadataEntityIntro] = new("以下内容来自当前租户的实际元数据记录。", "The following content comes from the current tenant's actual metadata records."),

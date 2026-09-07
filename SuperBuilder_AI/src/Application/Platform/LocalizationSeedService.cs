@@ -252,7 +252,7 @@ public sealed class LocalizationSeedService : ILocalizationSeedService
         ["Empty.NoData"] = "暂无数据。",
 
         ["Action.New"] = "新建", ["Action.Create"] = "创建", ["Action.Save"] = "保存", ["Action.Cancel"] = "取消",
-        ["Action.Refresh"] = "刷新", ["Action.Delete"] = "删除", ["Action.Edit"] = "编辑",         ["Action.Search"] = "搜索", ["Action.Close"] = "关闭", ["Action.Reset"] = "重置",
+        ["Action.Refresh"] = "刷新", ["Action.Delete"] = "删除", ["Action.Edit"] = "编辑",         ["Action.Search"] = "搜索", ["Action.Close"] = "关闭", ["Action.Reset"] = "重置", ["Action.ThemeAssignDefault"] = "指派为默认",
 
         ["Page.ThemeEditor.Preview"] = "实时预览", ["Page.ThemeEditor.Palette"] = "调色板",
 
@@ -433,7 +433,7 @@ public sealed class LocalizationSeedService : ILocalizationSeedService
 
         ["Content.ThemeEditorSampleMetric"] = "示例指标", ["Content.ThemeEditorBtnPrimary"] = "主要按钮",
         ["Content.ThemeEditorBtnSecondary"] = "次要", ["Content.ThemeEditorBadgePublished"] = "已发布",
-        ["Content.ThemeEditorBadgeDraft"] = "草稿", ["Content.ThemeEditorSavedToast"] = "主题已保存（持久化接入 api/themes，P11.3 收口）。",
+        ["Content.ThemeEditorBadgeDraft"] = "草稿", ["Content.ThemeEditorSavedToast"] = "主题已保存。", ["Content.ThemeEditorSelectTheme"] = "选择主题", ["Content.ThemeEditorNew"] = "新建主题", ["Content.ThemeEditorSaved"] = "主题已保存。", ["Content.ThemeEditorSaveFailed"] = "保存失败：{0}", ["Content.ThemeEditorKey"] = "主题键", ["Content.ThemeEditorName"] = "主题名称", ["Content.ThemeEditorKeyInvalid"] = "主题键仅允许小写字母、数字和连字符（-）。", ["Content.ThemeEditorDeleteConfirm"] = "确定要删除该主题吗？此操作不可撤销。", ["Content.ThemeEditorAssigned"] = "已指派为租户默认主题。",
 
         ["Content.MetadataEntityLoading"] = "正在读取元数据实体…",
         ["Content.MetadataEntityIntro"] = "以下内容来自当前租户的实际元数据记录。",
