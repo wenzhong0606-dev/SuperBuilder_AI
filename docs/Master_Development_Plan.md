@@ -880,6 +880,19 @@ M3 退出：✅ 已达成当前跟踪页面范围。平台/租户视图严格分
 - 明确 localStorage Token 的 XSS 边界，采用短期访问 Token 和安全刷新策略。
 - 增加 CSP；会话失效稳定回登录，不形成登录—Ask 循环。
 
+> **交付 M8-05**（2026-09-07；前端安全加固，双提交 feat+docs，未推送 origin）：
+> - **现状盘点（基于 2026-09-07 实际勘察 `MainLayout.razor` / `AuthStore.cs` / `ApiClient.cs` / `SuperBuilder_AI.Web/Program.cs` / `_Host.cshtml`）**：
+>   1. **MainLayout 事件订阅**：已 `@implements IDisposable` 且 `Dispose()` 退订 `Nav.LocationChanged` / `State.SessionExpired` / `L10n.Changed` 三处——「解除事件订阅」**已满足**；但 `OnSessionExpired` 为 `async void`（不受控异步，异常逃逸会中断 SignalR 电路）。
+>   2. **Token XSS 边界**：令牌存 `localStorage`（`sb_auth_v1`），同源 XSS 可读取——固有边界；后端签发带 `ExpiresInSeconds` 的短期 JWT（缓解窗口已具备），但**无静默刷新（refresh token）**，当前为「过期即重登录」模型。
+>   3. **CSP**：Web 宿主**未配置**任何 CSP 头（前端全本地资源、无 CDN）。
+>   4. **会话失效回登录**：`ApiClient.OnUnauthorized` 已用 `if(!IsAuthenticated) return` 守卫防重复通知；`MainLayout` 还原/校验仅 `firstRender` 触发，无回登录循环——但 `OnSessionExpired` 缺「已在登录页则跳过」兜底。
+> - **实施（前端安全加固）**：
+>   1. `MainLayout.OnSessionExpired` 包 `try/catch`（消除 async void 异常逃逸中断电路）+ 已处 `/login` 则直接返回（防并发 401 的「登录—Ask」回跳循环）；`Dispose` 注释明确已退订（满足原则 1）。
+>   2. `AuthStore` 类注释明确 XSS 边界（localStorage 可读、HttpOnly 不适用 Blazor、缓解=短期 Token + CSP + 不进 URL/日志）与「过期即重登录、刷新令牌列后续」。
+>   3. `SuperBuilder_AI.Web/Program.cs` 注入**环境感知 CSP** 中间件：`default-src 'self'`、脚本/样式允许 `unsafe-inline`（_Host 主题脚本与组件内联 style 需要）、`connect-src 'self' {ApiBaseUrl}`（放行跨源 API，否则整体阻断）、`frame-ancestors 'self'`（防点击劫持）、`object-src 'none'`、`base-uri 'self'`；读 `ApiBaseUrl` 入 `connect-src`，并加 `Security:EnableCsp` 熔断开关（默认开）。仅作用于 Web 宿主（MAUI 经文件系统 WebView，不经此管线；API 为独立宿主）。
+> - **验收达成**：Web + RCL build 0 error。全量测试 **959/959 零回归**（注：并行套件下 `RateLimitMiddlewareTests.Expired_Windows_Are_Evicted_To_Prevent_Unbounded_Growth` 偶发失败，隔离 3/3 通过，预存时序偶发、与本次无关）。
+> - **红线遵守/范围说明**：CSP 为**基线策略**（含 `unsafe-inline`/`unsafe-eval`）以杜绝 Blazor Server 运行期破坏；收紧（nonce 替代内联、去 unsafe-eval）需配套改造 _Host 与运行时，**待浏览器冒烟验证后实施**（未在本里程碑盲目收紧，避免未经验证即破坏应用）。静默刷新（refresh token）属后端契约增强，超出本前端安全里程碑，列入后续议题。所有资源本地化、无外部 CDN，故 `default-src 'self'` 安全。
+
 ### M8-06 E2E、无障碍与视觉回归（S6-6）
 
 - Playwright 覆盖初始化、登录、租户、语言、身份、数据源授权、元数据、Ask、CRUD 和权限拒绝。
