@@ -416,10 +416,18 @@ body {
 .content {
     flex: 1 1 auto;
     overflow-y: auto;
+    overflow-x: clip;
     padding: 24px 28px;
     min-width: 0;
 }
 .content > h2 { margin-top: 0; font-weight: 700; letter-spacing: .02em; }
+
+/* —— 响应式自适应网格（M8-02：复杂网格窄屏自动变单列，无页面级溢出） —— */
+.sb-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(var(--sb-grid-min, 260px), 1fr));
+    gap: var(--sb-grid-gap, 14px);
+}
 
 /* ============================================================
    卡片 / 表单 / 按钮（与 Bootstrap 协同，强化层次）
@@ -1016,6 +1024,27 @@ button.mini { padding: 4px 10px; font-size: 12px; border-radius: var(--sb-radius
 }
 .sb-spinner.sm { width: 13px; height: 13px; flex-basis: 13px; border-width: 2px; }
 @keyframes sb-spin { to { transform: rotate(360deg); } }
+
+/* —— 统一状态块（加载/空/错误/成功/重试 五态一致，M8-02） —— */
+.sb-state {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 12px; padding: 32px 16px; text-align: center; color: var(--sb-muted);
+}
+.sb-state .sb-state-ico { width: 40px; height: 40px; opacity: .8; }
+.sb-state .sb-state-title { font-size: 15px; font-weight: 600; color: var(--sb-text); }
+.sb-state .sb-state-text { font-size: 13px; line-height: 1.6; max-width: 46ch; }
+.sb-state .sb-state-actions { margin-top: 6px; display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+.sb-state.success .sb-state-title, .sb-state.success .sb-state-ico { color: var(--sb-success); }
+.sb-retry {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 8px 16px; border-radius: var(--sb-radius);
+    background: var(--sb-primary); color: #fff; border: none; cursor: pointer;
+    font-size: 14px; font-family: inherit; transition: background .15s, transform .05s;
+}
+.sb-retry:hover { background: var(--sb-btn-hover); }
+.sb-retry:active { transform: translateY(1px); }
+.sb-retry:disabled { opacity: .6; cursor: default; }
+.sb-retry .sb-spinner { border-top-color: #fff; border-color: rgba(255, 255, 255, .4); }
 
 /* —— 面板增强 —— */
 .panel-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
