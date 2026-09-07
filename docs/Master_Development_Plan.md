@@ -643,6 +643,7 @@ M3 退出：✅ 已达成当前跟踪页面范围。平台/租户视图严格分
 | M7-09 | P11 §12 | 自定义组件领域模型、持久化、api/components | 白名单、安全渲染、版本治理 |
 | M7-10 | P11 §12 | 自定义风格/主题复用 | App/Dashboard 可选择授权主题 |
 | M7-11 | P11 §12 | Ask 结果发布 App 的生命周期 | 可编辑、授权、版本化、回滚 |
+| M7-12 | FLOW/S6-4 | Agent 剩余工具接真实后端 | query/dashboard/forecast/report/alert/workflow 全部 live，或明确禁用且不可执行 |
 
 > **进度 M7-01**：✅ 已交付（提交 7aa731e，8 文件 +3927/−3；全量 894/894 零回归、含 Golden）。
 > - 草稿/发布隔离：`Dashboard.DslJson`（草稿工作副本）与 `Dashboard.PublishedDslJson`（发布快照）物理隔离；`Render` 优先返回发布态，编辑草稿不影响线上。
@@ -737,6 +738,15 @@ M3 退出：✅ 已达成当前跟踪页面范围。平台/租户视图严格分
 >   - 红线清理：`appsettings.Local.json` 明文 `Qwen:ApiKey`/`Embedding:ApiKey` 改为与已提交 `appsettings.json` 一致的环境变量占位符（`__SET_VIA_ENV_…__`），并新增 `SecretStore:MasterKey`(32 字节 base64 开发主密钥，文件已被 `.gitignore:14` 忽略，不进版本库)；连接串本地 DB 密码为预存本地配置，本次未动。
 >   - 测试与零回归门禁：新增 `ModelAccountServiceTests`(8：加密落库+掩码、首绑默认、重复冲突、租户隔离、设默认唯一性、明文往返、删除、轮换 Key)、`ModelAccountsControllerTests`(8：CRUD+掩码返回、重复 409、跨租户 403×2、设默认唯一性、删除、GetById 404)、`ModelCatalogTests`(3：目录完整性/展示名/契约对齐)；全量零回归、Golden 18/18 不变。
 >   - 验证：API `dotnet build` **0 error**（仅预存 CS/CA 告警）；RCL（net10.0/android/ios）`dotnet build` **0 error**（仅预存 IL2026 裁剪告警）；`ModelAccounts.razor` 编译干净。
+
+> **交付 M7-08**（2026-09-07）：Quota 平台默认、租户覆盖与用量维护闭环——全部验收达成。
+> - 后端契约：`QuotaItemView` 新增稳定字符串 `ResourceType/Window`、`IsOverride`、`PlatformLimit/PlatformWindow`，前端可同时展示生效策略与继承基线；`IQuotaService` 新增策略 Upsert、删除租户覆盖、维护当前周期用量能力。
+> - 管理端点：新增 `GET api/quota/defaults`、`PUT/DELETE api/quota/policy/{resourceType}`、`PUT api/quota/usage/{resourceType}`；平台默认可维护但不可删除，租户覆盖可恢复继承，用量仅允许写实际租户。
+> - 权限与范围：策略/用量写端点强制 `platform:quota:manage`；多个平台管理员沿用 `IPlatformAdminScopeService`，只能管理授权租户；普通租户主体仅可读取/校验/扣减自身租户配额；治理目标写入审计上下文。
+> - 前端：`Quota.razor` 从原始 JSON 平铺升级为正式管理表格；可切换平台默认或授权租户，显示资源、上限、已用、剩余、周期、周期键及策略来源；支持编辑策略、维护用量、恢复继承；导航与页面均绑定 `PlatformQuotaManage`。
+> - 多语言：新增 34 个中英文配额资源键，并同步 RCL Defaults、后端 Catalog、zh-CN 种子三处注册表；资源名、周期、策略来源、弹窗、成功/失败反馈全部可切换语言。
+> - 验证：配额专项 + 多语言护栏 **35/35**；全量测试 **950/950**（含 Golden 18/18）零回归；API/RCL/Web/MAUI Windows 均 build 0 error（仅预存告警）；无需迁移（复用既有 `QuotaPolicies/QuotaUsages` 表）。
+> - 边界澄清：M7-08 按原表定义仅负责 Quota。M7-04 曾承诺的 6 个 pending Agent 工具并未因配额交付自动变为 live，现显式收口为 M7-12，禁止以 `controlled/connected:false` 回执冒充 M7 完成。
 
 无后端能力的按钮必须禁用并显示原因，不得提示虚假的“已保存/已运行”。
 
