@@ -750,6 +750,39 @@ M3 退出：✅ 已达成当前跟踪页面范围。平台/租户视图严格分
 - `btn-primary`、`badge-primary` 等 `*-primary` 使用主题变量；统一 hover/active/focus/disabled/深色模式。
 - 避免浏览器默认控件和局部 Bootstrap 默认蓝色。
 
+> **计划 M8-01**（待实施，按「先计划后落地」节奏，用户确认切入点后执行）：
+> - **目标（保留原三原则）**：全平台统一视觉令牌；`btn-*`/`badge-*` 等 `*-primary` 全态（hover/active/focus/disabled/深色）映射品牌色；消除浏览器默认控件外观与局部 Bootstrap 默认蓝/灰蓝渗透。
+> - **现状盘点（基于 2026-09-07 实际勘察 `app.css` + 组件 grep）**：
+>   - **已具备**：`:root` 与 `[data-theme="dark"]` 完整 `--sb-*` 古风令牌（黛蓝/朱砂/黛绿/藤黄/石青 + 结构变量 `--sb-radius/-shadow*/-ring`）+ 全套 `--bs-*` 覆盖；`.btn-primary` 已全态 token 化（L163-177：hover 位移+阴影、active 下沉、disabled 复位、focus 用 `--bs-primary-rgb`）；`#0d6efd`（Bootstrap 默认蓝）仅存于 `bootstrap.min.css`，**应用层无硬编码默认蓝**。
+>   - **残留缺口**：
+>     1. `.badge-primary` **重复定义**——L178 `color-mix` 自适应 vs L732 硬编码 `rgba(47,79,111,.12)`（后者胜出）→ 深色模式错位。
+>     2. `.badge-*` 背景（L732-737）硬编码 5 个浅色 RGBA 字面量（`rgba(47,79,111,…)`/`rgba(79,111,82,…)`/`rgba(201,162,39,…)`/`rgba(158,61,52,…)`/`rgba(74,122,140,…)`）→ 深色模式对比度/色相漂移；`badge-warning/info` 文字色亦为固定深值（`#7a6110`/`#2f5563`）不随主题。
+>     3. `btn-secondary`/`btn-light`/`btn-dark` 的 `--bs-secondary` **未覆盖** → 仍露 Bootstrap 默认灰蓝，非品牌中性色。
+>     4. 原生控件（`select` 箭头 / `checkbox` / `radio` / `range` / 日期选择器）`appearance` 未重置 → 浏览器默认渲染与古风壳层割裂；`input/textarea/select` 仅 L370 做边框/圆角令牌化，未覆盖上述控件。
+>     5. `--sb-ring`（结构变量）已定义但未在 `:focus-visible` 使用（当前用 `2px outline`），焦点态契约未统一到结构变量。
+>   - **组件扩散面**：`btn-primary` 出现于约 35 个 `.razor`；`badge-primary` 出现于 5 个（ModelAccounts/DataSourceDetail/ComponentGallery/Ask + app.css）；`btn-*` 其余变体（secondary/outline/link/success/warning/danger/info）须逐变体核对 `--bs-*` 映射。
+> - **分阶段实施（每阶段可独立验收，纯前端样式零行为语义变更）**：
+>   1. **阶段 0 · 令牌契约固化**：在 `:root` 增补 `--sb-btn-hover/active/disabled/ring` 派生令牌与 `--sb-badge-bg-*`/`--sb-badge-fg-*` 语义令牌（基于现有 `--sb-primary/-accent/-success/-warning/-info/-muted` + 固定 alpha）；编制「令牌 → 用途 → 浅色值 → 深色值」单一映射表，所有组件只引用 `--sb-*` 而非 Bootstrap 内部 `--bs-btn-*`。
+>   2. **阶段 1 · 按钮全态统一**：`.btn-primary` 改引用 `--sb-btn-*` 派生令牌；补 `.btn-secondary`/`.btn-light`/`.btn-dark` 映射为品牌中性色（`--sb-surface-2`/`--sb-border` 体系，消除默认灰蓝）；核对 `btn-outline-*`/`btn-link`/`btn-danger`/`btn-success`/`btn-warning`/`btn-info` 已正确继承 `--bs-*` 覆盖；统一 `:hover`（位移+`--sb-shadow`）、`:active`（按压下沉）、`:focus-visible`（统一 `--sb-ring`）、`:disabled`（降饱和+`cursor:not-allowed`，清除残留默认蓝）。
+>   3. **阶段 2 · 徽标令牌化 + 深色对齐**：删除 L178/L732 重复的 `.badge-primary`，统一引用 `--sb-badge-*`；L732-737 硬编码 RGBA 全部替换为 token 驱动的 `color-mix(in srgb, var(--sb-*) X%, transparent)`，浅/深自动适应；补 `badge-secondary`/`-light`/`-dark` 映射。
+>   4. **阶段 3 · 原生控件令牌化**：对 `select`/`input[type=checkbox]`/`radio`/`range`/`date` 加 `appearance:none` + 自定义令牌化外观（下拉箭头内联 SVG/CSS、勾选框品牌色填充、range 用 `--sb-primary` 轨道），焦点态复用 `--sb-ring`；保留可访问性（`:focus-visible`、对比度）。
+>   5. **阶段 4 · 焦点/深色收口与残余默认蓝扫描**：`[data-theme="dark"]` 复核所有 `--sb-*`/`--bs-*` 成对、对比度达标；全仓 `git grep` 扫描 `btn-secondary`/`text-bg-*`/`border-*` 等是否仍命中 Bootstrap 默认色，确保无默认蓝/灰蓝渗透；将 `--sb-ring` 应用到统一焦点态。
+> - **验收标准（可量化）**：
+>   1. RCL/Web/MAUI 三端 build 0 error；`git grep` 应用层无硬编码 `#0d6efd`/Bootstrap 默认蓝/默认灰蓝字面量。
+>   2. `.btn-primary`/`-secondary`/`-outline-primary`/`-danger`/`-success`/`-warning`/`-info`/`-link` 在浅色与 `[data-theme="dark"]` 下均映射 `--sb-*` 品牌色（附浅/深截图各 1）。
+>   3. `badge-primary`/`-success`/`-warning`/`-danger`/`-info`/`-secondary` 浅/深模式文本对比度 ≥ WCAG AA（4.5:1）；`.badge-primary` 全局仅一处定义。
+>   4. 原生 `select`/`checkbox`/`radio`/`range` 浅/深外观与古风壳层一致，无浏览器默认割裂；`:focus-visible` 全部键盘可见。
+>   5. 零回归：既有 UI 文案/布局/交互不受影响；`ResourceKeyRegistryTests` 等前后端护栏全绿；Golden 18/18 不变。
+> - **测试与零回归门禁**：
+>   - 前端：采用「令牌映射表（阶段 0 产出）+ 浅/深模式关键页截图基线」双轨；建议与 M8-06 视觉回归共用 Playwright 基线（桌面/991px/560px/移动）。
+>   - 后端：纯前端样式里程碑，无后端代码改动、无后端测试新增；基线 942（M7-07 后）→ 零回归。
+>   - 全量绿、build 0 error、Golden 18/18 不变。
+> - **红线**：
+>   - 深色模式仅切 `data-theme` 属性，沿用 M7-05 `_mode` 预览机制，不落库、不新增端点、不引入运行时 JS 主题副作用。
+>   - 仅样式与令牌，不改变任何组件行为语义；不新增假数据/占位。
+>   - 令牌定义全部集中在 `app.css` 的 `:root`/`[data-theme="dark"]`；禁止在 `.razor` 内联 `style` 写死颜色字面量（PR 评审须核对此项）。
+> - **范围外（本里程碑不做）**：间距/排版/图标字体细化为独立 redesign（仅做"无默认蓝/全令牌化"收口）；移动端 MAUI 原生控件深度定制（归 M8-07）；CSP/axe 深度治理（归 M8-05/M8-06）；全新组件视觉重构（仅统一既有组件色彩/状态令牌，不做布局重构）。
+
 ### M8-02 列表、表格、菜单与响应式
 
 - 列表优先；新增/编辑使用弹窗、抽屉、标签页或详情页。
