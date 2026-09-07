@@ -40,7 +40,7 @@
         @if (State.IsAuthenticated)
         {
             <div class="user-menu">
-                <button class="user-chip" @onclick="ToggleUserMenu" aria-haspopup="true" aria-expanded="@UserMenuOpen" title="@L10n.T(Keys.Common.AccountMenu, "账号菜单")">
+                <button class="user-chip" data-testid="user-chip" @onclick="ToggleUserMenu" aria-haspopup="true" aria-expanded="@UserMenuOpen" title="@L10n.T(Keys.Common.AccountMenu, "账号菜单")">
                     <span class="avatar">@(string.IsNullOrEmpty(State.Username) ? "?" : State.Username.Substring(0, 1).ToUpper())</span>
                     <span class="uname">@State.Username</span>
                 </button>
@@ -50,7 +50,7 @@
                         <a class="sb-menu-item" href="settings" @onclick="CloseUserMenu">
                             <svg class="btn-ico"><use href="#sb-ico-settings" /></svg> @L10n.T(Keys.Common.Settings, "个人设置")
                         </a>
-                        <button class="sb-menu-item" @onclick="Logout">
+                        <button class="sb-menu-item" data-testid="logout" @onclick="Logout">
                             <svg class="btn-ico"><use href="#sb-ico-shield" /></svg> @L10n.T(Keys.Common.Logout, "退出登录")
                         </button>
                     </div>

@@ -1,7 +1,7 @@
 @inject LocalizationService L10n
 @if (L10n.AvailableCultures.Count > 1)
 {
-    <select class="culture-switcher" value="@L10n.CurrentCulture" @onchange="OnChange" aria-label="@L10n.T("Common.Settings", "设置")">
+    <select class="culture-switcher" data-testid="language-switcher" value="@L10n.CurrentCulture" @onchange="OnChange" aria-label="@L10n.T("Common.Settings", "设置")">
         @foreach (var culture in L10n.AvailableCultures)
         {
             <option value="@culture">@L10n.NativeName(culture)</option>

@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <OutputType>Library</OutputType>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <AssemblyName>SuperBuilder_AI.E2E</AssemblyName>
+    <RootNamespace>SuperBuilder_AI.E2E</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
+    <PackageReference Include="Microsoft.Playwright" Version="1.50.0" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+    <PackageReference Include="Xunit.SkippableFact" Version="1.4.8" />
+  </ItemGroup>
+
+  <!-- axe-core 由 README 说明 vendoring；存在时随输出复制到运行目录，缺失时无障碍测试自动跳过。 -->
+  <ItemGroup>
+    <None Include="axe.min.js" CopyToOutputDirectory="PreserveNewest" Condition="Exists('axe.min.js')" />
+  </ItemGroup>
+
+</Project>

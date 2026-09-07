@@ -46,7 +46,7 @@
                     <label>@L10n.T(Keys.Login.AdminPassword, "管理员口令")<input class="form-control" @bind="BootstrapPassword" type="password" placeholder="@L10n.T(Keys.Login.AdminPassword, "管理员口令")" /></label>
                     <label>@L10n.T(Keys.Login.ConfirmPassword, "确认口令")<input class="form-control" @bind="BootstrapPasswordConfirm" type="password" /></label>
                     <button class="btn btn-primary" @onclick="InitializePlatform" disabled="@Busy">@L10n.T(Keys.Login.CreateAdmin, "创建平台管理员")</button>
-                    @if (!string.IsNullOrEmpty(Error)) { <div class="alert alert-danger">@Error</div> }
+                    @if (!string.IsNullOrEmpty(Error)) { <div class="alert alert-danger" role="alert">@Error</div> }
                 </div>
             }
         }
@@ -61,19 +61,19 @@
         {
             <div class="card">
                 <h2 style="margin:0 0 4px;">@L10n.T("Login.Title")</h2>
-                <label>@L10n.T("Login.Username")<input class="form-control" @bind="Username" placeholder="@L10n.T(Keys.Login.Username, "用户名")" /></label>
-                <label>@L10n.T("Login.Password")<input class="form-control" @bind="Password" type="password" placeholder="@L10n.T(Keys.Login.Password, "口令")" /></label>
-                <label>@L10n.T("Login.TenantId")
+                <label for="login-username">@L10n.T("Login.Username")<input id="login-username" data-testid="login-username" class="form-control" @bind="Username" placeholder="@L10n.T(Keys.Login.Username, "用户名")" autocomplete="username" aria-invalid="@(string.IsNullOrEmpty(Error) ? "false" : "true")" /></label>
+                <label for="login-password">@L10n.T("Login.Password")<input id="login-password" data-testid="login-password" class="form-control" @bind="Password" type="password" placeholder="@L10n.T(Keys.Login.Password, "口令")" autocomplete="current-password" aria-invalid="@(string.IsNullOrEmpty(Error) ? "false" : "true")" /></label>
+                <label for="login-tenant">@L10n.T("Login.TenantId")
                 @if (_tenantOptions.Count > 0)
                 {
-                    <select class="form-control" value="@TenantId" @onchange="ChangeTenant">
+                    <select id="login-tenant" data-testid="login-tenant" class="form-control" value="@TenantId" @onchange="ChangeTenant">
                         <option value="0">@L10n.T(Keys.Login.TenantPlaceholder, "-- 请选择租户 --")</option>
                         @foreach (var tenant in _tenantOptions) { <option value="@TenantValue(tenant)">@TenantLabel(tenant)</option> }
                     </select>
                 }
                 else
                 {
-                    <input class="form-control" @bind="_manualTenantCode" placeholder="@L10n.T("Login.TenantCodePlaceholder", "如 demo / tenant-001")" />
+                    <input id="login-tenant-code" data-testid="login-tenant-code" class="form-control" @bind="_manualTenantCode" placeholder="@L10n.T("Login.TenantCodePlaceholder", "如 demo / tenant-001")" autocomplete="off" />
                     <span class="muted tiny">@L10n.T("Login.TenantCodeHint", "租户目录未公开，请输入您已知的确切租户编码登录。")</span>
                 }
                 </label>
@@ -81,8 +81,8 @@
                 {
                     <div class="alert alert-warning">@_tenantDirectoryError</div>
                 }
-                <button class="btn btn-primary" @onclick="DoLogin" disabled="@Busy">@L10n.T("Common.Login")</button>
-                @if (!string.IsNullOrEmpty(Error)) { <div class="alert alert-danger">@Error</div> }
+                <button id="login-submit" data-testid="login-submit" class="btn btn-primary" @onclick="DoLogin" disabled="@Busy">@L10n.T("Common.Login")</button>
+                @if (!string.IsNullOrEmpty(Error)) { <div id="login-error" data-testid="login-error" class="alert alert-danger" role="alert">@Error</div> }
                 <p class="muted tiny">@L10n.T(Keys.Content.LoginPasswordNotice, "P0-04A 起登录校验口令：未设置口令的账户需先由管理员初始化。令牌携带安全戳，口令/角色变更后旧令牌立即失效。")</p>
                 <p class="muted tiny"><a href="/register">@L10n.T(Keys.Login.NoTenantRegister, "还没有租户？申请开通")</a></p>
             </div>

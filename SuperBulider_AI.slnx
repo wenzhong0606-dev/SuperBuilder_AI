@@ -3,4 +3,5 @@
   <Project Path="SuperBuilder_AI.Components/SuperBuilder_AI.Components.csproj" />
   <Project Path="SuperBuilder_AI.Web/SuperBuilder_AI.Web.csproj" />
   <Project Path="SuperBuilder_AI.Maui/SuperBuilder_AI.Maui.csproj" />
+  <Project Path="tests/SuperBuilder_AI.E2E.Tests/SuperBuilder_AI.E2E.Tests.csproj" />
 </Solution>
