@@ -61,6 +61,7 @@ public static class ResourceKeys
         public const string TenantCodePlaceholder = "Login.TenantCodePlaceholder";
         public const string TenantCodeHint = "Login.TenantCodeHint";
         public const string TenantCodeInvalid = "Login.TenantCodeInvalid";
+        public const string TenantDirectoryLoadFailed = "Login.TenantDirectoryLoadFailed";
         public const string LoginFailed = "Login.LoginFailed";
         public const string HeroAINativeBI = "Login.Hero.AINativeBI";
         public const string HeroMultiTenant = "Login.Hero.MultiTenant";
@@ -1356,6 +1357,7 @@ public static class ResourceKeys
         [Login.TenantCodePlaceholder] = new("Login", Page: "Login", DefaultValue: "e.g. demo / tenant-001"),
         [Login.TenantCodeHint] = new("Login", Page: "Login", DefaultValue: "The tenant directory is not public; enter a tenant code you know to sign in."),
         [Login.TenantCodeInvalid] = new("Login", Page: "Login", DefaultValue: "The tenant code does not exist or is disabled."),
+        [Login.TenantDirectoryLoadFailed] = new("Login", Page: "Login", DefaultValue: "Failed to load the tenant list. Check the API service and address configuration."),
         [Login.LoginFailed] = new("Login", Page: "Login", DefaultValue: "Sign-in failed: user does not exist or is disabled."),
         [Login.HeroAINativeBI] = new("Login", Page: "Login", DefaultValue: "AI Native BI"),
         [Login.HeroMultiTenant] = new("Login", Page: "Login", DefaultValue: "Multi-tenant"),

@@ -527,7 +527,10 @@ using (var startupScope = app.Services.CreateScope())
 }
 
 if (!app.Environment.IsDevelopment()) { app.UseExceptionHandler("/Home/Error"); app.UseHsts(); }
-app.UseHttpsRedirection();
+// 本地 Blazor Server 与 API 是两个独立进程；Development 直连 HTTP 避免开发证书/
+// Schannel 故障被前端误表现为“空数据”。非开发环境仍强制 HTTPS。
+if (!app.Environment.IsDevelopment())
+    app.UseHttpsRedirection();
 app.UseRouting();
 // P11 错误治理：统一异常 → 结构化友好 JSON（错误码 + 关联ID），须位于路由之后、端点之前，包裹后续所有中间件
 app.UseMiddleware<UnifiedExceptionMiddleware>();

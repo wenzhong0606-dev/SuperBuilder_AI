@@ -186,6 +186,7 @@ public sealed class LocalizationSeedService : ILocalizationSeedService
         ["Login.InitFailed"] = "平台管理员初始化失败。", ["Login.SelectTenantFirst"] = "请先选择租户。",
         ["Login.TenantCodePlaceholder"] = "如 demo / tenant-001", ["Login.TenantCodeHint"] = "租户目录未公开，请输入您已知的确切租户编码登录。",
         ["Login.TenantCodeInvalid"] = "租户编码不存在或已停用。",
+        ["Login.TenantDirectoryLoadFailed"] = "租户列表加载失败，请检查 API 服务与地址配置。",
         ["Login.LoginFailed"] = "登录失败：用户不存在或已禁用。",
         ["Login.Hero.AINativeBI"] = "AI Native BI", ["Login.Hero.MultiTenant"] = "多租户", ["Login.Hero.Multilingual"] = "多语言",
         ["Login.Hero.LowCode"] = "低代码", ["Login.Hero.EnterpriseSaaS"] = "企业级 SaaS",

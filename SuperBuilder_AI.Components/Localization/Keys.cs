@@ -65,6 +65,7 @@ public static class Keys
         public const string TenantCodePlaceholder = "Login.TenantCodePlaceholder";
         public const string TenantCodeHint = "Login.TenantCodeHint";
         public const string TenantCodeInvalid = "Login.TenantCodeInvalid";
+        public const string TenantDirectoryLoadFailed = "Login.TenantDirectoryLoadFailed";
         public const string LoginFailed = "Login.LoginFailed";
         public const string HeroAINativeBI = "Login.Hero.AINativeBI";
         public const string HeroMultiTenant = "Login.Hero.MultiTenant";
@@ -1325,6 +1326,7 @@ public static class Keys
         [Login.TenantCodePlaceholder] = new("如 demo / tenant-001", "e.g. demo / tenant-001"),
         [Login.TenantCodeHint] = new("租户目录未公开，请输入您已知的确切租户编码登录。", "The tenant directory is not public; enter a tenant code you know to sign in."),
         [Login.TenantCodeInvalid] = new("租户编码不存在或已停用。", "The tenant code does not exist or is disabled."),
+        [Login.TenantDirectoryLoadFailed] = new("租户列表加载失败，请检查 API 服务与地址配置。", "Failed to load the tenant list. Check the API service and address configuration."),
         [Login.LoginFailed] = new("登录失败：用户不存在或已禁用。", "Sign-in failed: user does not exist or is disabled."),
         [Login.HeroAINativeBI] = new("AI Native BI", "AI Native BI"),
         [Login.HeroMultiTenant] = new("多租户", "Multi-tenant"),

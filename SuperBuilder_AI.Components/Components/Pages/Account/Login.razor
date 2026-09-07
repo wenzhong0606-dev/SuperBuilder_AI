@@ -77,6 +77,10 @@
                     <span class="muted tiny">@L10n.T("Login.TenantCodeHint", "租户目录未公开，请输入您已知的确切租户编码登录。")</span>
                 }
                 </label>
+                @if (!string.IsNullOrWhiteSpace(_tenantDirectoryError))
+                {
+                    <div class="alert alert-warning">@_tenantDirectoryError</div>
+                }
                 <button class="btn btn-primary" @onclick="DoLogin" disabled="@Busy">@L10n.T("Common.Login")</button>
                 @if (!string.IsNullOrEmpty(Error)) { <div class="alert alert-danger">@Error</div> }
                 <p class="muted tiny">@L10n.T(Keys.Content.LoginPasswordNotice, "P0-04A 起登录校验口令：未设置口令的账户需先由管理员初始化。令牌携带安全戳，口令/角色变更后旧令牌立即失效。")</p>
@@ -109,6 +113,7 @@
     private List<System.Text.Json.JsonElement> _tenantOptions = new();
     /// <summary>目录未公开时的手动租户编码兜底（M0-08 + M6 登录修复）。</summary>
     private string _manualTenantCode = "";
+    private string _tenantDirectoryError = "";
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -116,8 +121,10 @@
         var (languages, _, _, _) = await Api.GetJsonAsync("api/localization/public/languages");
         if (languages is { ValueKind: System.Text.Json.JsonValueKind.Array }) _loginCultures = languages.Value.EnumerateArray().Select(x => x.GetProperty("culture").GetString() ?? "").Where(x => x.Length > 0).ToList();
         await L10n.InitializeAsync(0, 0, _loginCultures, L10n.CurrentCulture);
-        var (tenants, _, _, _) = await Api.GetJsonAsync("api/auth/login-options");
+        var (tenants, _, tenantError, _) = await Api.GetJsonAsync("api/auth/login-options");
         if (tenants is { ValueKind: System.Text.Json.JsonValueKind.Array }) _tenantOptions = tenants.Value.EnumerateArray().ToList();
+        else if (!string.IsNullOrWhiteSpace(tenantError))
+            _tenantDirectoryError = $"{L10n.T(Keys.Login.TenantDirectoryLoadFailed, "租户列表加载失败，请检查 API 服务与地址配置。")} {tenantError}";
         if (_tenantOptions.Count > 0)
         {
             long savedTenant = 0;
