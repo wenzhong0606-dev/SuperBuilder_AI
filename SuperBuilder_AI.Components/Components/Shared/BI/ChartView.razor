@@ -1,4 +1,5 @@
 @inject IJSRuntime JS
+@implements IAsyncDisposable
 
 <div class="chart-view">
     <canvas @ref="_canvas" style="width:100%;height:320px;"></canvas>
@@ -7,6 +8,7 @@
 @code {
     private ElementReference _canvas;
     private string? _lastSig;
+    private bool _disposed;
 
     [Parameter] public string Type { get; set; } = "bar";
     [Parameter] public List<string>? Labels { get; set; }
@@ -30,6 +32,7 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        if (_disposed) return;
         if (Labels is null || Datasets is null) return;
         var sig = BuildSignature();
         if (sig == _lastSig) return;
@@ -134,5 +137,14 @@
             && int.TryParse(hex[5..7], System.Globalization.NumberStyles.HexNumber, null, out var b))
             return $"rgba({r},{g},{b},{alpha})";
         return hex;
+    }
+
+    /// <summary>组件卸载时销毁 Chart.js 实例，避免 canvas 移除后实例残留导致内存泄漏（M8-04）。</summary>
+    public async ValueTask DisposeAsync()
+    {
+        if (_disposed) return;
+        _disposed = true;
+        try { await JS.InvokeVoidAsync("SuperBuilder.destroyChart", _canvas); }
+        catch { /* 组件已卸载或 JS 不可达时静默忽略，不计为业务失败 */ }
     }
 }

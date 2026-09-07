@@ -14,7 +14,11 @@ window.SuperBuilder.getTheme = function () {
 };
 
 // 渲染图表：spec 为结构化对象 { type, data:{labels,datasets}, options }
-// 实例生命周期：同一 canvas 上先销毁旧图表再新建，支持「视图层多轮调整」即时重渲染。
+// 实例生命周期（M8-04 修正）：
+//  - 同类型（bar/line/pie 不变）时走「增量 update」——直接替换 data/options 后 chart.update()，
+//    避免每次视图调整都销毁+重建整图（性能与内存友好）。
+//  - 类型变化或首次渲染时，先销毁旧实例再新建，杜绝同一 canvas 上叠加多个 Chart 实例导致的内存泄漏。
+//  - 组件卸载时应调用 destroyChart 释放实例（见 ChartView.razor 的 IAsyncDisposable）。
 window.SuperBuilder.renderChart = function (canvas, spec) {
     if (!canvas || !canvas.getContext) return;
     if (!window.Chart) {
@@ -26,9 +30,20 @@ window.SuperBuilder.renderChart = function (canvas, spec) {
         return;
     }
     try {
-        if (canvas._sbChart) { canvas._sbChart.destroy(); canvas._sbChart = null; }
+        var existing = canvas._sbChart;
+        // 同类型：增量 update（Chart.js 不支持运行时切换 type，必须重建）
+        if (existing && existing.config && existing.config.type
+            && spec && spec.type && existing.config.type === spec.type) {
+            existing.data = spec.data;
+            existing.options = spec.options;
+            existing.update();
+            return;
+        }
+        // 类型变化或首次：销毁旧实例后新建，避免重复实例
+        if (existing) { existing.destroy(); canvas._sbChart = null; }
         canvas._sbChart = new window.Chart(canvas, spec);
     } catch (e) {
+        if (canvas._sbChart) { try { canvas._sbChart.destroy(); } catch (_) {} canvas._sbChart = null; }
         var c = canvas.getContext('2d');
         c.clearRect(0, 0, canvas.width, canvas.height);
         c.fillStyle = '#dc2626';

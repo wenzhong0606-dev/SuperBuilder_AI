@@ -9,7 +9,7 @@
                 <tr>@foreach (var c in Columns) { <th>@TablePresenter.Friendly(c)</th> }</tr>
             </thead>
             <tbody>
-                @foreach (var row in Rows)
+                @foreach (var row in View)
                 {
                     <tr>
                         @foreach (var c in Columns)
@@ -28,6 +28,13 @@
             </tbody>
         </table>
     </div>
+    @if (Rows.Count > PageSize)
+    {
+        <div class="sb-pager-wrap">
+            <SbPagination Page="_page" PageSize="PageSize" TotalCount="Rows.Count"
+                          PageChanged="EventCallback.Factory.Create<int>(this, p => _page = p)" />
+        </div>
+    }
     @if (!string.IsNullOrWhiteSpace(Footer))
     {
         <div class="muted tiny mt-2">@Footer</div>
@@ -42,6 +49,22 @@ else
     [Parameter] public List<Dictionary<string, object?>>? Rows { get; set; }
     [Parameter] public string? Footer { get; set; }
     [Parameter] public string? EmptyText { get; set; }
+    /// <summary>单页行数上限（M8-04：10k 行不一次渲染全部 DOM，默认 100）。</summary>
+    [Parameter] public int PageSize { get; set; } = 100;
+
+    private int _page = 1;
+
+    /// <summary>当前页切片；页码越界时自动夹紧，避免刷新后空页（M8-04）。</summary>
+    private List<Dictionary<string, object?>> View
+    {
+        get
+        {
+            if (Rows is null) return new();
+            var totalPages = PageSize <= 0 ? 1 : (int)Math.Ceiling(Rows.Count / (double)PageSize);
+            var page = Math.Max(1, Math.Min(totalPages, _page));
+            return Rows.Skip((page - 1) * PageSize).Take(PageSize).ToList();
+        }
+    }
 
     /// <summary>列顺序按首次出现顺序取并集。</summary>
     private List<string> Columns

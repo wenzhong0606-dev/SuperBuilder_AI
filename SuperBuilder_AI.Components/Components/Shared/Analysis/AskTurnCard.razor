@@ -47,6 +47,7 @@
             var drillRows = string.IsNullOrEmpty(_drillCat) || catCol is null
                 ? resp.Data.Rows
                 : resp.Data.Rows.Where(r => JsonValue.AsString(r.GetValueOrDefault(catCol)) == _drillCat).ToList();
+            var pageRows = drillRows.Skip((_page - 1) * _pageSize).Take(_pageSize).ToList();
 
             @for (var vi = 0; vi < (resp.Answer?.Visualizations.Count ?? 0); vi++)
             {
@@ -88,17 +89,17 @@
 
             <div class="table-wrap">
                 <div class="table-toolbar">
-                    <span class="muted tiny">@string.Format(L10n.T(Keys.Content.AskTurnRowsTotal, "共 {0} 行"), resp.Data.Rows.Count)</span>
+                    <span class="muted tiny">@string.Format(L10n.T(Keys.Content.AskTurnRowsTotal, "共 {0} 行"), drillRows.Count)</span>
                     @if (catCol is not null && resp.Data.Rows.Count > 0)
                     {
-                        <span class="drill-hint tiny">@L10n.T(Keys.Content.AskTurnDrill, "下钻：")</span>
+                        <span class="drill-hint tiny">@L10n.T(Keys.Content.AskTurnDrill, "筛选：")</span>
                         @foreach (var c in resp.Data.Rows.Select(r => JsonValue.AsString(r.GetValueOrDefault(catCol))).Where(c => !string.IsNullOrEmpty(c)).Distinct().Take(12))
                         {
                             <button class="chip @(_drillCat == c ? "active" : "")" @onclick="() => SetDrill(c)">@c</button>
                         }
                         @if (!string.IsNullOrEmpty(_drillCat))
                         {
-                            <button class="chip clear" @onclick='() => SetDrill("")'>@L10n.T(Keys.Content.AskTurnClearDrill, "清除下钻")</button>
+                            <button class="chip clear" @onclick='() => SetDrill("")'>@L10n.T(Keys.Content.AskTurnClearDrill, "清除筛选")</button>
                         }
                     }
                     <span class="export-group">
@@ -111,12 +112,19 @@
                         <tr>@foreach (var col in Columns(drillRows)) { <th>@col</th> }</tr>
                     </thead>
                     <tbody>
-                        @foreach (var row in drillRows)
+                        @foreach (var row in pageRows)
                         {
                             <tr>@foreach (var col in Columns(drillRows)) { <td>@JsonValue.AsString(row.GetValueOrDefault(col))</td> }</tr>
                         }
                     </tbody>
                 </table>
+                @if (drillRows.Count > _pageSize)
+                {
+                    <div class="sb-pager-wrap">
+                        <SbPagination Page="_page" PageSize="_pageSize" TotalCount="drillRows.Count"
+                                      PageChanged="EventCallback.Factory.Create<int>(this, p => _page = p)" />
+                    </div>
+                }
             </div>
         }
         else if (resp.Data is not null && !resp.Data.Success)
@@ -188,6 +196,8 @@
 
     private string _drillCat = "";
     private bool _compare = false;
+    private int _page = 1;
+    private const int _pageSize = 100;
 
     private static string EffType(VisualizationSuggestion v, VizOverride o)
     {
@@ -218,7 +228,7 @@
     private static void ToggleArea(AskTurn t, int vi) { var o = t.GetOverride(vi); o.Area = !(o.Area ?? false); }
     private static void ToggleMultiAxis(AskTurn t, int vi) { var o = t.GetOverride(vi); o.MultiAxis = !(o.MultiAxis ?? false); }
 
-    private void SetDrill(string c) => _drillCat = c;
+    private void SetDrill(string c) { _drillCat = c; _page = 1; }
 
     private void ApplyViewCommand()
     {
