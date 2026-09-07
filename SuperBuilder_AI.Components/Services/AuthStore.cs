@@ -11,6 +11,17 @@ namespace SuperBuilder_AI.Components.Services;
 /// 应用启动时自举还原，并经 <c>GET /api/auth/me</c> 校验令牌仍有效；失效时统一清除。
 /// 所有 JS 互操作都包在 try/catch 内（预渲染阶段无 JS 运行时、WebView 异常等均静默降级），不影响主流程。
 /// </para>
+///
+/// <para>
+/// <b>XSS 边界（M8-05 明确）：</b><c>localStorage</c> 中的令牌可被页面上任意 JavaScript 读取，
+/// 因此同源 XSS 可窃取令牌并冒用会话——这是 localStorage 方案的固有边界，无法靠 HttpOnly 缓解
+/// （HttpOnly 仅适用于 Cookie，而 Blazor Server 经 SignalR 持有令牌、不使用 Cookie 会话）。
+/// 采用的缓解组合：① <b>短期访问令牌</b>——后端签发带 <c>ExpiresInSeconds</c> 的短时效 JWT，
+/// 过期即失效，缩小被窃取后的可利用窗口；② <b>CSP</b>——Web 宿主注入内容安全策略（见 <c>SuperBuilder_AI.Web/Program.cs</c>），
+/// 禁止外部脚本源与非常规连接目标，从源头压低 XSS 植入与令牌外泄风险；③ 令牌仅在内存 <see cref="AppState"/> 与
+/// localStorage 间流转，不进入 URL/日志。当前为「过期即重新登录」模型，尚未实现静默刷新（refresh token）——
+/// 属后端契约增强，列入后续议题。
+/// </para>
 /// </summary>
 public sealed class AuthStore
 {

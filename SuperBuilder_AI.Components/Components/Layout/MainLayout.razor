@@ -123,13 +123,26 @@
     }
 
     /// <summary>会话失效（token 过期/被拒）时回收并跳登录。</summary>
+    /// <remarks>
+    /// 事件处理器签名要求返回 void，故以 <c>async void</c> 实现；异常不可被 await，
+    /// 必须包在 try/catch 内，否则会逃逸并中断 SignalR 电路（M8-05「消除不受控 async void」）。
+    /// 已处于登录页则直接返回，避免并发 401 触发的「登录—Ask」回跳循环。
+    /// </remarks>
     private async void OnSessionExpired()
     {
-        await Session.ClearAsync();
-        Nav.NavigateTo("/login");
+        try
+        {
+            if (Nav.Uri.EndsWith("/login", StringComparison.OrdinalIgnoreCase)) return;
+            await Session.ClearAsync();
+            Nav.NavigateTo("/login");
+        }
+        catch
+        {
+            // 清理/跳转异常不向上抛（async void 无法被调用方 await）
+        }
     }
 
-    /// <summary>电路销毁/重建时退订，避免重连后事件重复订阅。</summary>
+    /// <summary>电路销毁/重建时退订全部事件订阅（M8-05「解除事件订阅」），避免重连后事件重复订阅导致内存泄漏与重复处理。</summary>
     public void Dispose()
     {
         Nav.LocationChanged -= OnLocationChanged;
