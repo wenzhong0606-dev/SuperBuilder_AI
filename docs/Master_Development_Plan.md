@@ -964,6 +964,15 @@ A5/A3 在功能和数据约束稳定后分步执行，不得在同一提交中�
 > - **红线/诚实声明**：`SuperBuilder_AI.Data`（`SuperBIContext`）命名空间保留未改，其 `git status` 的 M 为既有 CRLF 行尾规范化伪改动，已按红线排除、未纳入提交；`nul` phantom 未跟踪、未提交；迁移命名空间统一仅改声明与 `using`，0 外部引用、EF 运行时经程序集扫描发现不受影响（本环境未实跑迁移应用，归部署流水线验证）；重命名为机械替换+全量构建门禁，git 可逆。
 > - **覆盖范围与后续**：双轨命名空间约定已固化，跨目录碰撞仅剩 `SuperBuilder_AI.Services` 跨 Application/Infrastructure（关注点约定的有意设计，非缺陷）；M9-03 BusinessTerm 强类型化。
 
+> **交付 M9-03**（2026-09-06；BusinessTerm 强类型化，双提交 feat+docs，未推送 origin）：
+> - **现状盘点**：业务术语全程以自由 `string`/`List<string>` 流转，全仓无 `BusinessTerm` 强类型（仅 `BusinessTermExtractor` 抽取器类，无 class/struct/record/enum）。引用面：6 个源文件 + 1 个测试，全部为 `List<string>` 形态——`BusinessTermExtractor.CollectBusinessTerms`/`CollectBusinessTermsFallback` 返回 `List<string>`、`QueryPlanBuilder.Diagnostics.BusinessTerms` 为 `List<string>`、候选表选择与评分链路 `SelectBestTable`/`ScoreTableCandidate`/`CalculateTableBoost`/`CalculateLocalMatchCount` 均收 `List<string> businessTerms`。命名无冲突，引入 `BusinessTerm` 类型零碰撞。
+> - **实施（强类型）**：新增 `Domain/BiQuery/BusinessTerm.cs`（`SuperBuilder_AI.Models.BI`，Domain 层）——`readonly struct` 值类型，构造即规范化（去首尾空白、折叠内部连续空白），值相等以 `OrdinalIgnoreCase` 为准（与既有 `Distinct(StringComparer.OrdinalIgnoreCase)` 去重语义一致，可作字典键/集合去重依据）；提供到 `string` 的隐式转换使下游（语义搜索、文本归一化、关联判断）无缝消费；配套 `JsonConverter` 使 `List<BusinessTerm>` 在诊断端点序列化为纯 `string[]`，保持与 `List<string>` 线格式兼容（`QueryPlanDiagnostics` 经 `AITestController.BuildWithDiagnosticsAsync` 暴露，须避免契约破坏）。
+> - **实施（链路收敛）**：`BusinessTermExtractor` 两处 `Collect*` 返回 `List<BusinessTerm>`、`SearchMetadataAsync` 收 `List<BusinessTerm>`；`QueryPlanBuilder` 三个 partial（Search/TableSelection/Diagnostics）与 `TableSelector` 的业务术语签名由 `List<string>` 收敛为 `List<BusinessTerm>`（含 `SelectBestTable` 及其 `ScoreTableCandidate`/`CalculateTableBoost`/`CalculateLocalMatchCount` 内部方法）。内部抽取逻辑、评分公式、召回/去重行为逐字节不变。
+> - **实施（防回归）**：`ArchitectureTests` 新增 3 条不变量——`BusinessTerm_Should_Be_ValueType_NotStringAlias`（须值类型而非 string 别名）、`QueryPlanDiagnostics_BusinessTerms_ShouldBe_ListOfBusinessTerm`、`BusinessTermExtractor_CollectBusinessTerms_ShouldReturn_ListOfBusinessTerm`。
+> - **验收（构建+测试）**：后端 0 错误；RCL 多目标 0 错误（127 警告为既有多目标裁剪提示）；Web 0 警告 0 错误；MAUI Windows 0 错误（2 既有警告）；单元套件 1002/1002 全绿（基线 999 + 新增 3 架构不变量），0 回归。
+> - **红线/诚实声明**：`SuperBIContext.cs` 无改动、未纳入；`nul` phantom 与 `tmp_ns_analysis` 临时脚本未纳入；诊断端点 JSON 线格式经 JsonConverter 保持 `string[]` 不变（未实跑 HTTP 验证，仅静态契约保持）。
+> - **覆盖范围与后续**：业务术语已实现编译期约束替代自由字符串；M9-04 Production/Internal Diagnostics 分区。
+
 ---
 
 ## 14. M10：扩展能力
