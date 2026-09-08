@@ -1,8 +1,5 @@
 using System.Collections.Generic;
-using System.Linq;
-using System.Net;
-using System.Net.Http.Headers;
-using System.Net.Http.Json;
+using System.Net.Http;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -11,630 +8,132 @@ using SuperBuilder_AI.Components.Models;
 namespace SuperBuilder_AI.Components.Services;
 
 /// <summary>
-/// 基于命名 HttpClient 的 API 客户端实现。Head 项目负责注册名为 "SuperBuilderApi" 的 HttpClient（BaseAddress=API 地址）。
-/// 租户隔离由服务端从令牌 <c>tid</c> 声明派生（数据面单租户恒等），前端不再发送 X-Tenant-Id 头。
+/// 基于命名 HttpClient 的 API 客户端门面（M9-01：拆分 God ApiClient 后的向后兼容层）。
+/// 自身不再实现任何业务逻辑，仅将 <see cref="IApiClient"/> 的 29 个方法委托给 7 个聚焦域客户端：
+/// Identity / Admin / BI / App / Dashboard / Agent / DataSource。
+/// 既有调用点（全部经 <c>@inject IApiClient</c> 注入）零改动即可继续工作。
 /// </summary>
 /// <remarks>
-/// SB-P0-02C：已移除 <c>X-Tenant-Id</c> 自动头。因不存在合法跨租户切换，移除后无需替代通道；
-/// 后端 <c>AuthMiddleware</c> / <c>TenantDataPlanePolicy</c> 一律以令牌租户为唯一事实源，
-/// 请求中的租户值即便存在也只会被记为「请求值(RequestedTenantId)」，不影响执行租户。
+/// 鉴权：登录后写入 <see cref="AppState.Token"/>，每次请求自动附带 Bearer。
+/// 租户恒由令牌承载（SB-P0-02C 已移除 X-Tenant-Id 自动头）。
+/// 若需仅测试某个域，可直接注入对应的 <c>I*ApiClient</c> 聚焦接口，无需牵连其他域。
 /// </remarks>
 public sealed class ApiClient : IApiClient
 {
-    private readonly IHttpClientFactory _factory;
-    private readonly AppState _appState;
+    private readonly IIdentityApiClient _identity;
+    private readonly IAdminApiClient _admin;
+    private readonly IBiApiClient _bi;
+    private readonly IAppApiClient _app;
+    private readonly IDashboardApiClient _dashboard;
+    private readonly IAgentApiClient _agent;
+    private readonly IDataSourceApiClient _dataSource;
 
-    public ApiClient(IHttpClientFactory factory, AppState appState)
+    public ApiClient(
+        IIdentityApiClient identity,
+        IAdminApiClient admin,
+        IBiApiClient bi,
+        IAppApiClient app,
+        IDashboardApiClient dashboard,
+        IAgentApiClient agent,
+        IDataSourceApiClient dataSource)
     {
-        _factory = factory;
-        _appState = appState;
+        _identity = identity;
+        _admin = admin;
+        _bi = bi;
+        _app = app;
+        _dashboard = dashboard;
+        _agent = agent;
+        _dataSource = dataSource;
     }
 
-    private HttpClient CreateClient()
-    {
-        var client = _factory.CreateClient("SuperBuilderApi");
-        client.DefaultRequestHeaders.Authorization = null;
-        // SB-P0-02C：不再发送 X-Tenant-Id（租户恒由令牌承载，前端无替代通道）
-        if (!string.IsNullOrEmpty(_appState.Token))
-            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _appState.Token);
-        return client;
-    }
+    public Task<(AuthResult? Result, string? Error)> LoginAsync(string username, long tenantId, string? password = null, CancellationToken ct = default)
+        => _identity.LoginAsync(username, tenantId, password, ct);
 
-    /// <summary>
-    /// 会话失效回收：收到 401 时清空本地 token 并通知壳层跳登录。
-    /// 仅当当前确为已登录态才触发，避免重复通知。
-    /// </summary>
-    private void OnUnauthorized()
-    {
-        if (!_appState.IsAuthenticated) return;
-        _appState.ClearSession();
-        _appState.NotifySessionExpired();
-    }
+    public Task<(long Id, string? TenantCode, string? Name, string? Error)> ResolveTenantByCodeAsync(string code, CancellationToken ct = default)
+        => _identity.ResolveTenantByCodeAsync(code, ct);
 
-    public async Task<(AuthResult? Result, string? Error)> LoginAsync(string username, long tenantId, string? password = null, CancellationToken ct = default)
-    {
-        var client = _factory.CreateClient("SuperBuilderApi");
-        try
-        {
-            var resp = await client.PostAsJsonAsync("api/auth/login", new { username, tenantId, password }, ct);
-            if (!resp.IsSuccessStatusCode)
-            {
-                var (code, msg, _) = ParseApiError(await resp.Content.ReadAsStringAsync(ct));
-                return (null, msg ?? $"登录失败（{(int)resp.StatusCode}）。");
-            }
-            var r = await resp.Content.ReadFromJsonAsync<AuthResult>(ct);
-            return (r, null);
-        }
-        catch (HttpRequestException ex)
-        {
-            return (null, "无法连接登录服务，请确认 API 服务已启动且地址配置正确。" +
-                (string.IsNullOrWhiteSpace(ex.Message) ? "" : $"（{ex.Message}）"));
-        }
-    }
+    public Task<string?> AskRawAsync(string question, long? dataSourceId, CancellationToken ct = default)
+        => _bi.AskRawAsync(question, dataSourceId, ct);
 
-    /// <summary>
-    /// M6 登录兜底：按已知租户编码解析租户（不枚举目录），供 <see cref="Auth:ShowTenantDirectory"/> 关闭时手动登录。
-    /// 命中规则与服务端 <c>TenantByCode</c> 对齐：排除 platform 与已停用租户；空编码 / 不存在返回 Error。
-    /// </summary>
-    public async Task<(long Id, string? TenantCode, string? Name, string? Error)> ResolveTenantByCodeAsync(string code, CancellationToken ct = default)
-    {
-        if (string.IsNullOrWhiteSpace(code)) return (0, null, null, "租户编码必填。");
-        var (data, _, error, _) = await GetJsonAsync($"api/auth/tenant-by-code?code={System.Uri.EscapeDataString(code)}", ct);
-        if (data is not { ValueKind: System.Text.Json.JsonValueKind.Object }) return (0, null, null, error ?? "租户解析失败。");
-        var id = data.Value.TryGetProperty("id", out var idEl) && idEl.TryGetInt64(out var idVal) ? idVal : 0L;
-        if (id <= 0) return (0, null, null, error ?? "租户解析失败。");
-        var tenantCode = data.Value.TryGetProperty("tenantCode", out var tc) ? tc.GetString() : null;
-        var name = data.Value.TryGetProperty("name", out var nm) ? nm.GetString() : null;
-        return (id, tenantCode, name, null);
-    }
+    public Task<AskOutcome> AskAsync(string question, long? dataSourceId, string? conversationId = null, CancellationToken ct = default)
+        => _bi.AskAsync(question, dataSourceId, conversationId, ct);
 
-    public async Task<string?> AskRawAsync(string question, long? dataSourceId, CancellationToken ct = default)
-    {
-        var client = CreateClient();
-        var payload = new { question, dataSourceId = dataSourceId ?? 0L };
-        var resp = await client.PostAsJsonAsync("api/ask", payload, ct);
-        if (!resp.IsSuccessStatusCode)
-        {
-            var err = await resp.Content.ReadAsStringAsync(ct);
-            if (resp.StatusCode == HttpStatusCode.Unauthorized) OnUnauthorized();
-            return "ERROR " + (int)resp.StatusCode + ": " + err;
-        }
-        return await resp.Content.ReadAsStringAsync(ct);
-    }
+    public Task<AskOutcome> RefineAsync(string? question, string instruction, IEnumerable<RefineTurn>? history, long? dataSourceId, CancellationToken ct = default)
+        => _bi.RefineAsync(question, instruction, history, dataSourceId, ct);
 
-    /// <summary>类型化问数：反序列化为 <see cref="BIResponse"/>，并对非成功状态解析统一错误码。</summary>
-    public async Task<AskOutcome> AskAsync(string question, long? dataSourceId, string? conversationId = null, CancellationToken ct = default)
-    {
-        var client = CreateClient();
-        var resp = await client.PostAsJsonAsync("api/ask", new { question, dataSourceId = dataSourceId ?? 0L, conversationId }, ct);
-        if (!resp.IsSuccessStatusCode)
-        {
-            var (code, msg, trace) = ParseApiError(await resp.Content.ReadAsStringAsync(ct));
-            if (resp.StatusCode == HttpStatusCode.Unauthorized) OnUnauthorized();
-            return new AskOutcome
-            {
-                Code = code,
-                TraceId = trace,
-                Error = msg ?? $"问数失败（{(int)resp.StatusCode}）。"
-            };
-        }
+    public Task<(bool Ok, string? Code, string? Error)> PublishAppAsync(long tenantId, string dslJson, string? code, CancellationToken ct = default)
+        => _app.PublishAppAsync(tenantId, dslJson, code, ct);
 
-        var raw = await resp.Content.ReadAsStringAsync(ct);
-        if (string.IsNullOrEmpty(raw))
-            return new AskOutcome { Error = "请求失败：空响应。" };
+    public Task<T?> GetAsync<T>(string relativeUrl, CancellationToken ct = default) where T : class
+        => _dashboard.GetAsync<T>(relativeUrl, ct);
 
-        try
-        {
-            var opt = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-            var response = JsonSerializer.Deserialize<BIResponse>(raw, opt);
-            if (response is null)
-                return new AskOutcome { Error = "响应解析失败。" };
-            return new AskOutcome { Response = response };
-        }
-        catch (JsonException ex)
-        {
-            return new AskOutcome { Error = "响应解析失败：" + ex.Message };
-        }
-    }
-
-    /// <summary>
-    /// 多轮语义调整：在已有问题（+ 历史上下文）上追加细化指令，重新走完整 BI 链路。
-    /// 仅在用户显式发起「细化」时调用（对应 <c>POST api/ask/refine</c>）；默认问数路径 <c>api/ask</c> 不变。
-    /// </summary>
-    /// <param name="question">原始问题，可空（仅凭历史 + 指令亦可）。</param>
-    /// <param name="instruction">本轮细化指令，必填。如「只看华东地区」。</param>
-    /// <param name="history">可选历史轮次，用于补全指代；仅 role=user 参与后端问题合成。</param>
-    public async Task<AskOutcome> RefineAsync(
-        string? question,
-        string instruction,
-        IEnumerable<RefineTurn>? history,
-        long? dataSourceId,
-        CancellationToken ct = default)
-    {
-        var client = CreateClient();
-        var payload = new
-        {
-            question,
-            instruction,
-            history = history?.Select(t => new { role = t.Role, content = t.Content }).ToList(),
-            dataSourceId = dataSourceId ?? 0L
-        };
-
-        var resp = await client.PostAsJsonAsync("api/ask/refine", payload, ct);
-        if (!resp.IsSuccessStatusCode)
-        {
-            var (code, msg, trace) = ParseApiError(await resp.Content.ReadAsStringAsync(ct));
-            if (resp.StatusCode == HttpStatusCode.Unauthorized) OnUnauthorized();
-            return new AskOutcome
-            {
-                Code = code,
-                TraceId = trace,
-                Error = msg ?? $"语义调整失败（{(int)resp.StatusCode}）。"
-            };
-        }
-
-        var raw = await resp.Content.ReadAsStringAsync(ct);
-        if (string.IsNullOrEmpty(raw))
-            return new AskOutcome { Error = "请求失败：空响应。" };
-
-        try
-        {
-            var opt = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-            var response = JsonSerializer.Deserialize<BIResponse>(raw, opt);
-            if (response is null)
-                return new AskOutcome { Error = "响应解析失败。" };
-            return new AskOutcome { Response = response };
-        }
-        catch (JsonException ex)
-        {
-            return new AskOutcome { Error = "响应解析失败：" + ex.Message };
-        }
-    }
-
-    /// <summary>
-    /// 解析后端统一错误体：优先 <see cref="ApiError"/>(code/message/traceId)，
-    /// 其次兼容旧 <c>{ error }</c> 形状，最后回退到原始文本（截断避免过长）。
-    /// </summary>
-    private static (string? Code, string? Message, string? TraceId) ParseApiError(string body)
-    {
-        if (string.IsNullOrWhiteSpace(body)) return (null, null, null);
-        try
-        {
-            var opt = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-            var e = JsonSerializer.Deserialize<ApiError>(body, opt);
-            if (e is not null && (!string.IsNullOrEmpty(e.Code) || !string.IsNullOrEmpty(e.Message)))
-                return (e.Code, e.Message, e.TraceId);
-            // 兼容旧 { error: "..." }
-            var raw = JsonSerializer.Deserialize<JsonElement>(body, opt);
-            if (raw.ValueKind == JsonValueKind.Object)
-            {
-                if (raw.TryGetProperty("error", out var ev) && ev.ValueKind == JsonValueKind.String)
-                    return (null, ev.GetString(), null);
-                // 后端写操作普遍以 { errors: ["..."] } 扁平数组返回，逐条合并为可读文本，
-                // 替代此前回退的原始 JSON 截断文本（如 AppBuilder/Agent/Tenant 等校验失败）。
-                if (raw.TryGetProperty("errors", out var errs) && errs.ValueKind == JsonValueKind.Array)
-                {
-                    var msgs = new List<string>();
-                    foreach (var item in errs.EnumerateArray())
-                        if (item.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(item.GetString()))
-                            msgs.Add(item.GetString()!);
-                    if (msgs.Count > 0)
-                        return (null, string.Join("；", msgs), null);
-                }
-            }
-        }
-        catch
-        {
-            // 非 JSON 则回退原始文本
-        }
-        var trimmed = body.Length > 240 ? body[..240] + "…" : body;
-        return (null, trimmed, null);
-    }
-
-    /// <summary>发布为应用：将结构化 App DSL 经默认路径（P8 <c>BuildFromDslAsync</c>）保存到 <c>api/apps</c>。</summary>
-    public async Task<(bool Ok, string? Code, string? Error)> PublishAppAsync(
-        long tenantId, string dslJson, string? code, CancellationToken ct = default)
-    {
-        var client = CreateClient();
-        var body = new { tenantId, dslJson, code };
-        var resp = await client.PostAsJsonAsync("api/apps", body, ct);
-        if (resp.IsSuccessStatusCode)
-        {
-            try
-            {
-                var detail = await resp.Content.ReadFromJsonAsync<JsonElement>(ct);
-                var c = detail.TryGetProperty("code", out var ce) ? ce.GetString() : code;
-                return (true, c ?? code, null);
-            }
-            catch
-            {
-                return (true, code, null);
-            }
-        }
-        var err = await resp.Content.ReadAsStringAsync(ct);
-        if (resp.StatusCode == HttpStatusCode.Unauthorized) OnUnauthorized();
-        return (false, null, $"{(int)resp.StatusCode}: {err}");
-    }
-
-    public async Task<T?> GetAsync<T>(string relativeUrl, CancellationToken ct = default) where T : class
-    {
-        var client = CreateClient();
-        try
-        {
-            var resp = await client.GetAsync(relativeUrl, ct);
-            if (resp.StatusCode == HttpStatusCode.Unauthorized) OnUnauthorized();
-            if (!resp.IsSuccessStatusCode) return null;
-            var body = await resp.Content.ReadAsStringAsync(ct);
-            if (string.IsNullOrWhiteSpace(body)) return null;
-            return JsonSerializer.Deserialize<T>(body, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-        }
-        catch
-        {
-            return null;
-        }
-    }
-
-    /// <summary>
-    /// 通用写操作：统一处理 401 回收与错误体解析，避免每个页面重复实现。
-    /// DELETE 与 GET 不发送请求体。
-    /// </summary>
-    public async Task<(bool Ok, int Status, string? Error, string? Code)> SendAsync(
-        HttpMethod method, string relativeUrl, object? body = null, CancellationToken ct = default)
-    {
-        var client = CreateClient();
-        try
-        {
-            using var req = new HttpRequestMessage(method, relativeUrl);
-            if (body is not null && method != HttpMethod.Get && method != HttpMethod.Delete)
-                req.Content = JsonContent.Create(body);
-
-            var resp = await client.SendAsync(req, ct);
-            if (resp.StatusCode == HttpStatusCode.Unauthorized) OnUnauthorized();
-            if (!resp.IsSuccessStatusCode)
-            {
-                var raw = await resp.Content.ReadAsStringAsync(ct);
-                var (code, msg, _) = ParseApiError(raw);
-                return (false, (int)resp.StatusCode, msg ?? $"请求失败（{(int)resp.StatusCode}）。", code);
-            }
-            return (true, (int)resp.StatusCode, null, null);
-        }
-        catch (Exception ex)
-        {
-            return (false, 0, "网络错误：" + ex.Message, null);
-        }
-    }
+    public Task<(bool Ok, int Status, string? Error, string? Code)> SendAsync(HttpMethod method, string relativeUrl, object? body = null, CancellationToken ct = default)
+        => _agent.SendAsync(method, relativeUrl, body, ct);
 
     public Task<(bool Ok, int Status, string? Error, string? Code)> PostAsync(string relativeUrl, object? body = null, CancellationToken ct = default)
-        => SendAsync(HttpMethod.Post, relativeUrl, body, ct);
+        => _agent.PostAsync(relativeUrl, body, ct);
 
     public Task<(bool Ok, int Status, string? Error, string? Code)> PutAsync(string relativeUrl, object? body, CancellationToken ct = default)
-        => SendAsync(HttpMethod.Put, relativeUrl, body, ct);
+        => _agent.PutAsync(relativeUrl, body, ct);
 
     public Task<(bool Ok, int Status, string? Error, string? Code)> PatchAsync(string relativeUrl, object? body = null, CancellationToken ct = default)
-        => SendAsync(HttpMethod.Patch, relativeUrl, body, ct);
+        => _agent.PatchAsync(relativeUrl, body, ct);
 
     public Task<(bool Ok, int Status, string? Error, string? Code)> DeleteAsync(string relativeUrl, CancellationToken ct = default)
-        => SendAsync(HttpMethod.Delete, relativeUrl, null, ct);
+        => _agent.DeleteAsync(relativeUrl, ct);
 
-    /// <summary>
-    /// M2-05 租户切换：校验当前用户是否为目标租户成员，校验通过则后端重签令牌（tid=目标，htid=主租户）并返回新令牌。
-    /// 非成员将收到 403（调用方转为错误提示，不抛异常）。
-    /// </summary>
-    public async Task<(TenantSwitchResult? Result, string? Error)> SwitchTenantAsync(long tenantId, CancellationToken ct = default)
-    {
-        var client = CreateClient();
-        var resp = await client.PostAsJsonAsync("api/tenant-membership/switch", new { tenantId }, ct);
-        if (!resp.IsSuccessStatusCode)
-        {
-            var (_, msg, _) = ParseApiError(await resp.Content.ReadAsStringAsync(ct));
-            if (resp.StatusCode == HttpStatusCode.Unauthorized) OnUnauthorized();
-            return (null, msg ?? $"切换失败（{(int)resp.StatusCode}）。");
-        }
-        var r = await resp.Content.ReadFromJsonAsync<TenantSwitchResult>(ct);
-        return (r, null);
-    }
+    public Task<(TenantSwitchResult? Result, string? Error)> SwitchTenantAsync(long tenantId, CancellationToken ct = default)
+        => _identity.SwitchTenantAsync(tenantId, ct);
 
-    /// <summary>M2-06 自助注册：匿名创建新租户与首位管理员，注册即登录（后端重签令牌）。</summary>
-    public async Task<(SelfRegistrationResult? Result, string? Error)> RegisterSelfAsync(
+    public Task<(SelfRegistrationResult? Result, string? Error)> RegisterSelfAsync(
         string tenantCode, string tenantName, string adminUsername, string adminEmail,
         string adminPassword, string? adminDisplayName = null, CancellationToken ct = default)
-    {
-        var client = _factory.CreateClient("SuperBuilderApi");
-        try
-        {
-            var resp = await client.PostAsJsonAsync("api/self-registration/register", new
-            {
-                tenantCode,
-                tenantName,
-                adminUsername,
-                adminEmail,
-                adminPassword,
-                adminDisplayName,
-            }, ct);
-            if (!resp.IsSuccessStatusCode)
-            {
-                var (_, msg, _) = ParseApiError(await resp.Content.ReadAsStringAsync(ct));
-                return (null, msg ?? $"注册失败（{(int)resp.StatusCode}）。");
-            }
-            var r = await resp.Content.ReadFromJsonAsync<SelfRegistrationResult>(ct);
-            return (r, null);
-        }
-        catch (HttpRequestException ex)
-        {
-            return (null, "无法连接注册服务，请确认 API 服务已启动且地址配置正确。" +
-                (string.IsNullOrWhiteSpace(ex.Message) ? "" : $"（{ex.Message}）"));
-        }
-    }
+        => _identity.RegisterSelfAsync(tenantCode, tenantName, adminUsername, adminEmail, adminPassword, adminDisplayName, ct);
 
-    /// <summary>M2-06 平台管理员查看自助注册配置（需 platform:admin:manage）。</summary>
-    public async Task<(SelfRegistrationConfigView? Result, string? Error)> GetSelfRegistrationConfigAsync(CancellationToken ct = default)
-    {
-        var (data, _, err, _) = await GetJsonAsync("api/self-registration/config", ct);
-        if (data is not { ValueKind: System.Text.Json.JsonValueKind.Object })
-            return (null, err ?? "无法读取自助注册配置。");
-        var v = data.Value;
-        var enabled = v.TryGetProperty("enabled", out var e) && e.GetBoolean();
-        var approval = v.TryGetProperty("approvalRequired", out var a) && a.GetBoolean();
-        var captcha = v.TryGetProperty("requireCaptcha", out var c) && c.GetBoolean();
-        var defaultCulture = v.TryGetProperty("defaultCulture", out var dc) ? dc.GetString() ?? "zh-CN" : "zh-CN";
-        var domains = v.TryGetProperty("allowedEmailDomains", out var d) && d.ValueKind == System.Text.Json.JsonValueKind.Array
-            ? d.EnumerateArray().Select(x => x.GetString() ?? "").Where(x => x.Length > 0).ToList()
-            : new System.Collections.Generic.List<string>();
-        var cultures = v.TryGetProperty("defaultAvailableCultures", out var cc) && cc.ValueKind == System.Text.Json.JsonValueKind.Array
-            ? cc.EnumerateArray().Select(x => x.GetString() ?? "").Where(x => x.Length > 0).ToList()
-            : new System.Collections.Generic.List<string> { "zh-CN" };
-        return (new SelfRegistrationConfigView
-        {
-            Enabled = enabled,
-            AllowedEmailDomains = domains,
-            DefaultCulture = defaultCulture,
-            DefaultAvailableCultures = cultures,
-            ApprovalRequired = approval,
-            RequireCaptcha = captcha,
-        }, null);
-    }
+    public Task<(SelfRegistrationConfigView? Result, string? Error)> GetSelfRegistrationConfigAsync(CancellationToken ct = default)
+        => _identity.GetSelfRegistrationConfigAsync(ct);
 
-    /// <summary>M2-07 演示数据：平台管理员预览将创建的演示内容（需 platform:admin:manage）。</summary>
-    public async Task<(DemoInstallPlan? Result, string? Error)> GetDemoDataPlanAsync(CancellationToken ct = default)
-    {
-        var (data, _, err, _) = await GetJsonAsync("api/demo-data/preview", ct);
-        if (data is not { ValueKind: System.Text.Json.JsonValueKind.Object })
-            return (null, err ?? "无法读取演示数据计划。");
-        var v = data.Value;
-        var items = v.TryGetProperty("items", out var its) && its.ValueKind == System.Text.Json.JsonValueKind.Array
-            ? its.EnumerateArray().Select(x => new DemoPlanItem(
-                x.TryGetProperty("entityType", out var et) ? et.GetString() ?? "" : "",
-                x.TryGetProperty("count", out var c) && c.TryGetInt32(out var n) ? n : 0,
-                x.TryGetProperty("description", out var d) ? d.GetString() : null)).ToList()
-            : new System.Collections.Generic.List<DemoPlanItem>();
-        return (new DemoInstallPlan
-        {
-            AlreadyInstalled = v.TryGetProperty("alreadyInstalled", out var a) && a.GetBoolean(),
-            DemoTenantCode = v.TryGetProperty("demoTenantCode", out var tc) ? tc.GetString() ?? "demo" : "demo",
-            DemoTenantName = v.TryGetProperty("demoTenantName", out var tn) ? tn.GetString() ?? "" : "",
-            AdminUsername = v.TryGetProperty("adminUsername", out var au) ? au.GetString() ?? "" : "",
-            AdminEmail = v.TryGetProperty("adminEmail", out var ae) ? ae.GetString() ?? "" : "",
-            Items = items,
-        }, null);
-    }
+    public Task<(DemoInstallPlan? Result, string? Error)> GetDemoDataPlanAsync(CancellationToken ct = default)
+        => _admin.GetDemoDataPlanAsync(ct);
 
-    /// <summary>M2-07 演示数据：平台管理员触发安装（事务原子、重复执行保护）。</summary>
-    public async Task<(DemoInstallResult? Result, string? Error)> InstallDemoDataAsync(CancellationToken ct = default)
-    {
-        var client = _factory.CreateClient("SuperBuilderApi");
-        try
-        {
-            var resp = await client.PostAsJsonAsync("api/demo-data/install", new { }, ct);
-            if (!resp.IsSuccessStatusCode)
-            {
-                var (_, msg, _) = ParseApiError(await resp.Content.ReadAsStringAsync(ct));
-                if (resp.StatusCode == System.Net.HttpStatusCode.Unauthorized) OnUnauthorized();
-                return (null, msg ?? $"安装失败（{(int)resp.StatusCode}）。");
-            }
-            var r = await resp.Content.ReadFromJsonAsync<DemoInstallResult>(ct);
-            return (r, null);
-        }
-        catch (System.Net.Http.HttpRequestException ex)
-        {
-            return (null, "无法连接服务，请确认 API 已启动且地址配置正确。" +
-                (string.IsNullOrWhiteSpace(ex.Message) ? "" : $"（{ex.Message}）"));
-        }
-    }
+    public Task<(DemoInstallResult? Result, string? Error)> InstallDemoDataAsync(CancellationToken ct = default)
+        => _admin.InstallDemoDataAsync(ct);
 
-    /// <summary>M3-G0 读取当前用户的服务端语言偏好。</summary>
-    public async Task<(string? Culture, string? Error)> GetUserLanguageAsync(CancellationToken ct = default)
-    {
-        var (data, status, error, _) = await GetJsonAsync("api/user/preferences/language", ct);
-        if (error != null) return (null, error);
-        if (data is not { ValueKind: JsonValueKind.Object }) return (null, null);
-        var culture = data.Value.TryGetProperty("culture", out var c) ? c.GetString() : null;
-        return (culture, null);
-    }
+    public Task<(string? Culture, string? Error)> GetUserLanguageAsync(CancellationToken ct = default)
+        => _identity.GetUserLanguageAsync(ct);
 
-    /// <summary>M3-G0 持久化当前用户语言偏好到服务端。</summary>
-    public async Task<(string? Culture, string? Error)> SetUserLanguageAsync(string culture, CancellationToken ct = default)
-    {
-        var client = CreateClient();
-        try
-        {
-            var resp = await client.PutAsJsonAsync("api/user/preferences/language", new { culture }, ct);
-            if (!resp.IsSuccessStatusCode)
-            {
-                var (_, msg, _) = ParseApiError(await resp.Content.ReadAsStringAsync(ct));
-                if (resp.StatusCode == System.Net.HttpStatusCode.Unauthorized) OnUnauthorized();
-                return (null, msg ?? $"保存语言偏好失败（{(int)resp.StatusCode}）。");
-            }
-            var (data, _, err, _) = await GetJsonAsync("api/user/preferences/language", ct);
-            var effective = (err == null && data is { ValueKind: JsonValueKind.Object } && data.Value.TryGetProperty("culture", out var c))
-                ? c.GetString()
-                : culture;
-            return (effective, null);
-        }
-        catch (System.Net.Http.HttpRequestException ex)
-        {
-            return (null, "无法连接服务，请确认 API 已启动且地址配置正确。" +
-                (string.IsNullOrWhiteSpace(ex.Message) ? "" : $"（{ex.Message}）"));
-        }
-    }
+    public Task<(string? Culture, string? Error)> SetUserLanguageAsync(string culture, CancellationToken ct = default)
+        => _identity.SetUserLanguageAsync(culture, ct);
 
-    /// <summary>M3-02 平台管理员查看全部语言目录（含已停用与翻译进度）。</summary>
-    public async Task<(IReadOnlyList<AdminLanguageView>? Result, string? Error)> GetAdminLanguagesAsync(CancellationToken ct = default)
-    {
-        try
-        {
-            var list = await GetAsync<List<AdminLanguageView>>("api/localization/admin/languages", ct);
-            if (list is null) return (null, null);
-            return (list, null);
-        }
-        catch (System.Net.Http.HttpRequestException ex)
-        {
-            return (null, "无法连接服务，请确认 API 已启动且地址配置正确。" +
-                (string.IsNullOrWhiteSpace(ex.Message) ? "" : $"（{ex.Message}）"));
-        }
-    }
+    public Task<(IReadOnlyList<AdminLanguageView>? Result, string? Error)> GetAdminLanguagesAsync(CancellationToken ct = default)
+        => _admin.GetAdminLanguagesAsync(ct);
 
-    /// <summary>M3-02 平台管理员新建语言（BCP 47 归一化 + 必填名 + 复制键集合待翻译）。</summary>
-    public async Task<(bool Ok, string? Error)> CreateLanguageAsync(AdminLanguageCreate model, CancellationToken ct = default)
-    {
-        var (ok, status, error, _) = await PostAsync("api/localization/languages", model, ct);
-        if (!ok && status == 401) OnUnauthorized();
-        return (ok, error);
-    }
+    public Task<(bool Ok, string? Error)> CreateLanguageAsync(AdminLanguageCreate model, CancellationToken ct = default)
+        => _admin.CreateLanguageAsync(model, ct);
 
-    /// <summary>M3-02 平台管理员更新语言显示名/本地名/排序。</summary>
-    public async Task<(bool Ok, string? Error)> UpdateLanguageAsync(long id, AdminLanguageUpdate model, CancellationToken ct = default)
-    {
-        var (ok, status, error, _) = await PutAsync($"api/localization/languages/{id}", model, ct);
-        if (!ok && status == 401) OnUnauthorized();
-        return (ok, error);
-    }
+    public Task<(bool Ok, string? Error)> UpdateLanguageAsync(long id, AdminLanguageUpdate model, CancellationToken ct = default)
+        => _admin.UpdateLanguageAsync(id, model, ct);
 
-    /// <summary>M3-02 平台管理员启用/停用语言（停用委托租户关系迁移）。</summary>
-    public async Task<(bool Ok, string? Error)> SetLanguageEnabledAsync(long id, bool enabled, CancellationToken ct = default)
-    {
-        var (ok, status, error, _) = await PostAsync($"api/localization/languages/{id}/enabled", new { enabled }, ct);
-        if (!ok && status == 401) OnUnauthorized();
-        return (ok, error);
-    }
+    public Task<(bool Ok, string? Error)> SetLanguageEnabledAsync(long id, bool enabled, CancellationToken ct = default)
+        => _admin.SetLanguageEnabledAsync(id, enabled, ct);
 
-    /// <summary>M3-02 平台管理员按 Id 顺序重排语言目录。</summary>
-    public async Task<(bool Ok, string? Error)> ReorderLanguagesAsync(IReadOnlyList<long> orderedIds, CancellationToken ct = default)
-    {
-        var (ok, status, error, _) = await PostAsync("api/localization/languages/reorder", new { orderedIds }, ct);
-        if (!ok && status == 401) OnUnauthorized();
-        return (ok, error);
-    }
+    public Task<(bool Ok, string? Error)> ReorderLanguagesAsync(IReadOnlyList<long> orderedIds, CancellationToken ct = default)
+        => _admin.ReorderLanguagesAsync(orderedIds, ct);
 
-    /// <summary>读取平台公开语言目录（含本地名称），供语言切换器展示 NativeName。</summary>
-    public async Task<(IReadOnlyList<PublicLanguageView>? Result, string? Error)> GetPublicLanguagesAsync(CancellationToken ct = default)
-    {
-        try
-        {
-            var list = await GetAsync<List<PublicLanguageView>>("api/localization/public/languages", ct);
-            if (list is null) return (null, null);
-            return (list, null);
-        }
-        catch (System.Net.Http.HttpRequestException ex)
-        {
-            return (null, "无法连接服务，请确认 API 已启动且地址配置正确。" +
-                (string.IsNullOrWhiteSpace(ex.Message) ? "" : $"（{ex.Message}）"));
-        }
-    }
+    public Task<(IReadOnlyList<PublicLanguageView>? Result, string? Error)> GetPublicLanguagesAsync(CancellationToken ct = default)
+        => _admin.GetPublicLanguagesAsync(ct);
 
-    /// <summary>
-    /// 读取任意 JSON 端点为 <see cref="JsonElement"/>，失败时返回错误信息且不抛异常。
-    /// 用于在不确定后端 DTO 精确结构时安全渲染列表/详情。
-    /// </summary>
-    public async Task<(JsonElement? Data, int Status, string? Error, string? Code)> GetJsonAsync(string relativeUrl, CancellationToken ct = default)
-    {
-        var client = CreateClient();
-        try
-        {
-            var resp = await client.GetAsync(relativeUrl, ct);
-            var body = await resp.Content.ReadAsStringAsync(ct);
-            if (!resp.IsSuccessStatusCode)
-            {
-                var (code, msg, _) = ParseApiError(body);
-                if (resp.StatusCode == HttpStatusCode.Unauthorized) OnUnauthorized();
-                return (null, (int)resp.StatusCode, msg ?? $"请求失败（{(int)resp.StatusCode}）。", code);
-            }
-            if (string.IsNullOrWhiteSpace(body))
-                return (null, 200, null, null);
-            using var doc = JsonDocument.Parse(body);
-            var el = doc.RootElement.Clone();
-            return (el, 200, null, null);
-        }
-        catch (Exception ex)
-        {
-            return (null, 0, "网络或解析错误：" + ex.Message, null);
-        }
-    }
+    public Task<(JsonElement? Data, int Status, string? Error, string? Code)> GetJsonAsync(string relativeUrl, CancellationToken ct = default)
+        => _dashboard.GetJsonAsync(relativeUrl, ct);
 
-    /// <summary>纯文本读取：不解析 JSON，供 /health、/metrics 等非 JSON 端点使用。</summary>
-    public async Task<(string? Text, int Status, string? Error)> GetTextAsync(string relativeUrl, CancellationToken ct = default)
-    {
-        var client = CreateClient();
-        try
-        {
-            var resp = await client.GetAsync(relativeUrl, ct);
-            var body = await resp.Content.ReadAsStringAsync(ct);
-            if (!resp.IsSuccessStatusCode)
-            {
-                if (resp.StatusCode == HttpStatusCode.Unauthorized) OnUnauthorized();
-                return (null, (int)resp.StatusCode, $"请求失败（{(int)resp.StatusCode}）。");
-            }
-            return (body, (int)resp.StatusCode, null);
-        }
-        catch (Exception ex)
-        {
-            return (null, 0, "网络错误：" + ex.Message);
-        }
-    }
+    public Task<(string? Text, int Status, string? Error)> GetTextAsync(string relativeUrl, CancellationToken ct = default)
+        => _dashboard.GetTextAsync(relativeUrl, ct);
 
-    /// <summary>M4-05 触发后台扫描：POST 创建任务并入队，从 202 响应体解析 jobId。</summary>
-    public async Task<(bool Ok, int Status, long? JobId, string? Error, string? Code)> StartScanAsync(long dataSourceId, CancellationToken ct = default)
-    {
-        var client = CreateClient();
-        try
-        {
-            var resp = await client.PostAsJsonAsync($"api/data-sources/{dataSourceId}/metadata/scan", new { }, ct);
-            var body = await resp.Content.ReadAsStringAsync(ct);
-            if (resp.StatusCode == HttpStatusCode.Unauthorized) OnUnauthorized();
-            if (!resp.IsSuccessStatusCode)
-            {
-                var (code, msg, _) = ParseApiError(body);
-                return (false, (int)resp.StatusCode, null, msg ?? $"请求失败（{(int)resp.StatusCode}）。", code);
-            }
-            long? jobId = null;
-            if (!string.IsNullOrWhiteSpace(body))
-            {
-                using var doc = JsonDocument.Parse(body);
-                if (doc.RootElement.TryGetProperty("jobId", out var jp) && jp.ValueKind == JsonValueKind.Number)
-                    jobId = jp.GetInt64();
-            }
-            return (true, (int)resp.StatusCode, jobId, null, null);
-        }
-        catch (Exception ex)
-        {
-            return (false, 0, null, "网络错误：" + ex.Message, null);
-        }
-    }
+    public Task<(bool Ok, int Status, long? JobId, string? Error, string? Code)> StartScanAsync(long dataSourceId, CancellationToken ct = default)
+        => _dataSource.StartScanAsync(dataSourceId, ct);
 
-    /// <summary>M4-05 轮询扫描任务状态；成功解析为 <see cref="ScanJobView"/>。</summary>
-    public async Task<(ScanJobView? Job, int Status, string? Error, string? Code)> GetScanJobAsync(long dataSourceId, long jobId, CancellationToken ct = default)
-    {
-        var (data, status, err, code) = await GetJsonAsync($"api/data-sources/{dataSourceId}/metadata/scan/{jobId}", ct);
-        if (data is null) return (null, status, err, code);
-        try
-        {
-            var job = JsonSerializer.Deserialize<ScanJobView>(data.Value.GetRawText(), new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-            return (job, status, null, null);
-        }
-        catch (Exception ex)
-        {
-            return (null, status, "解析扫描任务失败：" + ex.Message, code);
-        }
-    }
+    public Task<(ScanJobView? Job, int Status, string? Error, string? Code)> GetScanJobAsync(long dataSourceId, long jobId, CancellationToken ct = default)
+        => _dataSource.GetScanJobAsync(dataSourceId, jobId, ct);
 }
 
 /// <summary>

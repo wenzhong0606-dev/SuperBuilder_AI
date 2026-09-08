@@ -14,6 +14,14 @@ builder.Services.AddScoped<ThemeService>();
 builder.Services.AddScoped<LocalizationService>();
 // 全局轻提示（由 MainLayout 中的 SbToastHost 统一渲染）
 builder.Services.AddScoped<ToastService>();
+// M9-01：拆分 God ApiClient 后的 DI 注册——7 个聚焦域客户端（可独立测试/替换）+ 向后兼容门面。
+builder.Services.AddScoped<IIdentityApiClient, IdentityApiClient>();
+builder.Services.AddScoped<IAdminApiClient, AdminApiClient>();
+builder.Services.AddScoped<IBiApiClient, BiApiClient>();
+builder.Services.AddScoped<IAppApiClient, AppApiClient>();
+builder.Services.AddScoped<IDashboardApiClient, DashboardApiClient>();
+builder.Services.AddScoped<IAgentApiClient, AgentApiClient>();
+builder.Services.AddScoped<IDataSourceApiClient, DataSourceApiClient>();
 builder.Services.AddScoped<IApiClient, ApiClient>();
 builder.Services.AddScoped<AskSessionStore>();
 builder.Services.AddScoped<FileDownloadService>();
