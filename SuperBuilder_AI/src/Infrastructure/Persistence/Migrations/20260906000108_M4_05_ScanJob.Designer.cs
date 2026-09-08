@@ -9,7 +9,7 @@ using SuperBuilder_AI.Data;
 
 #nullable disable
 
-namespace SuperBuilder_AI.src.Infrastructure.Persistence.Migrations
+namespace SuperBuilder_AI.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(SuperBIContext))]
     [Migration("20260906000108_M4_05_ScanJob")]

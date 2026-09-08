@@ -3,18 +3,18 @@ using SuperBuilder_AI.Data;
 using SuperBuilder_AI.Infrastructure.Database;
 using SuperBuilder_AI.Interfaces;
 using SuperBuilder_AI.Models;
+using SuperBuilder_AI.Models.BI;
 using SuperBuilder_AI.Services.BI;
 using SuperBuilder_AI.Services.BI.Dashboard;
 using SuperBuilder_AI.Services.BI.Evaluation;
 using SuperBuilder_AI.Services.BI.Planning;
 using SuperBuilder_AI.Services;
-using SuperBuilder_AI.Configuration;
+using SuperBuilder_AI.Application.Common.Options;
 using SuperBuilder_AI.Interfaces.BI.Evaluation;
 using SuperBuilder_AI.Interfaces.BI;
 using SuperBuilder_AI.Interfaces.BI.Dashboard;
 using SuperBuilder_AI.Interfaces.BI.Planning;
 using SuperBuilder_AI.Interfaces.Database;
-using SuperBuilder_AI.Services.Database;
 using SuperBuilder_AI.Interfaces.BI.Entity;
 using SuperBuilder_AI.Infrastructure.Persistence;
 using SuperBuilder_AI.Services.BI.Entity;
@@ -36,11 +36,9 @@ using SuperBuilder_AI.Interfaces.Localization;
 using SuperBuilder_AI.Services.Localization;
 using SuperBuilder_AI.Interfaces.Quota;
 using SuperBuilder_AI.Services.Quota;
-using SuperBuilder_AI.Application.Metadata;
 using SuperBuilder_AI.Api.Background;
 using SuperBuilder_AI.Middleware;
 using SuperBuilder_AI.Api.Diagnostics;
-using SuperBuilder_AI.Application.Common.Options;
 using SuperBuilder_AI.Interfaces.Seed;
 using SuperBuilder_AI.Services.Seed;
 using Microsoft.AspNetCore.HttpOverrides;
@@ -70,6 +68,9 @@ builder.Services.AddControllersWithViews(options =>
 });
 builder.Services.AddHttpClient();
 
+// M9-02：迁移命名空间已统一收敛为 SuperBuilder_AI.Infrastructure.Persistence.Migrations
+// （原分散于 SuperBuilder_AI.Migrations 与 SuperBuilder_AI.src.Infrastructure.Persistence.Migrations 两种偏差，共 41 个文件）。
+// EF 通过程序集扫描发现迁移，不再依赖固定命名空间前缀，物理位置与命名空间已一致。
 builder.Services.AddDbContext<SuperBIContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
@@ -376,13 +377,13 @@ builder.Services.AddSingleton<SuperBuilder_AI.Api.Caching.IAskResponseCache,
 builder.Services.Configure<SuperBuilder_AI.Application.Common.Options.QwenOptions>(
 	builder.Configuration.GetSection(SuperBuilder_AI.Application.Common.Options.QwenOptions.SectionName));
 builder.Services.AddScoped<SuperBuilder_AI.Interfaces.BI.IMetadataVersionProvider,
-	SuperBuilder_AI.Application.BiQuery.MetadataVersionProvider>();
+	SuperBuilder_AI.Services.BI.MetadataVersionProvider>();
 builder.Services.AddScoped<SuperBuilder_AI.Interfaces.BI.ISemanticVersionProvider,
-	SuperBuilder_AI.Application.BiQuery.SemanticVersionProvider>();
+	SuperBuilder_AI.Services.BI.SemanticVersionProvider>();
 builder.Services.AddScoped<SuperBuilder_AI.Interfaces.BI.IDataSourceCatalogVersionProvider,
-	SuperBuilder_AI.Application.BiQuery.DataSourceCatalogVersionProvider>();
+	SuperBuilder_AI.Services.BI.DataSourceCatalogVersionProvider>();
 builder.Services.AddScoped<SuperBuilder_AI.Interfaces.BI.IAskCacheVersionProvider,
-	SuperBuilder_AI.Application.BiQuery.CompositeAskCacheVersionProvider>();
+	SuperBuilder_AI.Services.BI.CompositeAskCacheVersionProvider>();
 
 // P11.5.2 安全/运维轨：请求指标采集器（请求数 / 错误数 / P95 延迟，按路由聚合）
 builder.Services.AddSingleton<SuperBuilder_AI.Middleware.RequestMetricsCollector>();

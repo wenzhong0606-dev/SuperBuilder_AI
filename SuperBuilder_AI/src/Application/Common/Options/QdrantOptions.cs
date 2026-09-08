@@ -1,4 +1,4 @@
-﻿namespace SuperBuilder_AI.Configuration;
+﻿namespace SuperBuilder_AI.Application.Common.Options;
 
 /// <summary>
 /// Qdrant配置

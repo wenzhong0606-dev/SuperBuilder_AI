@@ -1,7 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace SuperBuilder_AI.Models.BI;
+namespace SuperBuilder_AI.Models;
 
 /// <summary>
 /// Flexible JSON converter for List&lt;string&gt; that handles both

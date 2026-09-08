@@ -9,7 +9,7 @@ using SuperBuilder_AI.Data;
 
 #nullable disable
 
-namespace SuperBuilder_AI.Migrations
+namespace SuperBuilder_AI.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(SuperBIContext))]
     [Migration("20260830093125_P10_1_Identity")]

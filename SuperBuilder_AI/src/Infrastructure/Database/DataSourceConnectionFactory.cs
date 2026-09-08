@@ -8,7 +8,7 @@ using SuperBuilder_AI.Interfaces.Database;
 using SuperBuilder_AI.Interfaces.Identity;
 
 
-namespace SuperBuilder_AI.Services.Database;
+namespace SuperBuilder_AI.Infrastructure.Database;
 
 /// <summary>
 /// 数据源连接工厂。

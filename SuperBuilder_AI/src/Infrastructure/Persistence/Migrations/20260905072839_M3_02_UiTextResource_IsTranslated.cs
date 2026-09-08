@@ -2,7 +2,7 @@
 
 #nullable disable
 
-namespace SuperBuilder_AI.src.Infrastructure.Persistence.Migrations
+namespace SuperBuilder_AI.Infrastructure.Persistence.Migrations
 {
     /// <inheritdoc />
     public partial class M3_02_UiTextResource_IsTranslated : Migration

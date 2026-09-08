@@ -1,7 +1,7 @@
 ﻿using SuperBuilder_AI.Interfaces.BI;
 using SuperBuilder_AI.Models.BI;
 
-namespace SuperBuilder_AI.Services.BI;
+namespace SuperBuilder_AI.Models.BI;
 
 /// <summary>
 /// QueryPlan Decision Gate。

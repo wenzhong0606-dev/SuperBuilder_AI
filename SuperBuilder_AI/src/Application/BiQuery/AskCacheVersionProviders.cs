@@ -11,7 +11,7 @@ using SuperBuilder_AI.Data;
 using SuperBuilder_AI.Interfaces.BI;
 using SuperBuilder_AI.Interfaces.Identity;
 
-namespace SuperBuilder_AI.Application.BiQuery;
+namespace SuperBuilder_AI.Services.BI;
 
 /// <summary>
 /// 组合式 Ask 缓存版本提供器（M6-04）。

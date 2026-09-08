@@ -9,7 +9,7 @@ using SuperBuilder_AI.Interfaces.Identity;
 using SuperBuilder_AI.Models.Identity;
 using SuperBuilder_AI.Models.Metadata;
 using SuperBuilder_AI.Models.Organization;
-using SuperBuilder_AI.Services.Database;
+using SuperBuilder_AI.Infrastructure.Database;
 using SuperBuilder_AI.Services.Identity;
 using Xunit;
 

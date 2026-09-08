@@ -1,7 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 using SuperBuilder_AI.Data;
 using Xunit;
@@ -122,5 +125,98 @@ public class ArchitectureTests
 
         result.Remove(root);
         return result;
+    }
+
+    // ---- M9-02：命名空间/目录边界一致性不变量（防回归）----
+    // 项目采用「关注点命名空间」约定（Models=Domain、Services=Application、Controllers=Api、
+    // Interfaces=Ports、Data/Infrastructure=Infra），目录仅作物理分层。以下不变量固化 M9-02 治理结果，
+    // 防止后续脚手架/手工编辑再次引入命名空间偏差（此前的 src. 前缀、迁移双命名空间、Domain 层误用 Services.BI 等）。
+
+    private static readonly string? SourceRoot = FindSourceRoot();
+
+    private static string? FindSourceRoot()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir != null)
+        {
+            var candidate = Path.Combine(dir.FullName, "SuperBuilder_AI", "src");
+            if (Directory.Exists(candidate)) return candidate;
+            dir = dir.Parent;
+        }
+        return null;
+    }
+
+    private static IEnumerable<(string FilePath, string Namespace)> EnumerateSourceNamespaces(string? root)
+    {
+        if (root == null) yield break;
+        foreach (var fp in Directory.EnumerateFiles(root, "*.cs", SearchOption.AllDirectories))
+        {
+            var name = Path.GetFileName(fp);
+            if (name.EndsWith(".Designer.cs", StringComparison.OrdinalIgnoreCase)) continue;
+            var bytes = File.ReadAllBytes(fp);
+            if (bytes.Length >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF)
+                bytes = bytes[3..];
+            var text = Encoding.UTF8.GetString(bytes);
+            if (text.Length >= 400 && text.Substring(0, 400).Contains("auto-generated")) continue;
+            yield return (fp, ParseNs(text));
+        }
+    }
+
+    private static string ParseNs(string text)
+    {
+        if (text.Length > 0 && text[0] == '\uFEFF') text = text[1..];
+        var m = Regex.Match(text, @"^\s*namespace\s+([A-Za-z0-9_.]+)\s*[\{;]", RegexOptions.Multiline);
+        return m.Success ? m.Groups[1].Value : string.Empty;
+    }
+
+    [Fact]
+    public void SourceRoot_Should_Be_Discoverable()
+    {
+        Assert.NotNull(SourceRoot); // 测试必须能定位 SuperBuilder_AI/src，否则以下不变量无法执行
+    }
+
+    [Fact]
+    public void NoNamespace_Should_Contain_Illegal_Src_Prefix()
+    {
+        var bad = EnumerateSourceNamespaces(SourceRoot)
+            .Where(x => !string.IsNullOrEmpty(x.Namespace) &&
+                        (x.Namespace.StartsWith("SuperBuilder_AI.src") || x.Namespace.Contains(".src.")))
+            .ToList();
+        Assert.Empty(bad); // M9-02 修复的 SuperBuilder_AI.src.Infrastructure.Persistence.Migrations 偏差不得复现
+    }
+
+    [Fact]
+    public void AllMigrations_Should_Share_Single_Namespace()
+    {
+        const string expected = "SuperBuilder_AI.Infrastructure.Persistence.Migrations";
+        var root = SourceRoot ?? throw new InvalidOperationException("SourceRoot not found");
+        var migrationsDir = Path.Combine(root, "Infrastructure", "Persistence", "Migrations");
+        var violations = Directory.EnumerateFiles(migrationsDir, "*.cs", SearchOption.TopDirectoryOnly)
+            .Select(fp => (fp, Ns: ParseNs(File.ReadAllText(fp))))
+            .Where(x => x.Ns != expected)
+            .ToList();
+        Assert.Empty(violations); // 迁移必须统一在同一命名空间，避免 EF 发现路径分裂
+    }
+
+    [Fact]
+    public void EverySourceFile_Should_Have_SuperBuilderAi_Namespace_ExceptProgram()
+    {
+        var violations = EnumerateSourceNamespaces(SourceRoot)
+            .Where(x => Path.GetFileName(x.FilePath) != "Program.cs"
+                        && (string.IsNullOrEmpty(x.Namespace) || !x.Namespace.StartsWith("SuperBuilder_AI.")))
+            .ToList();
+        Assert.Empty(violations); // 除 Program.cs（顶级语句）外，所有源文件须归属 SuperBuilder_AI 命名空间树
+    }
+
+    [Fact]
+    public void DomainLayer_Should_Use_Models_Namespace()
+    {
+        var root = SourceRoot ?? throw new InvalidOperationException("SourceRoot not found");
+        var domainDir = Path.Combine(root, "Domain");
+        var violations = Directory.EnumerateFiles(domainDir, "*.cs", SearchOption.AllDirectories)
+            .Select(fp => (fp, Ns: ParseNs(File.ReadAllText(fp))))
+            .Where(x => !x.Ns.StartsWith("SuperBuilder_AI.Models"))
+            .ToList();
+        Assert.Empty(violations); // Domain 层文件须归属 Models 关注点命名空间（M9-02 修复的 Domain/BiQuery 中 Services.BI 偏差不得复现）
     }
 }

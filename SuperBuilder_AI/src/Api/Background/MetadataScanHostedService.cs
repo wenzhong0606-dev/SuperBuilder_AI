@@ -5,10 +5,9 @@ using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using SuperBuilder_AI.Application.Metadata;
+using SuperBuilder_AI.Services;
 using SuperBuilder_AI.Data;
 using SuperBuilder_AI.Models.Metadata;
-using SuperBuilder_AI.Services;
 
 namespace SuperBuilder_AI.Api.Background;
 

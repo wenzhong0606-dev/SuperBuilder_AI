@@ -2,7 +2,7 @@
 using SuperBuilder_AI.Models.Metadata;
 
 
-namespace SuperBuilder_AI.Services.BI;
+namespace SuperBuilder_AI.Models.BI;
 
 /// <summary>
 /// QueryPlan Metadata关系验证器。

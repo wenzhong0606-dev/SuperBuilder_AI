@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace SuperBuilder_AI.src.Infrastructure.Persistence.Migrations
+namespace SuperBuilder_AI.Infrastructure.Persistence.Migrations
 {
     /// <inheritdoc />
     public partial class M3_01_TenantUiLanguage : Migration

@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
-using SuperBuilder_AI.Application.BiQuery;
+using SuperBuilder_AI.Services.BI;
 using SuperBuilder_AI.Application.Common.Options;
 using SuperBuilder_AI.Data;
 using SuperBuilder_AI.Interfaces.BI;

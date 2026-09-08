@@ -17,7 +17,6 @@ using SuperBuilder_AI.Models.BI;
 using SuperBuilder_AI.Models.Metadata;
 using SuperBuilder_AI.Models.Organization;
 using SuperBuilder_AI.Services.BI;
-using SuperBuilder_AI.Services.Database;
 using Xunit;
 
 namespace SuperBuilder_AI.Tests;

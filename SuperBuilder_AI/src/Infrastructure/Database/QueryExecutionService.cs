@@ -4,7 +4,7 @@ using SuperBuilder_AI.Interfaces.Database;
 using SuperBuilder_AI.Models.BI;
 
 
-namespace SuperBuilder_AI.Services.Database;
+namespace SuperBuilder_AI.Infrastructure.Database;
 
 /// <summary>
 /// 查询执行引擎。

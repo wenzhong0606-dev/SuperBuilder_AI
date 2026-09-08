@@ -8,7 +8,7 @@ using SuperBuilder_AI.Data;
 
 #nullable disable
 
-namespace SuperBuilder_AI.Migrations
+namespace SuperBuilder_AI.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(SuperBIContext))]
     partial class SuperBIContextModelSnapshot : ModelSnapshot

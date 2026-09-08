@@ -2,7 +2,7 @@
 
 #nullable disable
 
-namespace SuperBuilder_AI.Migrations
+namespace SuperBuilder_AI.Infrastructure.Persistence.Migrations
 {
     /// <inheritdoc />
     public partial class AddMetadataSemanticVector : Migration

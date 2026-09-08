@@ -1,4 +1,4 @@
-﻿namespace SuperBuilder_AI.Configuration;
+﻿namespace SuperBuilder_AI.Application.Common.Options;
 
 /// <summary>
 /// Qwen Embedding 配置。

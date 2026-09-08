@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace SuperBuilder_AI.Migrations
+namespace SuperBuilder_AI.Infrastructure.Persistence.Migrations
 {
     /// <inheritdoc />
     public partial class P10_4_Quota : Migration

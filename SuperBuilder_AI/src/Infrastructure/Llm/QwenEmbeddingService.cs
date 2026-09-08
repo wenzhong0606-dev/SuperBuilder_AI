@@ -2,7 +2,7 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Options;
-using SuperBuilder_AI.Configuration;
+using SuperBuilder_AI.Application.Common.Options;
 using SuperBuilder_AI.Interfaces;
 
 namespace SuperBuilder_AI.Services;

@@ -2,7 +2,7 @@ using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
 
-namespace SuperBuilder_AI.Application.Metadata;
+namespace SuperBuilder_AI.Services;
 
 /// <summary>
 /// 基于 <see cref="Channel{T}"/> 的扫描任务队列实现（M4-05）。

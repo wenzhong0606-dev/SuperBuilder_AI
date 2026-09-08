@@ -1,5 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-using SuperBuilder_AI.Application.Metadata;
+using SuperBuilder_AI.Services;
 using SuperBuilder_AI.Interfaces;
 using System.Security.Claims;
 using Microsoft.EntityFrameworkCore;
@@ -7,7 +7,6 @@ using SuperBuilder_AI.Api.Errors;
 using SuperBuilder_AI.Data;
 using SuperBuilder_AI.Interfaces.Identity;
 using SuperBuilder_AI.Models.Metadata;
-using SuperBuilder_AI.Services;
 
 
 namespace SuperBuilder_AI.Controllers;

@@ -1,7 +1,7 @@
 ﻿using Microsoft.Extensions.Options;
 using Qdrant.Client;
 using Qdrant.Client.Grpc;
-using SuperBuilder_AI.Configuration;
+using SuperBuilder_AI.Application.Common.Options;
 using SuperBuilder_AI.Interfaces;
 using SuperBuilder_AI.Models.AI;
 using System.Collections.Generic;
