@@ -219,4 +219,39 @@ public class ArchitectureTests
             .ToList();
         Assert.Empty(violations); // Domain 层文件须归属 Models 关注点命名空间（M9-02 修复的 Domain/BiQuery 中 Services.BI 偏差不得复现）
     }
+
+    // ---- M9-03：BusinessTerm 强类型化不变量（防回归）----
+    // 业务术语须以编译期强类型 BusinessTerm 流转，替代自由 string，
+    // 防止后续脚手架/手工编辑重新引入裸 string 业务术语（拼写/大小写漂移与误用）。
+
+    [Fact]
+    public void BusinessTerm_Should_Be_ValueType_NotStringAlias()
+    {
+        var t = typeof(SuperBuilder_AI.Models.BI.BusinessTerm);
+        Assert.True(t.IsValueType, "BusinessTerm 必须是值类型（非 string 别名），以在热路径避免分配并提供编译期约束");
+        Assert.False(t == typeof(string), "BusinessTerm 不得退化成 string 别名");
+    }
+
+    [Fact]
+    public void QueryPlanDiagnostics_BusinessTerms_ShouldBe_ListOfBusinessTerm()
+    {
+        var prop = typeof(SuperBuilder_AI.Services.BI.QueryPlanBuilder.QueryPlanDiagnostics)
+            .GetProperty("BusinessTerms");
+        Assert.NotNull(prop);
+        var listArg = prop!.PropertyType.IsGenericType
+            ? prop.PropertyType.GetGenericArguments()[0]
+            : null;
+        Assert.Equal(typeof(SuperBuilder_AI.Models.BI.BusinessTerm), listArg);
+    }
+
+    [Fact]
+    public void BusinessTermExtractor_CollectBusinessTerms_ShouldReturn_ListOfBusinessTerm()
+    {
+        var method = typeof(SuperBuilder_AI.Services.BI.BusinessTermExtractor)
+            .GetMethod("CollectBusinessTerms", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+        Assert.NotNull(method);
+        var ret = method!.ReturnType;
+        Assert.True(ret.IsGenericType, "CollectBusinessTerms 应返回泛型集合");
+        Assert.Equal(typeof(SuperBuilder_AI.Models.BI.BusinessTerm), ret.GetGenericArguments()[0]);
+    }
 }

@@ -13,7 +13,7 @@ public partial class QueryPlanBuilder : IQueryPlanBuilder
 	/// <summary>
 	/// A4 重构：业务术语抽取转发给 BusinessTermExtractor，逻辑保持原样。
 	/// </summary>
-	private List<string>
+	private List<BusinessTerm>
 		CollectBusinessTerms(
 			QueryIntent intent)
 		=> _businessTermExtractor.CollectBusinessTerms(
@@ -22,7 +22,7 @@ public partial class QueryPlanBuilder : IQueryPlanBuilder
 	/// <summary>
 	/// A4 重构：业务术语兜底抽取转发给 BusinessTermExtractor，逻辑保持原样。
 	/// </summary>
-	private List<string> CollectBusinessTermsFallback(QueryIntent intent)
+	private List<BusinessTerm> CollectBusinessTermsFallback(QueryIntent intent)
 		=> _businessTermExtractor.CollectBusinessTermsFallback(
 			intent);
 
@@ -31,7 +31,7 @@ public partial class QueryPlanBuilder : IQueryPlanBuilder
 	/// </summary>
 	private async Task<List<MetadataSemanticSearchResult>>
 		SearchMetadataAsync(
-			List<string> terms)
+			List<BusinessTerm> terms)
 		=> await _businessTermExtractor.SearchMetadataAsync(
 			terms);
 }

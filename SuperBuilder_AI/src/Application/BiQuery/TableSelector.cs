@@ -61,7 +61,7 @@ public sealed class TableSelector
 	internal MetadataTable?
 		SelectBestTable(
 			List<MetadataSemanticSearchResult> results,
-			List<string> businessTerms,
+			List<BusinessTerm> businessTerms,
 			QueryIntent? intent = null)
 	{
 		if (results == null || results.Count == 0)
@@ -139,7 +139,7 @@ public sealed class TableSelector
 		ScoreTableCandidate(
 			MetadataTable table,
 			List<MetadataSemanticSearchResult> results,
-			List<string> businessTerms)
+			List<BusinessTerm> businessTerms)
 	{
 		if (table == null)
 		{
@@ -218,7 +218,7 @@ public sealed class TableSelector
 	private double
 		CalculateTableBoost(
 			MetadataTable table,
-			List<string> businessTerms)
+			List<BusinessTerm> businessTerms)
 	{
 		if (table == null ||
 			businessTerms == null ||
@@ -391,7 +391,7 @@ public sealed class TableSelector
 	private int
 		CalculateLocalMatchCount(
 			MetadataTable table,
-			List<string> businessTerms)
+			List<BusinessTerm> businessTerms)
 	{
 		if (table == null ||
 			table.Columns == null ||

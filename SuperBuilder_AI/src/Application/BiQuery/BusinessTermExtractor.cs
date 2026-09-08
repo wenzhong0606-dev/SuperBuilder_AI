@@ -54,7 +54,7 @@ public sealed class BusinessTermExtractor
 	///
 	/// OrderBy
 	/// </summary>
-	internal List<string>
+	internal List<BusinessTerm>
 		CollectBusinessTerms(
 			QueryIntent intent)
 	{
@@ -112,6 +112,7 @@ public sealed class BusinessTermExtractor
 		return terms
 			.Distinct(
 				StringComparer.OrdinalIgnoreCase)
+			.Select(t => new BusinessTerm(t))
 			.ToList();
 	}
 
@@ -119,13 +120,13 @@ public sealed class BusinessTermExtractor
 	/// 如果 CollectBusinessTerms 未能提取到任何业务词，使用 OriginalQuestion 做兜底处理，
 	/// 生成若干变体并拆分关键词以提高召回概率。
 	/// </summary>
-	internal List<string> CollectBusinessTermsFallback(QueryIntent intent)
+	internal List<BusinessTerm> CollectBusinessTermsFallback(QueryIntent intent)
 	{
 		var terms = new List<string>();
 
 		if (intent == null || string.IsNullOrWhiteSpace(intent.OriginalQuestion))
 		{
-			return terms;
+			return new List<BusinessTerm>();
 		}
 
 		// 先尝试基于原始问题生成变体
@@ -155,7 +156,9 @@ public sealed class BusinessTermExtractor
 			AddTerm(terms, p);
 		}
 
-		return terms.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+		return terms.Distinct(StringComparer.OrdinalIgnoreCase)
+			.Select(t => new BusinessTerm(t))
+			.ToList();
 	}
 
 	/// <summary>
@@ -216,7 +219,7 @@ public sealed class BusinessTermExtractor
 	/// </summary>
 	internal async Task<List<MetadataSemanticSearchResult>>
 		SearchMetadataAsync(
-			List<string> terms)
+			List<BusinessTerm> terms)
 	{
 		var results =
 			new List<MetadataSemanticSearchResult>();

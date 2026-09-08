@@ -13,7 +13,7 @@ public partial class QueryPlanBuilder : IQueryPlanBuilder
 	public class QueryPlanDiagnostics
 	{
 		public QueryIntent Intent { get; set; } = null!;
-		public List<string> BusinessTerms { get; set; } = new();
+		public List<BusinessTerm> BusinessTerms { get; set; } = new();
 		public Dictionary<string, List<MetadataSemanticSearchResult>> PerTermResults { get; set; } = new();
 		public List<CandidateDiagnostic> Candidates { get; set; } = new();
 		public QueryPlan? Plan { get; set; }

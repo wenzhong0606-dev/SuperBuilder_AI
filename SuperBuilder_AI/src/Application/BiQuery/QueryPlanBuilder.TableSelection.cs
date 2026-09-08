@@ -16,7 +16,7 @@ public partial class QueryPlanBuilder : IQueryPlanBuilder
 	private MetadataTable?
 		SelectBestTable(
 			List<MetadataSemanticSearchResult> results,
-			List<string> businessTerms,
+			List<BusinessTerm> businessTerms,
 			QueryIntent? intent = null)
 		=> _tableSelector.SelectBestTable(
 			results,
