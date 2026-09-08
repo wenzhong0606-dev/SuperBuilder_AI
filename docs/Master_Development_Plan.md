@@ -955,6 +955,15 @@ A5/A3 在功能和数据约束稳定后分步执行，不得在同一提交中�
 > - **红线/诚实声明**：门面委托纯透传，既有 39 调用点行为未变；新增测试与本环境运行实例无关（纯单元、替身隔离），未触碰后端。
 > - **后续**：M9-02 Namespace 边界治理；聚焦客户端为按域替换/打桩奠定基础（M7-12 Agent 剩余 6 工具接真实后端可在 `IAgentApiClient` 增量扩方法，不影响其他域）。
 
+> **交付 M9-02**（2026-09-06；统一 Namespace 与目录边界，双提交 feat+docs，未推送 origin）：
+> - **现状盘点（BOM 容错重算）**：后端 `src/` 共 542 有效 .cs / 74 命名空间 / 71 目录，采用「目录按分层、命名空间按关注点」双轨（`Models`=Domain、`Services`=Application、`Controllers`=Api、`Interfaces`=Ports、`Data`/`Infrastructure`=Infra）。原有正则分析因 UTF-8 BOM 误报「全局命名空间」，重算后真实缺陷为：① `src.` 非法前缀（24 个迁移文件 `SuperBuilder_AI.src.Infrastructure.Persistence.Migrations`）；② `Api/Diagnostics` 错置 16 个 `Controllers` 文件；③ `Interfaces/BI` 2 个游离文件与 `Application/Ports/BI` 同名跨目录；④ 关注点命名空间内的游离文件（`Application.BiQuery`×1、`Application.Metadata`×2、`Configuration`×2、Domain 中 4 个误用 `Services.BI`、SharedKernel 1 个 `Models.BI`、`Infrastructure/Database` 3 个误用 `Services.Database`、`SuperBuilder_AI.Migrations`×16）；⑤ 跨目录同名空间碰撞 5 处（均由上述导致）。主流命名空间（`Services.BI` 99 引用、`Models.BI` 248、`Data` 135）保留不改 → 波及面小、git 可逆。
+> - **实施（Tier1 明确缺陷）**：移除 `src.` 前缀（24→canonical）；`git mv` 16 个 Controller `Api/Diagnostics`→`Api/Controllers`（Diagnostics 仅余 `SchemaProbe`/`StartupDiagnostics` 两个 `Api.Diagnostics` 文件）；`git mv` 2 个 `Interfaces/BI` 游离文件→`Application/Ports/BI`。
+> - **实施（Tier2 归一化）**：全局唯一游离命名空间全仓 `using`+`namespace`+限定名替换（`Application.BiQuery`→`Services.BI`、`Application.Metadata`→`Services`、`Configuration`→`Application.Common.Options`、`Services.Database`→`Infrastructure.Database`、`SuperBuilder_AI.Migrations` 16+快照 与 `src.` 24 共 41 → `Infrastructure.Persistence.Migrations`；目录实际 81 个迁移文件现全部统一）；`Services.BI`/`Models.BI` 因与保留命名空间共享，按文件路径精确编辑 `Domain/BiQuery` 4 文件→`Models.BI`、`SharedKernel` 1 文件→`Models`（避免误伤 69/46 个保留文件）；全仓 `using` 去重（消除重命名引入的重复指令）。
+> - **实施（Tier3 防回归）**：`ArchitectureTests` 新增 4 个不变量——`NoNamespaceContainsIllegalSrcPrefix`、`AllMigrationsShareSingleNamespace`、`EverySourceFileHasSuperBuilderAiNamespaceExceptProgram`、`DomainLayerUsesModelsNamespace`；并保留原 4 条依赖方向校验（反射，基于关注点命名空间）。`Program.cs`/`SuperBIContext` 配置：迁移命名空间统一后 EF 经程序集扫描发现，未使用 EF 10 不可用的 `MigrationsNamespace` API。
+> - **验收（构建+测试）**：后端 0 错误；RCL 多目标 0 错误；Web 0 警告 0 错误；MAUI Windows 0 错误（2 既有警告）；单元套件 999/999 全绿（基线 994 + 新增 4 架构不变量 + 1 既有），0 回归；依赖方向检查通过（M9-02 验收口径）。
+> - **红线/诚实声明**：`SuperBuilder_AI.Data`（`SuperBIContext`）命名空间保留未改，其 `git status` 的 M 为既有 CRLF 行尾规范化伪改动，已按红线排除、未纳入提交；`nul` phantom 未跟踪、未提交；迁移命名空间统一仅改声明与 `using`，0 外部引用、EF 运行时经程序集扫描发现不受影响（本环境未实跑迁移应用，归部署流水线验证）；重命名为机械替换+全量构建门禁，git 可逆。
+> - **覆盖范围与后续**：双轨命名空间约定已固化，跨目录碰撞仅剩 `SuperBuilder_AI.Services` 跨 Application/Infrastructure（关注点约定的有意设计，非缺陷）；M9-03 BusinessTerm 强类型化。
+
 ---
 
 ## 14. M10：扩展能力
