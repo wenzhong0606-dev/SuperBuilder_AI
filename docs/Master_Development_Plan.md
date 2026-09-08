@@ -946,6 +946,15 @@ M3 退出：✅ 已达成当前跟踪页面范围。平台/租户视图严格分
 
 A5/A3 在功能和数据约束稳定后分步执行，不得在同一提交中同时改变架构和业务语义。
 
+> **交付 M9-01**（2026-09-08；拆分 God ApiClient 为 7 个聚焦域客户端 + 向后兼容门面，双提交 feat+docs，未推送 origin）：
+> - **现状盘点**：`SuperBuilder_AI.Components/Services/ApiClient.cs` 为 761 行单体「上帝类」，横跨 Identity/Admin/BI/App/Dashboard/Agent/DataSource 七域共 26 个 `IApiClient` 方法；39 个调用点全部经 `@inject IApiClient` 注入。验收要求「各域可独立测试」无法满足——改动任一域需重建整类且易牵连其他域。
+> - **实施（拆分）**：新增 `Services/Clients/` 目录。抽象基类 `ApiClientBase` 持有命名 HttpClient 工厂 + `AppState`，统一 Bearer 头注入、`OnUnauthorized` 会话回收、`ParseApiError` 多形态错误体解析（ApiError / 旧 `{error}` / `{errors:[]}` / 纯文本）与通用读（GetAsync/GetJsonAsync/GetTextAsync）/写（SendAsync/Post/Put/Patch/Delete）原语。7 个聚焦客户端（Identity/Admin/BI/App/Dashboard/Agent/DataSource）各含接口 `I*ApiClient` + 实现 `*ApiClient : ApiClientBase`，仅补充本域方法；Dashboard/Agent 直接复用基类原语。
+> - **实施（门面）**：`ApiClient` 重构为 `IApiClient` 向后兼容门面，构造注入 7 个聚焦接口，29 个 `IApiClient` 方法逐一对委托；旧 DTO（AuthResult/SelfRegistration*/Demo*/TenantSwitchResult/RefineTurn/ScanJobView）保留于 `ApiClient.cs`。39 个既有调用点零改动。
+> - **实施（DI）**：两 Head（Web `Program.cs` / MAUI `MauiProgram.cs`）由单一 `AddScoped<IApiClient,ApiClient>()` 扩展为「7 个聚焦客户端注册 + 门面注册」。
+> - **验收（构建+测试）**：RCL 多目标（net10.0 / android / ios / windows / maccatalyst）0 错误；新增聚焦客户端单测（隔离 HTTP 替身，不触达真实 API）覆盖七域行为 + 基类错误解析多形态 + 门面委派路由（URI 级证明）+ 401 会话回收跨域生效；既有单元零回归。
+> - **红线/诚实声明**：门面委托纯透传，既有 39 调用点行为未变；新增测试与本环境运行实例无关（纯单元、替身隔离），未触碰后端。
+> - **后续**：M9-02 Namespace 边界治理；聚焦客户端为按域替换/打桩奠定基础（M7-12 Agent 剩余 6 工具接真实后端可在 `IAgentApiClient` 增量扩方法，不影响其他域）。
+
 ---
 
 ## 14. M10：扩展能力
