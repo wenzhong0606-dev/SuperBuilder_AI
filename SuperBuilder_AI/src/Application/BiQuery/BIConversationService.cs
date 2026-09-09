@@ -1,11 +1,16 @@
 ﻿using System.Diagnostics;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
 using SuperBuilder_AI.Data;
 using SuperBuilder_AI.Infrastructure.Database;
 using SuperBuilder_AI.Interfaces;
+using SuperBuilder_AI.Interfaces.AppBuilder;
 using SuperBuilder_AI.Interfaces.BI;
 using SuperBuilder_AI.Interfaces.BI.Planning;
 using SuperBuilder_AI.Interfaces.Database;
 using SuperBuilder_AI.Models.AI;
+using SuperBuilder_AI.Models.AppBuilder;
 using SuperBuilder_AI.Models.BI;
 using SuperBuilder_AI.Interfaces.Platform;
 using SuperBuilder_AI.Interfaces.Identity;
@@ -92,6 +97,7 @@ public class BIConversationService
 	private readonly IRowLevelSecurityService? _rowSecurity;
 	private readonly IDataSourceExecutionIdentityAccessor? _executionIdentity;
 	private readonly IQueryPlanSecurityGate? _securityGate;
+	private readonly IAskQuerySnapshotStore? _snapshotStore;
 
 
 	public BIConversationService(
@@ -105,7 +111,8 @@ public class BIConversationService
 		IPlatformContextAccessor? platformContextAccessor = null,
 		IRowLevelSecurityService? rowSecurity = null,
 		IDataSourceExecutionIdentityAccessor? executionIdentity = null,
-		IQueryPlanSecurityGate? securityGate = null)
+		IQueryPlanSecurityGate? securityGate = null,
+		IAskQuerySnapshotStore? snapshotStore = null)
 	{
 		_queryUnderstandingService =
 			queryUnderstandingService;
@@ -133,6 +140,7 @@ public class BIConversationService
 		_rowSecurity = rowSecurity;
 		_executionIdentity = executionIdentity;
 		_securityGate = securityGate;
+		_snapshotStore = snapshotStore;
 	}
 
 
@@ -256,6 +264,14 @@ public class BIConversationService
 		var explanation =
 			pipelineResult.Explanation;
 
+		// M7-11：在 RLS 注入前深拷贝允许查询的语义（不含发布者行级条件），供后续成功落库快照。
+		// 仅在已注册快照存储且为已认证访问者路径（authorizedDataSourceIds 非 null）时截取。
+		string? snapshotPlanJson = null;
+		long? snapshotCallerUserId = null;
+		string? snapshotTurnId = null;
+		if (_snapshotStore is not null && authorizedDataSourceIds is not null)
+			snapshotPlanJson = JsonSerializer.Serialize(plan);
+
 		// P0-05 最终闸门：即使计划被伪造或前置过滤回归，也不能进入 SQL 生成与执行。
 		if (authorizedDataSourceIds is not null &&
 			!authorizedDataSourceIds.Contains(plan.DataSourceId))
@@ -266,16 +282,25 @@ public class BIConversationService
 
 		// P0-06 固定落点：Plan 已成型、SQL Builder 尚未调用。
 		// 认证 API 必须具备执行身份；Golden/内部兼容路径的授权集合为 null，不进入 RLS。
-		if (authorizedDataSourceIds is not null && _rowSecurity is not null)
+		if (authorizedDataSourceIds is not null)
 		{
-			var caller = _executionIdentity?.Current;
-			if (caller is null || caller.TenantId != tenantId)
-				throw SuperBuilder_AI.Api.Errors.SuperBuilderException.FromCode(
-					SuperBuilder_AI.Api.Errors.ErrorCodes.RowPolicyForbidden, 403);
-			plan.EffectiveTenantId = tenantId;
-			await _rowSecurity.ApplyAsync(plan, tenantId, caller.UserId);
-			if (_securityGate is not null)
-				await _securityGate.ValidateAsync(plan, tenantId, caller.UserId);
+			if (_rowSecurity is not null)
+			{
+				var caller = _executionIdentity?.Current;
+				if (caller is null || caller.TenantId != tenantId)
+					throw SuperBuilder_AI.Api.Errors.SuperBuilderException.FromCode(
+						SuperBuilder_AI.Api.Errors.ErrorCodes.RowPolicyForbidden, 403);
+				snapshotCallerUserId = caller.UserId;
+				plan.EffectiveTenantId = tenantId;
+				await _rowSecurity.ApplyAsync(plan, tenantId, caller.UserId);
+				if (_securityGate is not null)
+					await _securityGate.ValidateAsync(plan, tenantId, caller.UserId);
+			}
+			else
+			{
+				// 极少数内部兼容路径（无 RLS 服务）：仍尝试取访问者身份用于快照归属。
+				snapshotCallerUserId = _executionIdentity?.Current?.UserId;
+			}
 		}
 
 
@@ -331,6 +356,26 @@ public class BIConversationService
 		var dbExecMs = sw.ElapsedMilliseconds;
 		sw.Restart();
 
+		// M7-11：查询成功 → 落库快照并返回 turnId（仅已认证访问者路径）。
+		// 快照在 RLS 注入前截取，不含发布者行级条件；运行时重新应用当前访问者策略。
+		if (_snapshotStore is not null && snapshotCallerUserId is { } uid && snapshotPlanJson is not null)
+		{
+			snapshotTurnId = Guid.NewGuid().ToString("N");
+			var hash = Convert.ToHexString(SHA256.HashData(
+				Encoding.UTF8.GetBytes($"{tenantId}|{uid}|{snapshotPlanJson}")));
+			await _snapshotStore.SaveAsync(new AskQuerySnapshot
+			{
+				TurnId = snapshotTurnId,
+				TenantId = tenantId,
+				UserId = uid,
+				DataSourceId = plan.DataSourceId,
+				EntityCode = plan.Tables.FirstOrDefault()?.SemanticText,
+				QueryPlanJson = snapshotPlanJson,
+				RequestHash = hash,
+				ExpiresAt = DateTime.UtcNow.AddHours(24),
+			}, CancellationToken.None);
+		}
+
 
 		/*
          * Step 8
@@ -366,6 +411,8 @@ public class BIConversationService
 			Success = true,
 
 			Question = question,
+
+			TurnId = snapshotTurnId,
 
 			Sql =
 				sql.Sql,

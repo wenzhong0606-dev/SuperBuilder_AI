@@ -4,7 +4,7 @@
     <select class="culture-switcher" data-testid="language-switcher" value="@L10n.CurrentCulture" @onchange="OnChange" aria-label="@L10n.T("Common.Settings", "设置")">
         @foreach (var culture in L10n.AvailableCultures)
         {
-            <option value="@culture">@L10n.NativeName(culture)</option>
+            <option value="@culture" selected="@(string.Equals(culture, L10n.CurrentCulture, StringComparison.OrdinalIgnoreCase))">@L10n.NativeName(culture)</option>
         }
     </select>
 }

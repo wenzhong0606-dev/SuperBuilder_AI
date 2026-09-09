@@ -1,0 +1,74 @@
+@page "/apps/{code}/preview"
+@inject IAppApiClient AppClient
+@inject AppState State
+@inject NavigationManager Nav
+@inject ToastService Toast
+@using SuperBuilder_AI.Components.Components.Constants
+@using SuperBuilder_AI.Components.Services.Models
+
+<PermissionGuard Require="@(new[] { PermissionCodes.AppEdit })">
+    <PageHead Icon="sb-ico-eye" Title="@_title" Desc="@L10n.T(Keys.Content.AppPreviewDesc, "预览应用草稿（仅编辑者可见），使用当前访问者权限取数。")">
+        <button class="btn btn-outline-secondary btn-sm" @onclick='() => Nav.NavigateTo("apps")'>@L10n.T(Keys.Content.AppDetailBack, "返回列表")</button>
+        <button class="btn btn-outline-secondary btn-sm" @onclick="() => Load()">@L10n.T(Keys.Content.AppDetailRefresh, "刷新")</button>
+    </PageHead>
+
+    @if (_loading)
+    {
+        <LoadingState Text="@L10n.T(Keys.Content.AppPreviewLoading, "正在预览草稿…")" />
+    }
+    else if (_noDraft)
+    {
+        <SbEmptyState Icon="sb-ico-eye" Title="@L10n.T(Keys.Content.AppPreviewNoDraftTitle, "草稿不存在")" Text="@L10n.T(Keys.Content.AppPreviewNoDraftText, "该应用没有可预览的草稿。请先在应用详情中编辑并保存草稿。")">
+            <Actions><button class="btn btn-primary btn-sm" @onclick='() => Nav.NavigateTo($"apps/{Uri.EscapeDataString(Code)}")'>@L10n.T(Keys.Content.AppPreviewGoEdit, "前往编辑")</button></Actions>
+        </SbEmptyState>
+    }
+    else if (_error)
+    {
+        <ErrorState Message="@(_errorMsg ?? "")" OnRetry="() => Load()" />
+    }
+    else if (_model is not null)
+    {
+        <div class="alert alert-info mb-3">@L10n.T(Keys.Content.AppPreviewBadge, "当前为草稿预览，数据基于访问者当前权限实时取数。")</div>
+        <AppRenderer Model="_model" />
+    }
+</PermissionGuard>
+
+@code {
+    [Parameter] public string Code { get; set; } = "";
+
+    private string _title = "预览应用";
+    private bool _loading = true;
+    private bool _error;
+    private bool _noDraft;
+    private string? _errorMsg;
+    private AppRenderDto? _model;
+
+    protected override void OnInitialized() => _title = L10n.T(Keys.Content.AppPreviewTitle, "预览应用");
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        await Load();
+    }
+
+    private async Task Load()
+    {
+        _loading = true;
+        _error = false;
+        _noDraft = false;
+        _errorMsg = null;
+        _model = null;
+        var r = await AppClient.PreviewAppAsync(State.TenantId, Code);
+        _loading = false;
+        if (!r.Ok || r.Model is null)
+        {
+            if (r.Status == 409) { _noDraft = true; }
+            else { _error = true; _errorMsg = r.ErrorMessage ?? string.Format(L10n.T(Keys.Content.AppPreviewFailed, "预览失败（{0}）。"), r.Status); }
+            StateHasChanged();
+            return;
+        }
+        _model = r.Model;
+        _title = string.IsNullOrWhiteSpace(r.Model.Name) ? Code : r.Model.Name;
+        StateHasChanged();
+    }
+}

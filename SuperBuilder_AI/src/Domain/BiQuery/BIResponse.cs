@@ -171,6 +171,14 @@ public sealed class BIResponse
 	public long DurationMs { get; set; }
 
 	/// <summary>
+	/// M7-11：成功查询的服务端引用标识（turnId）。
+	/// 仅当查询成功且存在已认证访问者时由 <c>BIConversationService</c> 填充；
+	/// 为空表示本次结果不可生成为应用。前端可凭此调用 <c>POST /api/apps/from-ask</c>。
+	/// 为新增加法字段，不改变既有 wire 结构。
+	/// </summary>
+	public string? TurnId { get; set; }
+
+	/// <summary>
 	/// 本次 Ask 调用内分段耗时（M6-05 指标：LLM/Metadata/Plan/SQL/DB/Repair）。
 	/// 为新增加法字段，不改变既有 wire 结构。
 	/// </summary>

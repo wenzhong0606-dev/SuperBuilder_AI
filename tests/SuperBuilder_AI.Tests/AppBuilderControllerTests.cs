@@ -1,10 +1,14 @@
 using System.Collections.Generic;
 using System.Net;
+using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using SuperBuilder_AI.Controllers;
+using SuperBuilder_AI.Models.Identity;
 using SuperBuilder_AI.Data;
 using SuperBuilder_AI.Interfaces;
 using SuperBuilder_AI.Interfaces.AppBuilder;
@@ -81,8 +85,28 @@ public class AppBuilderControllerTests
 	private static AppBuilderAgent CreateAgent(string qwenResponse) =>
 		new(new AppDslSerializer(), new FakeQwen(qwenResponse));
 
-	private static AppBuilderController Build(SuperBIContext db, string qwenResponse = "ignored") =>
-		new(db, new AppDslSerializer(), CreateAgent(qwenResponse));
+	private static AppBuilderController Build(SuperBIContext db, string qwenResponse = "ignored")
+	{
+		// 以具备全部 app:* 权限的已认证用户运行，使 Require 放行、GetByCode 返回草稿 DSL（服务端裁剪契约）。
+		var identity = new ClaimsIdentity(new[]
+		{
+			new Claim("perm", IdentityPermissions.AppView),
+			new Claim("perm", IdentityPermissions.AppEdit),
+			new Claim("perm", IdentityPermissions.AppCreate),
+			new Claim("perm", IdentityPermissions.AppPublish),
+			new Claim("perm", IdentityPermissions.AppDelete),
+			new Claim(ClaimTypes.NameIdentifier, "1"),
+		}, "test");
+		var httpContext = new DefaultHttpContext { User = new ClaimsPrincipal(identity) };
+
+		var controller = new AppBuilderController(
+			db, new AppDslSerializer(), CreateAgent(qwenResponse),
+			new FakeAppQueryBindingExporter(), new FakeAppQueryExecutor())
+		{
+			ControllerContext = new ControllerContext { HttpContext = httpContext }
+		};
+		return controller;
+	}
 
 	[Fact]
 	public async Task Create_ThemeMustBeAccessibleToTenant()

@@ -87,19 +87,17 @@ public sealed class SemanticLabelService : ISemanticLabelService
 
 	/// <inheritdoc />
 	public async Task<IReadOnlyList<SemanticLabel>> ListAsync(
-		string conceptType,
-		long conceptId,
+		string? conceptType,
+		long? conceptId,
 		string? culture = null,
 		CancellationToken cancellationToken = default)
 	{
-		if (string.IsNullOrWhiteSpace(conceptType)) return Array.Empty<SemanticLabel>();
-
 		var targetCulture = _localization.Resolve(culture).Culture;
 
 		return await _db.SemanticLabels
 			.AsNoTracking()
-			.Where(l => l.ConceptType == conceptType
-				&& l.ConceptId == conceptId
+			.Where(l => (conceptType == null || l.ConceptType == conceptType)
+				&& (conceptId == null || l.ConceptId == conceptId)
 				&& l.Culture == targetCulture)
 			.OrderBy(l => l.LabelKind)
 			.ThenBy(l => l.SortOrder)

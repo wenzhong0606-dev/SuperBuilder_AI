@@ -40,7 +40,9 @@ public sealed class AppBuilderControllerVersioningTests
 		var controller = new AppBuilderController(
 			db,
 			new AppDslSerializer(),
-			new FakeAppBuilderAgent())
+			new FakeAppBuilderAgent(),
+			new FakeAppQueryBindingExporter(),
+			new FakeAppQueryExecutor())
 		{
 			ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() }
 		};

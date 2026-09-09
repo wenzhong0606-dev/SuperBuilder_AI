@@ -21,9 +21,12 @@ public sealed class AdminApiClient : ApiClientBase, IAdminApiClient
     {
         try
         {
-            var list = await GetAsync<List<AdminLanguageView>>("api/localization/admin/languages", ct);
-            if (list is null) return (null, null);
-            return (list, null);
+            var endpoint = AppState.Permissions.Contains("localization:manage")
+                ? "api/localization/admin/languages" : "api/localization/languages";
+            var (data, status, error, _) = await GetJsonAsync(endpoint, ct);
+            if (data is not { ValueKind: JsonValueKind.Array })
+                return (null, error ?? $"语言目录加载失败（HTTP {status}）。");
+            return (data.Value.Deserialize<List<AdminLanguageView>>(new JsonSerializerOptions { PropertyNameCaseInsensitive = true }), null);
         }
         catch (HttpRequestException ex)
         {

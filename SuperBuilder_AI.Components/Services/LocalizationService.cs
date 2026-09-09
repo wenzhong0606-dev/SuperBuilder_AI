@@ -67,19 +67,23 @@ public sealed class LocalizationService
 
         // M3-G0「用户语言恢复」：已登录优先服务端持久化偏好；其次本机缓存；均缺失回退租户默认。
         string chosen = fallback;
+        bool hasServerPreference = false;
         if (userId > 0)
         {
             var serverCulture = await SafeGetUserLanguageAsync();
             if (!string.IsNullOrEmpty(serverCulture) && AvailableCultures.Contains(serverCulture, StringComparer.OrdinalIgnoreCase))
+            {
                 chosen = serverCulture!;
+                hasServerPreference = true;
+            }
         }
-        if (chosen == fallback)
+        if (!hasServerPreference)
         {
             var local = await SafeReadLocalAsync(tenantId, userId);
             if (!string.IsNullOrEmpty(local) && AvailableCultures.Contains(local, StringComparer.OrdinalIgnoreCase))
                 chosen = local!;
         }
-        CurrentCulture = chosen;
+        CurrentCulture = AvailableCultures.First(c => string.Equals(c, chosen, StringComparison.OrdinalIgnoreCase));
         await LoadPublicLanguagesAsync();
         await LoadRuntimeTextsAsync();
         Changed?.Invoke();

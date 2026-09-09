@@ -1,4 +1,5 @@
 @inject AppState State
+@implements IDisposable
 @* 权限守卫：RequireAny 为所需权限码集合；Mode = Any（任一命中）| All（全部命中） *@
 @if (Allowed)
 {
@@ -31,13 +32,15 @@ else
         get
         {
             if (Require.Count == 0) return true;
-            // 权限码体系未与后端对齐前不过度拦截（见 NavMenuItems.EnforcePermissions）
-            if (!SuperBuilder_AI.Components.Components.Layout.NavMenuItems.EnforcePermissions) return true;
+            if (!State.IsAuthenticated) return false;
             var owned = State.Permissions ?? Array.Empty<string>();
-            if (owned.Count == 0) return true;
+            if (owned.Count == 0) return false;
             return Mode.Equals("All", StringComparison.OrdinalIgnoreCase)
                 ? Require.All(p => owned.Contains(p))
                 : Require.Any(p => owned.Contains(p));
         }
     }
+    protected override void OnInitialized() => State.PermissionsChanged += Refresh;
+    private void Refresh() => _ = InvokeAsync(StateHasChanged);
+    public void Dispose() => State.PermissionsChanged -= Refresh;
 }

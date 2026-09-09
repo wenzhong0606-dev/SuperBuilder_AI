@@ -91,7 +91,7 @@
     {
         _loading = true;
         var (data, _, err, code) = await Api.GetJsonAsync($"api/dashboards?tenantId={State.TenantId}");
-        _error = L10n.Friendly(code, err ?? L10n.T(Keys.Content.DashboardsLoadFailed, "加载失败。"));
+        _error = data is not null ? "" : L10n.Friendly(code, err ?? L10n.T(Keys.Content.DashboardsLoadFailed, "加载失败。"));
         _rows = data is { ValueKind: JsonValueKind.Array } ? data.Value.EnumerateArray().ToList() : new();
         _cols = TablePresenter.InferColumns(data);
         _loading = false;

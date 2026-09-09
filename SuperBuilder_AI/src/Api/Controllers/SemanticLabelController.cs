@@ -34,8 +34,8 @@ public sealed class SemanticLabelController : ControllerBase
 	/// <summary>列出某概念在指定语言下的全部标签（不回退，仅精确文化）。</summary>
 	[HttpGet]
 	public async Task<IActionResult> List(
-		[FromQuery] string conceptType,
-		[FromQuery] long conceptId,
+		[FromQuery] string? conceptType = null,
+		[FromQuery] long? conceptId = null,
 		[FromQuery] string? culture = null,
 		CancellationToken cancellationToken = default)
 	{

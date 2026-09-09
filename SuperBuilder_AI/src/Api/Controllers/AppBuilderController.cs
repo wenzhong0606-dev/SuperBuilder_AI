@@ -1,47 +1,24 @@
-using System.Collections.Generic;
-using System.Threading;
-using System.Threading.Tasks;
+using System.Security.Claims;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using SuperBuilder_AI.Data;
+using SuperBuilder_AI.Api.Errors;
 using SuperBuilder_AI.Api.Security;
+using SuperBuilder_AI.Data;
 using SuperBuilder_AI.Interfaces.AppBuilder;
 using SuperBuilder_AI.Models.AppBuilder;
+using SuperBuilder_AI.Models.Identity;
 using SuperBuilder_AI.Models.Theme;
 
 namespace SuperBuilder_AI.Controllers;
 
 /// <summary>
-/// AI 应用构建端点（P8.3 AI App Builder）。
+/// AI 应用构建端点（P8.3 AI App Builder + M7-11 应用运行时）。
 ///
 /// <para>
-/// 提供应用（结构化 AppDsl 文档）的租户作用域 CRUD、从自然语言描述生成应用，以及编辑器蓝图：
-/// <list type="bullet">
-/// <item><c>POST /api/apps</c>：从结构化 DSL 创建应用（默认路径，确定性、不调 LLM）。</item>
-/// <item><c>POST /api/apps/generate</c>：从自然语言描述生成应用（非默认路径，仅显式描述启用 LLM）。</item>
-/// <item><c>GET /api/apps</c>：按租户作用域列表（含全局模板 TenantId=0）。</item>
-/// <item><c>GET /api/apps/{code}</c>：获取单个应用（含完整 DSL）。</item>
-/// <item><c>PUT /api/apps/{code}</c>：更新应用（Code 不变；全局模板不可改）。</item>
-/// <item><c>DELETE /api/apps/{code}</c>：删除应用（全局模板不可删）。</item>
-/// <item><c>GET /api/apps/editor/blueprint</c>：编辑器蓝图（DSL 骨架 + 枚举清单），仅 JSON。</item>
-/// </list>
+/// 提供应用（结构化 AppDsl 文档）的租户作用域 CRUD、从自然语言描述生成应用、从 Ask 结果生成应用（M7-11），
+/// 以及编辑器蓝图与运行时 render/preview：
 /// </para>
-///
-/// <para>
-/// 编排统一委托给 <see cref="IAppBuilderAgent"/>（P8.2）：<c>Create</c> 走默认路径
-/// <c>BuildFromDslAsync</c>（确定性、零回归），<c>Generate</c> 走非默认路径
-/// <c>GenerateFromDescriptionAsync</c>（仅显式描述启用 LLM）。传输层负责把请求 JSON 反序列化为
-/// <see cref="AppDsl"/> 并先校验后信任，编排层才生成 <see cref="AppPlan"/>。
-/// </para>
-///
-/// <para>
-/// 租户隔离沿用 P4.3 的"显式开启"策略：每个端点内调用 <see cref="SuperBIContext.ApplyTenantScope"/>。
-/// 当前平台无 IAM 中间件，租户由 <c>tenantId</c> 查询参数显式传入（默认 0 = 系统/全局视图）。
-/// 全局模板（TenantId=0）对所有租户可见但不可被租户修改/删除。Code 在同租户 + 全局范围内唯一。
-/// </para>
-///
-/// <para>本控制器属平台管理面，不触碰 BI 查询链路与 Golden 契约数据，不影响 Golden 18/18 行为契约。</para>
 /// </summary>
 [ApiController]
 [Route("api/apps")]
@@ -50,29 +27,44 @@ public sealed class AppBuilderController : ControllerBase
 	private readonly SuperBIContext _db;
 	private readonly IAppDslSerializer _dslSerializer;
 	private readonly IAppBuilderAgent _agent;
+	private readonly IAppQueryBindingExporter _bindingExporter;
+	private readonly IAppQueryExecutor _executor;
 
-	public AppBuilderController(SuperBIContext db, IAppDslSerializer dslSerializer, IAppBuilderAgent agent)
+	public AppBuilderController(
+		SuperBIContext db,
+		IAppDslSerializer dslSerializer,
+		IAppBuilderAgent agent,
+		IAppQueryBindingExporter bindingExporter,
+		IAppQueryExecutor executor)
 	{
 		_db = db;
 		_dslSerializer = dslSerializer;
 		_agent = agent;
+		_bindingExporter = bindingExporter;
+		_executor = executor;
 	}
 
-	/// <summary>在当前请求作用域内开启租户隔离，返回解析出的租户 Id。</summary>
-	/// <summary>在当前请求作用域内开启租户隔离：有效租户恒为认证租户，跨租户显式请求直接拒绝。</summary>
 	private long ScopeTo(long requestedTenantId)
 	{
 		var resolution = TenantDataPlanePolicy.ResolvePlatformScope(User, requestedTenantId);
-		// P0-02B：把解析出的租户上下文写盘，供审计/可观测中间件读取；治理角色管理他租户时另记管理目标
 		TenantDataPlanePolicy.StorePlatformScope(HttpContext, resolution, "App");
 		if (!resolution.Authorized)
-			throw new SuperBuilder_AI.Api.Errors.SuperBuilderException(
-				SuperBuilder_AI.Api.Errors.ErrorCodes.TenantIsolated,
+			throw new SuperBuilderException(
+				ErrorCodes.TenantIsolated,
 				"禁止：租户作用域请求只能访问认证租户的数据，跨租户访问被拒绝。",
 				403);
 		_db.ApplyTenantScope(resolution.EffectiveTenantId);
 		return resolution.EffectiveTenantId;
 	}
+
+	/// <summary>权限校验：缺 claim 即 403；通过返回 null。</summary>
+	private IActionResult? Require(string permission) =>
+		User.Identity?.IsAuthenticated == true && !User.HasClaim("perm", permission)
+			? StatusCode(403, new ApiError { Code = ErrorCodes.Forbidden, Message = $"禁止：缺少 {permission} 权限。" })
+			: null;
+
+	private long ResolveUserId() =>
+		long.TryParse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value, out var u) ? u : 0;
 
 	private async Task<IActionResult?> ValidateThemeAsync(long tenantId, string? themeKey, CancellationToken ct)
 	{
@@ -82,12 +74,13 @@ public sealed class AppBuilderController : ControllerBase
 		return accessible ? null : BadRequest(new { errors = new[] { $"主题不可用或不属于当前租户：{themeKey}。" } });
 	}
 
-	/// <summary>创建应用：从结构化 DSL 编排（默认路径，确定性、不调 LLM）。</summary>
+	/// <summary>创建应用：从结构化 DSL 编排（默认路径，确定性、不调 LLM）。需 app:create。</summary>
 	[HttpPost]
 	public async Task<IActionResult> Create(
 		[FromBody] CreateAppRequest request,
 		CancellationToken cancellationToken = default)
 	{
+		if (Require(IdentityPermissions.AppCreate) is { } denied) return denied;
 		if (request is null) return BadRequest("请求体不能为空。");
 		if (request.TenantId <= 0) return BadRequest("不能通过 API 创建全局/内置应用（TenantId 必须 > 0）。");
 		if (string.IsNullOrWhiteSpace(request.DslJson)) return BadRequest("DslJson 不能为空。");
@@ -95,7 +88,6 @@ public sealed class AppBuilderController : ControllerBase
 		if (!_dslSerializer.TryDeserialize(request.DslJson, out var dsl, out var errors) || dsl is null)
 			return BadRequest(new { errors });
 
-		// 默认路径：结构化 DSL → AppPlan，确定性、不调 LLM。
 		var result = await _agent.BuildFromDslAsync(request.TenantId, dsl, request.Code);
 		if (!result.Success || result.Plan is null)
 			return BadRequest(new { errors = result.Errors });
@@ -105,7 +97,6 @@ public sealed class AppBuilderController : ControllerBase
 		plan.TenantId = tenantId;
 		if (await ValidateThemeAsync(tenantId, plan.ThemeKey, cancellationToken) is { } themeDenied) return themeDenied;
 
-		// 同租户或全局模板已存在该 Code 则冲突。
 		var conflict = await _db.AppPlans
 			.IgnoreQueryFilters()
 			.AnyAsync(p => p.Code == plan.Code && (p.TenantId == tenantId || p.TenantId == 0), cancellationToken);
@@ -117,28 +108,22 @@ public sealed class AppBuilderController : ControllerBase
 		return CreatedAtAction(nameof(GetByCode), new { code = plan.Code, tenantId }, ToDetail(plan));
 	}
 
-	/// <summary>
-	/// 从自然语言描述生成应用（非默认路径）：描述 → Qwen 生成 DSL → 校验 → AppPlan。
-	/// 仅当调用方显式传入描述时才启用 LLM；LLM 失败返回 502，参数错误返回 400。
-	/// </summary>
+	/// <summary>从自然语言描述生成应用（非默认路径）：描述 → Qwen 生成 DSL → 校验 → AppPlan。需 app:create。</summary>
 	[HttpPost("generate")]
 	public async Task<IActionResult> Generate(
 		[FromBody] GenerateAppRequest request,
 		CancellationToken cancellationToken = default)
 	{
+		if (Require(IdentityPermissions.AppCreate) is { } denied) return denied;
 		if (request is null) return BadRequest("请求体不能为空。");
 		if (request.TenantId <= 0) return BadRequest("生成应用需要 tenantId > 0。");
 		if (string.IsNullOrWhiteSpace(request.Description)) return BadRequest("应用描述不能为空。");
 
-		// 非默认路径：调用 LLM 生成 DSL JSON，再经 agent 先校验后信任。
 		var result = await _agent.GenerateFromDescriptionAsync(request.TenantId, request.Description, request.Code);
 		if (!result.Success || result.Plan is null)
-		{
-			// 失败发生在 LLM 增强路径（UsedAi=true）视为服务端依赖问题；否则参数/结构问题。
 			return result.UsedAi
 				? StatusCode(StatusCodes.Status502BadGateway, new { errors = result.Errors, usedAi = true })
 				: BadRequest(new { errors = result.Errors });
-		}
 
 		var plan = result.Plan;
 		var tenantId = ScopeTo(request.TenantId);
@@ -164,38 +149,124 @@ public sealed class AppBuilderController : ControllerBase
 		return CreatedAtAction(nameof(GetByCode), new { code = plan.Code, tenantId }, ToDetail(plan));
 	}
 
-	/// <summary>列表：按租户作用域返回（含全局模板 TenantId=0）。tenantId=0 为系统视图。</summary>
+	/// <summary>M7-11：从 Ask 成功查询快照生成应用（确定性绑定，不调 LLM）。需 app:create，且快照须为调用者本人创建。</summary>
+	[HttpPost("from-ask")]
+	public async Task<IActionResult> CreateFromAsk(
+		[FromBody] CreateFromAskRequest request,
+		CancellationToken cancellationToken = default)
+	{
+		if (Require(IdentityPermissions.AppCreate) is { } denied) return denied;
+		if (request is null) return BadRequest("请求体不能为空。");
+		if (string.IsNullOrWhiteSpace(request.TurnId)) return BadRequest("turnId 必填（来自 api/ask 返回的 TurnId）。");
+		if (request.TenantId <= 0) return BadRequest("tenantId 必须 > 0。");
+
+		var tenantId = ScopeTo(request.TenantId);
+		var userId = ResolveUserId();
+		if (userId <= 0) return Unauthorized(new ApiError { Code = ErrorCodes.Unauthorized, Message = "未授权：令牌声明缺失。" });
+
+		AppDataSourceBinding binding;
+		try
+		{
+			binding = await _bindingExporter.ExportAsync(request.TurnId, tenantId, userId, cancellationToken);
+		}
+		catch (SuperBuilderException ex)
+		{
+			return StatusCode(ex.StatusCode, new ApiError { Code = ex.ErrorCode, Message = ex.Message });
+		}
+
+		var code = request.Code ?? $"ask-{tenantId}-{DateTime.UtcNow:yyyyMMddHHmmss}";
+		var name = request.Name ?? "Ask 生成的应用";
+		var componentType = binding.Metrics.Count > 0 ? AppComponentTypes.Chart : AppComponentTypes.Table;
+		var props = componentType == AppComponentTypes.Chart
+			? new Dictionary<string, string> { { "chartType", "bar" }, { "categoryField", binding.Dimensions.FirstOrDefault() ?? binding.Entity ?? "x" } }
+			: new Dictionary<string, string>();
+		var dsl = new AppDsl
+		{
+			Version = AppDslVersions.Current,
+			Code = code,
+			Name = name,
+			ThemeKey = request.ThemeKey,
+			Pages = new List<PagePlan>
+			{
+				new()
+				{
+					Id = "home",
+					Name = "首页",
+					Order = 1,
+					Components = new List<ComponentPlan>
+					{
+						new()
+						{
+							Type = componentType,
+							Id = "c1",
+							Title = name,
+							Order = 1,
+							Binding = binding,
+							Properties = props,
+						},
+					},
+				},
+			},
+		};
+
+		var result = await _agent.BuildFromDslAsync(tenantId, dsl, code);
+		if (!result.Success || result.Plan is null)
+			return BadRequest(new { errors = result.Errors });
+
+		var plan = result.Plan;
+		plan.TenantId = tenantId;
+		if (await ValidateThemeAsync(tenantId, plan.ThemeKey, cancellationToken) is { } themeDenied) return themeDenied;
+
+		var conflict = await _db.AppPlans
+			.IgnoreQueryFilters()
+			.AnyAsync(p => p.Code == plan.Code && (p.TenantId == tenantId || p.TenantId == 0), cancellationToken);
+		if (conflict) return Conflict(new { errors = new[] { $"应用编码已存在：{plan.Code}。" } });
+
+		_db.AppPlans.Add(plan);
+		await _db.SaveChangesAsync(cancellationToken);
+
+		return CreatedAtAction(nameof(GetByCode), new { code = plan.Code, tenantId }, ToDetail(plan));
+	}
+
+	/// <summary>列表：按租户作用域返回（含全局模板 TenantId=0）。需 app:view。</summary>
 	[HttpGet]
 	public async Task<IActionResult> List(
 		[FromQuery] long tenantId = 0,
 		CancellationToken cancellationToken = default)
 	{
+		if (Require(IdentityPermissions.AppView) is { } denied) return denied;
 		ScopeTo(tenantId);
 
 		var items = await _db.AppPlans.AsNoTracking()
-			.OrderBy(p => p.TenantId) // 全局(0) 在前，租户自有在后
+			.OrderBy(p => p.TenantId)
 			.ThenBy(p => p.Code)
 			.ToListAsync(cancellationToken);
 		return Ok(items.Select(ToSummary).ToList());
 	}
 
-	/// <summary>获取单个应用（含完整 DSL）。</summary>
+	/// <summary>获取单个应用。app:view 仅返回发布数据；app:edit 额外返回草稿 DSL（服务端裁剪，不靠前端隐藏）。</summary>
 	[HttpGet("{code}")]
 	public async Task<IActionResult> GetByCode(
 		string code,
 		[FromQuery] long tenantId = 0,
 		CancellationToken cancellationToken = default)
 	{
+		if (Require(IdentityPermissions.AppView) is { } denied) return denied;
 		if (string.IsNullOrWhiteSpace(code)) return BadRequest("应用编码不能为空。");
 		ScopeTo(tenantId);
 
 		var entity = await _db.AppPlans.AsNoTracking()
 			.FirstOrDefaultAsync(p => p.Code == code, cancellationToken);
 		if (entity is null) return NotFound();
-		return Ok(ToDetail(entity));
+
+		var canEdit = User.HasClaim("perm", IdentityPermissions.AppEdit);
+		var dslJson = canEdit ? entity.DslJson : (entity.PublishedDslJson ?? string.Empty);
+		return Ok(new AppDetail(
+			entity.Id, entity.TenantId, entity.Code, entity.Name, entity.Description, entity.Status,
+			entity.DslVersion, entity.ThemeKey, dslJson, entity.PublishedVersion, entity.PublishedAt));
 	}
 
-	/// <summary>更新应用：重新校验 DSL 后覆盖文档列（Code 不变；全局模板不可改）。</summary>
+	/// <summary>更新应用：重新校验 DSL 后覆盖文档列。需 app:edit。</summary>
 	[HttpPut("{code}")]
 	public async Task<IActionResult> Update(
 		string code,
@@ -203,6 +274,7 @@ public sealed class AppBuilderController : ControllerBase
 		[FromQuery] long tenantId = 0,
 		CancellationToken cancellationToken = default)
 	{
+		if (Require(IdentityPermissions.AppEdit) is { } denied) return denied;
 		if (request is null) return BadRequest("请求体不能为空。");
 		if (string.IsNullOrWhiteSpace(request.DslJson)) return BadRequest("DslJson 不能为空。");
 
@@ -215,7 +287,6 @@ public sealed class AppBuilderController : ControllerBase
 		if (entity.TenantId == 0)
 			return BadRequest(new { errors = new[] { "全局/内置应用不可修改。" } });
 
-		// Code 锁定为原值（与主题 Key 不可变一致），仅允许整文档（DSL）覆盖。
 		var result = await _agent.BuildFromDslAsync(entity.TenantId, dsl, entity.Code);
 		if (!result.Success || result.Plan is null)
 			return BadRequest(new { errors = result.Errors });
@@ -226,19 +297,19 @@ public sealed class AppBuilderController : ControllerBase
 		entity.DslVersion = result.Plan.DslVersion;
 		entity.DslJson = result.Plan.DslJson;
 		entity.ThemeKey = result.Plan.ThemeKey;
-		// Status 保持不变（草稿/发布状态不因改 DSL 而重置）。
 
 		await _db.SaveChangesAsync(cancellationToken);
 		return Ok(ToDetail(entity));
 	}
 
-	/// <summary>删除应用（全局模板不可删）。</summary>
+	/// <summary>删除应用。需 app:delete。</summary>
 	[HttpDelete("{code}")]
 	public async Task<IActionResult> Delete(
 		string code,
 		[FromQuery] long tenantId = 0,
 		CancellationToken cancellationToken = default)
 	{
+		if (Require(IdentityPermissions.AppDelete) is { } denied) return denied;
 		if (string.IsNullOrWhiteSpace(code)) return BadRequest("应用编码不能为空。");
 		ScopeTo(tenantId);
 		var entity = await _db.AppPlans.FirstOrDefaultAsync(p => p.Code == code, cancellationToken);
@@ -251,18 +322,14 @@ public sealed class AppBuilderController : ControllerBase
 		return NoContent();
 	}
 
-	/// <summary>
-	/// 发布应用（M7-02）：把当前草稿 <see cref="AppPlan.DslJson"/> 固化为发布快照，
-	/// 写入 <see cref="AppPlan.PublishedDslJson"/> 并自增 <see cref="AppPlan.PublishedVersion"/>，
-	/// 同时在 <c>AppVersions</c> 落一条不可变版本记录（可追溯回滚）。
-	/// 仅当草稿非空时允许发布；草稿与发布态物理隔离，编辑草稿不会直接覆盖线上版本（M7-02 验收）。
-	/// </summary>
+	/// <summary>发布应用（M7-02）：草稿固化为发布快照。需 app:publish。</summary>
 	[HttpPost("{code}/publish")]
 	public async Task<IActionResult> Publish(
 		string code,
 		[FromQuery] long tenantId = 0,
 		CancellationToken cancellationToken = default)
 	{
+		if (Require(IdentityPermissions.AppPublish) is { } denied) return denied;
 		var tid = ScopeTo(tenantId);
 		var entity = await _db.AppPlans.FirstOrDefaultAsync(p => p.Code == code, cancellationToken);
 		if (entity is null) return NotFound();
@@ -296,12 +363,7 @@ public sealed class AppBuilderController : ControllerBase
 		return Ok(new PublishResult(entity.Id, tid, entity.PublishedVersion, entity.PublishedAt, entity.PublishedBy));
 	}
 
-	/// <summary>
-	/// 回滚应用（M7-02）：把指定历史版本恢复为「当前发布态」。
-	/// 历史快照只读，不会改写；回滚会再固化为一条<em>新</em>版本
-	/// （<see cref="AppVersion.RolledBackFromVersion"/> 指向被恢复的来源版本），
-	/// 保证版本链单调递增、全程可追溯。
-	/// </summary>
+	/// <summary>回滚应用（M7-02）：指定历史版本恢复为当前发布态。需 app:publish。</summary>
 	[HttpPost("{code}/rollback/{version:int}")]
 	public async Task<IActionResult> Rollback(
 		string code,
@@ -309,6 +371,7 @@ public sealed class AppBuilderController : ControllerBase
 		[FromQuery] long tenantId = 0,
 		CancellationToken cancellationToken = default)
 	{
+		if (Require(IdentityPermissions.AppPublish) is { } denied) return denied;
 		var tid = ScopeTo(tenantId);
 		var entity = await _db.AppPlans.FirstOrDefaultAsync(p => p.Code == code, cancellationToken);
 		if (entity is null) return NotFound();
@@ -345,16 +408,14 @@ public sealed class AppBuilderController : ControllerBase
 		return Ok(new PublishResult(entity.Id, tid, entity.PublishedVersion, entity.PublishedAt, entity.PublishedBy, target.Version));
 	}
 
-	/// <summary>
-	/// 列出应用的全部发布版本（M7-02，按版本号倒序；含是否当前发布态标记）。
-	/// 仅元数据与版本链，不含 DSL 正文（避免大负载；如需恢复用 <see cref="Rollback"/>）。
-	/// </summary>
+	/// <summary>列出应用的全部发布版本（M7-02）。需 app:view。</summary>
 	[HttpGet("{code}/versions")]
 	public async Task<IActionResult> Versions(
 		string code,
 		[FromQuery] long tenantId = 0,
 		CancellationToken cancellationToken = default)
 	{
+		if (Require(IdentityPermissions.AppView) is { } denied) return denied;
 		ScopeTo(tenantId);
 		var entity = await _db.AppPlans.AsNoTracking()
 			.FirstOrDefaultAsync(p => p.Code == code, cancellationToken);
@@ -370,16 +431,106 @@ public sealed class AppBuilderController : ControllerBase
 		return Ok(list);
 	}
 
-	/// <summary>当前操作者标识（用于发布/回滚审计）。无认证身份时回退 "system"。</summary>
-	private string Actor() => User.Identity?.Name ?? "system";
+	/// <summary>
+	/// M7-11：运行已发布应用（使用发布快照）。需 app:view。
+	/// 未发布应用返回 409；任一数据组件失败使整体 Succeeded=false（不误报完整成功）。
+	/// </summary>
+	[HttpGet("{code}/render")]
+	public async Task<IActionResult> Render(
+		string code,
+		[FromQuery] long tenantId = 0,
+		CancellationToken cancellationToken = default)
+	{
+		if (Require(IdentityPermissions.AppView) is { } denied) return denied;
+		var tid = ScopeTo(tenantId);
+		var userId = ResolveUserId();
+		if (userId <= 0) return Unauthorized(new ApiError { Code = ErrorCodes.Unauthorized, Message = "未授权：令牌声明缺失。" });
+		return await RenderAppAsync(code, tid, userId, preview: false, cancellationToken);
+	}
 
 	/// <summary>
-	/// 编辑器蓝图：返回 AppDsl 骨架与可用枚举清单（组件类型/聚合/操作符/布局），供编辑器初始化。
-	/// 仅结构化 JSON，绝不承载 HTML。
+	/// M7-11：预览应用草稿（仅编辑者）。需 app:edit。
+	/// 未发布也可预览草稿；无草稿返回 409。
 	/// </summary>
+	[HttpGet("{code}/preview")]
+	public async Task<IActionResult> Preview(
+		string code,
+		[FromQuery] long tenantId = 0,
+		CancellationToken cancellationToken = default)
+	{
+		if (Require(IdentityPermissions.AppEdit) is { } denied) return denied;
+		var tid = ScopeTo(tenantId);
+		var userId = ResolveUserId();
+		if (userId <= 0) return Unauthorized(new ApiError { Code = ErrorCodes.Unauthorized, Message = "未授权：令牌声明缺失。" });
+		return await RenderAppAsync(code, tid, userId, preview: true, cancellationToken);
+	}
+
+	/// <summary>
+	/// M7-11：复制应用为新应用（另存为新）。需 app:create；来源为发布态需 app:view、来源为草稿需 app:edit。
+	/// 复制以草稿形式创建（不继承发布态），禁止伪造 turnId。
+	/// </summary>
+	[HttpPost("{code}/copy")]
+	public async Task<IActionResult> Copy(
+		string code,
+		[FromBody] CopyAppRequest? request,
+		CancellationToken cancellationToken = default)
+	{
+		if (Require(IdentityPermissions.AppCreate) is { } denied) return denied;
+		var tenantId = request?.TenantId ?? 0;
+		if (tenantId <= 0) return BadRequest("tenantId 必须 > 0。");
+		var tid = ScopeTo(tenantId);
+
+		var entity = await _db.AppPlans.FirstOrDefaultAsync(p => p.Code == code, cancellationToken);
+		if (entity is null) return NotFound();
+
+		// 来源读取权限：发布态需 app:view，草稿需 app:edit（不能仅 app:create 复制他人隐藏草稿）。
+		if (entity.Status == AppStatuses.Published)
+		{
+			if (Require(IdentityPermissions.AppView) is { } srcDenied) return srcDenied;
+		}
+		else
+		{
+			if (Require(IdentityPermissions.AppEdit) is { } srcDenied) return srcDenied;
+		}
+
+		var sourceDslJson = entity.Status == AppStatuses.Published && !string.IsNullOrWhiteSpace(entity.PublishedDslJson)
+			? entity.PublishedDslJson
+			: entity.DslJson;
+		if (!_dslSerializer.TryDeserialize(sourceDslJson, out var dsl, out var errors) || dsl is null)
+			return BadRequest(new { errors });
+
+		var newCode = request?.Code ?? $"{entity.Code}-copy";
+		dsl.Code = newCode;
+		dsl.Name = request?.Name ?? $"{entity.Name} 副本";
+
+		var result = await _agent.BuildFromDslAsync(tid, dsl, newCode);
+		if (!result.Success || result.Plan is null)
+			return BadRequest(new { errors = result.Errors });
+		if (await ValidateThemeAsync(tid, result.Plan.ThemeKey, cancellationToken) is { } themeDenied) return themeDenied;
+
+		var conflict = await _db.AppPlans
+			.IgnoreQueryFilters()
+			.AnyAsync(p => p.Code == newCode && (p.TenantId == tid || p.TenantId == 0), cancellationToken);
+		if (conflict) return Conflict(new { errors = new[] { $"应用编码已存在：{newCode}。" } });
+
+		var plan = result.Plan;
+		plan.TenantId = tid;
+		plan.Status = AppStatuses.Draft;
+		plan.PublishedDslJson = null;
+		plan.PublishedVersion = 0;
+		plan.PublishedAt = null;
+		plan.PublishedBy = null;
+
+		_db.AppPlans.Add(plan);
+		await _db.SaveChangesAsync(cancellationToken);
+		return CreatedAtAction(nameof(GetByCode), new { code = plan.Code, tenantId = tid }, ToDetail(plan));
+	}
+
+	/// <summary>编辑器蓝图（结构化，无 HTML）。需 app:view。</summary>
 	[HttpGet("editor/blueprint")]
 	public IActionResult EditorBlueprint()
 	{
+		if (Require(IdentityPermissions.AppView) is { } denied) return denied;
 		var skeleton = new AppDsl
 		{
 			Version = AppDslVersions.Current,
@@ -413,10 +564,10 @@ public sealed class AppBuilderController : ControllerBase
 							},
 							Properties = new Dictionary<string, string> { { "format", "N2" } },
 							Style = new AppComponentStyle { Palette = "primary", ShowBorder = true, Padding = "normal" },
-						}
-					}
-				}
-			}
+						},
+					},
+				},
+			},
 		};
 
 		return Ok(new AppEditorBlueprint(
@@ -428,6 +579,79 @@ public sealed class AppBuilderController : ControllerBase
 			Skeleton: _dslSerializer.Serialize(skeleton)));
 	}
 
+	private async Task<IActionResult> RenderAppAsync(string code, long tenantId, long userId, bool preview, CancellationToken ct)
+	{
+		var entity = await _db.AppPlans.AsNoTracking().FirstOrDefaultAsync(p => p.Code == code, ct);
+		if (entity is null) return NotFound();
+
+		var dslJson = preview ? entity.DslJson : entity.PublishedDslJson;
+		if (string.IsNullOrWhiteSpace(dslJson))
+			return StatusCode(409, new { errors = new[] { preview ? "草稿不存在，无法预览。" : "应用尚未发布，无法运行（请先发布）。" } });
+
+		if (!_dslSerializer.TryDeserialize(dslJson, out var dsl, out var errors) || dsl is null)
+			return BadRequest(new { errors });
+
+		var model = new AppRenderModel
+		{
+			Code = entity.Code,
+			Name = entity.Name,
+			ThemeKey = entity.ThemeKey,
+			PublishedVersion = entity.PublishedVersion,
+		};
+
+		foreach (var page in dsl.Pages)
+		{
+			foreach (var comp in page.Components)
+			{
+				var render = new AppComponentRender { Id = comp.Id, Type = comp.Type, Title = comp.Title };
+				if (comp.Type == AppComponentTypes.Text)
+				{
+					render.Text = comp.Properties.TryGetValue("text", out var t) ? t
+						: comp.Properties.TryGetValue("markdown", out var markdown) ? markdown : "";
+					render.Succeeded = true;
+				}
+				else if (comp.Binding is not null)
+				{
+					try
+					{
+						var exec = await _executor.ExecuteComponentAsync(comp.Binding, tenantId, userId, ct);
+						render.Succeeded = exec.Succeeded;
+						render.ErrorCode = exec.ErrorCode;
+						render.ErrorMessage = exec.ErrorMessage;
+						render.Columns = exec.Columns;
+						render.Data = exec.Data;
+						render.Series = exec.Series;
+						if (comp.Type == AppComponentTypes.Chart)
+						{
+							render.ChartType = comp.Properties.TryGetValue("chartType", out var ct2) ? ct2 : "bar";
+							render.AxisFields = comp.Properties.TryGetValue("categoryField", out var af)
+								? new List<string> { af }
+								: new List<string>();
+						}
+					}
+					catch (SuperBuilderException ex)
+					{
+						render.Succeeded = false;
+						render.ErrorCode = ex.ErrorCode;
+						render.ErrorMessage = ex.Message;
+					}
+				}
+				else
+				{
+					render.Succeeded = false;
+					render.ErrorCode = ErrorCodes.AppBindingNotSupported;
+					render.ErrorMessage = "该组件缺少数据绑定。请在 Ask 重新提问成功后生成应用，再运行新应用。";
+				}
+				model.Components.Add(render);
+			}
+		}
+
+		model.Succeeded = model.Components.All(c => c.Succeeded);
+		return Ok(model);
+	}
+
+	private string Actor() => User.Identity?.Name ?? "system";
+
 	private static AppSummary ToSummary(AppPlan p) =>
 		new(p.Id, p.TenantId, p.Code, p.Name, p.Description, p.Status, p.DslVersion, p.ThemeKey, p.PublishedVersion, p.PublishedAt);
 
@@ -435,24 +659,34 @@ public sealed class AppBuilderController : ControllerBase
 		new(p.Id, p.TenantId, p.Code, p.Name, p.Description, p.Status, p.DslVersion, p.ThemeKey, p.DslJson, p.PublishedVersion, p.PublishedAt);
 
 	#region Request / Response DTOs
-	/// <summary>创建应用请求体（从结构化 DSL）。</summary>
 	public sealed record CreateAppRequest(
 		long TenantId,
 		string DslJson,
 		string? Code = null);
 
-	/// <summary>从描述生成应用请求体（非默认路径，启用 LLM）。</summary>
 	public sealed record GenerateAppRequest(
 		long TenantId,
 		string Description,
 		string? Code = null,
 		string? ThemeKey = null);
 
-	/// <summary>更新应用请求体（Code 不可变，仅覆盖 DSL 文档）。</summary>
+	/// <summary>M7-11：从 Ask 快照生成应用。</summary>
+	public sealed record CreateFromAskRequest(
+		long TenantId,
+		string TurnId,
+		string? Name = null,
+		string? Code = null,
+		string? ThemeKey = null);
+
 	public sealed record UpdateAppRequest(
 		string DslJson);
 
-	/// <summary>应用摘要 DTO。</summary>
+	/// <summary>M7-11：复制应用为新应用。</summary>
+	public sealed record CopyAppRequest(
+		long TenantId,
+		string? Name = null,
+		string? Code = null);
+
 	public sealed record AppSummary(
 		long Id,
 		long TenantId,
@@ -465,7 +699,6 @@ public sealed class AppBuilderController : ControllerBase
 		int PublishedVersion,
 		DateTime? PublishedAt);
 
-	/// <summary>应用详情 DTO（含完整 DSL）。</summary>
 	public sealed record AppDetail(
 		long Id,
 		long TenantId,
@@ -479,7 +712,6 @@ public sealed class AppBuilderController : ControllerBase
 		int PublishedVersion,
 		DateTime? PublishedAt);
 
-	/// <summary>发布/回滚结果 DTO（M7-02）。</summary>
 	public sealed record PublishResult(
 		long AppId,
 		long TenantId,
@@ -488,7 +720,6 @@ public sealed class AppBuilderController : ControllerBase
 		string? PublishedBy,
 		int? RolledBackFromVersion = null);
 
-	/// <summary>应用版本摘要 DTO（M7-02，列表不含 DSL 正文）。</summary>
 	public sealed record AppVersionSummary(
 		long Id,
 		int Version,
@@ -500,7 +731,6 @@ public sealed class AppBuilderController : ControllerBase
 		int? RolledBackFromVersion,
 		bool IsCurrent);
 
-	/// <summary>编辑器蓝图 DTO（结构化，无 HTML）。</summary>
 	public sealed record AppEditorBlueprint(
 		string DslVersion,
 		IReadOnlyList<string> ComponentTypes,

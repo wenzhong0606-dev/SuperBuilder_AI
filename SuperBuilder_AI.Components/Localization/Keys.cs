@@ -74,6 +74,19 @@ public static class Keys
         public const string HeroEnterpriseSaaS = "Login.Hero.EnterpriseSaaS";
     }
 
+    /// <summary>平台专用登录入口（/admin/login，绕过业务租户选择器）。</summary>
+    public static class PlatformLogin
+    {
+        public const string Title = "PlatformLogin.Title";
+        public const string Username = "PlatformLogin.Username";
+        public const string Password = "PlatformLogin.Password";
+        public const string Submit = "PlatformLogin.Submit";
+        public const string Tagline = "PlatformLogin.Tagline";
+        public const string NotReady = "PlatformLogin.NotReady";
+        public const string LoginFailed = "PlatformLogin.LoginFailed";
+        public const string BackToTenantLogin = "PlatformLogin.BackToTenantLogin";
+    }
+
     /// <summary>应用级标题/副标题。</summary>
     public static class App
     {
@@ -608,6 +621,12 @@ public static class Keys
         public const string AskPublishSuccess = "Content.AskPublishSuccess";
         public const string AskPublishFailed = "Content.AskPublishFailed";
         public const string AskPublishException = "Content.AskPublishException";
+        public const string AskPublishDrafting = "Content.AskPublishDrafting";
+        public const string AskPublishDraftSaved = "Content.AskPublishDraftSaved";
+        public const string AskPublishDraftFailed = "Content.AskPublishDraftFailed";
+        public const string AskPublishPublished = "Content.AskPublishPublished";
+        public const string AskPublishPublishFailed = "Content.AskPublishPublishFailed";
+        public const string AskPublishDraftKept = "Content.AskPublishDraftKept";
         public const string DashboardsTitle = "Content.DashboardsTitle";
         public const string DashboardsDesc = "Content.DashboardsDesc";
         public const string DashboardsSearchPlaceholder = "Content.DashboardsSearchPlaceholder";
@@ -710,6 +729,39 @@ public static class Keys
         public const string AppDetailDeleteSuccess = "Content.AppDetailDeleteSuccess";
         public const string AppDetailDeleteFailed = "Content.AppDetailDeleteFailed";
         public const string AppDetailLoadFailed = "Content.AppDetailLoadFailed";
+        public const string AppDetailRun = "Content.AppDetailRun";
+        public const string AppDetailPreview = "Content.AppDetailPreview";
+
+        // Apps（应用列表）— M7-11 运行入口
+        public const string AppsRun = "Content.AppsRun";
+        public const string AppsMissingCodeRun = "Content.AppsMissingCodeRun";
+
+        // AppRun（运行已发布应用）— M7-11
+        public const string AppRunTitle = "Content.AppRunTitle";
+        public const string AppRunDesc = "Content.AppRunDesc";
+        public const string AppRunLoading = "Content.AppRunLoading";
+        public const string AppRunNotPublishedTitle = "Content.AppRunNotPublishedTitle";
+        public const string AppRunNotPublishedText = "Content.AppRunNotPublishedText";
+        public const string AppRunGoPublish = "Content.AppRunGoPublish";
+        public const string AppRunFailed = "Content.AppRunFailed";
+
+        // AppPreview（预览草稿）— M7-11
+        public const string AppPreviewTitle = "Content.AppPreviewTitle";
+        public const string AppPreviewDesc = "Content.AppPreviewDesc";
+        public const string AppPreviewLoading = "Content.AppPreviewLoading";
+        public const string AppPreviewNoDraftTitle = "Content.AppPreviewNoDraftTitle";
+        public const string AppPreviewNoDraftText = "Content.AppPreviewNoDraftText";
+        public const string AppPreviewGoEdit = "Content.AppPreviewGoEdit";
+        public const string AppPreviewBadge = "Content.AppPreviewBadge";
+        public const string AppPreviewFailed = "Content.AppPreviewFailed";
+
+        // AppRenderer（共享渲染器）— M7-11
+        public const string AppRenderNoComponentsTitle = "Content.AppRenderNoComponentsTitle";
+        public const string AppRenderNoComponentsText = "Content.AppRenderNoComponentsText";
+        public const string AppRenderPartial = "Content.AppRenderPartial";
+        public const string AppRenderKpiDefault = "Content.AppRenderKpiDefault";
+        public const string AppRenderUnknownTitle = "Content.AppRenderUnknownTitle";
+        public const string AppRenderComponentFailed = "Content.AppRenderComponentFailed";
         public const string AskTurnMe = "Content.AskTurnMe";
         public const string AskTurnAiSummary = "Content.AskTurnAiSummary";
         public const string AskTurnMeta = "Content.AskTurnMeta";
@@ -747,6 +799,8 @@ public static class Keys
         public const string AskTurnRefining = "Content.AskTurnRefining";
         public const string AskTurnPublish = "Content.AskTurnPublish";
         public const string AskTurnPublishing = "Content.AskTurnPublishing";
+        public const string AskTurnRun = "Content.AskTurnRun";
+        public const string AskTurnRetryPublish = "Content.AskTurnRetryPublish";
         public const string AskTurnRefineNoCmd = "Content.AskTurnRefineNoCmd";
         public const string AskTurnRefineNoViz = "Content.AskTurnRefineNoViz";
         public const string AskTurnRefineUnrecognized = "Content.AskTurnRefineUnrecognized";
@@ -1442,6 +1496,14 @@ public static class Keys
         [Login.HeroMultilingual] = new("多语言", "Multilingual"),
         [Login.HeroLowCode] = new("低代码", "Low-code"),
         [Login.HeroEnterpriseSaaS] = new("企业级 SaaS", "Enterprise SaaS"),
+        [PlatformLogin.Title] = new("平台运营登录", "Platform console sign-in"),
+        [PlatformLogin.Username] = new("管理员用户名", "Admin username"),
+        [PlatformLogin.Password] = new("管理员口令", "Admin password"),
+        [PlatformLogin.Submit] = new("登录平台控制台", "Sign in to console"),
+        [PlatformLogin.Tagline] = new("平台治理 · 租户运营控制台", "Platform governance console"),
+        [PlatformLogin.NotReady] = new("平台尚未初始化，暂无法登录。", "The platform is not initialized yet; sign-in is unavailable."),
+        [PlatformLogin.LoginFailed] = new("平台管理员登录失败：用户不存在、口令错误或无权访问。", "Platform admin sign-in failed: invalid user, password, or insufficient access."),
+        [PlatformLogin.BackToTenantLogin] = new("返回租户登录", "Back to tenant sign-in"),
 
         [App.Subtitle] = new("智能问数平台", "AI Analytics Platform"),
         [Document.OutboundOrder] = new("出库单", "Outbound order"),
@@ -1928,6 +1990,12 @@ public static class Keys
         [Content.AskPublishSuccess] = new("已发布为应用：{0}", "Published as app: {0}"),
         [Content.AskPublishFailed] = new("发布失败：{0}", "Publish failed: {0}"),
         [Content.AskPublishException] = new("发布异常：{0}", "Publish error: {0}"),
+        [Content.AskPublishDrafting] = new("正在保存草稿…", "Saving draft…"),
+        [Content.AskPublishDraftSaved] = new("已保存为草稿 {0}，正在发布…", "Draft {0} saved, publishing…"),
+        [Content.AskPublishDraftFailed] = new("创建草稿失败：{0}", "Failed to create draft: {0}"),
+        [Content.AskPublishPublished] = new("已发布为应用：{0}（v{1}）", "Published as app: {0} (v{1})"),
+        [Content.AskPublishPublishFailed] = new("已保存为草稿，发布失败：{0}", "Draft saved, publish failed: {0}"),
+        [Content.AskPublishDraftKept] = new("草稿已保留：{0}", "Draft kept: {0}"),
         [Content.DashboardsTitle] = new("仪表盘", "Dashboards"),
         [Content.DashboardsDesc] = new("将 Ask 分析结果固化为可复用的可视化看板，支持团队共享与定时刷新。", "Turn Ask analysis results into reusable visual dashboards, with team sharing and scheduled refresh."),
         [Content.DashboardsSearchPlaceholder] = new("搜索名称 / 编码…", "Search by name / code…"),
@@ -2030,6 +2098,31 @@ public static class Keys
         [Content.AppDetailDeleteSuccess] = new("应用已删除。", "App deleted."),
         [Content.AppDetailDeleteFailed] = new("删除失败（HTTP {0}）。", "Delete failed (HTTP {0})."),
         [Content.AppDetailLoadFailed] = new("加载失败（{0}）。", "Failed to load (HTTP {0})."),
+        [Content.AppDetailRun] = new("运行", "Run"),
+        [Content.AppDetailPreview] = new("预览", "Preview"),
+        [Content.AppsRun] = new("运行", "Run"),
+        [Content.AppsMissingCodeRun] = new("该记录缺少 code，无法运行。", "This record is missing a code and cannot be run."),
+        [Content.AppRunTitle] = new("运行应用", "Run app"),
+        [Content.AppRunDesc] = new("运行已发布的应用，按访问者当前权限取数。", "Run the published app; data is fetched under the current viewer's permissions."),
+        [Content.AppRunLoading] = new("正在运行应用…", "Running app…"),
+        [Content.AppRunNotPublishedTitle] = new("应用尚未发布", "App not published"),
+        [Content.AppRunNotPublishedText] = new("该应用还未发布，无法运行。请先在应用详情中发布。", "This app is not published yet and cannot be run. Publish it from the app detail page first."),
+        [Content.AppRunGoPublish] = new("前往发布", "Go to publish"),
+        [Content.AppRunFailed] = new("运行失败（{0}）。", "Run failed ({0})."),
+        [Content.AppPreviewTitle] = new("预览应用", "Preview app"),
+        [Content.AppPreviewDesc] = new("预览应用草稿（仅编辑者可见），使用当前访问者权限取数。", "Preview the app draft (editors only), fetching data under the current viewer's permissions."),
+        [Content.AppPreviewLoading] = new("正在预览草稿…", "Previewing draft…"),
+        [Content.AppPreviewNoDraftTitle] = new("草稿不存在", "No draft"),
+        [Content.AppPreviewNoDraftText] = new("该应用没有可预览的草稿。请先在应用详情中编辑并保存草稿。", "This app has no draft to preview. Edit and save a draft from the app detail page first."),
+        [Content.AppPreviewGoEdit] = new("前往编辑", "Go to edit"),
+        [Content.AppPreviewBadge] = new("当前为草稿预览，数据基于访问者当前权限实时取数。", "This is a draft preview; data is fetched live under the current viewer's permissions."),
+        [Content.AppPreviewFailed] = new("预览失败（{0}）。", "Preview failed ({0})."),
+        [Content.AppRenderNoComponentsTitle] = new("没有可渲染的组件", "No renderable components"),
+        [Content.AppRenderNoComponentsText] = new("该应用尚未包含任何组件。", "This app does not contain any components yet."),
+        [Content.AppRenderPartial] = new("部分组件加载失败，以下为可用结果（失败组件已单独标注）。", "Some components failed to load; below are the available results (failed components are flagged individually)."),
+        [Content.AppRenderKpiDefault] = new("指标", "Metric"),
+        [Content.AppRenderUnknownTitle] = new("未知组件类型", "Unknown component type"),
+        [Content.AppRenderComponentFailed] = new("组件加载失败。", "Component failed to load."),
         [Content.AskTurnMe] = new("我", "Me"),
         [Content.AskTurnAiSummary] = new("AI 解读", "AI insight"),
         [Content.AskTurnMeta] = new("耗时 {0} ms · 建议图表 {1} 个", "Elapsed {0} ms · {1} suggested chart(s)"),
@@ -2067,6 +2160,8 @@ public static class Keys
         [Content.AskTurnRefining] = new("查询中…", "Querying…"),
         [Content.AskTurnPublish] = new("发布为应用", "Publish as app"),
         [Content.AskTurnPublishing] = new("发布中…", "Publishing…"),
+        [Content.AskTurnRun] = new("运行", "Run"),
+        [Content.AskTurnRetryPublish] = new("重试发布", "Retry publish"),
         [Content.AskTurnRefineNoCmd] = new("请输入调整指令。", "Please enter an adjustment instruction."),
         [Content.AskTurnRefineNoViz] = new("当前轮无可视化结果。", "This turn has no visualization result."),
         [Content.AskTurnRefineUnrecognized] = new("未能识别指令（支持：改成柱状/折线/饼图、显示/隐藏图例、配色换绿/橙/红/灰/蓝）。", "Unrecognized instruction (supported: bar/line/pie, show/hide legend, palette green/orange/red/gray/blue)."),

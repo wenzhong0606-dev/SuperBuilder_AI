@@ -1,0 +1,164 @@
+@using System.Text.Json
+@using SuperBuilder_AI.Components.Services.Models
+@using SuperBuilder_AI.Components.Shared
+
+@* M7-11：应用运行/预览共享渲染器。接收后端 AppRenderModel，按组件类型渲染真实数据。 *@
+@if (Model.Components.Count == 0)
+{
+    <SbEmptyState Icon="sb-ico-comp" Title="@L10n.T(Keys.Content.AppRenderNoComponentsTitle, "没有可渲染的组件")" Text="@L10n.T(Keys.Content.AppRenderNoComponentsText, "该应用尚未包含任何组件。")" />
+}
+else
+{
+    @if (!Model.Succeeded)
+    {
+        <div class="alert alert-warning mb-3">@L10n.T(Keys.Content.AppRenderPartial, "部分组件加载失败，以下为可用结果（失败组件已单独标注）。")</div>
+    }
+    <div class="app-render-grid">
+        @foreach (var c in Model.Components)
+        {
+            <div class="app-render-item">
+                @if (!string.IsNullOrWhiteSpace(c.Title))
+                {
+                    <div class="ari-title">@c.Title</div>
+                }
+                @if (c.Succeeded)
+                {
+                    @switch (c.Type)
+                    {
+                        case "text":
+                            <div class="ari-text">@(c.Text ?? "")</div>
+                            break;
+                        case "table":
+                            <ResultTable Rows="Remap(c)" />
+                            break;
+                        case "chart":
+                            <ChartView Type="@(c.ChartType ?? "bar")" Labels="ChartLabels(c)" Datasets="ChartDatasets(c)" Title="@c.Title" />
+                            break;
+                        case "kpi":
+                            <SbStatTile Label="@(c.Title ?? L10n.T(Keys.Content.AppRenderKpiDefault, "指标"))" Value="@KpiValue(c)" />
+                            break;
+                        default:
+                            <SbEmptyState Icon="sb-ico-comp" Title="@L10n.T(Keys.Content.AppRenderUnknownTitle, "未知组件类型")" Text="@c.Type" />
+                            break;
+                    }
+                }
+                else
+                {
+                    <div class="alert alert-danger">
+                        @if (!string.IsNullOrWhiteSpace(c.ErrorCode)) { <strong>@c.ErrorCode</strong>@(" : ") }@(c.ErrorMessage ?? L10n.T(Keys.Content.AppRenderComponentFailed, "组件加载失败。"))
+                    </div>
+                }
+            </div>
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public AppRenderDto Model { get; set; } = default!;
+
+    /// <summary>用 Columns 元数据把结果表头重映射为展示名（避免裸字段名），并规避展示名冲突。</summary>
+    private List<Dictionary<string, object?>> Remap(AppComponentRenderDto c)
+    {
+        if (c.Columns.Count == 0) return c.Data;
+        var used = new HashSet<string>();
+        var keys = new List<string>();
+        foreach (var col in c.Columns)
+        {
+            var baseKey = string.IsNullOrWhiteSpace(col.DisplayName) ? col.Name : col.DisplayName;
+            var k = baseKey;
+            var n = 1;
+            while (used.Contains(k)) k = $"{baseKey}({++n})";
+            used.Add(k);
+            keys.Add(k);
+        }
+        return c.Data.Select(row =>
+        {
+            var dict = new Dictionary<string, object?>();
+            for (var i = 0; i < c.Columns.Count; i++)
+                dict[keys[i]] = row.TryGetValue(c.Columns[i].Name, out var v) ? v : null;
+            return dict;
+        }).ToList();
+    }
+
+    private List<string> ChartLabels(AppComponentRenderDto c)
+    {
+        var cat = c.AxisFields.FirstOrDefault();
+        if (string.IsNullOrWhiteSpace(cat)) return new();
+        return c.Data.Select(r => JsonValue.AsString(r.TryGetValue(cat, out var v) ? v : null)).ToList();
+    }
+
+    private List<ChartView.ChartDataset> ChartDatasets(AppComponentRenderDto c)
+    {
+        var cat = c.AxisFields.FirstOrDefault();
+        var numeric = NumericColumns(c, cat);
+        var datasets = numeric.Select(nc => new ChartView.ChartDataset
+        {
+            Label = nc,
+            Data = c.Data.Select(r =>
+            {
+                var raw = r.TryGetValue(nc, out var v) ? v : null;
+                return TryDouble(raw, out var d) ? d : (double?)null;
+            }).ToList()
+        }).ToList();
+
+        if (datasets.Count == 0 && c.Data.Count > 0)
+        {
+            var firstCol = c.Columns.FirstOrDefault()?.Name ?? c.Data[0].Keys.FirstOrDefault();
+            if (firstCol is not null)
+            {
+                datasets.Add(new ChartView.ChartDataset
+                {
+                    Label = firstCol,
+                    Data = c.Data.Select(r =>
+                    {
+                        var raw = r.TryGetValue(firstCol, out var v) ? v : null;
+                        return TryDouble(raw, out var d) ? d : (double?)null;
+                    }).ToList()
+                });
+            }
+        }
+        return datasets;
+    }
+
+    private List<string> NumericColumns(AppComponentRenderDto c, string? cat)
+    {
+        var result = new List<string>();
+        foreach (var col in c.Columns)
+        {
+            if (col.Name == cat) continue;
+            var t = (col.Type ?? "").ToLowerInvariant();
+            if (t.Contains("int") || t.Contains("decimal") || t.Contains("double") || t.Contains("float") || t.Contains("numeric") || t.Contains("number"))
+                result.Add(col.Name);
+        }
+        if (result.Count > 0) return result;
+        if (c.Data.Count > 0)
+        {
+            foreach (var k in c.Data[0].Keys)
+            {
+                if (k == cat) continue;
+                if (TryDouble(c.Data[0][k], out _)) result.Add(k);
+            }
+        }
+        return result;
+    }
+
+    private static bool TryDouble(object? v, out double d)
+    {
+        d = 0;
+        if (v is null) return false;
+        if (v is JsonElement je)
+        {
+            if (je.ValueKind == JsonValueKind.Number) { d = je.GetDouble(); return true; }
+            return double.TryParse(je.GetString(), out d);
+        }
+        return double.TryParse(v.ToString(), out d);
+    }
+
+    private static string KpiValue(AppComponentRenderDto c)
+    {
+        if (c.Data.Count == 0) return "—";
+        var first = c.Data[0];
+        var kv = first.FirstOrDefault();
+        return JsonValue.AsString(kv.Value);
+    }
+}

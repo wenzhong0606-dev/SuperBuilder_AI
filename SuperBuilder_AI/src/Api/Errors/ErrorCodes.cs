@@ -34,6 +34,16 @@ public static class ErrorCodes
     public const string AppDslInvalid = "SB_APP_001";
     public const string AgentNoContent = "SB_AGENT_001";
 
+    // M7-11 应用运行时（Ask 结果 → 可运行应用）
+    /// <summary>绑定不完整或查询模式不支持（如 JOIN / between / 多字段排序 / Distinct / 实体无法解析），统一 422。</summary>
+    public const string AppBindingNotSupported = "SB_APP_002";
+    /// <summary>应用运行时查询执行失败（脱敏后返回，不暴露内部异常）。</summary>
+    public const string AppQueryFailed = "SB_APP_003";
+    /// <summary>查询快照不存在或已过期（turnId 无效）。</summary>
+    public const string AppSnapshotNotFound = "SB_APP_004";
+    /// <summary>查询快照归属不符（跨用户/跨租户访问他人查询上下文）。</summary>
+    public const string AppSnapshotForbidden = "SB_APP_005";
+
     // 平台（多租户 / 配额 / 审计）
     public const string QuotaExceeded = "SB_PFM_001";
     public const string TenantIsolated = "SB_PFM_002";
@@ -63,6 +73,10 @@ public static class ErrorCodes
         [BiDataSourceUnreachable] = "数据源暂时不可达，请稍后重试或联系管理员检查连接。",
         [AppDslInvalid] = "应用定义（DSL）不合法，请检查组件配置后重试。",
         [AgentNoContent] = "智能体未返回有效内容，请重新描述任务。",
+        [AppBindingNotSupported] = "当前查询无法转为可发布的应用绑定（如含多表关联、多字段排序、去重或无法解析的实体），请简化查询后重试。",
+        [AppQueryFailed] = "应用取数执行失败，请稍后重试或联系管理员。",
+        [AppSnapshotNotFound] = "查询引用已失效或不存在，请重新发起查询后再生成应用。",
+        [AppSnapshotForbidden] = "无权访问该查询上下文，仅创建者本人可将其生成为应用。",
         [QuotaExceeded] = "当前租户配额已用尽，请升级套餐或联系管理员。",
         [TenantIsolated] = "操作越过了租户边界，已被安全策略拒绝。",
         [DataSourceForbidden] = "当前账号无权访问所选数据源。",

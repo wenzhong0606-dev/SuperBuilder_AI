@@ -2,8 +2,18 @@
 
 <Router AppAssembly="@typeof(Routes).Assembly">
     <Found Context="routeData">
-        <RouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)" />
-        <FocusOnNavigate RouteData="@routeData" Selector="h1" />
+        <ErrorBoundary>
+            <ChildContent>
+                <RouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)" />
+                <FocusOnNavigate RouteData="@routeData" Selector="h1" />
+            </ChildContent>
+            <ErrorContent Context="exception">
+                <div class="alert alert-danger m-3">
+                    <strong>页面渲染出错</strong>
+                    <pre class="mb-0" style="white-space:pre-wrap;">@exception.Message</pre>
+                </div>
+            </ErrorContent>
+        </ErrorBoundary>
     </Found>
     <NotFound>
         @* 404 页面自带 BlankLayout，此处以内联空态呈现，避免布局嵌套 *@

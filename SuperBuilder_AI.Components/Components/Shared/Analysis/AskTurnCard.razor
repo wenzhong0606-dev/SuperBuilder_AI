@@ -1,6 +1,7 @@
 @using System.Collections.Generic
 @using System.Linq
 @using SuperBuilder_AI.Components.Models
+@inject NavigationManager Nav
 
 <div class="turn @(Turn.IsRefine ? "refine" : "")">
     <div class="bubble user"><span class="who">@L10n.T(Keys.Content.AskTurnMe, "我")</span>@Turn.Question</div>
@@ -174,11 +175,28 @@
             @if (!string.IsNullOrEmpty(Turn.RefineError)) { <span class="error tiny">@Turn.RefineError</span> }
         </div>
 
-        <div class="publish-box">
-            <button class="btn btn-outline-secondary" @onclick="() => OnPublish.InvokeAsync(Turn)" disabled="@Turn.PublishBusy">@L10n.T(Keys.Content.AskTurnPublish, "发布为应用")</button>
-            @if (Turn.PublishBusy) { <span class="muted tiny">@L10n.T(Keys.Content.AskTurnPublishing, "发布中…")</span> }
-            @if (!string.IsNullOrEmpty(Turn.PublishInfo)) { <span class="ok tiny">@Turn.PublishInfo</span> }
-            @if (!string.IsNullOrEmpty(Turn.PublishError)) { <span class="error tiny">@Turn.PublishError</span> }
+        <div class="publish-box" data-testid="ask-publish-box" data-stage="@Turn.PublishStage" data-code="@Turn.PublishCode">
+            @if (Turn.PublishStage == PublishStage.Published)
+            {
+                <span class="ok tiny" data-testid="ask-publish-status">@Turn.PublishInfo</span>
+                @if (!string.IsNullOrEmpty(Turn.PublishCode))
+                {
+                    <button class="btn btn-sm btn-outline-primary" data-testid="ask-publish-run" @onclick='() => Nav.NavigateTo($"apps/{Uri.EscapeDataString(Turn.PublishCode!)}/run")'>@L10n.T(Keys.Content.AskTurnRun, "运行")</button>
+                }
+            }
+            else
+            {
+                <PermissionGuard Require="@(new[] { PermissionCodes.AppPublish })">
+                    <button class="btn btn-outline-secondary" data-testid="ask-publish" @onclick="() => OnPublish.InvokeAsync(Turn)" disabled="@Turn.PublishBusy">@L10n.T(Keys.Content.AskTurnPublish, "发布为应用")</button>
+                </PermissionGuard>
+                @if (Turn.PublishBusy) { <span class="muted tiny" data-testid="ask-publish-busy">@L10n.T(Keys.Content.AskTurnPublishing, "发布中…")</span> }
+                @if (!string.IsNullOrEmpty(Turn.PublishInfo)) { <span class="ok tiny" data-testid="ask-publish-status">@Turn.PublishInfo</span> }
+                @if (!string.IsNullOrEmpty(Turn.PublishError)) { <span class="error tiny" data-testid="ask-publish-error">@Turn.PublishError</span> }
+                @if (Turn.PublishStage == PublishStage.Failed && !string.IsNullOrEmpty(Turn.PublishCode))
+                {
+                    <button class="btn btn-sm btn-warning" data-testid="ask-publish-retry" @onclick="() => OnPublish.InvokeAsync(Turn)" disabled="@Turn.PublishBusy">@L10n.T(Keys.Content.AskTurnRetryPublish, "重试发布")</button>
+                }
+            }
         </div>
     }
 </div>

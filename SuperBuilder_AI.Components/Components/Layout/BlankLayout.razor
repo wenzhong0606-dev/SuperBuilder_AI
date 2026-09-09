@@ -17,11 +17,23 @@
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (!firstRender) return;
-        var theme = await JS.InvokeAsync<string>("SuperBuilder.getTheme");
-        await Theme.ApplyAsync(theme);
+        try
+        {
+            var theme = await JS.InvokeAsync<string>("SuperBuilder.getTheme");
+            await Theme.ApplyAsync(theme);
+        }
+        catch
+        {
+            // 主题获取失败时退避默认主题，不阻断会话自举。
+        }
 
+        // 本地还原后立即重渲染；网络校验失败保留本地会话，不向外抛出以免撕裂电路。
         await Session.RestoreAsync();
-        if (State.IsAuthenticated) await Session.ValidateAsync();
         StateHasChanged();
+        if (State.IsAuthenticated)
+        {
+            try { await Session.ValidateAsync(); } catch { /* 网络异常不登出 */ }
+            StateHasChanged();
+        }
     }
 }

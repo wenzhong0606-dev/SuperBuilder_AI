@@ -1,0 +1,77 @@
+@page "/apps/{code}/run"
+@inject IAppApiClient AppClient
+@inject AppState State
+@inject NavigationManager Nav
+@inject ToastService Toast
+@using SuperBuilder_AI.Components.Components.Constants
+@using SuperBuilder_AI.Components.Services.Models
+
+<PermissionGuard Require="@(new[] { PermissionCodes.AppView })">
+    <div data-testid="app-run" data-state="@_state">
+    <PageHead Icon="sb-ico-play" Title="@_title" Desc="@L10n.T(Keys.Content.AppRunDesc, "运行已发布的应用，按访问者当前权限取数。")">
+        <button class="btn btn-outline-secondary btn-sm" @onclick='() => Nav.NavigateTo("apps")'>@L10n.T(Keys.Content.AppDetailBack, "返回列表")</button>
+        <button class="btn btn-outline-secondary btn-sm" @onclick="() => Load()">@L10n.T(Keys.Content.AppDetailRefresh, "刷新")</button>
+    </PageHead>
+
+    @if (_loading)
+    {
+        <LoadingState Text="@L10n.T(Keys.Content.AppRunLoading, "正在运行应用…")" />
+    }
+    else if (_notPublished)
+    {
+        <SbEmptyState Icon="sb-ico-play" Title="@L10n.T(Keys.Content.AppRunNotPublishedTitle, "应用尚未发布")" Text="@L10n.T(Keys.Content.AppRunNotPublishedText, "该应用还未发布，无法运行。请先在应用详情中发布。")">
+            <Actions><button class="btn btn-primary btn-sm" @onclick='() => Nav.NavigateTo($"apps/{Uri.EscapeDataString(Code)}")'>@L10n.T(Keys.Content.AppRunGoPublish, "前往发布")</button></Actions>
+        </SbEmptyState>
+    }
+    else if (_error)
+    {
+        <ErrorState Message="@(_errorMsg ?? "")" OnRetry="() => Load()" />
+    }
+    else if (_model is not null)
+    {
+        <AppRenderer Model="_model" />
+    }
+    </div>
+</PermissionGuard>
+
+@code {
+    [Parameter] public string Code { get; set; } = "";
+
+    private string _title = "运行应用";
+    private string _state = "loading";
+    private bool _loading = true;
+    private bool _error;
+    private bool _notPublished;
+    private string? _errorMsg;
+    private AppRenderDto? _model;
+
+    protected override void OnInitialized() => _title = L10n.T(Keys.Content.AppRunTitle, "运行应用");
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        await Load();
+    }
+
+    private async Task Load()
+    {
+        _loading = true;
+        _error = false;
+        _notPublished = false;
+        _errorMsg = null;
+        _model = null;
+        var r = await AppClient.RenderAppAsync(State.TenantId, Code);
+        _loading = false;
+        if (!r.Ok || r.Model is null)
+        {
+            if (r.Status == 409) { _notPublished = true; _state = "not-published"; }
+            else { _error = true; _errorMsg = r.ErrorMessage ?? string.Format(L10n.T(Keys.Content.AppRunFailed, "运行失败（{0}）。"), r.Status); _state = "error"; }
+            StateHasChanged();
+            return;
+        }
+        _model = r.Model;
+        _state = "ok";
+        _title = string.IsNullOrWhiteSpace(r.Model.Name) ? Code : r.Model.Name;
+        StateHasChanged();
+    }
+}

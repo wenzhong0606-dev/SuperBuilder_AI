@@ -136,11 +136,17 @@ public sealed class AppGridPosition
 	public int H { get; set; } = 3;
 }
 
-/// <summary>取数绑定（P8）。以业务语义名表达"取什么数"，由运行时语义解析映射到实体/字段。</summary>
+/// <summary>取数绑定（P8 / M7-11）。以业务语义名表达"取什么数"，由运行时语义解析映射到实体/字段。</summary>
 public sealed class AppDataSourceBinding
 {
 	/// <summary>业务实体语义名（如 sales_order）。</summary>
 	public string? Entity { get; set; }
+
+	/// <summary>
+	/// M7-11：运行时硬约束的数据源 Id（来自 Ask 查询快照解析，非语义名）。
+	/// 应用运行必须在该数据源范围内执行；单源约束在选表前生效。为 null 时由实体语义回退解析。
+	/// </summary>
+	public long? DataSourceId { get; set; }
 
 	/// <summary>指标集合（字段 + 聚合方式）。</summary>
 	public List<AppMetricBinding> Metrics { get; set; } = new();
@@ -151,8 +157,23 @@ public sealed class AppDataSourceBinding
 	/// <summary>筛选条件集合。</summary>
 	public List<AppFilterBinding> Filters { get; set; } = new();
 
+	/// <summary>
+	/// M7-11：排序集合。首批仅支持单字段排序；多字段一律在导出/运行时阶段以 422 拒绝。
+	/// </summary>
+	public List<AppSortBinding> Sort { get; set; } = new();
+
 	/// <summary>返回行数上限；为 null 表示不限制。</summary>
 	public int? Limit { get; set; }
+}
+
+/// <summary>M7-11 排序绑定（确定性查询分支使用，替代 QueryIntent 的单值 OrderBy）。</summary>
+public sealed class AppSortBinding
+{
+	/// <summary>排序字段（语义名）。</summary>
+	public string Field { get; set; } = string.Empty;
+
+	/// <summary>排序方向：ASC / DESC。</summary>
+	public string Direction { get; set; } = "ASC";
 }
 
 /// <summary>指标绑定（P8）。</summary>
@@ -165,7 +186,7 @@ public sealed class AppMetricBinding
 	public string Aggregation { get; set; } = AppAggregateTypes.Sum;
 }
 
-/// <summary>筛选绑定（P8）。</summary>
+/// <summary>筛选绑定（P8 / M7-11）。</summary>
 public sealed class AppFilterBinding
 {
 	/// <summary>筛选字段（语义名）。</summary>
@@ -174,8 +195,15 @@ public sealed class AppFilterBinding
 	/// <summary>操作符，取值见 <see cref="AppFilterOperators"/>。</summary>
 	public string Operator { get; set; } = AppFilterOperators.Eq;
 
-	/// <summary>比较值（可为空，表示占位/由运行时注入）。</summary>
+	/// <summary>单值比较值（eq/neq/gt/lt/like 使用；可为空表示占位/由运行时注入）。</summary>
 	public string? Value { get; set; }
+
+	/// <summary>
+	/// M7-11：类型明确的多值集合（<c>in</c> 操作符使用）。
+	/// 数组中每个元素已是独立值，<strong>禁止按逗号拆分单个字符串</strong>；
+	/// 含逗号的字符串（如 "上海,浦东"）应作为数组的一项原样保留，由运行时按列类型参数化。
+	/// </summary>
+	public List<string> Values { get; set; } = new();
 }
 
 /// <summary>

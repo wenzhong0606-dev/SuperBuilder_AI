@@ -9,8 +9,13 @@ public sealed class AppState
     public long HomeTenantId { get; set; }
     public long UserId { get; set; }
     public string Username { get; set; } = "";
-    public System.Collections.Generic.IReadOnlyList<string> Permissions { get; set; }
-        = System.Array.Empty<string>();
+    private System.Collections.Generic.IReadOnlyList<string> _permissions = System.Array.Empty<string>();
+    public event Action? PermissionsChanged;
+    public System.Collections.Generic.IReadOnlyList<string> Permissions
+    {
+        get => _permissions;
+        set { _permissions = value ?? System.Array.Empty<string>(); PermissionsChanged?.Invoke(); }
+    }
     public System.Collections.Generic.IReadOnlyList<string> AvailableCultures { get; set; } = new[] { "zh-CN" };
     public string DefaultCulture { get; set; } = "zh-CN";
 
@@ -35,7 +40,11 @@ public sealed class AppState
         SessionRestoredChanged?.Invoke();
     }
 
-    /// <summary>清空本地会话态（不触碰持久化存储；存储清理由 <see cref="AuthStore"/> 负责）。</summary>
+    /// <summary>清空本地会话态（不触碰持久化存储；存储清理由 <see cref="AuthStore"/> 负责）。
+    /// 注意：不重置 <see cref="SessionRestored"/>——该标志仅表示"本电路生命周期内是否已检查过 localStorage 自举"，
+    /// 一旦置位应保持 true，否则 F5 后 ValidateAsync 触发 401→ClearAsync 会把它复位为 false，
+    /// 使页面永久退回"恢复中"分支（OnAfterRenderAsync(firstRender) 已消费、不会再跑）。登出后由
+    /// <see cref="IsAuthenticated"/> 驱动 UI 显示登录提示，而非卡在加载态。</summary>
     public void ClearSession()
     {
         Token = null;
@@ -46,7 +55,6 @@ public sealed class AppState
         Permissions = System.Array.Empty<string>();
         AvailableCultures = new[] { "zh-CN" };
         DefaultCulture = "zh-CN";
-        SessionRestored = false;
     }
 
     /// <summary>通知监听方会话已失效。</summary>

@@ -21,6 +21,10 @@ public sealed class AskTurn
     public bool PublishBusy { get; set; }
     public string? PublishInfo { get; set; }
     public string? PublishError { get; set; }
+    /// <summary>C4：发布阶段状态机（创建草稿 → 发布 → 失败可重试）。</summary>
+    public PublishStage PublishStage { get; set; } = PublishStage.None;
+    /// <summary>C4：已创建草稿的应用编码，重试发布时复用，避免重复创建。</summary>
+    public string? PublishCode { get; set; }
 
     public VizOverride GetOverride(int vi)
     {
@@ -28,6 +32,9 @@ public sealed class AskTurn
         return o;
     }
 }
+
+/// <summary>C4：Ask 发布为应用的阶段。None=未发起；DraftSaved=草稿已创建待发布；Published=已发布；Failed=任一阶段失败（草稿可能已保留）。</summary>
+public enum PublishStage { None, DraftSaved, Published, Failed }
 
 /// <summary>单个图表的视图层覆盖（纯前端，不触发后端请求）。</summary>
 public sealed class VizOverride

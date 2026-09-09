@@ -38,7 +38,7 @@ public static class NavMenuItems
     /// 是否启用基于权限码的菜单/页面过滤。
     /// 前端权限码已与后端 <c>IdentityPermissions</c> 对齐（见 <c>PermissionCodes</c>），
     /// <c>/api/auth/me</c> 返回用户实际持有的码集合，故可安全开启。
-    /// 守卫内置兜底：当权限数据尚未加载（owned.Count==0）时一律放行，避免首帧误隐藏。
+    /// 受限菜单与守卫采用默认拒绝，空权限不放行。
     /// </summary>
     public static bool EnforcePermissions { get; set; } = true;
 
@@ -51,7 +51,7 @@ public static class NavMenuItems
             Items = new[]
             {
                 new NavItem { Href = "", Title = "首页", Key = Keys.Nav.Home, Icon = "sb-ico-home" },
-                new NavItem { Href = "ask", Title = "Ask BI 智能问数", Key = Keys.Nav.Ask, Icon = "sb-ico-ask" }
+                new NavItem { Href = "ask", Title = "Ask BI 智能问数", Key = Keys.Nav.Ask, Icon = "sb-ico-ask", Permission = "metadata:view" }
             }
         },
         new NavGroup
@@ -60,11 +60,11 @@ public static class NavMenuItems
             Key = Keys.Nav.GroupAnalysis,
             Items = new[]
             {
-                new NavItem { Href = "dashboards", Title = "仪表盘", Key = Keys.Nav.Dashboards, Icon = "sb-ico-dash" },
-                new NavItem { Href = "apps", Title = "应用工厂", Key = Keys.Nav.Apps, Icon = "sb-ico-app" },
-                new NavItem { Href = "agent", Title = "智能体 / Copilot", Key = Keys.Nav.Agent, Icon = "sb-ico-agent" },
-                new NavItem { Href = "semantic-labels", Title = "语义标签", Key = Keys.Nav.SemanticLabels, Icon = "sb-ico-tag" },
-                new NavItem { Href = "business-model", Title = "语义模型", Key = Keys.Nav.BusinessModel, Icon = "sb-ico-model" }
+                new NavItem { Href = "dashboards", Title = "仪表盘", Key = Keys.Nav.Dashboards, Icon = "sb-ico-dash", Permission = "dashboard:view" },
+                new NavItem { Href = "apps", Title = "应用工厂", Key = Keys.Nav.Apps, Icon = "sb-ico-app", Permission = "app:view" },
+                new NavItem { Href = "agent", Title = "智能体 / Copilot", Key = Keys.Nav.Agent, Icon = "sb-ico-agent", Permission = "agent:view" },
+                new NavItem { Href = "semantic-labels", Title = "语义标签", Key = Keys.Nav.SemanticLabels, Icon = "sb-ico-tag", Permission = "metadata:view" },
+                new NavItem { Href = "business-model", Title = "语义模型", Key = Keys.Nav.BusinessModel, Icon = "sb-ico-model", Permission = "metadata:view" }
             }
         },
         new NavGroup
@@ -74,7 +74,7 @@ public static class NavMenuItems
             Items = new[]
             {
                 new NavItem { Href = "components", Title = "组件库", Key = Keys.Nav.Components, Icon = "sb-ico-comp", Permission = PermissionCodes.AppView },
-                new NavItem { Href = "themes", Title = "主题编辑器", Key = Keys.Nav.ThemeEditor, Icon = "sb-ico-theme" }
+                new NavItem { Href = "themes", Title = "主题编辑器", Key = Keys.Nav.ThemeEditor, Icon = "sb-ico-theme", Permission = "theme:view" }
             }
         },
         new NavGroup
@@ -83,8 +83,8 @@ public static class NavMenuItems
             Key = Keys.Nav.GroupPlatformExt,
             Items = new[]
             {
-                new NavItem { Href = "data-sources", Title = "数据源管理", Key = Keys.Nav.DataSources, Icon = "sb-ico-db" },
-                new NavItem { Href = "model-accounts", Title = "模型与账号", Key = Keys.Nav.ModelAccounts, Icon = "sb-ico-key" }
+                new NavItem { Href = "data-sources", Title = "数据源管理", Key = Keys.Nav.DataSources, Icon = "sb-ico-db", Permission = "metadata:view" },
+                new NavItem { Href = "model-accounts", Title = "模型与账号", Key = Keys.Nav.ModelAccounts, Icon = "sb-ico-key", Permission = "identity:manage" }
             }
         },
         new NavGroup
@@ -104,7 +104,7 @@ public static class NavMenuItems
                 new NavItem { Href = "admin/quota", Title = "配额", Key = Keys.Nav.Quota, Icon = "sb-ico-quota", Permission = PermissionCodes.PlatformQuotaManage },
                 new NavItem { Href = "admin/localization", Title = "多语言", Key = Keys.Nav.Localization, Icon = "sb-ico-lang", Permission = PermissionCodes.LocalizationView },
                 new NavItem { Href = "admin/themes", Title = "主题", Key = Keys.Nav.Themes, Icon = "sb-ico-theme", Permission = PermissionCodes.ThemeView },
-                new NavItem { Href = "admin/system", Title = "系统状态", Key = Keys.Nav.System, Icon = "sb-ico-activity" }
+                new NavItem { Href = "admin/system", Title = "系统状态", Key = Keys.Nav.System, Icon = "sb-ico-activity", Permission = "platform:diagnostics:view" }
             }
         }
     };

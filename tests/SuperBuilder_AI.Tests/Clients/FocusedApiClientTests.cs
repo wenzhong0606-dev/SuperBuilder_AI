@@ -17,6 +17,20 @@ namespace SuperBuilder_AI.Tests.Clients;
 /// </summary>
 public class FocusedApiClientTests
 {
+    [Theory]
+    [InlineData(true, "api/localization/admin/languages")]
+    [InlineData(false, "api/localization/languages")]
+    public async Task Language_catalog_uses_permission_scope_and_preserves_failure(bool manage, string endpoint)
+    {
+        var handler = new StubHttpMessageHandler(_ => HttpTestDoubles.JsonResponse(
+            HttpStatusCode.Forbidden, "{\"code\":\"SB_FORBIDDEN\",\"message\":\"access denied\"}"));
+        var client = HttpTestDoubles.BuildFocused<AdminApiClient>(handler, out var state);
+        state.Permissions = manage ? new List<string> { "localization:manage" } : new List<string>();
+        var (result, error) = await client.GetAdminLanguagesAsync();
+        Assert.Null(result);
+        Assert.Equal("access denied", error);
+        Assert.EndsWith(endpoint, handler.CapturedRequest!.RequestUri!.ToString());
+    }
     #region Identity
     [Fact]
     public async Task Identity_LoginAsync_200_Returns_AuthResult()
@@ -398,6 +412,36 @@ public class FocusedApiClientTests
         Assert.False(ok);
         Assert.Null(code);
         Assert.NotNull(error);
+    }
+
+    [Fact]
+    public async Task App_PublishExistingAsync_200_Returns_Version()
+    {
+        var handler = new StubHttpMessageHandler(_ =>
+            HttpTestDoubles.JsonResponse(HttpStatusCode.OK, "{\"appId\":1,\"tenantId\":7,\"version\":3,\"publishedAt\":null,\"publishedBy\":null}"));
+        var client = HttpTestDoubles.BuildFocused<AppApiClient>(handler, out _);
+
+        var (ok, version, error, status) = await client.PublishExistingAsync(7, "APP-1");
+
+        Assert.True(ok);
+        Assert.Equal(3, version);
+        Assert.Null(error);
+        Assert.Equal(200, status);
+    }
+
+    [Fact]
+    public async Task App_PublishExistingAsync_400_False_With_Error()
+    {
+        var handler = new StubHttpMessageHandler(_ =>
+            HttpTestDoubles.JsonResponse(HttpStatusCode.BadRequest, "{\"errors\":[\"草稿 DSL 为空，无法发布。\"]}"));
+        var client = HttpTestDoubles.BuildFocused<AppApiClient>(handler, out _);
+
+        var (ok, version, error, status) = await client.PublishExistingAsync(7, "APP-1");
+
+        Assert.False(ok);
+        Assert.Null(version);
+        Assert.NotNull(error);
+        Assert.Equal(400, status);
     }
     #endregion
 }

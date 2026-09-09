@@ -8,6 +8,12 @@
 <AuthGuard>
     <PageHead Icon="sb-ico-app" Title="@(_title)" Desc="@L10n.T(Keys.Content.AppDetailDesc, "应用详情：DSL 结构、页面与组件清单。")">
         <button class="btn btn-outline-secondary btn-sm" @onclick='() => Nav.NavigateTo("apps")'>@L10n.T(Keys.Content.AppDetailBack, "返回列表")</button>
+        <PermissionGuard Require="@(new[] { PermissionCodes.AppView })">
+            <button class="btn btn-primary btn-sm" @onclick='() => Nav.NavigateTo($"apps/{Uri.EscapeDataString(Code)}/run")'>@L10n.T(Keys.Content.AppDetailRun, "运行")</button>
+        </PermissionGuard>
+        <PermissionGuard Require="@(new[] { PermissionCodes.AppEdit })">
+            <button class="btn btn-outline-secondary btn-sm" @onclick='() => Nav.NavigateTo($"apps/{Uri.EscapeDataString(Code)}/preview")'>@L10n.T(Keys.Content.AppDetailPreview, "预览")</button>
+        </PermissionGuard>
         <button class="btn btn-outline-secondary btn-sm" @onclick="() => Load()">@L10n.T(Keys.Content.AppDetailRefresh, "刷新")</button>
         <button class="btn btn-danger btn-sm" @onclick="() => _confirmOpen = true">@L10n.T(Keys.Content.AppDetailDelete, "删除")</button>
     </PageHead>

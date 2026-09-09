@@ -48,6 +48,7 @@
                         <span class="badge badge-muted">@Cell(context, "code")</span>
                     }
                     <span style="margin-left:auto; display:inline-flex; gap:6px">
+                        <button class="btn btn-sm btn-outline-primary" @onclick="e => OpenRun(context)" @onclick:stopPropagation="true">@L10n.T(Keys.Content.AppsRun, "运行")</button>
                         <button class="btn btn-sm btn-outline-secondary" @onclick="e => OpenDsl(context)" @onclick:stopPropagation="true">@L10n.T(Keys.Content.AppsEdit, "编辑")</button>
                         <button class="btn btn-sm btn-outline-danger" @onclick="e => AskDelete(context)" @onclick:stopPropagation="true">@L10n.T(Keys.Content.AppsDelete, "删除")</button>
                     </span>
@@ -124,7 +125,7 @@
     {
         _loading = true;
         var (data, _, err, code) = await Api.GetJsonAsync($"api/apps?tenantId={State.TenantId}");
-        _error = L10n.Friendly(code, err ?? L10n.T(Keys.Content.AppsLoadFailed, "加载失败。"));
+        _error = data is not null ? "" : L10n.Friendly(code, err ?? L10n.T(Keys.Content.AppsLoadFailed, "加载失败。"));
         _rows = data is { ValueKind: JsonValueKind.Array } ? data.Value.EnumerateArray().ToList() : new();
         _cols = TablePresenter.InferColumns(data);
         _loading = false;
@@ -144,6 +145,18 @@
     }
 
     private void Create() => OpenGen();
+
+    /// <summary>打开应用运行页；缺少 code 时提示。</summary>
+    private void OpenRun(JsonElement row)
+    {
+        var code = Cell(row, "code");
+        if (string.IsNullOrWhiteSpace(code))
+        {
+            Toast.Warning(L10n.T(Keys.Content.AppsMissingCodeRun, "该记录缺少 code，无法运行。"));
+            return;
+        }
+        Nav.NavigateTo($"apps/{Uri.EscapeDataString(code)}/run");
+    }
 
     // ---- 新建（描述生成） ----
     private bool _genModal;

@@ -267,6 +267,15 @@ builder.Services.AddScoped<ISqlDialectResolver>(sp => sp.GetRequiredService<SqlD
 builder.Services.AddScoped<BIConversationService>();
 builder.Services.AddScoped<IBIConversationService>(sp => sp.GetRequiredService<BIConversationService>());
 
+// M7-11：Ask 查询快照存储（可选依赖；未注册时 BIConversationService 跳过写入，零回归）
+builder.Services.AddScoped<IAskQuerySnapshotStore, AskQuerySnapshotStore>();
+
+// M7-11 C1：Ask 快照 → 应用取数绑定导出器（from-ask）
+builder.Services.AddScoped<IAppQueryBindingExporter, AppQueryBindingExporter>();
+
+// M7-11 C2：确定性取数执行器（绕过 NLU，复用当前访问者安全链路；依赖必需，缺依赖即拒）
+builder.Services.AddScoped<IAppQueryExecutor, AppQueryExecutor>();
+
 // P6.1/P6.2 DSL 序列化与校验端口
 builder.Services.AddScoped<IDashboardDslSerializer, DashboardDslSerializer>();
 

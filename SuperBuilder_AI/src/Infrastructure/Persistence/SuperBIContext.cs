@@ -139,6 +139,7 @@ public class SuperBIContext : DbContext
     #region P8 AI App Builder
     public DbSet<AppPlan> AppPlans { get; set; }
     public DbSet<AppVersion> AppVersions { get; set; }
+    public DbSet<AskQuerySnapshot> AskQuerySnapshots { get; set; }
     #endregion
 
         #region P9 AI Agent / Copilot
@@ -551,6 +552,21 @@ public class SuperBIContext : DbContext
         builder.Entity<AppVersion>()
             .HasOne<AppPlan>().WithMany().HasForeignKey(x => x.AppId)
             .OnDelete(DeleteBehavior.Cascade);
+        #endregion
+
+        #region M7-11 AskQuerySnapshot（应用运行时查询上下文引用）
+        builder.Entity<AskQuerySnapshot>().ToTable(tb => tb.HasComment("Ask 查询快照（应用运行时引用）"));
+        builder.Entity<AskQuerySnapshot>().HasKey(x => x.TurnId);
+        builder.Entity<AskQuerySnapshot>().Property(x => x.TurnId).IsRequired().HasMaxLength(64).HasComment("查询引用标识(GUID)");
+        builder.Entity<AskQuerySnapshot>().Property(x => x.TenantId).IsRequired().HasComment("所属租户");
+        builder.Entity<AskQuerySnapshot>().Property(x => x.UserId).IsRequired().HasComment("快照创建者");
+        builder.Entity<AskQuerySnapshot>().Property(x => x.DataSourceId).IsRequired().HasComment("解析数据源Id（运行时硬约束）");
+        builder.Entity<AskQuerySnapshot>().Property(x => x.EntityCode).HasMaxLength(128).HasComment("主表业务实体语义名");
+        builder.Entity<AskQuerySnapshot>().Property(x => x.QueryPlanJson).IsRequired().HasComment("允许查询的QueryPlan语义(JSON,RLS注入前截取)");
+        builder.Entity<AskQuerySnapshot>().Property(x => x.RequestHash).IsRequired().HasMaxLength(128).HasComment("请求摘要哈希(创建幂等冲突检测)");
+        builder.Entity<AskQuerySnapshot>().Property(x => x.ExpiresAt).IsRequired().HasComment("过期时间(UTC)");
+        builder.Entity<AskQuerySnapshot>().HasIndex(x => new { x.TenantId, x.UserId }).HasDatabaseName("IX_AskQuerySnapshots_TenantId_UserId");
+        builder.Entity<AskQuerySnapshot>().HasIndex(x => x.ExpiresAt).HasDatabaseName("IX_AskQuerySnapshots_ExpiresAt");
         #endregion
 
         #region P9.1 AgentPlan

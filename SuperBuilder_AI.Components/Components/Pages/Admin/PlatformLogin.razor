@@ -1,0 +1,83 @@
+@page "/admin/login"
+@layout BlankLayout
+@inject IApiClient Api
+@inject AuthStore Session
+@inject NavigationManager Nav
+@inject LocalizationService L10n
+
+<div class="login-wrap">
+    <section class="login-hero">
+        <h1>SuperBuilder AI</h1>
+        <p class="sub">@L10n.T(Keys.PlatformLogin.Tagline, "平台治理 · 租户运营控制台")</p>
+    </section>
+
+    <section class="login-form">
+        <div class="card">
+            <h2 style="margin:0 0 4px;">@L10n.T(Keys.PlatformLogin.Title, "平台运营登录")</h2>
+            @if (_notReady)
+            {
+                <div class="alert alert-warning" data-testid="platform-login-notready">@L10n.T(Keys.PlatformLogin.NotReady, "平台尚未初始化，暂无法登录。")</div>
+            }
+            <label for="platform-login-username">@L10n.T(Keys.PlatformLogin.Username, "管理员用户名")
+                <input id="platform-login-username" data-testid="platform-login-username" class="form-control" @bind="Username" placeholder="@L10n.T(Keys.PlatformLogin.Username, "管理员用户名")" autocomplete="username" />
+            </label>
+            <label for="platform-login-password">@L10n.T(Keys.PlatformLogin.Password, "管理员口令")
+                <input id="platform-login-password" data-testid="platform-login-password" class="form-control" @bind="Password" type="password" placeholder="@L10n.T(Keys.PlatformLogin.Password, "管理员口令")" autocomplete="current-password" />
+            </label>
+            @if (!string.IsNullOrWhiteSpace(Error)) { <div id="platform-login-error" data-testid="platform-login-error" class="alert alert-danger" role="alert">@Error</div> }
+            <button id="platform-login-submit" data-testid="platform-login-submit" class="btn btn-primary" @onclick="DoLogin" disabled="@Busy">@L10n.T(Keys.PlatformLogin.Submit, "登录平台控制台")</button>
+            <p class="muted tiny"><a href="/login">@L10n.T(Keys.PlatformLogin.BackToTenantLogin, "返回租户登录")</a></p>
+        </div>
+    </section>
+</div>
+
+@code {
+    private string Username = "";
+    private string Password = "";
+    private long PlatformTenantId;
+    private bool Busy = false;
+    private string Error = "";
+    private bool _notReady;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        await ResolvePlatformTenantAsync();
+        StateHasChanged();
+    }
+
+    /// <summary>从匿名端点解析平台租户数字 Id（platform 租户不出现在业务登录下拉框，故单独解析）。</summary>
+    private async Task ResolvePlatformTenantAsync()
+    {
+        var (data, _, err, _) = await Api.GetJsonAsync("api/platform-bootstrap/status");
+        if (data is { ValueKind: System.Text.Json.JsonValueKind.Object } &&
+            data.Value.TryGetProperty("platformTenantId", out var id) && id.TryGetInt64(out var tenantId) && tenantId > 0)
+        {
+            PlatformTenantId = tenantId;
+            _notReady = false;
+        }
+        else
+        {
+            PlatformTenantId = 0;
+            _notReady = true;
+            if (string.IsNullOrEmpty(Error)) Error = err ?? L10n.T(Keys.PlatformLogin.NotReady, "平台尚未初始化，暂无法登录。");
+        }
+    }
+
+    private async Task DoLogin()
+    {
+        if (PlatformTenantId <= 0) { Error = L10n.T(Keys.PlatformLogin.NotReady, "平台尚未初始化，暂无法登录。"); return; }
+        Busy = true; Error = "";
+        var (r, loginErr) = await Api.LoginAsync(Username, PlatformTenantId, Password);
+        Busy = false;
+        if (r is null || string.IsNullOrEmpty(r.Token))
+        {
+            Error = loginErr ?? L10n.T(Keys.PlatformLogin.LoginFailed, "平台管理员登录失败：用户不存在、口令错误或无权访问。");
+            return;
+        }
+        // 复用与业务登录一致的会话写入路径（AuthStore → localStorage sb_auth_v1）。
+        await Session.SetFromLoginAsync(r);
+        await L10n.InitializeAsync(r.TenantId, r.UserId, r.AvailableCultures, r.DefaultCulture);
+        Nav.NavigateTo("/admin/tenants");
+    }
+}

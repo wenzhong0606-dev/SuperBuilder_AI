@@ -108,18 +108,32 @@
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (!firstRender) return;
-        var theme = await JS.InvokeAsync<string>("SuperBuilder.getTheme");
-        IsDark = theme == "dark";
-        await Theme.ApplyAsync(theme);
+        try
+        {
+            var theme = await JS.InvokeAsync<string>("SuperBuilder.getTheme");
+            IsDark = theme == "dark";
+            await Theme.ApplyAsync(theme);
+        }
+        catch
+        {
+            // 主题获取失败时退避默认主题，不阻断会话自举。
+        }
 
-        // 会话自举：从 localStorage 还原令牌，并校验是否仍有效（过期则清除）。
+        // 会话自举：先从 localStorage 还原令牌（纯本地、无网络，必然快速完成）。
+        // 还原结束立即重渲染，让页面脱离"正在恢复登录会话…"——网络校验不得阻塞 UI。
+        // （F5 后首次带令牌执行 ValidateAsync / L10n.InitializeAsync，此二步此前在登录流程里
+        //  因首屏未登录被跳过、从未真正跑过；若其挂起或抛错会使 StateHasChanged 永不到达。）
         await Session.RestoreAsync();
+        StateHasChanged();
+
+        // 网络校验与本地化仅在已还原出令牌时执行；任一失败均保留本地会话，
+        // 不向外抛出（避免撕裂 SignalR 电路、导致页面永久停在预渲染态）。
         if (State.IsAuthenticated)
         {
-            await Session.ValidateAsync();
-            await L10n.InitializeAsync(State.TenantId, State.UserId, State.AvailableCultures, State.DefaultCulture);
+            try { await Session.ValidateAsync(); } catch { /* 网络异常不登出 */ }
+            try { await L10n.InitializeAsync(State.TenantId, State.UserId, State.AvailableCultures, State.DefaultCulture); } catch { /* 本地化失败不影响主流程 */ }
+            StateHasChanged();
         }
-        StateHasChanged();
     }
 
     /// <summary>会话失效（token 过期/被拒）时回收并跳登录。</summary>

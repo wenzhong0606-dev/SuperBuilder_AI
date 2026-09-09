@@ -11,6 +11,10 @@
     <div class="locale-console">
         <aside class="locale-rail">
             <div class="locale-rail-title">@L10n.T(Keys.Content.AdminLocalizationRailTitle, "语言目录") <span>@_languages.Count</span></div>
+            @if (!string.IsNullOrWhiteSpace(_languageError))
+            {
+                <ErrorState Message="@_languageError" OnRetry="Load" />
+            }
             @foreach (var language in _languages)
             {
                 <div class="locale-item @(language.Culture == _culture ? "active" : "") @(!language.Enabled ? "disabled" : "")">
@@ -101,19 +105,20 @@
 
 @code {
     private List<AdminLanguageView> _languages = new();
+    private string _languageError = "";
     private List<JsonElement> _texts = new();
     private string _culture = "zh-CN", _error = ""; private bool _loading = true;
     private bool _addingLanguage; private string _newCulture="", _newDisplayName="", _newNativeName="", _copyFrom="en-US";
     private bool _editingLanguage; private long _editId; private string _editCulture="", _editDisplayName="", _editNativeName="";
     private bool _addingText; private string _newTextKey="", _newTextValue="";
-    private bool _isPlatform => State.Permissions?.Contains(PermissionCodes.PlatformTenantView) == true;
+    private bool _isPlatform => State.Permissions?.Contains(PermissionCodes.LocalizationManage) == true;
     protected override async Task OnAfterRenderAsync(bool firstRender) { if (firstRender) await Load(); }
     private async Task Load() { await LoadLanguages(); await LoadTexts(); }
     private async Task LoadLanguages()
     {
         var (result, err) = await Api.GetAdminLanguagesAsync();
-        if (err != null) { _error = err; _languages = new(); }
-        else { _languages = (result ?? new List<AdminLanguageView>()).OrderBy(x => x.SortOrder).ToList(); _error = ""; }
+        if (err != null) { _languageError = err; _languages = new(); }
+        else { _languages = (result ?? new List<AdminLanguageView>()).OrderBy(x => x.SortOrder).ToList(); _languageError = ""; }
         if (_languages.Count > 0 && !_languages.Any(x => x.Culture == _culture)) _culture = _languages[0].Culture;
     }
     private async Task SelectCulture(string culture) { _culture = culture; await LoadTexts(); }

@@ -22,6 +22,21 @@ namespace SuperBuilder_AI.Tests.Platform;
 /// </summary>
 public class SemanticLabelServiceTests
 {
+    [Fact]
+    public async Task List_without_concept_filters_preserves_tenant_scope()
+    {
+        var (ctx, conn, svc) = Create();
+        await using var connection = conn;
+        await using var context = ctx;
+        await AddLabel(svc, "zh-CN", "shared", tenantId: 0);
+        await AddLabel(svc, "zh-CN", "own", tenantId: 1);
+        await AddLabel(svc, "zh-CN", "other", tenantId: 2);
+        ctx.ApplyTenantScope(1);
+        var rows = await svc.ListAsync(null, null, "zh-CN");
+        Assert.Equal(2, rows.Count);
+        Assert.DoesNotContain(rows, x => x.TenantId == 2);
+        Assert.Empty(await svc.ListAsync("unknown", null, "zh-CN"));
+    }
     private const string Concept = SemanticConceptTypes.MetadataSemantic;
     private const long ConceptId = 1910; // 与生产库中 come_time 语义同 Id，仅作测试取值
 

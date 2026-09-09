@@ -43,8 +43,8 @@ public interface ISemanticLabelService
 
 	/// <summary>列出某概念在指定语言下的全部标签（不回退，仅精确文化）。</summary>
 	Task<IReadOnlyList<SemanticLabel>> ListAsync(
-		string conceptType,
-		long conceptId,
+		string? conceptType,
+		long? conceptId,
 		string? culture = null,
 		CancellationToken cancellationToken = default);
 

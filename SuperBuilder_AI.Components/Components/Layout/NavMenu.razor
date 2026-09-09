@@ -1,4 +1,5 @@
 @inject AppState State
+@implements IDisposable
 @inject LocalizationService L10n
 @* 侧栏导航：由 NavMenuItems 元数据驱动，按权限过滤（无权限项隐藏） *@
 <nav class="nav">
@@ -17,7 +18,7 @@
 @code {
     private IEnumerable<NavGroup> VisibleGroups =>
         NavMenuItems.Groups
-            .Select(g => new NavGroup { Title = g.Title, Items = g.Items.Where(Allowed).ToArray() })
+            .Select(g => new NavGroup { Title = g.Title, Key = g.Key, Items = g.Items.Where(Allowed).ToArray() })
             .Where(g => g.Items.Count > 0);
 
     /// <summary>
@@ -26,9 +27,21 @@
     /// </summary>
     private bool Allowed(NavItem item)
     {
+        if (!State.IsAuthenticated) return false;
         if (string.IsNullOrWhiteSpace(item.Permission)) return true;
-        if (!NavMenuItems.EnforcePermissions) return true;
         var owned = State.Permissions ?? Array.Empty<string>();
-        return owned.Count == 0 || owned.Contains(item.Permission!);
+        return owned.Contains(item.Permission!);
+    }
+
+    protected override void OnInitialized()
+    {
+        State.PermissionsChanged += Refresh;
+        State.SessionRestoredChanged += Refresh;
+    }
+    private void Refresh() => _ = InvokeAsync(StateHasChanged);
+    public void Dispose()
+    {
+        State.PermissionsChanged -= Refresh;
+        State.SessionRestoredChanged -= Refresh;
     }
 }

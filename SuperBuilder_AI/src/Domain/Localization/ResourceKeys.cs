@@ -70,6 +70,19 @@ public static class ResourceKeys
         public const string HeroEnterpriseSaaS = "Login.Hero.EnterpriseSaaS";
     }
 
+    /// <summary>平台专用登录入口（/admin/login）。</summary>
+    public static class PlatformLogin
+    {
+        public const string Title = "PlatformLogin.Title";
+        public const string Username = "PlatformLogin.Username";
+        public const string Password = "PlatformLogin.Password";
+        public const string Submit = "PlatformLogin.Submit";
+        public const string Tagline = "PlatformLogin.Tagline";
+        public const string NotReady = "PlatformLogin.NotReady";
+        public const string LoginFailed = "PlatformLogin.LoginFailed";
+        public const string BackToTenantLogin = "PlatformLogin.BackToTenantLogin";
+    }
+
     /// <summary>应用级标题/副标题。</summary>
     public static class App
     {
@@ -574,6 +587,12 @@ public static class ResourceKeys
         public const string AskPublishSuccess = "Content.AskPublishSuccess";
         public const string AskPublishFailed = "Content.AskPublishFailed";
         public const string AskPublishException = "Content.AskPublishException";
+        public const string AskPublishDrafting = "Content.AskPublishDrafting";
+        public const string AskPublishDraftSaved = "Content.AskPublishDraftSaved";
+        public const string AskPublishDraftFailed = "Content.AskPublishDraftFailed";
+        public const string AskPublishPublished = "Content.AskPublishPublished";
+        public const string AskPublishPublishFailed = "Content.AskPublishPublishFailed";
+        public const string AskPublishDraftKept = "Content.AskPublishDraftKept";
         public const string DashboardsTitle = "Content.DashboardsTitle";
         public const string DashboardsDesc = "Content.DashboardsDesc";
         public const string DashboardsSearchPlaceholder = "Content.DashboardsSearchPlaceholder";
@@ -713,10 +732,37 @@ public static class ResourceKeys
         public const string AskTurnRefining = "Content.AskTurnRefining";
         public const string AskTurnPublish = "Content.AskTurnPublish";
         public const string AskTurnPublishing = "Content.AskTurnPublishing";
+        public const string AskTurnRun = "Content.AskTurnRun";
+        public const string AskTurnRetryPublish = "Content.AskTurnRetryPublish";
         public const string AskTurnRefineNoCmd = "Content.AskTurnRefineNoCmd";
         public const string AskTurnRefineNoViz = "Content.AskTurnRefineNoViz";
         public const string AskTurnRefineUnrecognized = "Content.AskTurnRefineUnrecognized";
         public const string AskTurnRefineApplied = "Content.AskTurnRefineApplied";
+        public const string AppDetailRun = "Content.AppDetailRun";
+        public const string AppDetailPreview = "Content.AppDetailPreview";
+        public const string AppsRun = "Content.AppsRun";
+        public const string AppsMissingCodeRun = "Content.AppsMissingCodeRun";
+        public const string AppRunTitle = "Content.AppRunTitle";
+        public const string AppRunDesc = "Content.AppRunDesc";
+        public const string AppRunLoading = "Content.AppRunLoading";
+        public const string AppRunNotPublishedTitle = "Content.AppRunNotPublishedTitle";
+        public const string AppRunNotPublishedText = "Content.AppRunNotPublishedText";
+        public const string AppRunGoPublish = "Content.AppRunGoPublish";
+        public const string AppRunFailed = "Content.AppRunFailed";
+        public const string AppPreviewTitle = "Content.AppPreviewTitle";
+        public const string AppPreviewDesc = "Content.AppPreviewDesc";
+        public const string AppPreviewLoading = "Content.AppPreviewLoading";
+        public const string AppPreviewNoDraftTitle = "Content.AppPreviewNoDraftTitle";
+        public const string AppPreviewNoDraftText = "Content.AppPreviewNoDraftText";
+        public const string AppPreviewGoEdit = "Content.AppPreviewGoEdit";
+        public const string AppPreviewBadge = "Content.AppPreviewBadge";
+        public const string AppPreviewFailed = "Content.AppPreviewFailed";
+        public const string AppRenderNoComponentsTitle = "Content.AppRenderNoComponentsTitle";
+        public const string AppRenderNoComponentsText = "Content.AppRenderNoComponentsText";
+        public const string AppRenderPartial = "Content.AppRenderPartial";
+        public const string AppRenderKpiDefault = "Content.AppRenderKpiDefault";
+        public const string AppRenderUnknownTitle = "Content.AppRenderUnknownTitle";
+        public const string AppRenderComponentFailed = "Content.AppRenderComponentFailed";
         public const string CommonRefresh = "Content.CommonRefresh";
         public const string CommonCancel = "Content.CommonCancel";
         public const string CommonCreate = "Content.CommonCreate";
@@ -1466,6 +1512,14 @@ public static class ResourceKeys
         [Login.TenantCodeInvalid] = new("Login", Page: "Login", DefaultValue: "The tenant code does not exist or is disabled."),
         [Login.TenantDirectoryLoadFailed] = new("Login", Page: "Login", DefaultValue: "Failed to load the tenant list. Check the API service and address configuration."),
         [Login.LoginFailed] = new("Login", Page: "Login", DefaultValue: "Sign-in failed: user does not exist or is disabled."),
+        [PlatformLogin.Title] = new("Login", Page: "PlatformLogin", DefaultValue: "Platform console sign-in"),
+        [PlatformLogin.Username] = new("Login", Page: "PlatformLogin", DefaultValue: "Admin username"),
+        [PlatformLogin.Password] = new("Login", Page: "PlatformLogin", DefaultValue: "Admin password"),
+        [PlatformLogin.Submit] = new("Login", Page: "PlatformLogin", DefaultValue: "Sign in to console"),
+        [PlatformLogin.Tagline] = new("Login", Page: "PlatformLogin", DefaultValue: "Platform governance console"),
+        [PlatformLogin.NotReady] = new("Login", Page: "PlatformLogin", DefaultValue: "The platform is not initialized yet; sign-in is unavailable."),
+        [PlatformLogin.LoginFailed] = new("Login", Page: "PlatformLogin", DefaultValue: "Platform admin sign-in failed: invalid user, password, or insufficient access."),
+        [PlatformLogin.BackToTenantLogin] = new("Login", Page: "PlatformLogin", DefaultValue: "Back to tenant sign-in"),
         [Login.HeroAINativeBI] = new("Login", Page: "Login", DefaultValue: "AI Native BI"),
         [Login.HeroMultiTenant] = new("Login", Page: "Login", DefaultValue: "Multi-tenant"),
         [Login.HeroMultilingual] = new("Login", Page: "Login", DefaultValue: "Multilingual"),
@@ -1948,6 +2002,12 @@ public static class ResourceKeys
         [Content.AskPublishSuccess] = new("Content", Page: "Ask", DefaultValue: "Published as app: {0}"),
         [Content.AskPublishFailed] = new("Content", Page: "Ask", DefaultValue: "Publish failed: {0}"),
         [Content.AskPublishException] = new("Content", Page: "Ask", DefaultValue: "Publish error: {0}"),
+        [Content.AskPublishDrafting] = new("Content", Page: "Ask", DefaultValue: "Saving draft…"),
+        [Content.AskPublishDraftSaved] = new("Content", Page: "Ask", DefaultValue: "Draft {0} saved, publishing…"),
+        [Content.AskPublishDraftFailed] = new("Content", Page: "Ask", DefaultValue: "Failed to create draft: {0}"),
+        [Content.AskPublishPublished] = new("Content", Page: "Ask", DefaultValue: "Published as app: {0} (v{1})"),
+        [Content.AskPublishPublishFailed] = new("Content", Page: "Ask", DefaultValue: "Draft saved, publish failed: {0}"),
+        [Content.AskPublishDraftKept] = new("Content", Page: "Ask", DefaultValue: "Draft kept: {0}"),
         [Content.DashboardsTitle] = new("Content", Page: "Dashboards", DefaultValue: "Dashboards"),
         [Content.DashboardsDesc] = new("Content", Page: "Dashboards", DefaultValue: "Turn Ask analysis results into reusable visual dashboards, with team sharing and scheduled refresh."),
         [Content.DashboardsSearchPlaceholder] = new("Content", Page: "Dashboards", DefaultValue: "Search by name / code…"),
@@ -2087,10 +2147,37 @@ public static class ResourceKeys
         [Content.AskTurnRefining] = new("Content", Page: "AskTurn", DefaultValue: "Querying…"),
         [Content.AskTurnPublish] = new("Content", Page: "AskTurn", DefaultValue: "Publish as app"),
         [Content.AskTurnPublishing] = new("Content", Page: "AskTurn", DefaultValue: "Publishing…"),
+        [Content.AskTurnRun] = new("Content", Page: "AskTurn", DefaultValue: "Run"),
+        [Content.AskTurnRetryPublish] = new("Content", Page: "AskTurn", DefaultValue: "Retry publish"),
         [Content.AskTurnRefineNoCmd] = new("Content", Page: "AskTurn", DefaultValue: "Please enter an adjustment instruction."),
         [Content.AskTurnRefineNoViz] = new("Content", Page: "AskTurn", DefaultValue: "This turn has no visualization result."),
         [Content.AskTurnRefineUnrecognized] = new("Content", Page: "AskTurn", DefaultValue: "Unrecognized instruction (supported: bar/line/pie, show/hide legend, palette green/orange/red/gray/blue)."),
         [Content.AskTurnRefineApplied] = new("Content", Page: "AskTurn", DefaultValue: "View adjustment applied (front-end only, no backend request)."),
+        [Content.AppDetailRun] = new("Content", Page: "AppDetail", DefaultValue: "Run"),
+        [Content.AppDetailPreview] = new("Content", Page: "AppDetail", DefaultValue: "Preview"),
+        [Content.AppsRun] = new("Content", Page: "Apps", DefaultValue: "Run"),
+        [Content.AppsMissingCodeRun] = new("Content", Page: "Apps", DefaultValue: "This record is missing a code and cannot be run."),
+        [Content.AppRunTitle] = new("Content", Page: "AppRun", DefaultValue: "Run app"),
+        [Content.AppRunDesc] = new("Content", Page: "AppRun", DefaultValue: "Run the published app; data is fetched under the current viewer's permissions."),
+        [Content.AppRunLoading] = new("Content", Page: "AppRun", DefaultValue: "Running app…"),
+        [Content.AppRunNotPublishedTitle] = new("Content", Page: "AppRun", DefaultValue: "App not published"),
+        [Content.AppRunNotPublishedText] = new("Content", Page: "AppRun", DefaultValue: "This app is not published yet and cannot be run. Publish it from the app detail page first."),
+        [Content.AppRunGoPublish] = new("Content", Page: "AppRun", DefaultValue: "Go to publish"),
+        [Content.AppRunFailed] = new("Content", Page: "AppRun", DefaultValue: "Run failed ({0})."),
+        [Content.AppPreviewTitle] = new("Content", Page: "AppPreview", DefaultValue: "Preview app"),
+        [Content.AppPreviewDesc] = new("Content", Page: "AppPreview", DefaultValue: "Preview the app draft (editors only), fetching data under the current viewer's permissions."),
+        [Content.AppPreviewLoading] = new("Content", Page: "AppPreview", DefaultValue: "Previewing draft…"),
+        [Content.AppPreviewNoDraftTitle] = new("Content", Page: "AppPreview", DefaultValue: "No draft"),
+        [Content.AppPreviewNoDraftText] = new("Content", Page: "AppPreview", DefaultValue: "This app has no draft to preview. Edit and save a draft from the app detail page first."),
+        [Content.AppPreviewGoEdit] = new("Content", Page: "AppPreview", DefaultValue: "Go to edit"),
+        [Content.AppPreviewBadge] = new("Content", Page: "AppPreview", DefaultValue: "This is a draft preview; data is fetched live under the current viewer's permissions."),
+        [Content.AppPreviewFailed] = new("Content", Page: "AppPreview", DefaultValue: "Preview failed ({0})."),
+        [Content.AppRenderNoComponentsTitle] = new("Content", Page: "AppRender", DefaultValue: "No renderable components"),
+        [Content.AppRenderNoComponentsText] = new("Content", Page: "AppRender", DefaultValue: "This app does not contain any components yet."),
+        [Content.AppRenderPartial] = new("Content", Page: "AppRender", DefaultValue: "Some components failed to load; below are the available results (failed components are flagged individually)."),
+        [Content.AppRenderKpiDefault] = new("Content", Page: "AppRender", DefaultValue: "Metric"),
+        [Content.AppRenderUnknownTitle] = new("Content", Page: "AppRender", DefaultValue: "Unknown component type"),
+        [Content.AppRenderComponentFailed] = new("Content", Page: "AppRender", DefaultValue: "Component failed to load."),
         [Content.CommonRefresh] = new("Content", Page: "Common", DefaultValue: "Refresh"),
         [Content.CommonCancel] = new("Content", Page: "Common", DefaultValue: "Cancel"),
         [Content.CommonCreate] = new("Content", Page: "Common", DefaultValue: "Create"),

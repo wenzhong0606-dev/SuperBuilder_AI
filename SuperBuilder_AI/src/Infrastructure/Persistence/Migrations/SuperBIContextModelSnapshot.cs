@@ -390,6 +390,63 @@ namespace SuperBuilder_AI.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("SuperBuilder_AI.Models.AppBuilder.AskQuerySnapshot", b =>
+                {
+                    b.Property<string>("TurnId")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)")
+                        .HasComment("查询引用标识(GUID)");
+
+                    b.Property<DateTime>("CreatedTime")
+                        .HasColumnType("datetime2")
+                        .HasComment("创建时间");
+
+                    b.Property<long>("DataSourceId")
+                        .HasColumnType("bigint")
+                        .HasComment("解析数据源Id（运行时硬约束）");
+
+                    b.Property<string>("EntityCode")
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)")
+                        .HasComment("主表业务实体语义名");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("datetime2")
+                        .HasComment("过期时间(UTC)");
+
+                    b.Property<string>("QueryPlanJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)")
+                        .HasComment("允许查询的QueryPlan语义(JSON,RLS注入前截取)");
+
+                    b.Property<string>("RequestHash")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)")
+                        .HasComment("请求摘要哈希(创建幂等冲突检测)");
+
+                    b.Property<long>("TenantId")
+                        .HasColumnType("bigint")
+                        .HasComment("所属租户");
+
+                    b.Property<long>("UserId")
+                        .HasColumnType("bigint")
+                        .HasComment("快照创建者");
+
+                    b.HasKey("TurnId");
+
+                    b.HasIndex("ExpiresAt")
+                        .HasDatabaseName("IX_AskQuerySnapshots_ExpiresAt");
+
+                    b.HasIndex("TenantId", "UserId")
+                        .HasDatabaseName("IX_AskQuerySnapshots_TenantId_UserId");
+
+                    b.ToTable("AskQuerySnapshots", t =>
+                        {
+                            t.HasComment("Ask 查询快照（应用运行时引用）");
+                        });
+                });
+
             modelBuilder.Entity("SuperBuilder_AI.Models.Audit.AuditLog", b =>
                 {
                     b.Property<long>("Id")

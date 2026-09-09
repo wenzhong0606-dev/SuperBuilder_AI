@@ -1,9 +1,11 @@
 @page "/ask"
+@implements IDisposable
 @using System.Collections.Generic
 @using System.Linq
 @using System.Text.Json
 @using SuperBuilder_AI.Components.Models
 @inject IApiClient Api
+@inject IAppApiClient AppClient
 @inject AppState State
 @inject NavigationManager Nav
 @inject AskSessionStore Session
@@ -39,10 +41,10 @@ else
                     <div class="ask-source-scope">@foreach (var source in _dsOptions) { <span class="badge badge-primary">@source.Name</span> }</div>
                 }
             </div>
-            <label class="ask-q">@L10n.T(Keys.Content.AskQuestionLabel, "自然语言问题")<textarea class="form-control" @bind="Question" placeholder="@L10n.T(Keys.Content.AskQuestionPlaceholder, "例如：上个月各区域销售额对比")"></textarea></label>
+            <label class="ask-q">@L10n.T(Keys.Content.AskQuestionLabel, "自然语言问题")<textarea class="form-control" data-testid="ask-input" @bind="Question" placeholder="@L10n.T(Keys.Content.AskQuestionPlaceholder, "例如：上个月各区域销售额对比")"></textarea></label>
         </div>
         <div class="ask-actions">
-            <button class="btn btn-primary" @onclick="DoAsk" disabled="@Busy">@L10n.T(Keys.Content.AskButtonAsk, "提问")</button>
+            <button class="btn btn-primary" data-testid="ask-submit" @onclick="DoAsk" disabled="@Busy">@L10n.T(Keys.Content.AskButtonAsk, "提问")</button>
             <button class="btn btn-outline-secondary" @onclick="ClearChat" disabled="@Busy">@L10n.T(Keys.Content.AskButtonClear, "清空对话")</button>
             @if (_sessionLoaded && Turns.Count > 0) { <span class="muted tiny">@string.Format(L10n.T(Keys.Content.AskHistoryRestored, "已恢复 {0} 轮历史"), Turns.Count)</span> }
             @if (!string.IsNullOrEmpty(GlobalError)) { <span class="error">@GlobalError</span> }
@@ -73,6 +75,12 @@ else
 
     private bool _sessionLoaded = false;
     private string? _conversationId;
+
+    protected override void OnInitialized() => State.SessionRestoredChanged += OnSessionRestored;
+
+    private void OnSessionRestored() => _ = InvokeAsync(StateHasChanged);
+
+    public void Dispose() => State.SessionRestoredChanged -= OnSessionRestored;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -290,7 +298,7 @@ else
 
     private static string EscapeHtml(string s) => s.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;");
 
-    // ===== 发布为应用（序列化 → P8 BuildFromDslAsync）=====
+    // ===== 发布为应用（C4 两段式：创建草稿 → 发布，创建≠发布，失败保留草稿可重试）=====
 
     private async Task Publish(AskTurn turn)
     {
@@ -298,61 +306,52 @@ else
         turn.PublishBusy = true; turn.PublishError = null; turn.PublishInfo = null;
         try
         {
-            var q = turn.Question;
-            var code = "ask-" + State.TenantId + "-" + DateTimeOffset.UtcNow.ToUnixTimeSeconds() + "-" + Guid.NewGuid().ToString("N")[..4];
-            var name = L10n.T(Keys.Content.AskPublishedAppNamePrefix, "问数应用：") + (q.Length > 40 ? q[..40] + "…" : q);
-            var desc = turn.Response.Answer?.Answer;
-            if (!string.IsNullOrEmpty(desc) && desc.Length > 200) desc = desc[..200] + "…";
-
-            var viz = turn.Response.Answer?.Visualizations?.FirstOrDefault();
-            var chartType = viz?.Type ?? "bar";
-            if (chartType == "table") chartType = "bar";
-
-            var components = new List<object>
+            // 阶段 1：创建草稿（仅当尚未创建时；重试发布复用已有草稿编码）
+            if (string.IsNullOrEmpty(turn.PublishCode))
             {
-                new
+                turn.PublishInfo = L10n.T(Keys.Content.AskPublishDrafting, "正在保存草稿…");
+                var q = turn.Question;
+                var code = "ask-" + State.TenantId + "-" + DateTimeOffset.UtcNow.ToUnixTimeSeconds() + "-" + Guid.NewGuid().ToString("N")[..4];
+                var name = L10n.T(Keys.Content.AskPublishedAppNamePrefix, "问数应用：") + (q.Length > 40 ? q[..40] + "…" : q);
+                if (string.IsNullOrWhiteSpace(turn.Response.TurnId))
                 {
-                    type = "chart", id = "chart1", title = viz?.Title ?? L10n.T(Keys.Content.AskChartTitleDefault, "结果图"), order = 1,
-                    properties = new Dictionary<string, string> { { "chartType", chartType }, { "categoryField", viz?.XAxis ?? "" } },
-                    style = new { palette = "primary", showBorder = true, padding = "normal" }
-                },
-                new
-                {
-                    type = "table", id = "table1", title = L10n.T(Keys.Content.AskTableTitleDefault, "明细数据"), order = 2,
-                    properties = new Dictionary<string, string> { { "pageSize", "20" } },
-                    style = new { showBorder = true }
-                },
-                new
-                {
-                    type = "text", id = "answer1", title = L10n.T(Keys.Content.AskAiSummaryTitle, "AI 解读"), order = 3,
-                    properties = new Dictionary<string, string> { { "markdown", desc ?? "" } },
-                    style = new { showBorder = true }
+                    turn.PublishStage = PublishStage.Failed;
+                    turn.PublishError = "当前结果缺少查询快照，请重新提问成功后再生成应用。";
+                    return;
                 }
-            };
+                var (ok, _, err, errorCode) = await Api.PostAsync("api/apps/from-ask", new
+                {
+                    tenantId = State.TenantId, turnId = turn.Response.TurnId, name, code
+                });
+                if (!ok)
+                {
+                    turn.PublishStage = PublishStage.Failed;
+                    turn.PublishError = string.Format(L10n.T(Keys.Content.AskPublishDraftFailed, "创建草稿失败：{0}"), L10n.Friendly(errorCode, err ?? "未知错误"));
+                    return;
+                }
+                turn.PublishCode = code;
+                turn.PublishStage = PublishStage.DraftSaved;
+                turn.PublishInfo = string.Format(L10n.T(Keys.Content.AskPublishDraftSaved, "已保存为草稿 {0}，正在发布…"), turn.PublishCode);
+            }
 
-            var dsl = new
+            // 阶段 2：发布已创建的草稿（失败保留草稿，可重试）
+            var (pok, ver, perr, _) = await AppClient.PublishExistingAsync(State.TenantId, turn.PublishCode);
+            if (pok)
             {
-                version = "1.0",
-                code,
-                name,
-                description = desc,
-                pages = new[]
-                {
-                    new
-                    {
-                        id = "home", name = "结果", order = 1,
-                        layout = new { kind = "grid", columns = 12, rowHeight = 64, gap = 12 },
-                        components
-                    }
-                }
-            };
-            var json = System.Text.Json.JsonSerializer.Serialize(dsl);
-            var (ok, c, err) = await Api.PublishAppAsync(State.TenantId, json, code);
-            if (ok) turn.PublishInfo = string.Format(L10n.T(Keys.Content.AskPublishSuccess, "已发布为应用：{0}"), c);
-            else turn.PublishError = string.Format(L10n.T(Keys.Content.AskPublishFailed, "发布失败：{0}"), err ?? "未知错误");
+                turn.PublishStage = PublishStage.Published;
+                turn.PublishInfo = string.Format(L10n.T(Keys.Content.AskPublishPublished, "已发布为应用：{0}（v{1}）"), turn.PublishCode, ver ?? 1);
+                turn.PublishError = null;
+            }
+            else
+            {
+                turn.PublishStage = PublishStage.Failed;
+                turn.PublishError = string.Format(L10n.T(Keys.Content.AskPublishPublishFailed, "已保存为草稿，发布失败：{0}"), perr ?? "未知错误");
+                turn.PublishInfo = string.Format(L10n.T(Keys.Content.AskPublishDraftKept, "草稿已保留：{0}"), turn.PublishCode);
+            }
         }
         catch (Exception ex)
         {
+            turn.PublishStage = PublishStage.Failed;
             turn.PublishError = string.Format(L10n.T(Keys.Content.AskPublishException, "发布异常：{0}"), ex.Message);
         }
         finally
