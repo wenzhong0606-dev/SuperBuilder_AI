@@ -73,4 +73,16 @@ public sealed class QueryPlanPipelineResult
 	/// 调用方应直接将其作为 BIResponse 返回。
 	/// </summary>
 	public BIResponse? EarlyResponse { get; set; }
+
+	/// <summary>
+	/// 语义验证 + 自动修复管线是否实际执行了修复（<c>RepairTrace.TotalAttempts &gt; 0</c>）。
+	/// 纯观测字段，默认 false，不影响任何业务语义与 Golden 行为契约。
+	/// </summary>
+	public bool WasRepaired { get; set; }
+
+	/// <summary>
+	/// Decision Gate 是否以 Reject 形态阻断（<c>QueryPlanDecision.IsReject</c>）。
+	/// 纯观测字段，默认 false，不影响任何业务语义与 Golden 行为契约。
+	/// </summary>
+	public bool WasRejected { get; set; }
 }

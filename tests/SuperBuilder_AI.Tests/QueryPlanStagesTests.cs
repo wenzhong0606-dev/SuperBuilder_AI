@@ -219,6 +219,108 @@ public class QueryPlanStagesTests
 		Assert.NotNull(result.EarlyResponse.Explanation);
 	}
 
+	// M9-05：验证 WasRejected / WasRepaired 纯观测标志位的线程逻辑。
+
+	[Fact]
+	public async Task RunAsync_DecisionGateReject_SetsWasRejectedTrue()
+	{
+		var decision = new FakeDecisionGate
+		{
+			Decision = new QueryPlanDecision { Decision = QueryPlanDecisionType.Reject, Reason = "rejected" }
+		};
+
+		var pipeline = BuildPipeline(
+			new FakeBuilder(),
+			new FakeContextBuilder(),
+			new NoOpValidator(),
+			new FakeValidationPipeline(),
+			new FakeConfidence(),
+			decision,
+			new FakeExplain());
+
+		var result = await pipeline.RunAsync("q", new QueryIntent());
+
+		Assert.True(result.WasRejected);
+		Assert.False(result.WasRepaired);
+	}
+
+	[Fact]
+	public async Task RunAsync_NonRejectDecision_DoesNotSetWasRejected()
+	{
+		var decision = new FakeDecisionGate
+		{
+			Decision = new QueryPlanDecision { Decision = QueryPlanDecisionType.Allow }
+		};
+
+		var pipeline = BuildPipeline(
+			new FakeBuilder(),
+			new FakeContextBuilder(),
+			new NoOpValidator(),
+			new FakeValidationPipeline(),
+			new FakeConfidence(),
+			decision,
+			new FakeExplain());
+
+		var result = await pipeline.RunAsync("q", new QueryIntent());
+
+		Assert.False(result.WasRejected);
+	}
+
+	[Fact]
+	public async Task RunAsync_RepairTraceHasAttempts_SetsWasRepairedTrue()
+	{
+		var validation = new FakeValidationPipeline
+		{
+			Result = new QueryPlanValidationPipelineResult
+			{
+				Plan = new QueryPlan(),
+				ValidationResult = new QuerySemanticValidationResult(),
+				RepairTrace = new QueryPlanRepairTrace { TotalAttempts = 2 }
+			}
+		};
+
+		var pipeline = BuildPipeline(
+			new FakeBuilder(),
+			new FakeContextBuilder(),
+			new NoOpValidator(),
+			validation,
+			new FakeConfidence(),
+			new FakeDecisionGate(),
+			new FakeExplain());
+
+		var result = await pipeline.RunAsync("q", new QueryIntent());
+
+		Assert.True(result.WasRepaired);
+		Assert.False(result.WasRejected);
+	}
+
+	[Fact]
+	public async Task RunAsync_NoRepairAttempts_DoesNotSetWasRepaired()
+	{
+		var validation = new FakeValidationPipeline
+		{
+			Result = new QueryPlanValidationPipelineResult
+			{
+				Plan = new QueryPlan(),
+				ValidationResult = new QuerySemanticValidationResult(),
+				RepairTrace = new QueryPlanRepairTrace { TotalAttempts = 0 }
+			}
+		};
+
+		var pipeline = BuildPipeline(
+			new FakeBuilder(),
+			new FakeContextBuilder(),
+			new NoOpValidator(),
+			validation,
+			new FakeConfidence(),
+			new FakeDecisionGate(),
+			new FakeExplain());
+
+		var result = await pipeline.RunAsync("q", new QueryIntent());
+
+		Assert.False(result.WasRepaired);
+	}
+
 	#endregion
 
 	#region 阶段隔离单测

@@ -99,6 +99,8 @@ public class BIConversationService
 	private readonly IQueryPlanSecurityGate? _securityGate;
 	private readonly IAskQuerySnapshotStore? _snapshotStore;
 
+	private readonly IPipelineMetricsSink? _metrics;
+
 
 	public BIConversationService(
 		IQueryUnderstandingService queryUnderstandingService,
@@ -112,7 +114,8 @@ public class BIConversationService
 		IRowLevelSecurityService? rowSecurity = null,
 		IDataSourceExecutionIdentityAccessor? executionIdentity = null,
 		IQueryPlanSecurityGate? securityGate = null,
-		IAskQuerySnapshotStore? snapshotStore = null)
+		IAskQuerySnapshotStore? snapshotStore = null,
+		IPipelineMetricsSink? metrics = null)
 	{
 		_queryUnderstandingService =
 			queryUnderstandingService;
@@ -141,6 +144,7 @@ public class BIConversationService
 		_executionIdentity = executionIdentity;
 		_securityGate = securityGate;
 		_snapshotStore = snapshotStore;
+		_metrics = metrics;
 	}
 
 
@@ -217,6 +221,8 @@ public class BIConversationService
 				.UnderstandAsync(question, platformContext);
 
 		var metadataUnderstandMs = sw.ElapsedMilliseconds;
+		// M9-05：管线分段延迟埋点（异常静默，不影响主流程）。
+		_metrics?.RecordStage(IPipelineMetricsSink.StageUnderstand, metadataUnderstandMs);
 		sw.Restart();
 
 
@@ -247,6 +253,11 @@ public class BIConversationService
 					authorizedDataSourceIds);
 
 		var planMs = sw.ElapsedMilliseconds;
+		// M9-05：管线分段延迟埋点 + 结果分类计数。
+		_metrics?.RecordStage(IPipelineMetricsSink.StagePlan, planMs);
+		_metrics?.RecordOutcome(IPipelineMetricsSink.OutcomeReject, pipelineResult.WasRejected);
+		_metrics?.RecordOutcome(IPipelineMetricsSink.OutcomeRepair, pipelineResult.WasRepaired);
+		_metrics?.RecordOutcome(IPipelineMetricsSink.OutcomeEarlyReturn, pipelineResult.EarlyResponse != null);
 		sw.Restart();
 
 		if (pipelineResult.EarlyResponse != null)
@@ -337,6 +348,8 @@ public class BIConversationService
 					dialect);
 
 		var sqlBuildMs = sw.ElapsedMilliseconds;
+		// M9-05：管线分段延迟埋点。
+		_metrics?.RecordStage(IPipelineMetricsSink.StageSql, sqlBuildMs);
 		sw.Restart();
 
 
@@ -354,6 +367,8 @@ public class BIConversationService
 					plan.DataSourceId);
 
 		var dbExecMs = sw.ElapsedMilliseconds;
+		// M9-05：管线分段延迟埋点。
+		_metrics?.RecordStage(IPipelineMetricsSink.StageDb, dbExecMs);
 		sw.Restart();
 
 		// M7-11：查询成功 → 落库快照并返回 turnId（仅已认证访问者路径）。
@@ -392,6 +407,8 @@ public class BIConversationService
 					plan);
 
 		var resultUnderstandMs = sw.ElapsedMilliseconds;
+		// M9-05：管线分段延迟埋点。
+		_metrics?.RecordStage(IPipelineMetricsSink.StageResult, resultUnderstandMs);
 		sw.Stop();
 		swTotal.Stop();
 

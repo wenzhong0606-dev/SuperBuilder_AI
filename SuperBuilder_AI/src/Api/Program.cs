@@ -396,6 +396,9 @@ builder.Services.AddScoped<SuperBuilder_AI.Interfaces.BI.IAskCacheVersionProvide
 
 // P11.5.2 安全/运维轨：请求指标采集器（请求数 / 错误数 / P95 延迟，按路由聚合）
 builder.Services.AddSingleton<SuperBuilder_AI.Middleware.RequestMetricsCollector>();
+// M9-05：同一单例同时注册为端口抽象，使 Application 层经接口写入同一份内存指标（不反向依赖 Middleware）。
+builder.Services.AddSingleton<SuperBuilder_AI.Interfaces.BI.IPipelineMetricsSink>(sp =>
+	sp.GetRequiredService<SuperBuilder_AI.Middleware.RequestMetricsCollector>());
 
 // M0-05：受控启动诊断单例（供 /health 与初始化端点读取，绝不向普通用户输出堆栈）
 builder.Services.AddSingleton<StartupDiagnostics>();
@@ -593,12 +596,16 @@ app.MapGet("/metrics", (SuperBuilder_AI.Middleware.RequestMetricsCollector metri
 	try
 	{
 		var routes = metrics.Snapshot();
+		var stages = metrics.StageSnapshot();
+		var outcomes = metrics.OutcomeSnapshot();
 		var (hits, misses) = cache.Snapshot();
 		var total = hits + misses;
 		return Results.Ok(new
 		{
 			generatedAt = System.DateTime.UtcNow,
 			routes,
+			pipelineStages = stages,
+			outcomes,
 			askCache = new
 			{
 				hits,
@@ -609,7 +616,13 @@ app.MapGet("/metrics", (SuperBuilder_AI.Middleware.RequestMetricsCollector metri
 	}
 	catch
 	{
-		return Results.Ok(new { generatedAt = System.DateTime.UtcNow, routes = Array.Empty<object>() });
+		return Results.Ok(new
+		{
+			generatedAt = System.DateTime.UtcNow,
+			routes = Array.Empty<object>(),
+			pipelineStages = Array.Empty<object>(),
+			outcomes = Array.Empty<object>()
+		});
 	}
 });
 app.Run();

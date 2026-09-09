@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using SuperBuilder_AI.Interfaces.BI;
 
 namespace SuperBuilder_AI.Middleware;
 
@@ -22,7 +23,7 @@ namespace SuperBuilder_AI.Middleware;
 /// </list>
 /// </para>
 /// </summary>
-public sealed class RequestMetricsCollector
+public sealed class RequestMetricsCollector : IPipelineMetricsSink
 {
 	/// <summary>每条路由保留的耗时样本上限。</summary>
 	public const int SampleCapacity = 512;
@@ -35,6 +36,14 @@ public sealed class RequestMetricsCollector
 
 	private readonly object _gate = new();
 	private readonly Dictionary<string, RouteMetrics> _routes =
+		new(StringComparer.OrdinalIgnoreCase);
+
+	/// <summary>BI 管线分段延迟样本（键固定，无基数爆炸风险）。</summary>
+	private readonly Dictionary<string, RouteMetrics> _stages =
+		new(StringComparer.OrdinalIgnoreCase);
+
+	/// <summary>管线结果分类计数（Reject / EarlyReturn / Repair）。</summary>
+	private readonly Dictionary<string, long> _outcomes =
 		new(StringComparer.OrdinalIgnoreCase);
 
 	/// <summary>记录一次请求。</summary>
@@ -82,6 +91,118 @@ public sealed class RequestMetricsCollector
 		}
 	}
 
+	/// <summary>
+	/// 记录一次 BI 管线分段耗时（固定 5 段，复用有界内存 + 异常静默范式）。
+	/// 用于 <c>GET /metrics</c> 的 <c>pipelineStages</c> 输出。
+	/// </summary>
+	/// <param name="stage">分段键（见 <see cref="StageUnderstand"/> 等常量）。</param>
+	/// <param name="elapsedMs">耗时（毫秒）。</param>
+	public void RecordStage(string stage, long elapsedMs)
+	{
+		if (string.IsNullOrWhiteSpace(stage)) stage = OtherRoute;
+
+		try
+		{
+			lock (_gate)
+			{
+				if (!_stages.TryGetValue(stage, out var m))
+				{
+					m = new RouteMetrics();
+					_stages[stage] = m;
+				}
+
+				m.Count++;
+				m.TotalMs += elapsedMs;
+				if (elapsedMs > m.MaxMs) m.MaxMs = elapsedMs;
+
+				if (m.Samples.Count < SampleCapacity) m.Samples.Add(elapsedMs);
+				else
+				{
+					m.Samples[m.SampleCursor] = elapsedMs;
+					m.SampleCursor = (m.SampleCursor + 1) % SampleCapacity;
+				}
+			}
+		}
+		catch
+		{
+			// 指标采集失败不影响主链路
+		}
+	}
+
+	/// <summary>
+	/// 记录一次管线结果分类（Reject / EarlyReturn / Repair）。<c>occurred=false</c> 时忽略，
+	/// 便于调用方无条件传入各标志位而无需前置判断。
+	/// 用于 <c>GET /metrics</c> 的 <c>outcomes</c> 输出。
+	/// </summary>
+	/// <param name="outcome">分类键（见 <see cref="OutcomeReject"/> 等常量）。</param>
+	/// <param name="occurred">本次是否发生该分类。</param>
+	public void RecordOutcome(string outcome, bool occurred)
+	{
+		if (string.IsNullOrWhiteSpace(outcome) || !occurred) return;
+
+		try
+		{
+			lock (_gate)
+			{
+				_outcomes.TryGetValue(outcome, out var c);
+				_outcomes[outcome] = c + 1;
+			}
+		}
+		catch
+		{
+			// 指标采集失败不影响主链路
+		}
+	}
+
+	/// <summary>输出全部管线分段的指标快照（按请求数降序）。</summary>
+	public IReadOnlyList<StageMetricsSnapshot> StageSnapshot()
+	{
+		try
+		{
+			List<KeyValuePair<string, RouteMetrics>> copy;
+			lock (_gate)
+			{
+				copy = _stages.ToList();
+			}
+
+			return copy
+				.Select(kv => new StageMetricsSnapshot(
+					kv.Key,
+					kv.Value.Count,
+					kv.Value.Count == 0 ? 0 : Math.Round(kv.Value.TotalMs / (double)kv.Value.Count, 2),
+					Percentile(kv.Value.Samples, 0.95),
+					kv.Value.MaxMs))
+				.OrderByDescending(s => s.Count)
+				.ToList();
+		}
+		catch
+		{
+			return Array.Empty<StageMetricsSnapshot>();
+		}
+	}
+
+	/// <summary>输出管线结果分类计数快照。</summary>
+	public IReadOnlyList<OutcomeCounter> OutcomeSnapshot()
+	{
+		try
+		{
+			List<KeyValuePair<string, long>> copy;
+			lock (_gate)
+			{
+				copy = _outcomes.ToList();
+			}
+
+			return copy
+				.Select(kv => new OutcomeCounter(kv.Key, kv.Value))
+				.OrderBy(kv => kv.Outcome, StringComparer.OrdinalIgnoreCase)
+				.ToList();
+		}
+		catch
+		{
+			return Array.Empty<OutcomeCounter>();
+		}
+	}
+
 	/// <summary>输出全部路由的指标快照（按请求数降序）。</summary>
 	public IReadOnlyList<RouteMetricsSnapshot> Snapshot()
 	{
@@ -116,7 +237,12 @@ public sealed class RequestMetricsCollector
 	{
 		try
 		{
-			lock (_gate) { _routes.Clear(); }
+			lock (_gate)
+			{
+				_routes.Clear();
+				_stages.Clear();
+				_outcomes.Clear();
+			}
 		}
 		catch
 		{
@@ -169,3 +295,23 @@ public sealed record RouteMetricsSnapshot(
 	/// <summary>服务端错误率（0~1，保留 4 位小数）。</summary>
 	public double ErrorRate => Count == 0 ? 0 : Math.Round(Errors / (double)Count, 4);
 }
+
+/// <summary>单段管线分段延迟快照。</summary>
+/// <param name="Stage">分段键。</param>
+/// <param name="Count">采样次数。</param>
+/// <param name="AvgMs">平均耗时（毫秒）。</param>
+/// <param name="P95Ms">P95 耗时（毫秒）。</param>
+/// <param name="MaxMs">最大耗时（毫秒）。</param>
+public sealed record StageMetricsSnapshot(
+	string Stage,
+	long Count,
+	double AvgMs,
+	double P95Ms,
+	long MaxMs);
+
+/// <summary>管线结果分类计数快照。</summary>
+/// <param name="Outcome">分类键。</param>
+/// <param name="Count">发生次数。</param>
+public sealed record OutcomeCounter(
+	string Outcome,
+	long Count);

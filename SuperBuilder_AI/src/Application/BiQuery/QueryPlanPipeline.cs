@@ -105,7 +105,10 @@ public sealed class QueryPlanPipeline : IQueryPlanPipeline
 							?? "QueryPlan 未通过 Decision Gate，禁止进入 SQL Builder。",
 
 						Explanation = ctx.Explanation
-					}
+					},
+
+					// M9-05：纯观测——Decision Gate 以 Reject 阻断时置位。
+					WasRejected = decision.IsReject
 				};
 			}
 
@@ -120,7 +123,10 @@ public sealed class QueryPlanPipeline : IQueryPlanPipeline
 
 				Decision = ctx.Decision!,
 
-				Explanation = ctx.Explanation!
+				Explanation = ctx.Explanation!,
+
+				// M9-05：纯观测——修复闭环实际执行过（TotalAttempts > 0）时置位。
+				WasRepaired = ctx.SemanticValidation?.RepairTrace?.TotalAttempts > 0
 			};
 		}
 		finally
