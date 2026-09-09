@@ -237,7 +237,9 @@ public class SuperBIContext : DbContext
         #endregion
 
         #region DataSource
-        builder.Entity<DataSource>().HasOne(x => x.Tenant).WithMany(x => x.DataSources).HasForeignKey(x => x.TenantId).IsRequired().OnDelete(DeleteBehavior.Restrict);
+        // M9-11：移除 Tenant.DataSources 集合导航以打破 Models.Organization → Models.Metadata 循环依赖；
+        // 关系改由从属侧 DataSource.Tenant + TenantId 定义，数据库结构（FK/索引）不变。
+        builder.Entity<DataSource>().HasOne(x => x.Tenant).WithMany().HasForeignKey(x => x.TenantId).IsRequired().OnDelete(DeleteBehavior.Restrict);
         builder.Entity<DataSource>().ToTable(tb => tb.HasComment("数据源"));
         // M1-04：保留按 TenantId 的常规查询索引（List/Manage 按租户过滤），与下方过滤唯一索引共存。
         builder.Entity<DataSource>().HasIndex(x => x.TenantId).HasDatabaseName("IX_DataSources_TenantId");

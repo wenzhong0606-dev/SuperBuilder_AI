@@ -61,6 +61,20 @@ public class ArchitectureTests
         Assert.Empty(violations);
     }
 
+    // ---- M9-11：限界上下文解耦——消除 Metadata↔Organization 循环依赖 ----
+    // 验收口径：无 Metadata↔Organization 循环。允许 Metadata 引用 Organization
+    // （DataSource.Tenant / MetadataLearningRecord.Tenant 等 FK 导航属正常方向），
+    // 但 Organization 不得反向引用 Metadata（此前 Tenant.DataSources 集合导航造成环）。
+    // 以下不变量固化该方向约束，防止后续编辑重新引入环。
+
+    [Fact]
+    public void Organization_Should_Not_Depend_On_Metadata()
+    {
+        var violations = FindViolations("SuperBuilder_AI.Models.Organization",
+            "SuperBuilder_AI.Models.Metadata");
+        Assert.Empty(violations); // M9-11：Organization 上下文不得依赖 Metadata 上下文
+    }
+
     /// <summary>扫描某层全部类型，返回所有「指向 forbidden 命名空间」的非法依赖。</summary>
     private static List<string> FindViolations(string layer, params string[] forbidden)
     {

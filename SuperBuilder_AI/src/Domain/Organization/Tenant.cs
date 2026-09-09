@@ -1,5 +1,4 @@
 ﻿using System;
-using SuperBuilder_AI.Models.Metadata;
 
 namespace SuperBuilder_AI.Models.Organization;
 
@@ -39,11 +38,6 @@ public class Tenant : BaseEntity
 
 	/// <summary>执行停用的操作者用户 Id（M1-02）。</summary>
 	public long? DisabledByUserId { get; set; }
-
-	/// <summary>
-	/// 该租户下关联的数据源集合。
-	/// </summary>
-	public ICollection<DataSource> DataSources { get; set; } = new List<DataSource>();
 
 	/// <summary>
 	/// 规范化租户编码：去首尾空白并转小写，用于唯一性与查找一致性。
