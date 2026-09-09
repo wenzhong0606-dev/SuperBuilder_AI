@@ -42,7 +42,9 @@ using SuperBuilder_AI.Api.Diagnostics;
 using SuperBuilder_AI.Interfaces.Seed;
 using SuperBuilder_AI.Services.Seed;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.OpenApi;
 using Microsoft.Extensions.Configuration;
+using SuperBuilder_AI.Api.OpenApi;
 using System.Net;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -65,6 +67,12 @@ builder.Services.AddControllersWithViews(options =>
 	// 鉴权主力仍是 AuthMiddleware；本过滤器作为第二道防线，
 	// 在中间件被绕过或白名单被误改时，仍然拒绝匿名访问 /api（标注 [AllowAnonymous] 的端点除外）。
 	options.Filters.Add<SuperBuilder_AI.Api.Security.ApiAuthorizationFilter>();
+});
+builder.Services.AddOpenApi("v1", options =>
+{
+    // M9-13：OpenAPI 契约——声明 Bearer 鉴权方案与 401/403/422 错误响应说明。
+    options.AddDocumentTransformer<OpenApiSecurityTransformer>();
+    options.AddDocumentTransformer<OpenApiErrorResponsesTransformer>();
 });
 builder.Services.AddHttpClient();
 
@@ -595,6 +603,7 @@ app.UseAuthorization();
 app.UseMiddleware<ObservabilityMiddleware>();
 app.MapStaticAssets();
 app.MapControllerRoute(name: "default", pattern: "{controller=Home}/{action=Index}/{id?}").WithStaticAssets();
+app.MapOpenApi("/openapi/v1.json");
 // P11.0 健康探测（匿名白名单，供运维/可观测面使用）
 // M0-05：在受限诊断模式下仍返回 200，但通过 state/reason 暴露可诊断状态，避免启动崩溃或堆栈泄漏。
 app.MapGet("/health", (StartupDiagnostics d) => new

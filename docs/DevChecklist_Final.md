@@ -113,6 +113,7 @@
 | **SB-P2-08** | P2 | Testing | 增加 Web / Blazor UI 关键链路自动化测试 | ✅ |
 | **SB-P2-09** | P2 | Dashboard | DSL Schema Version 与兼容升级 | ✅ 已完成｜M9-09 Dashboard DSL 版本兼容（旧 DSL 可加载/升级/回滚，Upgrade 归一化 + 回滚快照）｜`DashboardDslSerializer.Upgrade` |
 | **SB-P2-10** | P2 | App / Agent | DSL Schema Version 与兼容升级 | ✅ 已完成｜M9-10 App/Agent DSL 版本兼容（旧 DSL 可加载/升级；App 回滚已具备、Agent 回滚待立子项）｜`AppDslSerializer.Upgrade`/`AgentDslSerializer.Upgrade` |
+| **SB-P2-11** | P2 | API Contract | OpenAPI/Swagger 契约生成（公开 API 鉴权 / DTO / 错误说明） | ✅ 已完成｜M9-13 OpenAPI 契约生成（`Microsoft.AspNetCore.OpenApi` + 两个 `IOpenApiDocumentTransformer`：声明 `bearerAuth` 鉴权 + 401/403/422 错误说明 + `ApiError` schema）｜`docs/api/openapi-v1.json` / `docs/api/openapi-v1.html` |
 
 ---
 
