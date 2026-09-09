@@ -112,7 +112,7 @@
 | **SB-P2-07** | P2 | Config | Development / Test / Production 配置校验统一化 | ✅ 已完成｜M9-07 统一配置校验框架（fail-fast + 不泄密）｜`StartupConfigurationValidator` 接入 `Program.cs` |
 | **SB-P2-08** | P2 | Testing | 增加 Web / Blazor UI 关键链路自动化测试 | ✅ |
 | **SB-P2-09** | P2 | Dashboard | DSL Schema Version 与兼容升级 | ✅ 已完成｜M9-09 Dashboard DSL 版本兼容（旧 DSL 可加载/升级/回滚，Upgrade 归一化 + 回滚快照）｜`DashboardDslSerializer.Upgrade` |
-| **SB-P2-10** | P2 | App / Agent | DSL Schema Version 与兼容升级 | ⬜ |
+| **SB-P2-10** | P2 | App / Agent | DSL Schema Version 与兼容升级 | ✅ 已完成｜M9-10 App/Agent DSL 版本兼容（旧 DSL 可加载/升级；App 回滚已具备、Agent 回滚待立子项）｜`AppDslSerializer.Upgrade`/`AgentDslSerializer.Upgrade` |
 
 ---
 

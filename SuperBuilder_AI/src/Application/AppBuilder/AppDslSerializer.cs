@@ -67,6 +67,16 @@ public sealed class AppDslSerializer : IAppDslSerializer
 			return false;
 		}
 
+		// 版本白名单：未知版本直接拒绝（M9-10 之前的唯一行为；先拒绝再升级）。
+		if (!AppDslVersions.Supported.Contains(parsed.Version))
+		{
+			errors = new[] { $"不支持的应用 DSL 版本：{parsed.Version}（受支持：{string.Join(", ", AppDslVersions.Supported)}）。" };
+			return false;
+		}
+
+		// M9-10：受支持版本归一化为 Current（缺省布局物化为默认 Grid 12 栅格）。
+		Upgrade(parsed);
+
 		var validationErrors = Validate(parsed);
 		if (validationErrors.Count > 0)
 		{
@@ -110,6 +120,42 @@ public sealed class AppDslSerializer : IAppDslSerializer
 		}
 
 		return errors;
+	}
+
+	/// <summary>
+	/// 将任意<strong>受支持</strong>版本的 DSL 归一化为 <see cref="AppDslVersions.Current"/>（M9-10）。
+	/// 调用方须先通过 <see cref="AppDslVersions.Supported"/> 白名单。归一化后即可被渲染器/执行器消费，
+	/// 无需手工数据迁移；当前仅 V1（等同 Current），结构同构，归一化仅做前向兼容的默认值物化。
+	/// </summary>
+	/// <remarks>
+	/// 显式<strong>不</strong>做「版本 == Current 即跳过」的早返回：因 V1 == Current，须对所有受支持版本
+	/// 执行结构归一化，确保未来 V2 演进时旧文档也能统一升级。
+	/// </remarks>
+	private static void Upgrade(AppDsl dsl)
+	{
+		switch (dsl.Version)
+		{
+			case AppDslVersions.V1:
+				NormalizeV1(dsl);
+				break;
+			default:
+				// 白名单已拦截未知版本，理论上不可达。
+				throw new InvalidOperationException($"未注册的应用 DSL 升级路径：{dsl.Version}");
+		}
+
+		dsl.Version = AppDslVersions.Current;
+	}
+
+	/// <summary>V1 → 当前版本的结构归一化。</summary>
+	/// <remarks>
+	/// 当前 V1 与 Current 同构，此处仅做一项前向兼容的默认值物化：将缺失（<c>null</c>）的页面布局
+	/// 补全为默认 <see cref="AppLayoutKinds.Grid"/>（12 栅格）。渲染器对 <c>null</c> 与默认值输出一致，
+	/// 故行为零变化；未来 V2 演进时在此追加字段迁移（字段重命名 / 默认值补全 / 结构迁移）。
+	/// </remarks>
+	private static void NormalizeV1(AppDsl dsl)
+	{
+		foreach (var page in dsl.Pages)
+			page.Layout ??= new AppLayoutDsl();
 	}
 
 	private static void ValidatePage(PagePlan page, HashSet<string> pageIds, List<string> errors)

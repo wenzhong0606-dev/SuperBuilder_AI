@@ -67,6 +67,16 @@ public sealed class AgentDslSerializer : IAgentDslSerializer
 			return false;
 		}
 
+		// 版本白名单：未知版本直接拒绝（M9-10 之前的唯一行为；先拒绝再升级）。
+		if (!AgentDslVersions.Supported.Contains(parsed.Version))
+		{
+			errors = new[] { $"不支持的 Agent DSL 版本：{parsed.Version}（受支持：{string.Join(", ", AgentDslVersions.Supported)}）。" };
+			return false;
+		}
+
+		// M9-10：受支持版本归一化为 Current（V1 与 Current 同构，结构就绪、前向兼容）。
+		Upgrade(parsed);
+
 		var validationErrors = Validate(parsed);
 		if (validationErrors.Count > 0)
 		{
@@ -119,6 +129,40 @@ public sealed class AgentDslSerializer : IAgentDslSerializer
 		}
 
 		return errors;
+	}
+
+	/// <summary>
+	/// 将任意<strong>受支持</strong>版本的 DSL 归一化为 <see cref="AgentDslVersions.Current"/>（M9-10）。
+	/// 调用方须先通过 <see cref="AgentDslVersions.Supported"/> 白名单。归一化后即可被运行时消费，
+	/// 无需手工数据迁移；当前仅 V1（等同 Current），结构同构，归一化仅保证版本号统一为 Current。
+	/// </summary>
+	/// <remarks>
+	/// 显式<strong>不</strong>做「版本 == Current 即跳过」的早返回：因 V1 == Current，须对所有受支持版本
+	/// 执行结构归一化，确保未来 V2 演进时旧文档也能统一升级。
+	/// </remarks>
+	private static void Upgrade(AgentDsl dsl)
+	{
+		switch (dsl.Version)
+		{
+			case AgentDslVersions.V1:
+				NormalizeV1(dsl);
+				break;
+			default:
+				// 白名单已拦截未知版本，理论上不可达。
+				throw new InvalidOperationException($"未注册的 Agent DSL 升级路径：{dsl.Version}");
+		}
+
+		dsl.Version = AgentDslVersions.Current;
+	}
+
+	/// <summary>V1 → 当前版本的结构归一化。</summary>
+	/// <remarks>
+	/// 当前 V1 与 Current 同构，且 <see cref="AgentDsl"/> 无可空的结构性布局字段（<c>SelectedTools</c> /
+	/// <c>AnomalyChain</c> 均以空集合为默认值）；此处为 V2 演进预留迁移点，不修改任何字段，保证旧文档无损升级。
+	/// </remarks>
+	private static void NormalizeV1(AgentDsl dsl)
+	{
+		// V1 无结构性缺口；预留字段迁移位置（如未来 V2 重命名工具类型枚举）。
 	}
 
 	private static void ValidateToolSelection(AgentToolSelection tool, HashSet<int> orders, List<string> errors)

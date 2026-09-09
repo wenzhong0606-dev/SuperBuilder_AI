@@ -148,4 +148,40 @@ public class AppDslSerializerTests
 		Assert.Equal(AppDslVersions.Current, plan.DslVersion);
 		Assert.Equal(0, plan.TenantId);
 	}
+
+	[Fact]
+	public void TryDeserialize_SupportedV1Version_LoadsAndNormalizesToCurrent()
+	{
+		var dsl = SampleDsl();
+		dsl.Version = AppDslVersions.V1;
+		var json = Create().Serialize(dsl);
+
+		var ok = Create().TryDeserialize(json, out var restored, out var errors);
+		Assert.True(ok);
+		Assert.Empty(errors);
+		Assert.NotNull(restored);
+		Assert.Equal(AppDslVersions.Current, restored!.Version);
+		Assert.All(restored.Pages, p => Assert.NotNull(p.Layout));
+		Assert.Equal(AppLayoutKinds.Grid, restored.Pages[0].Layout!.Kind);
+		Assert.Equal(12, restored.Pages[0].Layout!.Columns);
+	}
+
+	[Fact]
+	public void TryDeserialize_NullPageLayout_IsNormalizedToDefault()
+	{
+		var dsl = SampleDsl();
+		Assert.All(dsl.Pages, p => Assert.Null(p.Layout)); // 前置：样例页面未声明布局
+		var json = Create().Serialize(dsl);
+
+		var ok = Create().TryDeserialize(json, out var restored, out var errors);
+		Assert.True(ok);
+		Assert.Empty(errors);
+		Assert.NotNull(restored);
+		Assert.All(restored!.Pages, p =>
+		{
+			Assert.NotNull(p.Layout);
+			Assert.Equal(AppLayoutKinds.Grid, p.Layout!.Kind);
+			Assert.Equal(12, p.Layout.Columns);
+		});
+	}
 }

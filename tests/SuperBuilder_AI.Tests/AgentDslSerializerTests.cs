@@ -121,4 +121,20 @@ public class AgentDslSerializerTests
 	[Fact]
 	public void TryDeserialize_EmptyJson_Fails()
 		=> Assert.False(Create().TryDeserialize("   ", out _, out _));
+
+	[Fact]
+	public void TryDeserialize_SupportedV1Version_LoadsAndNormalizesToCurrent()
+	{
+		var dsl = SampleDsl();
+		dsl.Version = AgentDslVersions.V1;
+		var json = Create().Serialize(dsl);
+
+		var ok = Create().TryDeserialize(json, out var restored, out var errors);
+		Assert.True(ok);
+		Assert.Empty(errors);
+		Assert.NotNull(restored);
+		Assert.Equal(AgentDslVersions.Current, restored!.Version);
+		Assert.Equal(2, restored.SelectedTools.Count);
+		Assert.Equal(6, restored.AnomalyChain.Count);
+	}
 }
