@@ -9,6 +9,10 @@ else if (Fallback is not null)
 {
     @Fallback
 }
+else if (Silent)
+{
+    @* 按钮级守卫：未授权时静默隐藏，不渲染空状态框 *@
+}
 else
 {
     <SbEmptyState Icon="sb-ico-shield" Title="@L10n.T(Keys.Content.SharedPermDeniedTitle, "无访问权限")" Text="@(DenyText ?? L10n.T(Keys.Content.SharedPermDeniedText, "当前账号缺少访问该页面所需的权限，请联系管理员。"))">
@@ -26,6 +30,8 @@ else
     [Parameter] public string? DenyText { get; set; }
     [Parameter] public RenderFragment? ChildContent { get; set; }
     [Parameter] public RenderFragment? Fallback { get; set; }
+    /// <summary>按钮级守卫：未授权时静默隐藏（不渲染空状态框）。页面级守卫保持 false 以显示空状态。</summary>
+    [Parameter] public bool Silent { get; set; } = false;
 
     private bool Allowed
     {

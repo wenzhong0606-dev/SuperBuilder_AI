@@ -7,9 +7,11 @@
 
 <AuthGuard>
     <PageHead Icon="sb-ico-db" Key="DataSources" Title="数据源管理" Desc="统一管理租户数据连接、元数据覆盖与访问状态。">
-        <button class="btn btn-primary" @onclick="() => CreateVisible = true">
-            <svg class="btn-ico"><use href="#sb-ico-plus" /></svg> @L10n.T(Keys.Content.DataSourcesNew, "新增数据源")
-        </button>
+        <PermissionGuard Require="@(new[] { PermissionCodes.MetadataEdit })" Silent>
+            <button class="btn btn-primary" @onclick="() => CreateVisible = true">
+                <svg class="btn-ico"><use href="#sb-ico-plus" /></svg> @L10n.T(Keys.Content.DataSourcesNew, "新增数据源")
+            </button>
+        </PermissionGuard>
     </PageHead>
 
     <div class="ds-overview">
@@ -56,9 +58,15 @@
 							<td class="ta-right">
 								<div class="ds-row-actions">
 									<button class="btn btn-outline-secondary btn-sm" @onclick="() => Open(source)">@L10n.T(Keys.Content.DataSourcesManage, "管理连接 →")</button>
-									<button class="btn btn-outline-secondary btn-sm" @onclick="() => OpenEdit(source)">@L10n.T(Keys.Action.Edit, "编辑")</button>
-									<button class="btn btn-outline-secondary btn-sm" @onclick="() => Toggle(source)" disabled="@(TogglingId == Cell(source, "id"))">@(Bool(source, "enabled") ? L10n.T(Keys.Content.DataSourcesDisable, "停用") : L10n.T(Keys.Content.DataSourcesEnable, "启用"))</button>
-									<button class="btn btn-outline-secondary btn-sm" @onclick="() => Test(source)" disabled="@(TestingId == Cell(source, "id"))">@(TestingId == Cell(source, "id") ? L10n.T(Keys.Content.DataSourcesTesting, "测试中…") : L10n.T(Keys.Content.DataSourcesTestConn, "测试连接"))</button>
+									<PermissionGuard Require="@(new[] { PermissionCodes.MetadataEdit })" Silent>
+										<button class="btn btn-outline-secondary btn-sm" @onclick="() => OpenEdit(source)">@L10n.T(Keys.Action.Edit, "编辑")</button>
+									</PermissionGuard>
+									<PermissionGuard Require="@(new[] { PermissionCodes.MetadataEdit })" Silent>
+										<button class="btn btn-outline-secondary btn-sm" @onclick="() => Toggle(source)" disabled="@(TogglingId == Cell(source, "id"))">@(Bool(source, "enabled") ? L10n.T(Keys.Content.DataSourcesDisable, "停用") : L10n.T(Keys.Content.DataSourcesEnable, "启用"))</button>
+									</PermissionGuard>
+									<PermissionGuard Require="@(new[] { PermissionCodes.MetadataEdit })" Silent>
+										<button class="btn btn-outline-secondary btn-sm" @onclick="() => Test(source)" disabled="@(TestingId == Cell(source, "id"))">@(TestingId == Cell(source, "id") ? L10n.T(Keys.Content.DataSourcesTesting, "测试中…") : L10n.T(Keys.Content.DataSourcesTestConn, "测试连接"))</button>
+									</PermissionGuard>
 								</div>
 							</td>
 						</tr>
@@ -91,8 +99,12 @@
         </Body>
         <Footer>
             <button class="btn btn-outline-secondary" @onclick="() => CreateVisible = false">@L10n.T(Keys.Action.Cancel, "取消")</button>
-            <button class="btn btn-outline-secondary" @onclick="TestConn">@L10n.T(Keys.Content.DataSourcesTestConn, "测试连接")</button>
-            <button class="btn btn-primary" @onclick="Save" disabled="@Saving">@(Saving ? L10n.T(Keys.Content.DataSourcesSaving, "正在保存…") : L10n.T(Keys.Content.DataSourcesSaveAndConnect, "保存并接入"))</button>
+            <PermissionGuard Require="@(new[] { PermissionCodes.MetadataEdit })" Silent>
+                <button class="btn btn-outline-secondary" @onclick="TestConn">@L10n.T(Keys.Content.DataSourcesTestConn, "测试连接")</button>
+            </PermissionGuard>
+            <PermissionGuard Require="@(new[] { PermissionCodes.MetadataEdit })" Silent>
+                <button class="btn btn-primary" @onclick="Save" disabled="@Saving">@(Saving ? L10n.T(Keys.Content.DataSourcesSaving, "正在保存…") : L10n.T(Keys.Content.DataSourcesSaveAndConnect, "保存并接入"))</button>
+            </PermissionGuard>
         </Footer>
     </SbModal>
 
@@ -110,7 +122,9 @@
         </Body>
         <Footer>
             <button class="btn btn-outline-secondary" @onclick="() => EditVisible = false">@L10n.T(Keys.Action.Cancel, "取消")</button>
-            <button class="btn btn-primary" @onclick="SaveEdit" disabled="@SavingEdit">@(SavingEdit ? L10n.T(Keys.Content.DataSourcesSaving, "正在保存…") : L10n.T(Keys.Action.Save, "保存"))</button>
+            <PermissionGuard Require="@(new[] { PermissionCodes.MetadataEdit })" Silent>
+                <button class="btn btn-primary" @onclick="SaveEdit" disabled="@SavingEdit">@(SavingEdit ? L10n.T(Keys.Content.DataSourcesSaving, "正在保存…") : L10n.T(Keys.Action.Save, "保存"))</button>
+            </PermissionGuard>
         </Footer>
     </SbModal>
 </AuthGuard>

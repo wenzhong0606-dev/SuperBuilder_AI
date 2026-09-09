@@ -16,9 +16,11 @@
                 LoadingText="@L10n.T(Keys.Content.AgentLoadingText, "正在加载智能体…")">
 
         <Actions>
-            <button class="btn btn-primary btn-sm" @onclick="Create">
-                <svg class="btn-ico"><use href="#sb-ico-plus" /></svg> @L10n.T(Keys.Content.AgentCreate, "新建智能体")
-            </button>
+            <PermissionGuard Require="@(new[] { PermissionCodes.AgentCreate })" Silent>
+                <button class="btn btn-primary btn-sm" @onclick="Create">
+                    <svg class="btn-ico"><use href="#sb-ico-plus" /></svg> @L10n.T(Keys.Content.AgentCreate, "新建智能体")
+                </button>
+            </PermissionGuard>
         </Actions>
 
         <Stats>
@@ -29,7 +31,9 @@
         <RowActions>
             <button class="btn btn-sm btn-outline-secondary" @onclick="() => Open(context)">@L10n.T(Keys.Content.AgentRowDetail, "详情")</button>
             <button class="btn btn-sm btn-outline-secondary" @onclick="() => Run(context)">@L10n.T(Keys.Content.AgentRowRun, "运行")</button>
-            <button class="btn btn-sm btn-outline-danger" @onclick="() => AskDelete(context)">@L10n.T(Keys.Content.AgentRowDelete, "删除")</button>
+            <PermissionGuard Require="@(new[] { PermissionCodes.AgentDelete })" Silent>
+                <button class="btn btn-sm btn-outline-danger" @onclick="() => AskDelete(context)">@L10n.T(Keys.Content.AgentRowDelete, "删除")</button>
+            </PermissionGuard>
         </RowActions>
     </SbListPage>
 

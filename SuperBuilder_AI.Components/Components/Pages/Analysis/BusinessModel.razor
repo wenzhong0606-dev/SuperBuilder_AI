@@ -8,9 +8,11 @@
 
 <AuthGuard>
     <PageHead Icon="sb-ico-model" Key="BusinessModel" Title="语义模型" Desc="把物理表结构映射为业务语言：实体、业务域与字段同义词，让自然语言问数更精准。">
-        <button class="btn btn-primary btn-sm" @onclick="OpenCreate">
-            <svg class="btn-ico"><use href="#sb-ico-plus" /></svg> @L10n.T(Keys.Action.New, "新建") @L10n.T(Keys.Content.BusinessModelEntities, "实体")
-        </button>
+        <PermissionGuard Require="@(new[] { PermissionCodes.MetadataEdit })" Silent>
+            <button class="btn btn-primary btn-sm" @onclick="OpenCreate">
+                <svg class="btn-ico"><use href="#sb-ico-plus" /></svg> @L10n.T(Keys.Action.New, "新建") @L10n.T(Keys.Content.BusinessModelEntities, "实体")
+            </button>
+        </PermissionGuard>
     </PageHead>
 
     <div class="stat-grid">

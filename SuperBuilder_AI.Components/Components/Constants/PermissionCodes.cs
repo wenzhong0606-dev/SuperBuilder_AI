@@ -33,4 +33,26 @@ public static class PermissionCodes
     public const string AppEdit = "app:edit";
     public const string AppDelete = "app:delete";
     public const string AppPublish = "app:publish";
+
+    // —— 仪表盘（与后端 IdentityPermissions 对齐）——
+    public const string DashboardView = "dashboard:view";
+    public const string DashboardCreate = "dashboard:create";
+    public const string DashboardEdit = "dashboard:edit";
+    public const string DashboardPublish = "dashboard:publish";
+    public const string DashboardDelete = "dashboard:delete";
+
+    // —— 智能体 ——
+    public const string AgentView = "agent:view";
+    public const string AgentCreate = "agent:create";
+    public const string AgentManage = "agent:manage";
+    public const string AgentDelete = "agent:delete";
+
+    // —— 主题（编辑 / 发布）——
+    public const string ThemeEdit = "theme:edit";
+    public const string ThemePublish = "theme:publish";
+
+    // —— 业务元数据 ——
+    public const string MetadataView = "metadata:view";
+    public const string MetadataEdit = "metadata:edit";
+    public const string MetadataScan = "metadata:scan";
 }

@@ -17,12 +17,16 @@
                 LoadingText="@L10n.T(Keys.Content.AppsLoading, "正在加载应用…")" PanelTitle="@L10n.T(Keys.Content.AppsPanelTitle, "应用清单")">
 
         <Actions>
-            <button class="btn btn-primary btn-sm" @onclick="OpenGen">
-                <svg class="btn-ico"><use href="#sb-ico-plus" /></svg> @L10n.T(Keys.Content.AppsNew, "新建应用")
-            </button>
-            <button class="btn btn-outline-secondary btn-sm" @onclick='() => Nav.NavigateTo("ask")'>
-                <svg class="btn-ico"><use href="#sb-ico-play" /></svg> @L10n.T(Keys.Content.AppsFromAsk, "从 Ask 发布")
-            </button>
+            <PermissionGuard Require="@(new[] { PermissionCodes.AppCreate })" Silent>
+                <button class="btn btn-primary btn-sm" @onclick="OpenGen">
+                    <svg class="btn-ico"><use href="#sb-ico-plus" /></svg> @L10n.T(Keys.Content.AppsNew, "新建应用")
+                </button>
+            </PermissionGuard>
+            <PermissionGuard Require="@(new[] { PermissionCodes.AppCreate })" Silent>
+                <button class="btn btn-outline-secondary btn-sm" @onclick='() => Nav.NavigateTo("ask")'>
+                    <svg class="btn-ico"><use href="#sb-ico-play" /></svg> @L10n.T(Keys.Content.AppsFromAsk, "从 Ask 发布")
+                </button>
+            </PermissionGuard>
         </Actions>
 
         <Stats>
@@ -32,7 +36,9 @@
         </Stats>
 
         <EmptyActions>
-            <button class="btn btn-primary btn-sm" @onclick='() => Nav.NavigateTo("ask")'>@L10n.T(Keys.Content.AppsFromAsk, "从 Ask 发布")</button>
+            <PermissionGuard Require="@(new[] { PermissionCodes.AppCreate })" Silent>
+                <button class="btn btn-primary btn-sm" @onclick='() => Nav.NavigateTo("ask")'>@L10n.T(Keys.Content.AppsFromAsk, "从 Ask 发布")</button>
+            </PermissionGuard>
         </EmptyActions>
 
         @* 应用以卡片墙呈现（表格视图由 SbListPage 在未提供 CardTemplate 时自动启用） *@
@@ -49,8 +55,12 @@
                     }
                     <span style="margin-left:auto; display:inline-flex; gap:6px">
                         <button class="btn btn-sm btn-outline-primary" @onclick="e => OpenRun(context)" @onclick:stopPropagation="true">@L10n.T(Keys.Content.AppsRun, "运行")</button>
-                        <button class="btn btn-sm btn-outline-secondary" @onclick="e => OpenDsl(context)" @onclick:stopPropagation="true">@L10n.T(Keys.Content.AppsEdit, "编辑")</button>
-                        <button class="btn btn-sm btn-outline-danger" @onclick="e => AskDelete(context)" @onclick:stopPropagation="true">@L10n.T(Keys.Content.AppsDelete, "删除")</button>
+                        <PermissionGuard Require="@(new[] { PermissionCodes.AppEdit })" Silent>
+                            <button class="btn btn-sm btn-outline-secondary" @onclick="e => OpenDsl(context)" @onclick:stopPropagation="true">@L10n.T(Keys.Content.AppsEdit, "编辑")</button>
+                        </PermissionGuard>
+                        <PermissionGuard Require="@(new[] { PermissionCodes.AppDelete })" Silent>
+                            <button class="btn btn-sm btn-outline-danger" @onclick="e => AskDelete(context)" @onclick:stopPropagation="true">@L10n.T(Keys.Content.AppsDelete, "删除")</button>
+                        </PermissionGuard>
                     </span>
                 </div>
             </div>

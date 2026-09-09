@@ -16,9 +16,11 @@
                 LoadingText="@L10n.T(Keys.Content.SemanticLabelsLoadingText, "正在加载语义标签…")">
 
         <Actions>
-            <button class="btn btn-primary btn-sm" @onclick="Create">
-                <svg class="btn-ico"><use href="#sb-ico-plus" /></svg> @L10n.T(Keys.Content.SemanticLabelsCreateBtn, "新建标签")
-            </button>
+            <PermissionGuard Require="@(new[] { PermissionCodes.MetadataEdit })" Silent>
+                <button class="btn btn-primary btn-sm" @onclick="Create">
+                    <svg class="btn-ico"><use href="#sb-ico-plus" /></svg> @L10n.T(Keys.Content.SemanticLabelsCreateBtn, "新建标签")
+                </button>
+            </PermissionGuard>
         </Actions>
 
         <Stats>
@@ -32,7 +34,9 @@
         </RowActions>
 
         <EmptyActions>
-            <button class="btn btn-primary btn-sm" @onclick="Create">@L10n.T(Keys.Content.SemanticLabelsCreateBtn, "新建标签")</button>
+            <PermissionGuard Require="@(new[] { PermissionCodes.MetadataEdit })" Silent>
+                <button class="btn btn-primary btn-sm" @onclick="Create">@L10n.T(Keys.Content.SemanticLabelsCreateBtn, "新建标签")</button>
+            </PermissionGuard>
         </EmptyActions>
     </SbListPage>
 

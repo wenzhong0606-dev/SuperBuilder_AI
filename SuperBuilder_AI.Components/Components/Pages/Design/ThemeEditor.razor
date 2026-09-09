@@ -7,7 +7,9 @@
 @using System.Text.RegularExpressions
 @using SuperBuilder_AI.Components.Shared
 
-<PageHead Icon="sb-ico-theme" Key="ThemeEditor" Title="主题编辑器" Desc="基于设计令牌自定义你的视觉风格：实时预览、保存为租户主题并指派为默认。" />
+<AuthGuard>
+    <PermissionGuard Require="@(new[] { PermissionCodes.ThemeView })">
+        <PageHead Icon="sb-ico-theme" Key="ThemeEditor" Title="主题编辑器" Desc="基于设计令牌自定义你的视觉风格：实时预览、保存为租户主题并指派为默认。" />
 
 @if (_loading)
 {
@@ -24,11 +26,22 @@ else
         <button class="btn btn-outline-secondary btn-sm" @onclick="ResetTokens" disabled="@_saving">@L10n.T(Keys.Action.Reset, "重置")</button>
         @if (_selectedKey != "new")
         {
-            <button class="btn btn-outline-secondary btn-sm" @onclick="OpenCopy" disabled="@_saving">@L10n.T(Keys.Content.ThemeCopy, "复制主题")</button>
-            <button class="btn btn-outline-primary btn-sm" @onclick="AssignDefault" disabled="@_saving">@L10n.T(Keys.Action.ThemeAssignDefault, "指派为默认")</button>
-            @if (!_isBuiltIn) { <button class="btn btn-outline-danger btn-sm" @onclick="OpenDelete" disabled="@_saving">@L10n.T(Keys.Action.Delete, "删除")</button> }
+            <PermissionGuard Require="@(new[] { PermissionCodes.ThemeEdit })" Silent>
+                <button class="btn btn-outline-secondary btn-sm" @onclick="OpenCopy" disabled="@_saving">@L10n.T(Keys.Content.ThemeCopy, "复制主题")</button>
+            </PermissionGuard>
+            <PermissionGuard Require="@(new[] { PermissionCodes.ThemePublish })" Silent>
+                <button class="btn btn-outline-primary btn-sm" @onclick="AssignDefault" disabled="@_saving">@L10n.T(Keys.Action.ThemeAssignDefault, "指派为默认")</button>
+            </PermissionGuard>
+            @if (!_isBuiltIn)
+            {
+                <PermissionGuard Require="@(new[] { PermissionCodes.ThemeEdit })" Silent>
+                    <button class="btn btn-outline-danger btn-sm" @onclick="OpenDelete" disabled="@_saving">@L10n.T(Keys.Action.Delete, "删除")</button>
+                </PermissionGuard>
+            }
         }
-        <button class="btn btn-primary btn-sm" @onclick="Save" disabled="@(_saving || _isBuiltIn)">@(_saving ? L10n.T(Keys.Content.ComponentLibrarySaving, "保存中…") : (@L10n.T(Keys.Action.Save, "保存") + " " + @L10n.T(Keys.Content.ThemeEditorSaveTheme, "主题")))</button>
+        <PermissionGuard Require="@(new[] { PermissionCodes.ThemeEdit })" Silent>
+            <button class="btn btn-primary btn-sm" @onclick="Save" disabled="@(_saving || _isBuiltIn)">@(_saving ? L10n.T(Keys.Content.ComponentLibrarySaving, "保存中…") : (@L10n.T(Keys.Action.Save, "保存") + " " + @L10n.T(Keys.Content.ThemeEditorSaveTheme, "主题")))</button>
+        </PermissionGuard>
     </div>
 
     <div class="panel" style="margin-bottom:0">
@@ -117,6 +130,9 @@ else
         <Footer><button class="btn btn-outline-secondary" @onclick="() => CopyVisible = false">@L10n.T(Keys.Action.Cancel, "取消")</button><button class="btn btn-primary" @onclick="CopyTheme" disabled="@_saving">@L10n.T(Keys.Content.ThemeCopy, "复制主题")</button></Footer>
     </SbModal>
 }
+
+    </PermissionGuard>
+</AuthGuard>
 
 @code {
     private Dictionary<string, string> _tokens = new();

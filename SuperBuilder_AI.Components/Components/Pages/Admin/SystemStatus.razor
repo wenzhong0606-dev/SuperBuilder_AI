@@ -3,7 +3,7 @@
 @inject ToastService Toast
 
 <AuthGuard>
-    <PermissionGuard>
+    <PermissionGuard Require="@(new[] { PermissionCodes.PlatformDiagnosticsView })">
         <PageHead Icon="sb-ico-activity" Key="SystemStatus" Title="系统状态" Desc="@L10n.T(Keys.Content.SystemStatusDesc, "后端健康检查与运行时指标（只读）。")">
             <button class="btn btn-outline-secondary btn-sm" @onclick="() => Load()" disabled="@_loading">
                 @(_loading ? L10n.T(Keys.Content.SystemStatusRefreshing, "刷新中…") : L10n.T(Keys.Content.CommonRefresh, "刷新"))
