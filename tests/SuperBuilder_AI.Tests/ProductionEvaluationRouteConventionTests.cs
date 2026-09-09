@@ -26,6 +26,8 @@ public sealed class ProductionEvaluationRouteConventionTests
 	[InlineData("evaluation/golden-runtime")]
 	[InlineData("/evaluation/diagnostics")]
 	[InlineData("EVALUATION/business-entity")]
+	[InlineData("test")]
+	[InlineData("test/foo")]
 	public void IsEvaluationRoute_MatchesEvaluationControllers(string template)
 	{
 		Assert.True(ProductionEvaluationRouteConvention.IsEvaluationRoute(template));
@@ -35,7 +37,6 @@ public sealed class ProductionEvaluationRouteConventionTests
 	[InlineData(null)]
 	[InlineData("")]
 	[InlineData("api/metadata-vector")]
-	[InlineData("test")]
 	public void IsEvaluationRoute_DoesNotMatchOtherControllers(string? template)
 	{
 		Assert.False(ProductionEvaluationRouteConvention.IsEvaluationRoute(template));
