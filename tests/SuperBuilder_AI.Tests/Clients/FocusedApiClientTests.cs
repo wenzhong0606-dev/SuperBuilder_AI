@@ -40,7 +40,7 @@ public class FocusedApiClientTests
                 "{\"token\":\"t1\",\"tenantId\":7,\"userId\":1,\"username\":\"u\"}"));
         var client = HttpTestDoubles.BuildFocused<IdentityApiClient>(handler, out _);
 
-        var (result, error) = await client.LoginAsync("u", 7, "p");
+        var (result, error, _) = await client.LoginAsync("u", 7, "p");
 
         Assert.Null(error);
         Assert.NotNull(result);
@@ -56,7 +56,7 @@ public class FocusedApiClientTests
             HttpTestDoubles.JsonResponse(HttpStatusCode.Unauthorized, "{\"code\":\"AUTH\",\"message\":\"无效凭据\"}"));
         var client = HttpTestDoubles.BuildFocused<IdentityApiClient>(handler, out _);
 
-        var (result, error) = await client.LoginAsync("u", 7, "bad");
+        var (result, error, _) = await client.LoginAsync("u", 7, "bad");
 
         Assert.Null(result);
         Assert.NotNull(error);
@@ -96,7 +96,7 @@ public class FocusedApiClientTests
             HttpTestDoubles.JsonResponse(HttpStatusCode.OK, "{\"culture\":\"fr-FR\"}"));
         var client = HttpTestDoubles.BuildFocused<IdentityApiClient>(handler, out _);
 
-        var (culture, error) = await client.SetUserLanguageAsync("fr-FR");
+        var (culture, error, _) = await client.SetUserLanguageAsync("fr-FR");
 
         Assert.Equal("fr-FR", culture);
         Assert.Null(error);

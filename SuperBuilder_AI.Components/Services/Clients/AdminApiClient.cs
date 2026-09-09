@@ -101,7 +101,7 @@ public sealed class AdminApiClient : ApiClientBase, IAdminApiClient
         }, null);
     }
 
-    public async Task<(DemoInstallResult? Result, string? Error)> InstallDemoDataAsync(CancellationToken ct = default)
+    public async Task<(DemoInstallResult? Result, string? Error, string? Code)> InstallDemoDataAsync(CancellationToken ct = default)
     {
         var client = Factory.CreateClient("SuperBuilderApi");
         try
@@ -109,17 +109,17 @@ public sealed class AdminApiClient : ApiClientBase, IAdminApiClient
             var resp = await client.PostAsJsonAsync("api/demo-data/install", new { }, ct);
             if (!resp.IsSuccessStatusCode)
             {
-                var (_, msg, _) = ParseApiError(await resp.Content.ReadAsStringAsync(ct));
+                var (code, msg, _) = ParseApiError(await resp.Content.ReadAsStringAsync(ct));
                 if (resp.StatusCode == HttpStatusCode.Unauthorized) OnUnauthorized();
-                return (null, msg ?? $"安装失败（{(int)resp.StatusCode}）。");
+                return (null, msg ?? $"安装失败（{(int)resp.StatusCode}）。", code);
             }
             var r = await resp.Content.ReadFromJsonAsync<DemoInstallResult>(ct);
-            return (r, null);
+            return (r, null, null);
         }
         catch (HttpRequestException ex)
         {
             return (null, "无法连接服务，请确认 API 已启动且地址配置正确。" +
-                (string.IsNullOrWhiteSpace(ex.Message) ? "" : $"（{ex.Message}）"));
+                (string.IsNullOrWhiteSpace(ex.Message) ? "" : $"（{ex.Message}）"), null);
         }
     }
 }

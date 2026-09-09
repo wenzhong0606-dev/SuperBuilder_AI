@@ -68,7 +68,7 @@
     {
         if (PlatformTenantId <= 0) { Error = L10n.T(Keys.PlatformLogin.NotReady, "平台尚未初始化，暂无法登录。"); return; }
         Busy = true; Error = "";
-        var (r, loginErr) = await Api.LoginAsync(Username, PlatformTenantId, Password);
+        var (r, loginErr, _) = await Api.LoginAsync(Username, PlatformTenantId, Password);
         Busy = false;
         if (r is null || string.IsNullOrEmpty(r.Token))
         {

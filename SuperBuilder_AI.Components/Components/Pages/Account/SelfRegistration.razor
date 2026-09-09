@@ -112,7 +112,7 @@
         { Error = L10n.T(Keys.Content.SelfRegistrationErrPasswordMismatch, "两次输入的口令不一致。"); return; }
 
         Busy = true;
-        var (r, err) = await Api.RegisterSelfAsync(TenantCode.Trim(), TenantName.Trim(), AdminUsername.Trim(), AdminEmail.Trim(), AdminPassword, AdminUsername.Trim());
+        var (r, err, _) = await Api.RegisterSelfAsync(TenantCode.Trim(), TenantName.Trim(), AdminUsername.Trim(), AdminEmail.Trim(), AdminPassword, AdminUsername.Trim());
         Busy = false;
 
         if (r is null || !r.Success || string.IsNullOrEmpty(r.Token))

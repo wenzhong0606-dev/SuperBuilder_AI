@@ -12,7 +12,7 @@ namespace SuperBuilder_AI.Components.Services;
 /// </summary>
 public interface IApiClient
 {
-    Task<(AuthResult? Result, string? Error)> LoginAsync(string username, long tenantId, string? password = null, CancellationToken ct = default);
+    Task<(AuthResult? Result, string? Error, string? Code)> LoginAsync(string username, long tenantId, string? password = null, CancellationToken ct = default);
     /// <summary>M6 登录兜底：按已知租户编码（不枚举目录）解析租户 Id，供 <c>Auth:ShowTenantDirectory</c> 关闭时手动登录。</summary>
     Task<(long Id, string? TenantCode, string? Name, string? Error)> ResolveTenantByCodeAsync(string code, CancellationToken ct = default);
     Task<string?> AskRawAsync(string question, long? dataSourceId, CancellationToken ct = default);
@@ -47,10 +47,10 @@ public interface IApiClient
     Task<(bool Ok, int Status, string? Error, string? Code)> DeleteAsync(string relativeUrl, CancellationToken ct = default);
 
     /// <summary>M2-05 切换生效租户：校验成员资格后由后端重签令牌，返回新令牌与切换后端租户上下文。</summary>
-    Task<(TenantSwitchResult? Result, string? Error)> SwitchTenantAsync(long tenantId, CancellationToken ct = default);
+    Task<(TenantSwitchResult? Result, string? Error, string? Code)> SwitchTenantAsync(long tenantId, CancellationToken ct = default);
 
     /// <summary>M2-06 自助注册：匿名创建新租户与首位管理员，注册即登录（后端重签令牌）。</summary>
-    Task<(SelfRegistrationResult? Result, string? Error)> RegisterSelfAsync(
+    Task<(SelfRegistrationResult? Result, string? Error, string? Code)> RegisterSelfAsync(
         string tenantCode, string tenantName, string adminUsername, string adminEmail,
         string adminPassword, string? adminDisplayName = null, CancellationToken ct = default);
 
@@ -61,13 +61,13 @@ public interface IApiClient
     Task<(DemoInstallPlan? Result, string? Error)> GetDemoDataPlanAsync(CancellationToken ct = default);
 
     /// <summary>M2-07 平台管理员触发演示数据安装（事务原子、重复执行保护，需 platform:admin:manage）。</summary>
-    Task<(DemoInstallResult? Result, string? Error)> InstallDemoDataAsync(CancellationToken ct = default);
+    Task<(DemoInstallResult? Result, string? Error, string? Code)> InstallDemoDataAsync(CancellationToken ct = default);
 
     /// <summary>M3-G0 读取当前用户的服务端语言偏好（已认证；无记录时 Culture 为 null）。</summary>
     Task<(string? Culture, string? Error)> GetUserLanguageAsync(CancellationToken ct = default);
 
     /// <summary>M3-G0 持久化当前用户语言偏好到服务端（强制校验租户可用语言范围，越界回退默认）。</summary>
-    Task<(string? Culture, string? Error)> SetUserLanguageAsync(string culture, CancellationToken ct = default);
+    Task<(string? Culture, string? Error, string? Code)> SetUserLanguageAsync(string culture, CancellationToken ct = default);
 
     /// <summary>M3-02 平台管理员查看全部语言目录（含已停用与翻译进度）。</summary>
     Task<(IReadOnlyList<AdminLanguageView>? Result, string? Error)> GetAdminLanguagesAsync(CancellationToken ct = default);

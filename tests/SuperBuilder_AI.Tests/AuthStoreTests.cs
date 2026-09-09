@@ -56,10 +56,10 @@ public sealed class AuthStoreTests
 		public Task<(JsonElement? Data, int Status, string? Error, string? Code)> GetJsonAsync(string relativeUrl, CancellationToken ct = default)
 			=> Task.FromResult<(JsonElement?, int, string?, string?)>((null, status, status == 200 ? null : "temporary", null));
 
-		public Task<(AuthResult? Result, string? Error)> LoginAsync(string username, long tenantId, string? password = null, CancellationToken ct = default) => throw new NotSupportedException();
+		public Task<(AuthResult? Result, string? Error, string? Code)> LoginAsync(string username, long tenantId, string? password = null, CancellationToken ct = default) => throw new NotSupportedException();
 		public Task<(long Id, string? TenantCode, string? Name, string? Error)> ResolveTenantByCodeAsync(string code, CancellationToken ct = default) => throw new NotSupportedException();
-		public Task<(TenantSwitchResult? Result, string? Error)> SwitchTenantAsync(long tenantId, CancellationToken ct = default) => throw new NotSupportedException();
-		public Task<(SelfRegistrationResult? Result, string? Error)> RegisterSelfAsync(string tenantCode, string tenantName, string adminUsername, string adminEmail, string adminPassword, string? adminDisplayName = null, CancellationToken ct = default) => throw new NotSupportedException();
+		public Task<(TenantSwitchResult? Result, string? Error, string? Code)> SwitchTenantAsync(long tenantId, CancellationToken ct = default) => throw new NotSupportedException();
+		public Task<(SelfRegistrationResult? Result, string? Error, string? Code)> RegisterSelfAsync(string tenantCode, string tenantName, string adminUsername, string adminEmail, string adminPassword, string? adminDisplayName = null, CancellationToken ct = default) => throw new NotSupportedException();
 		public Task<(SelfRegistrationConfigView? Result, string? Error)> GetSelfRegistrationConfigAsync(CancellationToken ct = default) => throw new NotSupportedException();
 		public Task<string?> AskRawAsync(string question, long? dataSourceId, CancellationToken ct = default) => throw new NotSupportedException();
 		public Task<AskOutcome> AskAsync(string question, long? dataSourceId, string? conversationId = null, CancellationToken ct = default) => throw new NotSupportedException();
@@ -73,9 +73,9 @@ public sealed class AuthStoreTests
 		public Task<(bool Ok, int Status, string? Error, string? Code)> DeleteAsync(string relativeUrl, CancellationToken ct = default) => throw new NotSupportedException();
 		public Task<(string? Text, int Status, string? Error)> GetTextAsync(string relativeUrl, CancellationToken ct = default) => throw new NotSupportedException();
 		public Task<(DemoInstallPlan? Result, string? Error)> GetDemoDataPlanAsync(CancellationToken ct = default) => throw new NotSupportedException();
-		public Task<(DemoInstallResult? Result, string? Error)> InstallDemoDataAsync(CancellationToken ct = default) => throw new NotSupportedException();
+		public Task<(DemoInstallResult? Result, string? Error, string? Code)> InstallDemoDataAsync(CancellationToken ct = default) => throw new NotSupportedException();
 		public Task<(string? Culture, string? Error)> GetUserLanguageAsync(CancellationToken ct = default) => throw new NotSupportedException();
-		public Task<(string? Culture, string? Error)> SetUserLanguageAsync(string culture, CancellationToken ct = default) => throw new NotSupportedException();
+		public Task<(string? Culture, string? Error, string? Code)> SetUserLanguageAsync(string culture, CancellationToken ct = default) => throw new NotSupportedException();
 		public Task<(IReadOnlyList<AdminLanguageView>? Result, string? Error)> GetAdminLanguagesAsync(CancellationToken ct = default) => throw new NotSupportedException();
 		public Task<(bool Ok, string? Error)> CreateLanguageAsync(AdminLanguageCreate model, CancellationToken ct = default) => throw new NotSupportedException();
 		public Task<(bool Ok, string? Error)> UpdateLanguageAsync(long id, AdminLanguageUpdate model, CancellationToken ct = default) => throw new NotSupportedException();

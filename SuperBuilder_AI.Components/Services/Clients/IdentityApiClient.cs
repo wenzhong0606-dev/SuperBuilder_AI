@@ -16,7 +16,7 @@ public sealed class IdentityApiClient : ApiClientBase, IIdentityApiClient
 {
     public IdentityApiClient(IHttpClientFactory factory, AppState appState) : base(factory, appState) { }
 
-    public async Task<(AuthResult? Result, string? Error)> LoginAsync(string username, long tenantId, string? password = null, CancellationToken ct = default)
+    public async Task<(AuthResult? Result, string? Error, string? Code)> LoginAsync(string username, long tenantId, string? password = null, CancellationToken ct = default)
     {
         var client = Factory.CreateClient("SuperBuilderApi");
         try
@@ -25,15 +25,15 @@ public sealed class IdentityApiClient : ApiClientBase, IIdentityApiClient
             if (!resp.IsSuccessStatusCode)
             {
                 var (code, msg, _) = ParseApiError(await resp.Content.ReadAsStringAsync(ct));
-                return (null, msg ?? $"登录失败（{(int)resp.StatusCode}）。");
+                return (null, msg ?? $"登录失败（{(int)resp.StatusCode}）。", code);
             }
             var r = await resp.Content.ReadFromJsonAsync<AuthResult>(ct);
-            return (r, null);
+            return (r, null, null);
         }
         catch (HttpRequestException ex)
         {
             return (null, "无法连接登录服务，请确认 API 服务已启动且地址配置正确。" +
-                (string.IsNullOrWhiteSpace(ex.Message) ? "" : $"（{ex.Message}）"));
+                (string.IsNullOrWhiteSpace(ex.Message) ? "" : $"（{ex.Message}）"), null);
         }
     }
 
@@ -49,21 +49,21 @@ public sealed class IdentityApiClient : ApiClientBase, IIdentityApiClient
         return (id, tenantCode, name, null);
     }
 
-    public async Task<(TenantSwitchResult? Result, string? Error)> SwitchTenantAsync(long tenantId, CancellationToken ct = default)
+    public async Task<(TenantSwitchResult? Result, string? Error, string? Code)> SwitchTenantAsync(long tenantId, CancellationToken ct = default)
     {
         var client = CreateClient();
         var resp = await client.PostAsJsonAsync("api/tenant-membership/switch", new { tenantId }, ct);
         if (!resp.IsSuccessStatusCode)
         {
-            var (_, msg, _) = ParseApiError(await resp.Content.ReadAsStringAsync(ct));
+            var (code, msg, _) = ParseApiError(await resp.Content.ReadAsStringAsync(ct));
             if (resp.StatusCode == HttpStatusCode.Unauthorized) OnUnauthorized();
-            return (null, msg ?? $"切换失败（{(int)resp.StatusCode}）。");
+            return (null, msg ?? $"切换失败（{(int)resp.StatusCode}）。", code);
         }
-        var r = await resp.Content.ReadFromJsonAsync<TenantSwitchResult>(ct);
-        return (r, null);
+            var r = await resp.Content.ReadFromJsonAsync<TenantSwitchResult>(ct);
+            return (r, null, null);
     }
 
-    public async Task<(SelfRegistrationResult? Result, string? Error)> RegisterSelfAsync(
+    public async Task<(SelfRegistrationResult? Result, string? Error, string? Code)> RegisterSelfAsync(
         string tenantCode, string tenantName, string adminUsername, string adminEmail,
         string adminPassword, string? adminDisplayName = null, CancellationToken ct = default)
     {
@@ -81,16 +81,16 @@ public sealed class IdentityApiClient : ApiClientBase, IIdentityApiClient
             }, ct);
             if (!resp.IsSuccessStatusCode)
             {
-                var (_, msg, _) = ParseApiError(await resp.Content.ReadAsStringAsync(ct));
-                return (null, msg ?? $"注册失败（{(int)resp.StatusCode}）。");
+                var (code, msg, _) = ParseApiError(await resp.Content.ReadAsStringAsync(ct));
+                return (null, msg ?? $"注册失败（{(int)resp.StatusCode}）。", code);
             }
             var r = await resp.Content.ReadFromJsonAsync<SelfRegistrationResult>(ct);
-            return (r, null);
+            return (r, null, null);
         }
         catch (HttpRequestException ex)
         {
             return (null, "无法连接注册服务，请确认 API 服务已启动且地址配置正确。" +
-                (string.IsNullOrWhiteSpace(ex.Message) ? "" : $"（{ex.Message}）"));
+                (string.IsNullOrWhiteSpace(ex.Message) ? "" : $"（{ex.Message}）"), null);
         }
     }
 
@@ -130,7 +130,7 @@ public sealed class IdentityApiClient : ApiClientBase, IIdentityApiClient
         return (culture, null);
     }
 
-    public async Task<(string? Culture, string? Error)> SetUserLanguageAsync(string culture, CancellationToken ct = default)
+    public async Task<(string? Culture, string? Error, string? Code)> SetUserLanguageAsync(string culture, CancellationToken ct = default)
     {
         var client = CreateClient();
         try
@@ -138,20 +138,20 @@ public sealed class IdentityApiClient : ApiClientBase, IIdentityApiClient
             var resp = await client.PutAsJsonAsync("api/user/preferences/language", new { culture }, ct);
             if (!resp.IsSuccessStatusCode)
             {
-                var (_, msg, _) = ParseApiError(await resp.Content.ReadAsStringAsync(ct));
+                var (code, msg, _) = ParseApiError(await resp.Content.ReadAsStringAsync(ct));
                 if (resp.StatusCode == HttpStatusCode.Unauthorized) OnUnauthorized();
-                return (null, msg ?? $"保存语言偏好失败（{(int)resp.StatusCode}）。");
+                return (null, msg ?? $"保存语言偏好失败（{(int)resp.StatusCode}）。", code);
             }
             var (data, _, err, _) = await GetJsonAsync("api/user/preferences/language", ct);
             var effective = (err == null && data is { ValueKind: JsonValueKind.Object } && data.Value.TryGetProperty("culture", out var c))
                 ? c.GetString()
                 : culture;
-            return (effective, null);
+            return (effective, null, null);
         }
         catch (HttpRequestException ex)
         {
             return (null, "无法连接服务，请确认 API 已启动且地址配置正确。" +
-                (string.IsNullOrWhiteSpace(ex.Message) ? "" : $"（{ex.Message}）"));
+                (string.IsNullOrWhiteSpace(ex.Message) ? "" : $"（{ex.Message}）"), null);
         }
     }
 }

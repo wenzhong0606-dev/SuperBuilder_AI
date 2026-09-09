@@ -73,7 +73,7 @@
         if (!long.TryParse(raw, out var target) || target <= 0) return;
         if (target == State.TenantId) return;
 
-        var (result, error) = await Api.SwitchTenantAsync(target);
+        var (result, error, _) = await Api.SwitchTenantAsync(target);
         if (result is null)
         {
             Toast.Error(error ?? L10n.T(Keys.Content.SharedTenantSwitchFailed, "切换失败"));

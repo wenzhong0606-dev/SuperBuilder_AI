@@ -31,5 +31,5 @@ public interface IAdminApiClient
     Task<(DemoInstallPlan? Result, string? Error)> GetDemoDataPlanAsync(CancellationToken ct = default);
 
     /// <summary>M2-07 平台管理员触发演示数据安装（事务原子、重复执行保护，需 platform:admin:manage）。</summary>
-    Task<(DemoInstallResult? Result, string? Error)> InstallDemoDataAsync(CancellationToken ct = default);
+    Task<(DemoInstallResult? Result, string? Error, string? Code)> InstallDemoDataAsync(CancellationToken ct = default);
 }

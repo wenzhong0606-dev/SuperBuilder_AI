@@ -46,7 +46,7 @@ public sealed class ApiClient : IApiClient
         _dataSource = dataSource;
     }
 
-    public Task<(AuthResult? Result, string? Error)> LoginAsync(string username, long tenantId, string? password = null, CancellationToken ct = default)
+    public Task<(AuthResult? Result, string? Error, string? Code)> LoginAsync(string username, long tenantId, string? password = null, CancellationToken ct = default)
         => _identity.LoginAsync(username, tenantId, password, ct);
 
     public Task<(long Id, string? TenantCode, string? Name, string? Error)> ResolveTenantByCodeAsync(string code, CancellationToken ct = default)
@@ -82,10 +82,10 @@ public sealed class ApiClient : IApiClient
     public Task<(bool Ok, int Status, string? Error, string? Code)> DeleteAsync(string relativeUrl, CancellationToken ct = default)
         => _agent.DeleteAsync(relativeUrl, ct);
 
-    public Task<(TenantSwitchResult? Result, string? Error)> SwitchTenantAsync(long tenantId, CancellationToken ct = default)
+    public Task<(TenantSwitchResult? Result, string? Error, string? Code)> SwitchTenantAsync(long tenantId, CancellationToken ct = default)
         => _identity.SwitchTenantAsync(tenantId, ct);
 
-    public Task<(SelfRegistrationResult? Result, string? Error)> RegisterSelfAsync(
+    public Task<(SelfRegistrationResult? Result, string? Error, string? Code)> RegisterSelfAsync(
         string tenantCode, string tenantName, string adminUsername, string adminEmail,
         string adminPassword, string? adminDisplayName = null, CancellationToken ct = default)
         => _identity.RegisterSelfAsync(tenantCode, tenantName, adminUsername, adminEmail, adminPassword, adminDisplayName, ct);
@@ -96,13 +96,13 @@ public sealed class ApiClient : IApiClient
     public Task<(DemoInstallPlan? Result, string? Error)> GetDemoDataPlanAsync(CancellationToken ct = default)
         => _admin.GetDemoDataPlanAsync(ct);
 
-    public Task<(DemoInstallResult? Result, string? Error)> InstallDemoDataAsync(CancellationToken ct = default)
+    public Task<(DemoInstallResult? Result, string? Error, string? Code)> InstallDemoDataAsync(CancellationToken ct = default)
         => _admin.InstallDemoDataAsync(ct);
 
     public Task<(string? Culture, string? Error)> GetUserLanguageAsync(CancellationToken ct = default)
         => _identity.GetUserLanguageAsync(ct);
 
-    public Task<(string? Culture, string? Error)> SetUserLanguageAsync(string culture, CancellationToken ct = default)
+    public Task<(string? Culture, string? Error, string? Code)> SetUserLanguageAsync(string culture, CancellationToken ct = default)
         => _identity.SetUserLanguageAsync(culture, ct);
 
     public Task<(IReadOnlyList<AdminLanguageView>? Result, string? Error)> GetAdminLanguagesAsync(CancellationToken ct = default)
