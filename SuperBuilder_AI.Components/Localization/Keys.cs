@@ -1107,6 +1107,7 @@ public static class Keys
         public const string ErrServerTitle = "Content.ErrServerTitle";
         public const string ErrServerText = "Content.ErrServerText";
         public const string ErrBackToWorkbench = "Content.ErrBackToWorkbench";
+        public const string PageRenderError = "Content.PageRenderError";
         public const string ErrBack = "Content.ErrBack";
         public const string ErrGoAsk = "Content.ErrGoAsk";
         public const string ErrReload = "Content.ErrReload";
@@ -2468,6 +2469,7 @@ public static class Keys
         [Content.ErrServerTitle] = new("服务出现异常", "Something went wrong"),
         [Content.ErrServerText] = new("请求处理过程中发生未预期的错误，请稍后重试；若持续出现，请联系管理员并提供追踪 ID。", "An unexpected error occurred. Please retry later; if it persists, contact an administrator with the trace ID."),
         [Content.ErrBackToWorkbench] = new("返回工作台", "Back to workbench"),
+        [Content.PageRenderError] = new("页面渲染出错", "Page rendering error"),
         [Content.ErrBack] = new("返回上一页", "Go back"),
         [Content.ErrGoAsk] = new("去提问", "Ask a question"),
         [Content.ErrReload] = new("重新加载", "Reload"),

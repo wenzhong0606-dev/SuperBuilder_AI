@@ -1,3 +1,7 @@
+> **治理声明**：本文档是 `Master_Development_Plan.md` 的**输入 / 审计基线**，**不是**独立执行计划。所有里程碑状态、优先级与验收以 `Master_Development_Plan.md`（唯一事实来源）及其 `milestones/` 拆分文档为准；本文与 MDP 冲突时以 MDP 为准。映射见 MDP §17。
+>
+> **文档角色**：前身主计划（已被 MDP 取代，保留作历史输入；其 Stage/P 阶段对应 M0–M11）
+
 # SuperBuilder AI Native Low-code BI Platform — 主开发计划（单一事实来源）
 
 > 本文件是项目**唯一事实来源**，整合了：

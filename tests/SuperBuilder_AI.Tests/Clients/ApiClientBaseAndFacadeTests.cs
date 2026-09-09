@@ -79,6 +79,7 @@ public class ApiClientBaseAndFacadeTests
             if (url.Contains("api/auth/login")) return HttpTestDoubles.JsonResponse(HttpStatusCode.OK, "{\"token\":\"t\"}");
             if (url.Contains("api/apps")) return HttpTestDoubles.JsonResponse(HttpStatusCode.OK, "{\"code\":\"APP-1\"}");
             if (url.Contains("api/localization/admin/languages")) return HttpTestDoubles.JsonResponse(HttpStatusCode.OK, "[{\"id\":1,\"culture\":\"zh-CN\"}]");
+            if (url.Contains("api/localization/languages")) return HttpTestDoubles.JsonResponse(HttpStatusCode.OK, "[{\"id\":1,\"culture\":\"zh-CN\"}]");
             if (url.Contains("api/ask")) return HttpTestDoubles.JsonResponse(HttpStatusCode.OK, "{\"conversationId\":\"c1\"}");
             if (url.Contains("api/data-sources/1/metadata/scan")) return HttpTestDoubles.JsonResponse((HttpStatusCode)202, "{\"jobId\":5}");
             if (url.Contains("api/demo-data/preview")) return HttpTestDoubles.JsonResponse(HttpStatusCode.OK, "{\"alreadyInstalled\":true}");

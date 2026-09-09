@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using SuperBuilder_AI.Data;
 
@@ -11,9 +12,11 @@ using SuperBuilder_AI.Data;
 namespace SuperBuilder_AI.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(SuperBIContext))]
-    partial class SuperBIContextModelSnapshot : ModelSnapshot
+    [Migration("20260909025001_M7_11_PublishIdempotency")]
+    partial class M7_11_PublishIdempotency
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

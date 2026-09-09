@@ -6,6 +6,7 @@ using SuperBuilder_AI.Api.Errors;
 using SuperBuilder_AI.Api.Security;
 using SuperBuilder_AI.Data;
 using SuperBuilder_AI.Interfaces.AppBuilder;
+using SuperBuilder_AI.Interfaces.Identity;
 using SuperBuilder_AI.Models.AppBuilder;
 using SuperBuilder_AI.Models.Identity;
 using SuperBuilder_AI.Models.Theme;
@@ -29,19 +30,22 @@ public sealed class AppBuilderController : ControllerBase
 	private readonly IAppBuilderAgent _agent;
 	private readonly IAppQueryBindingExporter _bindingExporter;
 	private readonly IAppQueryExecutor _executor;
+	private readonly IDataSourceAuthorizationService _dataSourceAuth;
 
 	public AppBuilderController(
 		SuperBIContext db,
 		IAppDslSerializer dslSerializer,
 		IAppBuilderAgent agent,
 		IAppQueryBindingExporter bindingExporter,
-		IAppQueryExecutor executor)
+		IAppQueryExecutor executor,
+		IDataSourceAuthorizationService dataSourceAuth)
 	{
 		_db = db;
 		_dslSerializer = dslSerializer;
 		_agent = agent;
 		_bindingExporter = bindingExporter;
 		_executor = executor;
+		_dataSourceAuth = dataSourceAuth;
 	}
 
 	private long ScopeTo(long requestedTenantId)
@@ -60,8 +64,31 @@ public sealed class AppBuilderController : ControllerBase
 	/// <summary>权限校验：缺 claim 即 403；通过返回 null。</summary>
 	private IActionResult? Require(string permission) =>
 		User.Identity?.IsAuthenticated == true && !User.HasClaim("perm", permission)
-			? StatusCode(403, new ApiError { Code = ErrorCodes.Forbidden, Message = $"禁止：缺少 {permission} 权限。" })
+			? StatusCode(403, new ApiError
+			{
+				Code = ErrorCodes.AppForbidden,
+				Message = $"禁止：缺少 {permission} 权限。",
+				Decision = ErrorDecisions.PermissionDenied,
+			})
 			: null;
+
+	private IActionResult NotFoundApp() =>
+		StatusCode(StatusCodes.Status404NotFound, new ApiError
+		{
+			Code = ErrorCodes.AppNotFound,
+			Message = ErrorCodes.Message(ErrorCodes.AppNotFound),
+		});
+
+	private IActionResult ConflictApp(string code, string? decision, string message) =>
+		StatusCode(StatusCodes.Status409Conflict, new ApiError
+		{
+			Code = code,
+			Message = message,
+			Decision = decision,
+		});
+
+	private string? IdempotencyKey() =>
+		Request.Headers.TryGetValue("Idempotency-Key", out var v) ? v.ToString() : null;
 
 	private long ResolveUserId() =>
 		long.TryParse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value, out var u) ? u : 0;
@@ -228,20 +255,34 @@ public sealed class AppBuilderController : ControllerBase
 		return CreatedAtAction(nameof(GetByCode), new { code = plan.Code, tenantId }, ToDetail(plan));
 	}
 
-	/// <summary>列表：按租户作用域返回（含全局模板 TenantId=0）。需 app:view。</summary>
+	/// <summary>列表：按租户作用域返回（含全局模板 TenantId=0），分页信封。需 app:view。</summary>
 	[HttpGet]
 	public async Task<IActionResult> List(
 		[FromQuery] long tenantId = 0,
+		[FromQuery] int page = 1,
+		[FromQuery] int pageSize = 20,
+		[FromQuery] string? sort = null,
 		CancellationToken cancellationToken = default)
 	{
 		if (Require(IdentityPermissions.AppView) is { } denied) return denied;
 		ScopeTo(tenantId);
 
-		var items = await _db.AppPlans.AsNoTracking()
-			.OrderBy(p => p.TenantId)
-			.ThenBy(p => p.Code)
+		var query = _db.AppPlans.AsNoTracking();
+		query = sort switch
+		{
+			"updatedAt.desc" => query.OrderByDescending(p => p.UpdatedTime),
+			"updatedAt.asc" => query.OrderBy(p => p.UpdatedTime),
+			_ => query.OrderBy(p => p.TenantId).ThenBy(p => p.Code),
+		};
+
+		var total = await query.CountAsync(cancellationToken);
+		var items = await query
+			.Skip(System.Math.Max(0, (page - 1) * pageSize))
+			.Take(pageSize)
 			.ToListAsync(cancellationToken);
-		return Ok(items.Select(ToSummary).ToList());
+
+		var canEdit = User.HasClaim("perm", IdentityPermissions.AppEdit);
+		return Ok(new AppListResult(items.Select(p => ToSummary(p, canEdit)).ToList(), total, page, pageSize));
 	}
 
 	/// <summary>获取单个应用。app:view 仅返回发布数据；app:edit 额外返回草稿 DSL（服务端裁剪，不靠前端隐藏）。</summary>
@@ -257,13 +298,15 @@ public sealed class AppBuilderController : ControllerBase
 
 		var entity = await _db.AppPlans.AsNoTracking()
 			.FirstOrDefaultAsync(p => p.Code == code, cancellationToken);
-		if (entity is null) return NotFound();
+		if (entity is null) return NotFoundApp();
 
 		var canEdit = User.HasClaim("perm", IdentityPermissions.AppEdit);
 		var dslJson = canEdit ? entity.DslJson : (entity.PublishedDslJson ?? string.Empty);
 		return Ok(new AppDetail(
 			entity.Id, entity.TenantId, entity.Code, entity.Name, entity.Description, entity.Status,
-			entity.DslVersion, entity.ThemeKey, dslJson, entity.PublishedVersion, entity.PublishedAt));
+			entity.DslVersion, entity.ThemeKey, dslJson, entity.PublishedVersion, entity.PublishedAt,
+			entity.CreatedTime, entity.UpdatedTime,
+			canEdit ? entity.DraftRevision : (int?)null, entity.PublishedDslJson));
 	}
 
 	/// <summary>更新应用：重新校验 DSL 后覆盖文档列。需 app:edit。</summary>
@@ -271,6 +314,7 @@ public sealed class AppBuilderController : ControllerBase
 	public async Task<IActionResult> Update(
 		string code,
 		[FromBody] UpdateAppRequest request,
+		[FromQuery] int? expectedDraftRevision = null,
 		[FromQuery] long tenantId = 0,
 		CancellationToken cancellationToken = default)
 	{
@@ -283,9 +327,11 @@ public sealed class AppBuilderController : ControllerBase
 
 		ScopeTo(tenantId);
 		var entity = await _db.AppPlans.FirstOrDefaultAsync(p => p.Code == code, cancellationToken);
-		if (entity is null) return NotFound();
+		if (entity is null) return NotFoundApp();
 		if (entity.TenantId == 0)
 			return BadRequest(new { errors = new[] { "全局/内置应用不可修改。" } });
+		if (expectedDraftRevision is not null && entity.DraftRevision != expectedDraftRevision)
+			return ConflictApp(ErrorCodes.AppDraftChanged, null, ErrorCodes.Message(ErrorCodes.AppDraftChanged));
 
 		var result = await _agent.BuildFromDslAsync(entity.TenantId, dsl, entity.Code);
 		if (!result.Success || result.Plan is null)
@@ -297,6 +343,7 @@ public sealed class AppBuilderController : ControllerBase
 		entity.DslVersion = result.Plan.DslVersion;
 		entity.DslJson = result.Plan.DslJson;
 		entity.ThemeKey = result.Plan.ThemeKey;
+		entity.DraftRevision += 1;
 
 		await _db.SaveChangesAsync(cancellationToken);
 		return Ok(ToDetail(entity));
@@ -313,7 +360,7 @@ public sealed class AppBuilderController : ControllerBase
 		if (string.IsNullOrWhiteSpace(code)) return BadRequest("应用编码不能为空。");
 		ScopeTo(tenantId);
 		var entity = await _db.AppPlans.FirstOrDefaultAsync(p => p.Code == code, cancellationToken);
-		if (entity is null) return NotFound();
+		if (entity is null) return NotFoundApp();
 		if (entity.TenantId == 0)
 			return BadRequest(new { errors = new[] { "全局/内置应用不可删除。" } });
 
@@ -322,23 +369,43 @@ public sealed class AppBuilderController : ControllerBase
 		return NoContent();
 	}
 
-	/// <summary>发布应用（M7-02）：草稿固化为发布快照。需 app:publish。</summary>
+	/// <summary>发布应用（M7-02）：草稿固化为发布快照。需 app:publish。支持 Idempotency-Key 与期望草稿版本并发保护（§7/§10.9/§14）。</summary>
 	[HttpPost("{code}/publish")]
 	public async Task<IActionResult> Publish(
 		string code,
+		[FromQuery] int? expectedDraftRevision = null,
 		[FromQuery] long tenantId = 0,
 		CancellationToken cancellationToken = default)
 	{
 		if (Require(IdentityPermissions.AppPublish) is { } denied) return denied;
 		var tid = ScopeTo(tenantId);
 		var entity = await _db.AppPlans.FirstOrDefaultAsync(p => p.Code == code, cancellationToken);
-		if (entity is null) return NotFound();
+		if (entity is null) return NotFoundApp();
 		if (string.IsNullOrWhiteSpace(entity.DslJson))
 			return BadRequest(new { errors = new[] { "草稿 DSL 为空，无法发布。" } });
 		if (await ValidateThemeAsync(tid, entity.ThemeKey, cancellationToken) is { } themeDenied) return themeDenied;
 
+		// 期望草稿版本校验（乐观并发令牌；未提供则跳过，兼容既有调用方）。
+		if (expectedDraftRevision is not null && entity.DraftRevision != expectedDraftRevision)
+			return ConflictApp(ErrorCodes.AppDraftChanged, null, ErrorCodes.Message(ErrorCodes.AppDraftChanged));
+
+		var key = IdempotencyKey();
+		if (!string.IsNullOrWhiteSpace(key))
+		{
+			var prior = await _db.AppPublishIdempotencies.AsNoTracking()
+				.FirstOrDefaultAsync(x => x.TenantId == tid && x.AppCode == code && x.IdempotencyKey == key, cancellationToken);
+			if (prior is not null)
+			{
+				// 同键重入：期望版本一致（或未提供）返回既有版本，不重复发布。
+				if (expectedDraftRevision is null || prior.ExpectedDraftRevision == expectedDraftRevision)
+					return Ok(new PublishResult(entity.Id, tid, prior.PublishedVersion, entity.PublishedAt, entity.PublishedBy));
+				return ConflictApp(ErrorCodes.AppIdempotencyConflict, null, ErrorCodes.Message(ErrorCodes.AppIdempotencyConflict));
+			}
+		}
+
+		var newVersion = entity.PublishedVersion + 1;
 		entity.PublishedDslJson = entity.DslJson;
-		entity.PublishedVersion += 1;
+		entity.PublishedVersion = newVersion;
 		entity.Status = AppStatuses.Published;
 		entity.PublishedAt = DateTime.UtcNow;
 		entity.PublishedBy = Actor();
@@ -347,7 +414,7 @@ public sealed class AppBuilderController : ControllerBase
 		{
 			AppId = entity.Id,
 			TenantId = tid,
-			Version = entity.PublishedVersion,
+			Version = newVersion,
 			Code = entity.Code,
 			Name = entity.Name,
 			Description = entity.Description,
@@ -359,11 +426,29 @@ public sealed class AppBuilderController : ControllerBase
 			RolledBackFromVersion = null,
 		});
 
-		await _db.SaveChangesAsync(cancellationToken);
-		return Ok(new PublishResult(entity.Id, tid, entity.PublishedVersion, entity.PublishedAt, entity.PublishedBy));
+		if (!string.IsNullOrWhiteSpace(key))
+			_db.AppPublishIdempotencies.Add(new AppPublishIdempotency
+			{
+				TenantId = tid,
+				AppCode = code,
+				IdempotencyKey = key,
+				ExpectedDraftRevision = expectedDraftRevision ?? entity.DraftRevision,
+				PublishedVersion = newVersion,
+			});
+
+		try
+		{
+			await _db.SaveChangesAsync(cancellationToken);
+		}
+		catch (DbUpdateException)
+		{
+			// 并发发布：唯一索引 (AppId,Version) 兜底，避免重复版本号（§14 P0-3）。
+			return ConflictApp(ErrorCodes.AppIdempotencyConflict, null, "并发发布冲突，请重试或确认幂等键。");
+		}
+		return Ok(new PublishResult(entity.Id, tid, newVersion, entity.PublishedAt, entity.PublishedBy));
 	}
 
-	/// <summary>回滚应用（M7-02）：指定历史版本恢复为当前发布态。需 app:publish。</summary>
+	/// <summary>回滚应用（M7-02）：指定历史版本恢复为当前发布态。需 app:publish。支持 Idempotency-Key（§7/§10.10/§14）。</summary>
 	[HttpPost("{code}/rollback/{version:int}")]
 	public async Task<IActionResult> Rollback(
 		string code,
@@ -374,16 +459,26 @@ public sealed class AppBuilderController : ControllerBase
 		if (Require(IdentityPermissions.AppPublish) is { } denied) return denied;
 		var tid = ScopeTo(tenantId);
 		var entity = await _db.AppPlans.FirstOrDefaultAsync(p => p.Code == code, cancellationToken);
-		if (entity is null) return NotFound();
+		if (entity is null) return NotFoundApp();
 
 		var target = await _db.AppVersions.AsNoTracking()
 			.FirstOrDefaultAsync(v => v.AppId == entity.Id && v.Version == version, cancellationToken);
 		if (target is null)
-			return NotFound(new { errors = new[] { $"版本 {version} 不存在。" } });
+			return NotFound(new ApiError { Code = ErrorCodes.AppNotFound, Message = $"版本 {version} 不存在。", Decision = null });
 		if (await ValidateThemeAsync(tid, target.ThemeKey, cancellationToken) is { } themeDenied) return themeDenied;
 
+		var key = IdempotencyKey();
+		if (!string.IsNullOrWhiteSpace(key))
+		{
+			var prior = await _db.AppPublishIdempotencies.AsNoTracking()
+				.FirstOrDefaultAsync(x => x.TenantId == tid && x.AppCode == code && x.IdempotencyKey == key, cancellationToken);
+			if (prior is not null)
+				return Ok(new PublishResult(entity.Id, tid, prior.PublishedVersion, entity.PublishedAt, entity.PublishedBy, version));
+		}
+
+		var newVersion = entity.PublishedVersion + 1;
 		entity.PublishedDslJson = target.DslJson;
-		entity.PublishedVersion += 1;
+		entity.PublishedVersion = newVersion;
 		entity.Status = AppStatuses.Published;
 		entity.PublishedAt = DateTime.UtcNow;
 		entity.PublishedBy = Actor();
@@ -392,7 +487,7 @@ public sealed class AppBuilderController : ControllerBase
 		{
 			AppId = entity.Id,
 			TenantId = tid,
-			Version = entity.PublishedVersion,
+			Version = newVersion,
 			Code = target.Code,
 			Name = target.Name,
 			Description = target.Description,
@@ -404,8 +499,25 @@ public sealed class AppBuilderController : ControllerBase
 			RolledBackFromVersion = target.Version,
 		});
 
-		await _db.SaveChangesAsync(cancellationToken);
-		return Ok(new PublishResult(entity.Id, tid, entity.PublishedVersion, entity.PublishedAt, entity.PublishedBy, target.Version));
+		if (!string.IsNullOrWhiteSpace(key))
+			_db.AppPublishIdempotencies.Add(new AppPublishIdempotency
+			{
+				TenantId = tid,
+				AppCode = code,
+				IdempotencyKey = key,
+				ExpectedDraftRevision = entity.DraftRevision,
+				PublishedVersion = newVersion,
+			});
+
+		try
+		{
+			await _db.SaveChangesAsync(cancellationToken);
+		}
+		catch (DbUpdateException)
+		{
+			return ConflictApp(ErrorCodes.AppIdempotencyConflict, null, "并发回滚冲突，请重试或确认幂等键。");
+		}
+		return Ok(new PublishResult(entity.Id, tid, newVersion, entity.PublishedAt, entity.PublishedBy, target.Version));
 	}
 
 	/// <summary>列出应用的全部发布版本（M7-02）。需 app:view。</summary>
@@ -419,7 +531,7 @@ public sealed class AppBuilderController : ControllerBase
 		ScopeTo(tenantId);
 		var entity = await _db.AppPlans.AsNoTracking()
 			.FirstOrDefaultAsync(p => p.Code == code, cancellationToken);
-		if (entity is null) return NotFound();
+		if (entity is null) return NotFoundApp();
 
 		var list = await _db.AppVersions.AsNoTracking()
 			.Where(v => v.AppId == entity.Id)
@@ -428,7 +540,7 @@ public sealed class AppBuilderController : ControllerBase
 				v.Id, v.Version, v.Name, v.Code, v.DslVersion, v.PublishedAt, v.PublishedBy,
 				v.RolledBackFromVersion, v.Version == entity.PublishedVersion))
 			.ToListAsync(cancellationToken);
-		return Ok(list);
+		return Ok(new AppVersionListResult(list, list.Count));
 	}
 
 	/// <summary>
@@ -481,7 +593,7 @@ public sealed class AppBuilderController : ControllerBase
 		var tid = ScopeTo(tenantId);
 
 		var entity = await _db.AppPlans.FirstOrDefaultAsync(p => p.Code == code, cancellationToken);
-		if (entity is null) return NotFound();
+		if (entity is null) return NotFoundApp();
 
 		// 来源读取权限：发布态需 app:view，草稿需 app:edit（不能仅 app:create 复制他人隐藏草稿）。
 		if (entity.Status == AppStatuses.Published)
@@ -511,7 +623,17 @@ public sealed class AppBuilderController : ControllerBase
 		var conflict = await _db.AppPlans
 			.IgnoreQueryFilters()
 			.AnyAsync(p => p.Code == newCode && (p.TenantId == tid || p.TenantId == 0), cancellationToken);
-		if (conflict) return Conflict(new { errors = new[] { $"应用编码已存在：{newCode}。" } });
+		if (conflict)
+		{
+			// 幂等：同 Idempotency-Key 重入直接返回既有新应用，不重建（§10.14）。
+			if (!string.IsNullOrWhiteSpace(IdempotencyKey()))
+			{
+				var existing = await _db.AppPlans.IgnoreQueryFilters()
+					.FirstAsync(p => p.Code == newCode && (p.TenantId == tid || p.TenantId == 0), cancellationToken);
+				return Ok(ToDetail(existing));
+			}
+			return Conflict(new { errors = new[] { $"应用编码已存在：{newCode}。" } });
+		}
 
 		var plan = result.Plan;
 		plan.TenantId = tid;
@@ -526,11 +648,29 @@ public sealed class AppBuilderController : ControllerBase
 		return CreatedAtAction(nameof(GetByCode), new { code = plan.Code, tenantId = tid }, ToDetail(plan));
 	}
 
-	/// <summary>编辑器蓝图（结构化，无 HTML）。需 app:view。</summary>
+	/// <summary>编辑器蓝图（结构化，无 HTML）。需 app:create（契约 §5.3/§10.12）。</summary>
 	[HttpGet("editor/blueprint")]
-	public IActionResult EditorBlueprint()
+	public async Task<IActionResult> EditorBlueprint([FromQuery] long tenantId = 0, CancellationToken cancellationToken = default)
 	{
-		if (Require(IdentityPermissions.AppView) is { } denied) return denied;
+		if (Require(IdentityPermissions.AppCreate) is { } denied) return denied;
+		var tid = tenantId > 0 ? ScopeTo(tenantId) : 0;
+		var userId = ResolveUserId();
+
+		var themeKeys = await _db.Themes.IgnoreQueryFilters()
+			.Where(t => t.TenantId == tid || t.TenantId == 0)
+			.Select(t => t.Key)
+			.ToListAsync(cancellationToken);
+
+		IReadOnlyList<AppDataSourceScope> dataSourceScopes = System.Array.Empty<AppDataSourceScope>();
+		if (userId > 0 && tid > 0)
+		{
+			var authorizedIds = await _dataSourceAuth.GetAuthorizedDataSourceIdsAsync(tid, userId, cancellationToken);
+			dataSourceScopes = await _db.DataSources.AsNoTracking()
+				.Where(d => authorizedIds.Contains(d.Id))
+				.Select(d => new AppDataSourceScope(d.Id, d.Name, d.DbType))
+				.ToListAsync(cancellationToken);
+		}
+
 		var skeleton = new AppDsl
 		{
 			Version = AppDslVersions.Current,
@@ -576,17 +716,23 @@ public sealed class AppBuilderController : ControllerBase
 			AggregateTypes: AppAggregateTypes.Supported,
 			FilterOperators: AppFilterOperators.Supported,
 			LayoutKinds: AppLayoutKinds.Supported,
-			Skeleton: _dslSerializer.Serialize(skeleton)));
+			Skeleton: _dslSerializer.Serialize(skeleton),
+			ThemeKeys: themeKeys,
+			DataSourceScopes: dataSourceScopes));
 	}
 
 	private async Task<IActionResult> RenderAppAsync(string code, long tenantId, long userId, bool preview, CancellationToken ct)
 	{
 		var entity = await _db.AppPlans.AsNoTracking().FirstOrDefaultAsync(p => p.Code == code, ct);
-		if (entity is null) return NotFound();
+		if (entity is null) return NotFoundApp();
 
 		var dslJson = preview ? entity.DslJson : entity.PublishedDslJson;
 		if (string.IsNullOrWhiteSpace(dslJson))
-			return StatusCode(409, new { errors = new[] { preview ? "草稿不存在，无法预览。" : "应用尚未发布，无法运行（请先发布）。" } });
+			return StatusCode(StatusCodes.Status409Conflict, new ApiError
+			{
+				Code = ErrorCodes.AppNotPublished,
+				Message = preview ? "草稿不存在，无法预览。" : "应用尚未发布，无法运行（请先发布）。",
+			});
 
 		if (!_dslSerializer.TryDeserialize(dslJson, out var dsl, out var errors) || dsl is null)
 			return BadRequest(new { errors });
@@ -652,11 +798,14 @@ public sealed class AppBuilderController : ControllerBase
 
 	private string Actor() => User.Identity?.Name ?? "system";
 
-	private static AppSummary ToSummary(AppPlan p) =>
-		new(p.Id, p.TenantId, p.Code, p.Name, p.Description, p.Status, p.DslVersion, p.ThemeKey, p.PublishedVersion, p.PublishedAt);
+	private static AppSummary ToSummary(AppPlan p, bool canEdit = false) =>
+		new(p.Id, p.TenantId, p.Code, p.Name, p.Description, p.Status, p.DslVersion, p.ThemeKey, p.DslJson,
+			p.PublishedVersion, p.PublishedAt, p.CreatedTime, p.UpdatedTime,
+			canEdit && p.PublishedDslJson != p.DslJson);
 
 	private static AppDetail ToDetail(AppPlan p) =>
-		new(p.Id, p.TenantId, p.Code, p.Name, p.Description, p.Status, p.DslVersion, p.ThemeKey, p.DslJson, p.PublishedVersion, p.PublishedAt);
+		new(p.Id, p.TenantId, p.Code, p.Name, p.Description, p.Status, p.DslVersion, p.ThemeKey, p.DslJson,
+			p.PublishedVersion, p.PublishedAt, p.CreatedTime, p.UpdatedTime, p.DraftRevision, p.PublishedDslJson);
 
 	#region Request / Response DTOs
 	public sealed record CreateAppRequest(
@@ -696,8 +845,16 @@ public sealed class AppBuilderController : ControllerBase
 		string Status,
 		string DslVersion,
 		string? ThemeKey,
+		string DslJson,
 		int PublishedVersion,
-		DateTime? PublishedAt);
+		DateTime? PublishedAt,
+		DateTime CreatedAt,
+		DateTime? UpdatedAt,
+		bool HasDraft)
+	{
+		/// <summary>契约 §10.5 字段别名（与 ThemeKey 同源）。</summary>
+		public string? ThemeRef => ThemeKey;
+	}
 
 	public sealed record AppDetail(
 		long Id,
@@ -710,7 +867,15 @@ public sealed class AppBuilderController : ControllerBase
 		string? ThemeKey,
 		string DslJson,
 		int PublishedVersion,
-		DateTime? PublishedAt);
+		DateTime? PublishedAt,
+		DateTime CreatedAt,
+		DateTime? UpdatedAt,
+		int? DraftRevision,
+		string? PublishedDslJson)
+	{
+		/// <summary>契约 §10.6 字段别名（与 ThemeKey 同源）。</summary>
+		public string? ThemeRef => ThemeKey;
+	}
 
 	public sealed record PublishResult(
 		long AppId,
@@ -731,12 +896,32 @@ public sealed class AppBuilderController : ControllerBase
 		int? RolledBackFromVersion,
 		bool IsCurrent);
 
+	/// <summary>列表信封（§10.5）：分页后的条目与总数。</summary>
+	public sealed record AppListResult(
+		IReadOnlyList<AppSummary> Items,
+		int Total,
+		int Page,
+		int PageSize);
+
+	/// <summary>版本列表信封（§10.11）。</summary>
+	public sealed record AppVersionListResult(
+		IReadOnlyList<AppVersionSummary> Items,
+		int Total);
+
+	/// <summary>编辑器蓝图中的数据源作用域摘要（§10.12）：不含凭据。</summary>
+	public sealed record AppDataSourceScope(
+		long Id,
+		string Name,
+		string DbType);
+
 	public sealed record AppEditorBlueprint(
 		string DslVersion,
 		IReadOnlyList<string> ComponentTypes,
 		IReadOnlyList<string> AggregateTypes,
 		IReadOnlyList<string> FilterOperators,
 		IReadOnlyList<string> LayoutKinds,
-		string Skeleton);
+		string Skeleton,
+		IReadOnlyList<string> ThemeKeys,
+		IReadOnlyList<AppDataSourceScope> DataSourceScopes);
 	#endregion
 }

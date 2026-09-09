@@ -1065,6 +1065,7 @@ public static class ResourceKeys
         public const string ErrServerTitle = "Content.ErrServerTitle";
         public const string ErrServerText = "Content.ErrServerText";
         public const string ErrBackToWorkbench = "Content.ErrBackToWorkbench";
+        public const string PageRenderError = "Content.PageRenderError";
         public const string ErrBack = "Content.ErrBack";
         public const string ErrGoAsk = "Content.ErrGoAsk";
         public const string ErrReload = "Content.ErrReload";
@@ -2480,6 +2481,7 @@ public static class ResourceKeys
         [Content.ErrServerTitle] = new("Content", Page: "Errors", DefaultValue: "Something went wrong"),
         [Content.ErrServerText] = new("Content", Page: "Errors", DefaultValue: "An unexpected error occurred. Please retry later; if it persists, contact an administrator with the trace ID."),
         [Content.ErrBackToWorkbench] = new("Content", Page: "Errors", DefaultValue: "Back to workbench"),
+        [Content.PageRenderError] = new("Content", Page: "Errors", DefaultValue: "Page rendering error"),
         [Content.ErrBack] = new("Content", Page: "Errors", DefaultValue: "Go back"),
         [Content.ErrGoAsk] = new("Content", Page: "Errors", DefaultValue: "Ask a question"),
         [Content.ErrReload] = new("Content", Page: "Errors", DefaultValue: "Reload"),

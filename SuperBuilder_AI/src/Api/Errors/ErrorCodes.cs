@@ -44,6 +44,24 @@ public static class ErrorCodes
     /// <summary>查询快照归属不符（跨用户/跨租户访问他人查询上下文）。</summary>
     public const string AppSnapshotForbidden = "SB_APP_005";
 
+    // M7-11 应用运行时（契约 §3.2 缺口补码；既有 SB_APP_001..005 继续保留，避免前端/测试回归）
+    /// <summary>应用不存在（code 无效）。用于 get/update/delete/publish/rollback/versions/copy 的 404。</summary>
+    public const string AppNotFound = "SB_APP_NOT_FOUND";
+    /// <summary>应用未发布却被运行（render）。</summary>
+    public const string AppNotPublished = "SB_APP_NOT_PUBLISHED";
+    /// <summary>发布/编辑并发冲突：期望草稿版本与当前不符。</summary>
+    public const string AppDraftChanged = "SB_APP_DRAFT_CHANGED";
+    /// <summary>幂等键冲突：同键但请求摘要/期望版本不一致（创建或发布）。</summary>
+    public const string AppIdempotencyConflict = "SB_APP_IDEMPOTENCY_CONFLICT";
+    /// <summary>绑定数据源未授权/已停用/已撤权（运行时）。</summary>
+    public const string AppDataSourceUnauthorized = "SB_APP_DATASOURCE_UNAUTHORIZED";
+    /// <summary>RLS / Security Gate 策略拒绝（运行时）。</summary>
+    public const string AppQueryBlocked = "SB_APP_QUERY_BLOCKED";
+    /// <summary>应用运行时查询执行失败（脱敏，不回吐内部异常）。</summary>
+    public const string AppQueryError = "SB_APP_QUERY_ERROR";
+    /// <summary>应用操作缺 app:* 权限（区别于通用 SB_FORBIDDEN，专用于 AppBuilder 端点）。</summary>
+    public const string AppForbidden = "SB_APP_FORBIDDEN";
+
     // 平台（多租户 / 配额 / 审计）
     public const string QuotaExceeded = "SB_PFM_001";
     public const string TenantIsolated = "SB_PFM_002";
@@ -83,9 +101,36 @@ public static class ErrorCodes
         [RowPolicyForbidden] = "当前账号没有满足行级数据策略的访问范围。",
         [QueryPlanSecurityRejected] = "查询计划未通过最终安全校验，已在执行前阻断。",
         [QueryPlanCostGoverned] = "查询成本超过治理阈值，已在执行前拒绝或降级执行。",
+        [AppNotFound] = "应用不存在或已被删除，请确认应用编码后重试。",
+        [AppNotPublished] = "应用尚未发布，无法运行（请先发布）。",
+        [AppDraftChanged] = "应用草稿已被他人或并发编辑修改，请刷新后重试。",
+        [AppIdempotencyConflict] = "相同请求已处理过，但本次内容与既有记录不一致，请检查后重试。",
+        [AppDataSourceUnauthorized] = "当前账号无权访问该应用绑定的数据源，或数据源已停用。",
+        [AppQueryBlocked] = "查询被行级安全或安全网关策略拒绝。",
+        [AppQueryError] = "应用取数执行失败，请稍后重试或联系管理员。",
+        [AppForbidden] = "权限不足，当前账号无权执行该应用操作（需相应 app:* 权限）。",
     };
 
     /// <summary>取错误码对应的友好中文提示；缺省回退到通用内部错误提示。</summary>
     public static string Message(string code) =>
         Friendly.TryGetValue(code, out var m) ? m : Friendly[Internal];
+}
+
+/// <summary>
+/// 拒绝原因码（契约 §3.3）：用于 <see cref="ApiError.Decision"/>，使调用方以结构化方式区分拒绝类型，
+/// 而<strong>不靠解析中文 <see cref="ErrorCodes.Message"/> 文本</see>。
+/// </summary>
+public static class ErrorDecisions
+{
+    /// <summary>权限不足（缺 app:* 操作权限 / 跨用户访问）。</summary>
+    public const string PermissionDenied = "PermissionDenied";
+
+    /// <summary>绑定数据源未授权/已停用/已撤权。</summary>
+    public const string DataSourceUnauthorized = "DataSourceUnauthorized";
+
+    /// <summary>RLS / Security Gate 策略拒绝。</summary>
+    public const string PolicyBlocked = "PolicyBlocked";
+
+    /// <summary>绑定不完整 / 实体不确定 / 计划无法解析 / 多字段排序 / between / JOIN 等不支持场景。</summary>
+    public const string RequiresClarification = "RequiresClarification";
 }

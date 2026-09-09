@@ -1008,6 +1008,7 @@ public sealed class LocalizationSeedService : ILocalizationSeedService
         ["Content.ErrServerTitle"] = "服务出现异常",
         ["Content.ErrServerText"] = "请求处理过程中发生未预期的错误，请稍后重试；若持续出现，请联系管理员并提供追踪 ID。",
         ["Content.ErrBackToWorkbench"] = "返回工作台",
+        ["Content.PageRenderError"] = "页面渲染出错",
         ["Content.ErrBack"] = "返回上一页",
         ["Content.ErrGoAsk"] = "去提问",
         ["Content.ErrReload"] = "重新加载",

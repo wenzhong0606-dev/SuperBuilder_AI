@@ -140,6 +140,7 @@ public class SuperBIContext : DbContext
     public DbSet<AppPlan> AppPlans { get; set; }
     public DbSet<AppVersion> AppVersions { get; set; }
     public DbSet<AskQuerySnapshot> AskQuerySnapshots { get; set; }
+    public DbSet<AppPublishIdempotency> AppPublishIdempotencies { get; set; }
     #endregion
 
         #region P9 AI Agent / Copilot
@@ -531,6 +532,7 @@ public class SuperBIContext : DbContext
         builder.Entity<AppPlan>().Property(x => x.PublishedVersion).HasComment("当前发布版本号（0=未发布）");
         builder.Entity<AppPlan>().Property(x => x.PublishedAt).HasComment("最近发布时间(UTC)");
         builder.Entity<AppPlan>().Property(x => x.PublishedBy).HasMaxLength(128).HasComment("最近发布者");
+        builder.Entity<AppPlan>().Property(x => x.DraftRevision).IsRequired().HasDefaultValue(1).HasComment("草稿修订乐观并发令牌(每次编辑+1,发布校验用)");
         #endregion
 
         #region P8.2 AppVersion（M7-02 版本快照）
@@ -567,6 +569,20 @@ public class SuperBIContext : DbContext
         builder.Entity<AskQuerySnapshot>().Property(x => x.ExpiresAt).IsRequired().HasComment("过期时间(UTC)");
         builder.Entity<AskQuerySnapshot>().HasIndex(x => new { x.TenantId, x.UserId }).HasDatabaseName("IX_AskQuerySnapshots_TenantId_UserId");
         builder.Entity<AskQuerySnapshot>().HasIndex(x => x.ExpiresAt).HasDatabaseName("IX_AskQuerySnapshots_ExpiresAt");
+        #endregion
+
+        #region M7-11 AppPublishIdempotency（发布/回滚幂等）
+        builder.Entity<AppPublishIdempotency>().ToTable(tb => tb.HasComment("应用发布/回滚幂等记录"));
+        builder.Entity<AppPublishIdempotency>().HasKey(x => x.Id);
+        builder.Entity<AppPublishIdempotency>().Property(x => x.TenantId).IsRequired().HasComment("作用域租户");
+        builder.Entity<AppPublishIdempotency>().Property(x => x.AppCode).IsRequired().HasMaxLength(128).HasComment("应用业务编码");
+        builder.Entity<AppPublishIdempotency>().Property(x => x.IdempotencyKey).IsRequired().HasMaxLength(128).HasComment("客户端幂等键(UUID)");
+        builder.Entity<AppPublishIdempotency>().Property(x => x.ExpectedDraftRevision).HasComment("发布时的期望草稿修订号");
+        builder.Entity<AppPublishIdempotency>().Property(x => x.PublishedVersion).HasComment("成功发布固化的版本号(同键重入返回此值)");
+        builder.Entity<AppPublishIdempotency>().Property(x => x.CreatedAt).HasComment("记录创建时间(UTC)");
+        builder.Entity<AppPublishIdempotency>()
+            .HasIndex(x => new { x.TenantId, x.AppCode, x.IdempotencyKey }).IsUnique()
+            .HasDatabaseName("IX_AppPublishIdempotencies_Tenant_AppCode_Key");
         #endregion
 
         #region P9.1 AgentPlan

@@ -11,6 +11,8 @@ using SuperBuilder_AI.Controllers;
 using static SuperBuilder_AI.Controllers.AppBuilderController;
 using SuperBuilder_AI.Data;
 using SuperBuilder_AI.Interfaces.AppBuilder;
+using SuperBuilder_AI.Interfaces.Identity;
+using SuperBuilder_AI.Models.Identity;
 using SuperBuilder_AI.Models.AppBuilder;
 using SuperBuilder_AI.Services.AppBuilder;
 using Xunit;
@@ -42,11 +44,29 @@ public sealed class AppBuilderControllerVersioningTests
 			new AppDslSerializer(),
 			new FakeAppBuilderAgent(),
 			new FakeAppQueryBindingExporter(),
-			new FakeAppQueryExecutor())
+			new FakeAppQueryExecutor(),
+			new FakeDataSourceAuth())
 		{
 			ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() }
 		};
 		return controller;
+	}
+
+	/// <summary>测试桩：返回空授权数据源集合。</summary>
+	private sealed class FakeDataSourceAuth : IDataSourceAuthorizationService
+	{
+		public Task<IReadOnlyList<long>> GetAuthorizedDataSourceIdsAsync(long tenantId, long userId, CancellationToken ct = default)
+			=> Task.FromResult<IReadOnlyList<long>>(Array.Empty<long>());
+		public Task<bool> IsAuthorizedAsync(long tenantId, long userId, long dataSourceId, CancellationToken ct = default)
+			=> Task.FromResult(false);
+		public Task GrantAsync(long tenantId, long dataSourceId, DataSourceGrantSubjectType subjectType, long subjectId, CancellationToken ct = default)
+			=> Task.CompletedTask;
+		public Task RevokeAsync(long tenantId, long dataSourceId, DataSourceGrantSubjectType subjectType, long subjectId, CancellationToken ct = default)
+			=> Task.CompletedTask;
+		public Task RevokeBySubjectAsync(long tenantId, DataSourceGrantSubjectType subjectType, long subjectId, CancellationToken ct = default)
+			=> Task.CompletedTask;
+		public Task<IReadOnlyList<DataSourceAccessGrant>> DetectOrphanGrantsAsync(long tenantId, CancellationToken ct = default)
+			=> Task.FromResult<IReadOnlyList<DataSourceAccessGrant>>(Array.Empty<DataSourceAccessGrant>());
 	}
 
 	private static string SampleDslJson(AppDslSerializer serializer, string name, string code) =>
@@ -108,7 +128,7 @@ public sealed class AppBuilderControllerVersioningTests
 			var dsl = SampleDslJson(serializer, "销售应用", "sales-app");
 			var code = await CreateAppAsync(controller, dsl);
 
-			var pubResult = await controller.Publish(code, 1, CancellationToken.None);
+			var pubResult = await controller.Publish(code, tenantId: 1, cancellationToken: CancellationToken.None);
 			var pub = Assert.IsType<AppBuilderController.PublishResult>(Assert.IsType<OkObjectResult>(pubResult).Value);
 			Assert.Equal(1, pub.Version);
 
@@ -142,10 +162,10 @@ public sealed class AppBuilderControllerVersioningTests
 			var controller = BuildController(db);
 			var dslA = SampleDslJson(serializer, "应用A", "app-a");
 			var code = await CreateAppAsync(controller, dslA);
-			await controller.Publish(code, 1, CancellationToken.None);
+			await controller.Publish(code, tenantId: 1, cancellationToken: CancellationToken.None);
 
 			var dslB = SampleDslJson(serializer, "应用A-修订", "app-a");
-			await controller.Update(code, new UpdateAppRequest(dslB), 1, CancellationToken.None);
+			await controller.Update(code, new UpdateAppRequest(dslB), tenantId: 1, cancellationToken: CancellationToken.None);
 
 			var entity = await db.AppPlans.AsNoTracking().FirstAsync(p => p.Code == code);
 			Assert.Equal(dslB, entity.DslJson);              // 草稿已更新
@@ -171,9 +191,9 @@ public sealed class AppBuilderControllerVersioningTests
 			var dslA = SampleDslJson(serializer, "应用A", "app-rl");
 			var dslB = SampleDslJson(serializer, "应用B", "app-rl");
 			var code = await CreateAppAsync(controller, dslA);
-			await controller.Publish(code, 1, CancellationToken.None);          // v1 = A
-			await controller.Update(code, new UpdateAppRequest(dslB), 1, CancellationToken.None);
-			await controller.Publish(code, 1, CancellationToken.None);          // v2 = B
+			await controller.Publish(code, tenantId: 1, cancellationToken: CancellationToken.None);          // v1 = A
+			await controller.Update(code, new UpdateAppRequest(dslB), tenantId: 1, cancellationToken: CancellationToken.None);
+			await controller.Publish(code, tenantId: 1, cancellationToken: CancellationToken.None);          // v2 = B
 
 			var rbResult = await controller.Rollback(code, 1, 1, CancellationToken.None);
 			var rb = Assert.IsType<AppBuilderController.PublishResult>(Assert.IsType<OkObjectResult>(rbResult).Value);
@@ -208,17 +228,18 @@ public sealed class AppBuilderControllerVersioningTests
 			var serializer = new AppDslSerializer();
 			var controller = BuildController(db);
 			var code = await CreateAppAsync(controller, SampleDslJson(serializer, "应用", "app-v"));
-			await controller.Publish(code, 1, CancellationToken.None);
+			await controller.Publish(code, tenantId: 1, cancellationToken: CancellationToken.None);
 			await controller.Update(code, new UpdateAppRequest(SampleDslJson(serializer, "应用-2", "app-v")));
-			await controller.Publish(code, 1, CancellationToken.None);
+			await controller.Publish(code, tenantId: 1, cancellationToken: CancellationToken.None);
 
 			var verResult = await controller.Versions(code, 1, CancellationToken.None);
-			var versions = Assert.IsType<List<AppVersionSummary>>(Assert.IsType<OkObjectResult>(verResult).Value);
-			Assert.Equal(2, versions.Count);
-			Assert.Equal(2, versions[0].Version);
-			Assert.True(versions[0].IsCurrent);
-			Assert.Equal(1, versions[1].Version);
-			Assert.False(versions[1].IsCurrent);
+			var versions = Assert.IsType<AppVersionListResult>(Assert.IsType<OkObjectResult>(verResult).Value);
+			Assert.Equal(2, versions.Items.Count);
+			Assert.Equal(2, versions.Total);
+			Assert.Equal(2, versions.Items[0].Version);
+			Assert.True(versions.Items[0].IsCurrent);
+			Assert.Equal(1, versions.Items[1].Version);
+			Assert.False(versions.Items[1].IsCurrent);
 		}
 		finally
 		{
@@ -241,7 +262,7 @@ public sealed class AppBuilderControllerVersioningTests
 			entity.DslJson = string.Empty;
 			await db.SaveChangesAsync();
 
-			var pubResult = await controller.Publish(code, 1, CancellationToken.None);
+			var pubResult = await controller.Publish(code, tenantId: 1, cancellationToken: CancellationToken.None);
 			Assert.IsType<BadRequestObjectResult>(pubResult);
 		}
 		finally
@@ -260,7 +281,7 @@ public sealed class AppBuilderControllerVersioningTests
 			var serializer = new AppDslSerializer();
 			var controller = BuildController(db);
 			var code = await CreateAppAsync(controller, SampleDslJson(serializer, "应用", "app-rb"));
-			await controller.Publish(code, 1, CancellationToken.None);
+			await controller.Publish(code, tenantId: 1, cancellationToken: CancellationToken.None);
 
 			var rbResult = await controller.Rollback(code, 99, 1, CancellationToken.None);
 			Assert.IsType<NotFoundObjectResult>(rbResult);
@@ -282,13 +303,15 @@ public sealed class AppBuilderControllerVersioningTests
 			var controller = BuildController(db);
 			// 租户 7 创建并发布
 			var code = await CreateAppAsync(controller, SampleDslJson(serializer, "租户7应用", "app-t7"), tenantId: 7);
-			await controller.Publish(code, 7, CancellationToken.None);
+			await controller.Publish(code, tenantId: 7, cancellationToken: CancellationToken.None);
 
-			// 租户 8 看不到租户 7 的应用
-			var getOther = await controller.GetByCode(code, tenantId: 8);
-			Assert.IsType<NotFoundResult>(getOther);
-			var verOther = await controller.Versions(code, tenantId: 8);
-			Assert.IsType<NotFoundResult>(verOther);
+			// 租户 8 看不到租户 7 的应用（结构化 404 ApiError）。
+			var getOther = await controller.GetByCode(code, tenantId: 8) as ObjectResult;
+			Assert.NotNull(getOther);
+			Assert.Equal(404, getOther!.StatusCode);
+			var verOther = await controller.Versions(code, tenantId: 8) as ObjectResult;
+			Assert.NotNull(verOther);
+			Assert.Equal(404, verOther!.StatusCode);
 
 			// 租户 7 自身可见
 			var getSelf = await controller.GetByCode(code, tenantId: 7);

@@ -1,3 +1,7 @@
+> **治理声明**：本文档是 `Master_Development_Plan.md` 的**输入 / 审计基线**，**不是**独立执行计划。所有里程碑状态、优先级与验收以 `Master_Development_Plan.md`（唯一事实来源）及其 `milestones/` 拆分文档为准；本文与 MDP 冲突时以 MDP 为准。映射见 MDP §17。
+>
+> **文档角色**：前端整改清单（S6* 映射到 M8/M11，见 MDP §17.2）
+
 # SuperBuilder AI · 前端开发与发布整改清单（P11.7）
 
 > 结构规范见 `docs/Frontend_Structure_Plan.md`。

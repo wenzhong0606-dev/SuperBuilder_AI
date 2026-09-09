@@ -87,4 +87,11 @@ public class AppPlan : BaseEntity
 
 	/// <summary>最近一次发布者标识；未发布为 null。</summary>
 	public string? PublishedBy { get; set; }
+
+	/// <summary>
+	/// 草稿修订乐观并发令牌（M7-11 契约 §7/§10.7/§10.9）：每次 <c>PUT</c> 编辑草稿自增 1；
+	/// 发布携 <c>ExpectedDraftRevision</c> 校验，不匹配即 409 <c>SB_APP_DRAFT_CHANGED</c>。
+	/// 新应用初始为 1。
+	/// </summary>
+	public int DraftRevision { get; set; } = 1;
 }

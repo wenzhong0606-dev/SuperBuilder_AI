@@ -1,5 +1,8 @@
+using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net;
+using SuperBuilder_AI.Api.Errors;
 using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
@@ -12,6 +15,7 @@ using SuperBuilder_AI.Models.Identity;
 using SuperBuilder_AI.Data;
 using SuperBuilder_AI.Interfaces;
 using SuperBuilder_AI.Interfaces.AppBuilder;
+using SuperBuilder_AI.Interfaces.Identity;
 using SuperBuilder_AI.Models.AppBuilder;
 using SuperBuilder_AI.Models.Theme;
 using SuperBuilder_AI.Services.AppBuilder;
@@ -72,6 +76,23 @@ public class AppBuilderControllerTests
 	private static string DslJsonNoPages() =>
 		new AppDslSerializer().Serialize(new AppDsl { Name = "缺页面" });
 
+	/// <summary>测试桩：返回空授权数据源集合（蓝图 data-source-scopes 不应因此抛错）。</summary>
+	private sealed class FakeDataSourceAuth : IDataSourceAuthorizationService
+	{
+		public Task<IReadOnlyList<long>> GetAuthorizedDataSourceIdsAsync(long tenantId, long userId, CancellationToken ct = default)
+			=> Task.FromResult<IReadOnlyList<long>>(Array.Empty<long>());
+		public Task<bool> IsAuthorizedAsync(long tenantId, long userId, long dataSourceId, CancellationToken ct = default)
+			=> Task.FromResult(false);
+		public Task GrantAsync(long tenantId, long dataSourceId, DataSourceGrantSubjectType subjectType, long subjectId, CancellationToken ct = default)
+			=> Task.CompletedTask;
+		public Task RevokeAsync(long tenantId, long dataSourceId, DataSourceGrantSubjectType subjectType, long subjectId, CancellationToken ct = default)
+			=> Task.CompletedTask;
+		public Task RevokeBySubjectAsync(long tenantId, DataSourceGrantSubjectType subjectType, long subjectId, CancellationToken ct = default)
+			=> Task.CompletedTask;
+		public Task<IReadOnlyList<DataSourceAccessGrant>> DetectOrphanGrantsAsync(long tenantId, CancellationToken ct = default)
+			=> Task.FromResult<IReadOnlyList<DataSourceAccessGrant>>(Array.Empty<DataSourceAccessGrant>());
+	}
+
 	private static SuperBIContext CreateContext(out SqliteConnection connection)
 	{
 		connection = new SqliteConnection("DataSource=:memory:");
@@ -85,27 +106,28 @@ public class AppBuilderControllerTests
 	private static AppBuilderAgent CreateAgent(string qwenResponse) =>
 		new(new AppDslSerializer(), new FakeQwen(qwenResponse));
 
-	private static AppBuilderController Build(SuperBIContext db, string qwenResponse = "ignored")
+	private static AppBuilderController Build(SuperBIContext db, string qwenResponse = "ignored") =>
+		BuildWith(db, qwenResponse,
+			IdentityPermissions.AppView, IdentityPermissions.AppEdit, IdentityPermissions.AppCreate,
+			IdentityPermissions.AppPublish, IdentityPermissions.AppDelete);
+
+	/// <summary>以指定 app:* 权限集合构造控制器；不传任何 perm 即模拟未授权（Require 返回 403）。</summary>
+	private static AppBuilderController BuildWith(SuperBIContext db, string qwenResponse = "ignored", params string[] perms)
 	{
-		// 以具备全部 app:* 权限的已认证用户运行，使 Require 放行、GetByCode 返回草稿 DSL（服务端裁剪契约）。
-		var identity = new ClaimsIdentity(new[]
+		var claims = new List<Claim>(perms.Select(p => new Claim("perm", p)))
 		{
-			new Claim("perm", IdentityPermissions.AppView),
-			new Claim("perm", IdentityPermissions.AppEdit),
-			new Claim("perm", IdentityPermissions.AppCreate),
-			new Claim("perm", IdentityPermissions.AppPublish),
-			new Claim("perm", IdentityPermissions.AppDelete),
 			new Claim(ClaimTypes.NameIdentifier, "1"),
-		}, "test");
+		};
+		var identity = new ClaimsIdentity(claims, "test");
 		var httpContext = new DefaultHttpContext { User = new ClaimsPrincipal(identity) };
 
-		var controller = new AppBuilderController(
+		return new AppBuilderController(
 			db, new AppDslSerializer(), CreateAgent(qwenResponse),
-			new FakeAppQueryBindingExporter(), new FakeAppQueryExecutor())
+			new FakeAppQueryBindingExporter(), new FakeAppQueryExecutor(),
+			new FakeDataSourceAuth())
 		{
 			ControllerContext = new ControllerContext { HttpContext = httpContext }
 		};
-		return controller;
 	}
 
 	[Fact]
@@ -203,9 +225,10 @@ public class AppBuilderControllerTests
 		var controller = Build(ctx);
 		await controller.Create(new AppBuilderController.CreateAppRequest(Tenant5, DslJson("app5", "应用5")), CancellationToken.None);
 
-		// 租户 7 作用域下按 code 查 app5 → 404（跨租户不可见）。
-		var other = await controller.GetByCode("app5", 7, CancellationToken.None);
-		Assert.IsType<Microsoft.AspNetCore.Mvc.NotFoundResult>(other);
+		// 租户 7 作用域下按 code 查 app5 → 404（跨租户不可见，结构化 ApiError）。
+		var other = await controller.GetByCode("app5", 7, CancellationToken.None) as Microsoft.AspNetCore.Mvc.ObjectResult;
+		Assert.NotNull(other);
+		Assert.Equal(404, other!.StatusCode);
 
 		// 所属租户作用域下可见。
 		var own = await controller.GetByCode("app5", Tenant5, CancellationToken.None) as Microsoft.AspNetCore.Mvc.OkObjectResult;
@@ -236,8 +259,8 @@ public class AppBuilderControllerTests
 		var result = await controller.Update(
 			"appx",
 			new AppBuilderController.UpdateAppRequest(newDsl),
-			Tenant5,
-			CancellationToken.None) as Microsoft.AspNetCore.Mvc.OkObjectResult;
+			tenantId: Tenant5,
+			cancellationToken: CancellationToken.None) as Microsoft.AspNetCore.Mvc.OkObjectResult;
 		Assert.NotNull(result);
 
 		var detail = Assert.IsType<AppBuilderController.AppDetail>(result!.Value);
@@ -268,8 +291,8 @@ public class AppBuilderControllerTests
 		var result = await Build(ctx).Update(
 			"global-app",
 			new AppBuilderController.UpdateAppRequest(DslJson("global-app", "改后")),
-			Tenant5,
-			CancellationToken.None) as Microsoft.AspNetCore.Mvc.BadRequestObjectResult;
+			tenantId: Tenant5,
+			cancellationToken: CancellationToken.None) as Microsoft.AspNetCore.Mvc.BadRequestObjectResult;
 		Assert.NotNull(result);
 	}
 
@@ -286,8 +309,9 @@ public class AppBuilderControllerTests
 			as Microsoft.AspNetCore.Mvc.NoContentResult;
 		Assert.NotNull(del);
 
-		var get = await controller.GetByCode("to-del", Tenant5, CancellationToken.None);
-		Assert.IsType<Microsoft.AspNetCore.Mvc.NotFoundResult>(get);
+		var get = await controller.GetByCode("to-del", Tenant5, CancellationToken.None) as Microsoft.AspNetCore.Mvc.ObjectResult;
+		Assert.NotNull(get);
+		Assert.Equal(404, get!.StatusCode);
 	}
 
 	[Fact]
@@ -323,10 +347,42 @@ public class AppBuilderControllerTests
 		var controller = Build(ctx);
 		await controller.Create(new AppBuilderController.CreateAppRequest(Tenant5, DslJson("tenant-only", "租户应用")), CancellationToken.None);
 
-		var result = await controller.List(Tenant5, CancellationToken.None) as Microsoft.AspNetCore.Mvc.OkObjectResult;
+		var result = await controller.List(Tenant5, cancellationToken: CancellationToken.None) as Microsoft.AspNetCore.Mvc.OkObjectResult;
 		Assert.NotNull(result);
-		var list = Assert.IsType<List<AppBuilderController.AppSummary>>(result!.Value);
-		Assert.Contains(list, s => s.Code == "tenant-only" && s.TenantId == Tenant5);
+		var list = Assert.IsType<AppBuilderController.AppListResult>(result!.Value);
+		Assert.Contains(list.Items, s => s.Code == "tenant-only" && s.TenantId == Tenant5);
+	}
+
+	[Fact]
+	public async Task List_ReturnsPagedEnvelope_WithAuditFields_And_HasDraft()
+	{
+		var ctx = CreateContext(out var connection);
+		await using var _ = connection;
+		await using var __ = ctx;
+
+		var controller = Build(ctx);
+		await controller.Create(new AppBuilderController.CreateAppRequest(Tenant5, DslJson("a1", "A1")), CancellationToken.None);
+		await controller.Create(new AppBuilderController.CreateAppRequest(Tenant5, DslJson("a2", "A2")), CancellationToken.None);
+		await controller.Create(new AppBuilderController.CreateAppRequest(Tenant5, DslJson("a3", "A3")), CancellationToken.None);
+
+		// 第一页：pageSize=2 → 仅返回 2 条，但 total 反映全部 3 条。
+		var p1 = await controller.List(Tenant5, 1, 2, null, CancellationToken.None) as Microsoft.AspNetCore.Mvc.OkObjectResult;
+		var env = Assert.IsType<AppBuilderController.AppListResult>(p1!.Value);
+		Assert.Equal(3, env.Total);
+		Assert.Equal(2, env.Items.Count);
+		Assert.Equal(1, env.Page);
+		Assert.Equal(2, env.PageSize);
+
+		// 审计字段与 HasDraft（具 app:edit 的调用者可见草稿标记）应填充。
+		var first = env.Items[0];
+		Assert.NotEqual(default, first.CreatedAt);
+		Assert.True(first.HasDraft);
+		Assert.Equal(first.ThemeKey, first.ThemeRef);
+
+		// 第二页返回剩余 1 条。
+		var p2 = await controller.List(Tenant5, 2, 2, null, CancellationToken.None) as Microsoft.AspNetCore.Mvc.OkObjectResult;
+		var env2 = Assert.IsType<AppBuilderController.AppListResult>(p2!.Value);
+		Assert.Single(env2.Items);
 	}
 
 	[Fact]
@@ -384,7 +440,7 @@ public class AppBuilderControllerTests
 		await using var _ = connection;
 		await using var __ = ctx;
 
-		var result = Build(ctx).EditorBlueprint() as Microsoft.AspNetCore.Mvc.OkObjectResult;
+		var result = await Build(ctx).EditorBlueprint() as Microsoft.AspNetCore.Mvc.OkObjectResult;
 		Assert.NotNull(result);
 		var bp = Assert.IsType<AppBuilderController.AppEditorBlueprint>(result!.Value);
 		Assert.Contains(AppComponentTypes.Kpi, bp.ComponentTypes);
@@ -394,5 +450,123 @@ public class AppBuilderControllerTests
 		Assert.False(string.IsNullOrWhiteSpace(bp.Skeleton));
 		// 骨架本身应当是可反序列化的合法 AppDsl。
 		Assert.True(new AppDslSerializer().TryDeserialize(bp.Skeleton, out var _dsl, out var _errs));
+	}
+
+	// ── M7-11 P0：结构化错误契约验证（§3.2 / §14）───────────────────────────
+
+	[Fact]
+	public async Task GetByCode_UnknownCode_Returns404_StructuredApiError()
+	{
+		var ctx = CreateContext(out var connection);
+		await using var _ = connection;
+		await using var __ = ctx;
+
+		var result = await Build(ctx).GetByCode("nope", Tenant5, CancellationToken.None)
+			as Microsoft.AspNetCore.Mvc.ObjectResult;
+		Assert.NotNull(result);
+		Assert.Equal(404, result!.StatusCode);
+		var err = Assert.IsType<ApiError>(result.Value);
+		Assert.Equal(ErrorCodes.AppNotFound, err.Code);
+		Assert.Null(err.Decision); // 404 不携带拒绝决策
+	}
+
+	[Fact]
+	public async Task GetByCode_MissingPermission_Returns403_WithDecision_PermissionDenied()
+	{
+		var ctx = CreateContext(out var connection);
+		await using var _ = connection;
+		await using var __ = ctx;
+
+		// 未携带任何 app:* 权限 → Require 返回 403 结构化 ApiError（SB_APP_FORBIDDEN + PermissionDenied）。
+		var result = await BuildWith(ctx).GetByCode("x", Tenant5, CancellationToken.None)
+			as Microsoft.AspNetCore.Mvc.ObjectResult;
+		Assert.NotNull(result);
+		Assert.Equal(403, result!.StatusCode);
+		var err = Assert.IsType<ApiError>(result.Value);
+		Assert.Equal(ErrorCodes.AppForbidden, err.Code);
+		Assert.Equal(ErrorDecisions.PermissionDenied, err.Decision);
+	}
+
+	[Fact]
+	public async Task Publish_DraftRevisionMismatch_Returns409_DraftChanged()
+	{
+		var ctx = CreateContext(out var connection);
+		await using var _ = connection;
+		await using var __ = ctx;
+		ctx.AppPlans.Add(new AppPlan
+		{
+			TenantId = Tenant5, Code = "p1", Name = "P1",
+			Status = AppStatuses.Draft, DslVersion = AppDslVersions.Current, DslJson = "{}",
+		});
+		await ctx.SaveChangesAsync();
+
+		// 期望草稿版本 2，但当前实体 DraftRevision=1 → 409 SB_APP_DRAFT_CHANGED（乐观并发令牌）。
+		var result = await Build(ctx).Publish("p1", expectedDraftRevision: 2, Tenant5, CancellationToken.None)
+			as Microsoft.AspNetCore.Mvc.ObjectResult;
+		Assert.NotNull(result);
+		Assert.Equal(409, result!.StatusCode);
+		var err = Assert.IsType<ApiError>(result.Value);
+		Assert.Equal(ErrorCodes.AppDraftChanged, err.Code);
+	}
+
+	[Fact]
+	public async Task Publish_IdempotencyKeyMismatch_Returns409_Conflict()
+	{
+		var ctx = CreateContext(out var connection);
+		await using var _ = connection;
+		await using var __ = ctx;
+		ctx.AppPlans.Add(new AppPlan
+		{
+			TenantId = Tenant5, Code = "p2", Name = "P2",
+			Status = AppStatuses.Draft, DslVersion = AppDslVersions.Current, DslJson = "{}",
+		});
+		ctx.AppPublishIdempotencies.Add(new AppPublishIdempotency
+		{
+			TenantId = Tenant5, AppCode = "p2", IdempotencyKey = "KEY",
+			ExpectedDraftRevision = 5, PublishedVersion = 1,
+		});
+		await ctx.SaveChangesAsync();
+
+		// 同键重入：期望草稿版本(1，与当前实体一致) 但既有记录期望(5) 不一致 → 409 SB_APP_IDEMPOTENCY_CONFLICT。
+		var ctrl = Build(ctx);
+		ctrl.ControllerContext.HttpContext.Request.Headers["Idempotency-Key"] = "KEY";
+		var result = await ctrl.Publish("p2", expectedDraftRevision: 1, Tenant5, CancellationToken.None)
+			as Microsoft.AspNetCore.Mvc.ObjectResult;
+		Assert.NotNull(result);
+		Assert.Equal(409, result!.StatusCode);
+		var err = Assert.IsType<ApiError>(result.Value);
+		Assert.Equal(ErrorCodes.AppIdempotencyConflict, err.Code);
+	}
+
+	[Fact]
+	public async Task Publish_IdempotencyKeyReplay_ReturnsPriorVersion_WithoutRepublish()
+	{
+		var ctx = CreateContext(out var connection);
+		await using var _ = connection;
+		await using var __ = ctx;
+		ctx.AppPlans.Add(new AppPlan
+		{
+			TenantId = Tenant5, Code = "p3", Name = "P3",
+			Status = AppStatuses.Draft, DslVersion = AppDslVersions.Current, DslJson = "{}",
+		});
+		ctx.AppPublishIdempotencies.Add(new AppPublishIdempotency
+		{
+			TenantId = Tenant5, AppCode = "p3", IdempotencyKey = "KEY",
+			ExpectedDraftRevision = 1, PublishedVersion = 7,
+		});
+		await ctx.SaveChangesAsync();
+
+		// 同键且期望草稿版本一致(=当前实体 DraftRevision=1=既有记录) → 直接返回既有版本(7)，不重复发布、不产生新版本号。
+		var ctrl = Build(ctx);
+		ctrl.ControllerContext.HttpContext.Request.Headers["Idempotency-Key"] = "KEY";
+		var result = await ctrl.Publish("p3", expectedDraftRevision: 1, Tenant5, CancellationToken.None)
+			as Microsoft.AspNetCore.Mvc.OkObjectResult;
+		Assert.NotNull(result);
+		var published = Assert.IsType<AppBuilderController.PublishResult>(result!.Value);
+		Assert.Equal(7, published.Version);
+
+		// 不应写入新的幂等记录或版本（保持既有 1 条）。
+		Assert.Equal(1, await ctx.AppPublishIdempotencies.CountAsync());
+		Assert.Equal(0, await ctx.AppVersions.CountAsync());
 	}
 }

@@ -1,3 +1,7 @@
+> **治理声明**：本文档是 `Master_Development_Plan.md` 的**输入 / 审计基线**，**不是**独立执行计划。所有里程碑状态、优先级与验收以 `Master_Development_Plan.md`（唯一事实来源）及其 `milestones/` 拆分文档为准；本文与 MDP 冲突时以 MDP 为准。映射见 MDP §17。
+>
+> **文档角色**：可执行清单（Stage/P 阶段映射到 M0–M11，见 MDP §17.5）
+
 # SuperBuilder — 至完成开发清单（可执行 CheckList）
 
 > 配套主文档：`docs/DevelopmentPlan.md`（单一事实来源）。本文件为纯执行清单，按 §0 主阶段脊柱编号。  

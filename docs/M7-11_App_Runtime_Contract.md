@@ -1,9 +1,14 @@
+> **治理声明**：本文档是 `Master_Development_Plan.md` 的**输入 / 审计基线**，**不是**独立执行计划。所有里程碑状态、优先级与验收以 `Master_Development_Plan.md`（唯一事实来源）及其 `milestones/` 拆分文档为准；本文与 MDP 冲突时以 MDP 为准。映射见 MDP §17。
+>
+> **文档角色**：M7-11 契约（MDP M7-11 的权威契约补充）
+
 # M7-11 应用闭环前置契约
 
 > 状态：**已冻结（第五轮定点修订，2026-09-08）**。C0 设计收口完成，五组内部矛盾已消除，可转入 C1–C4 实现与测试验证。
 > **第六轮勘误（2026-09-08）**：保留冻结基线，仅作局部校正——**3 项 P0 列为实现验收必过（见 §14）**、**4 处措辞/字段勘误（见 §0/§5.1/§8/§9 内联标注）**。**不重新设计**。
+> **第七轮补全（2026-09-09）**：补全 §10.5–§10.14 管理端点（generate/list/get/update/delete/publish/rollback/versions/blueprint/copy）请求-响应契约、§10.4 字段定义（layout/themeRef/columns[].type）、§3.2 新增 `SB_APP_NOT_FOUND`(404)；§5.3 权限矩阵所列 14 端点至此全部有契约。**不重新设计核心链路**。
 > 依据：`docs/Master_Development_Plan.md` M7-11（Ask 结果发布 App 的生命周期：可编辑、授权、版本化、回滚）。
-> 本文件只约束「Ask 结果 → 应用 → 运行/发布」这条链路，不覆盖全站错误码整改（M9-06）。
+> 本文件约束「Ask 结果 → 应用 → 运行/发布」核心链路，并收口 AppBuilder 全部 14 个端点的权限与请求-响应契约；不覆盖全站错误码整改（M9-06）。
 
 ## 0. 本轮已核实的关键事实（修正措辞）
 
@@ -76,6 +81,12 @@ ApiError {
 | `SB_APP_DATASOURCE_UNAUTHORIZED` | 403 | 绑定数据源未授权/已停用/已撤权（`decision=DataSourceUnauthorized`） |
 | `SB_APP_QUERY_BLOCKED` | 403 | RLS / Security Gate 策略拒绝（`decision=PolicyBlocked`） |
 | `SB_APP_QUERY_ERROR` | 500 | 取数执行失败（**脱敏**，不回吐 `ex.Message`） |
+| `SB_APP_NOT_FOUND` | 404 | 应用 `code` 不存在（get/update/delete/publish/rollback/versions/copy） |
+
+> **代码常量映射（第七轮补全核对）**：上表逻辑名与 `ErrorCodes` 实际常量略有差异，落地以代码为准——
+> `SB_APP_DSL_INVALID` = `ErrorCodes.AppDslInvalid`(`SB_APP_001`)，`SB_APP_NOT_SUPPORTED` = `ErrorCodes.AppBindingNotSupported`(`SB_APP_002`)；
+> 过期快照当前复用 `SB_APP_NOT_FOUND`(404) 而非独立的 `SB_APP_RESULT_EXPIRED`（该逻辑名暂无对应常量，后续如需区分再补）；
+> 其余 `SB_APP_*` 名（NOT_PUBLISHED / DRAFT_CHANGED / IDEMPOTENCY_CONFLICT / FORBIDDEN / DATASOURCE_UNAUTHORIZED / QUERY_BLOCKED / QUERY_ERROR / NOT_FOUND）均与新增常量一一对应。
 
 ### 3.3 拒绝原因映射（修正：非全部 403）
 
@@ -232,7 +243,7 @@ resolver 内授权 / 执行身份 / RLS / Security Gate **均为可选依赖**�
 ```
 POST /api/apps/from-ask
 { "turnId": "guid", "name": "str", "code": "str?", "themeKey": "str?" }
-→ 200 AppDetail(Status=Draft, DslJson 含导出 binding；仅当调用者含 app:edit 才含 DslJson/草稿字段)
+→ 201 AppDetail(Status=Draft, DslJson 含导出 binding；仅当调用者含 app:edit 才含 DslJson/草稿字段)
 → 403（权限/归属）/ 409（快照过期/幂等冲突）/ 422（计划不支持）/ 400（参数）
 ```
 
@@ -270,11 +281,150 @@ POST /api/apps/{code}/render         // 需 app:view
   componentErrors: [ { componentId, decision, error } ]
 }
 ```
+**字段定义补遗（第七轮补全）**：
+- `layout`：页面/组件布局描述（网格行列或自由布局），由前端 DSL 解释器消费；契约仅要求其为可序列化对象，不约束具体内部结构。
+- `themeRef`：可选主题键，取值来自主题注册表——首批 `default` / `light` / `dark`（平台可扩展）；缺省 `default`。与 `from-ask`/`update`/`copy` 的 `themeKey` 一致。
+- `columns[].type`：结果列类型枚举，取值 = `string | integer | number | decimal | boolean | date | datetime`（由元数据列类型映射，渲染层据此决定对齐/格式化）。
+
 **多组件失败语义（统一，修正）**：
 - 数据组件失败、静态文本组件正常 → HTTP **200** + `succeeded=false` + 逐组件 `componentErrors`（不误报完整成功），静态文本照常渲染。
 - 整页无任何可渲染内容（无静态文本且所有数据组件被安全/权限拒绝）→ HTTP **403**，body 为结构化 `ApiError`（`decision` 非空），**不为可空**。
 - 单组件 DSL/绑定错误 → 该组件 `error`，不阻断其余组件。
-- **任一数据组件 `Blocked/Error/绑定缺失/不支持` → `succeeded=false`**（不限于 `Blocked`/`Error` 两种名称）。
+  - **任一数据组件 `Blocked/Error/绑定缺失/不支持` → `succeeded=false`**（不限于 `Blocked`/`Error` 两种名称）。
+
+### 10.5 列表（GET /api/apps）
+
+```
+GET /api/apps                      // 需 app:view
+→ 200 AppListResult { items: [ AppSummary ], total }
+   AppSummary { code, name, status, publishedVersion?, themeRef?,
+                createdAt, updatedAt, hasDraft? }   // hasDraft 仅 app:edit 可见
+→ 403 SB_APP_FORBIDDEN（缺 app:view）
+```
+
+- 红线：list **绝不返回** `DslJson`/草稿 DSL；`app:view` 仅见发布态摘要，`app:edit` 额外见 `hasDraft` 标记（是否含未发布草稿）。
+- 分页：支持 `?page=1&pageSize=20`（默认），服务端裁剪；排序 `?sort=updatedAt.desc` 可选。
+
+### 10.6 详情（GET /api/apps/{code}）
+
+```
+GET /api/apps/{code}              // 需 app:view（读发布）/ app:edit（读草稿）
+→ 200 AppDetail {
+     code, name, status, themeRef?, dslVersion, publishedVersion?,
+     publishedAt?, updatedAt,
+     dslJson?, draftRevision?          // 仅 app:edit 返回（草稿）
+     publishedDslJson?                 // 存在发布时返回（发布快照，app:view 可读）
+   }
+→ 403 SB_APP_FORBIDDEN；404 SB_APP_NOT_FOUND（code 不存在）
+```
+
+- 与 §6 一致：`app:view` 仅得发布数据；`app:edit` 额外得草稿 `dslJson`/`draftRevision`。服务端按权限裁剪，不依赖前端隐藏。
+
+### 10.7 更新草稿（PUT /api/apps/{code}）
+
+```
+PUT /api/apps/{code}              // 需 app:edit
+{ name?, themeKey?, dslJson, expectedDraftRevision }
+→ 200 AppDetail（status 不变；draftRevision+1）
+→ 403 SB_APP_FORBIDDEN；404 SB_APP_NOT_FOUND；
+  409 SB_APP_DRAFT_CHANGED（expectedDraftRevision 不匹配）；
+  422 SB_APP_NOT_SUPPORTED（草稿含不支持查询，见 §9）
+```
+
+- 仅改草稿，不影响已发布版本；发布须走 §10.9。
+- 草稿 DSL 须通过 §8 最小兼容 + §9 支持矩阵校验，否则 422。
+
+### 10.8 删除（DELETE /api/apps/{code}）
+
+```
+DELETE /api/apps/{code}          // 需 app:delete
+→ 204 No Content
+→ 403 SB_APP_FORBIDDEN；404 SB_APP_NOT_FOUND
+```
+
+- 级联：**立即物理删除**应用及其草稿 `DslJson`/`DraftRevision`、已发布版本快照 `PublishedDslJson`（随应用级联删除，无审计保留期）；`AppPublishIdempotency` 幂等记录一并清除；`AskQuerySnapshots` 不随应用删除（按 §4 TTL 独立过期）。（G4 决策：采用 B 方案——立即硬删，无 30d 保留期。）
+- 红线：删除不级联租户/数据源/元数据。
+
+### 10.9 发布（POST /api/apps/{code}/publish）
+
+```
+POST /api/apps/{code}/publish    // 需 app:publish
+Headers: Idempotency-Key: uuid
+Body: { expectedDraftRevision }
+→ 200 { code, status=Published, publishedVersion, publishedAt }
+→ 403 SB_APP_FORBIDDEN（含重试重鉴权）；404 SB_APP_NOT_FOUND；
+  409 SB_APP_DRAFT_CHANGED（expectedDraftRevision 不匹配）；
+  409 SB_APP_IDEMPOTENCY_CONFLICT（同键不同期望版本）；
+  422 SB_APP_NOT_SUPPORTED（草稿含不支持查询）
+```
+
+- 同 §3.4/§7：同 `Idempotency-Key` + 同期望版本 → 返回既有版本不增号；响应丢失重试先重鉴权再查既有成功记录。
+- 发布失败保留草稿，前端展示「已保存为草稿，发布失败：<message>（TraceId: xxx）」并提供重试（§3.4 红线）。
+
+### 10.10 回滚（POST /api/apps/{code}/rollback/{v}）
+
+```
+POST /api/apps/{code}/rollback/{v}   // 需 app:publish
+Headers: Idempotency-Key: uuid
+→ 200 { code, status=Published, publishedVersion(新版本号), rolledBackFrom=v }
+→ 403 SB_APP_FORBIDDEN；404 SB_APP_NOT_FOUND 或版本 v 不存在；
+  409 SB_APP_IDEMPOTENCY_CONFLICT（同键重入但目标版本不一致）
+```
+
+- 回滚固化为**新版本**（沿用 §1），不覆盖历史；与并发发布受 §7「发布版本更新并发保护」同一行级锁/乐观守卫，不产生重复版本号（§14 P0-3）。
+
+### 10.11 版本列表（GET /api/apps/{code}/versions）
+
+```
+GET /api/apps/{code}/versions     // 需 app:view
+→ 200 { items: [ AppVersionInfo ], total }
+   AppVersionInfo { version, status(=published), publishedAt,
+                    createdBy?, idempotencyKey?(仅 app:edit/publish 可见), note? }
+→ 403 SB_APP_FORBIDDEN；404 SB_APP_NOT_FOUND
+```
+
+- 仅列已发布版本（草稿不计入版本序列）；`idempotencyKey` 属审计信息，仅具 `app:edit` 或 `app:publish` 者可见，`app:view` 省略。
+
+### 10.12 编辑器蓝图（GET /api/apps/editor/blueprint）
+
+```
+GET /api/apps/editor/blueprint    // 需 app:create
+→ 200 AppEditorBlueprint {
+     componentTypes:[...], operators:[...], aggregateTypes:[...],
+     themeKeys:[...], dataSourceScopes:[...] }
+→ 403 SB_APP_FORBIDDEN
+```
+
+- 返回前端编辑器可用的**白名单与约束**：`componentTypes` = §8 白名单（text/chart/table/kpi 可用，filter/form 标记 disabled）；`operators` = §9 操作符（eq/neq/gt/lt/in/like）；`aggregateTypes` = none/sum/avg/count/min/max；`themeKeys` = §10.4 主题注册表；`dataSourceScopes` = 调用者具 `app:create` 时可授权数据源摘要（不含凭据）。
+- 用途：前端「新建/编辑」时静态约束输入，避免提交即 422。
+
+### 10.13 生成（POST /api/apps/generate）
+
+```
+POST /api/apps/generate           // 需 app:create
+{ prompt?, name?, themeKey?, dataSourceId? }   // 自然语言/模板生成草稿 DSL
+→ 201 AppDetail(Status=Draft, dslJson 含 binding 草稿；同 from-ask 服务端导出)
+→ 403 SB_APP_FORBIDDEN；422 SB_APP_NOT_SUPPORTED（生成结果含不支持查询）；
+  400（缺 prompt 且无模板）；429（生成限流，见平台 RateLimit）
+```
+
+- 生成结果**等同 from-ask 草稿**：binding 须服务端从可验证查询语义导出，不得信任前端字段（§4 防篡改原则适用）。
+- 生成的草稿**不自动发布**；发布须走 §10.9。
+- 注：生成可能走 LLM/模板引擎；若实现为异步（202 + jobId 轮询），最终草稿形态与权限同上，异步细节由实现补充，本契约仅约束最终 `AppDetail` 与权限。
+
+### 10.14 复制（POST /api/apps/{code}/copy）
+
+```
+POST /api/apps/{code}/copy        // 需 来源读取 + app:create（见 §7/§14）
+{ name?, code?(新应用码，缺省服务端生成), themeKey? }
+→ 201 AppDetail(Status=Draft, code=新码, dslJson=来源副本)
+→ 403 SB_APP_FORBIDDEN（缺 app:create 或来源读取权限）；404 SB_APP_NOT_FOUND（来源不存在）；
+  409 SB_APP_IDEMPOTENCY_CONFLICT（copy 幂等键冲突）
+```
+
+- 来源读取权限（§14 P0-1）：复制发布快照需来源 `app:view`、复制草稿需来源 `app:edit`，且须同时持 `app:create`；仅 `app:create` 不足以复制他人隐藏草稿。
+- 路由固定，无 from-ask 备选（§7）。复制产出**新应用（新 code）**，独立 `DraftRevision`；`AskQuerySnapshots` 不复制（运行期各自重新取数）。
+- copy 使用独立幂等键（`tenantId+sourceCode+newCode` 或请求 `Idempotency-Key`），同键返回既有新应用不重建。
 
 ## 11. C0–C4 施工顺序（C0 已冻结）
 

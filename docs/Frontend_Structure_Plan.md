@@ -1,3 +1,7 @@
+> **治理声明**：本文档是 `Master_Development_Plan.md` 的**输入 / 审计基线**，**不是**独立执行计划。所有里程碑状态、优先级与验收以 `Master_Development_Plan.md`（唯一事实来源）及其 `milestones/` 拆分文档为准；本文与 MDP 冲突时以 MDP 为准。映射见 MDP §17。
+>
+> **文档角色**：前端结构计划（映射到 M8）
+
 # SuperBuilder AI · 前端页面结构规范（P11.6）
 
 > 适用范围：`SuperBuilder_AI.Components`（RCL，Web 与 MAUI 双端共享）。
