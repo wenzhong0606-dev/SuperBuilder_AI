@@ -76,6 +76,17 @@ public sealed class DashboardDslSerializer : IDashboardDslSerializer
 			return false;
 		}
 
+		// 版本兼容门禁（M9-09）：先拦截不受支持的版本，避免对其做迁移假设。
+		if (!DslVersions.Supported.Contains(parsed.Version))
+		{
+			errors = new[] { $"不支持的 DSL 版本：{parsed.Version}（受支持：{string.Join(", ", DslVersions.Supported)}）。" };
+			return false;
+		}
+
+		// 旧版本归一化为当前版本（M9-09：旧 DSL 可加载 / 升级）。
+		Upgrade(parsed);
+
+		// 升级后做完整业务校验（先校验后信任）。
 		var validationErrors = Validate(parsed);
 		if (validationErrors.Count > 0)
 		{
@@ -86,6 +97,48 @@ public sealed class DashboardDslSerializer : IDashboardDslSerializer
 		dsl = parsed;
 		errors = Array.Empty<string>();
 		return true;
+	}
+
+	/// <summary>
+	/// 将任意<strong>受支持</strong>版本的 DSL 归一化为 <see cref="DslVersions.Current"/>（M9-09）。
+	/// 在 <see cref="TryDeserialize"/> 中于校验前调用，使历史仪表盘在加载时自动升级，
+	/// 无需手工数据迁移；调用方须先通过 <see cref="DslVersions.Supported"/> 白名单。
+	/// </summary>
+	/// <remarks>
+	/// 当前仅有 V1 且 <see cref="DslVersions.V1"/> == <see cref="DslVersions.Current"/>，故 V1 分支即现状同构；
+	/// 但结构归一化（缺省布局物化）对<strong>所有受支持版本</strong>（含当前）都应执行，
+	/// 以保证内存模型完整、渲染器无需判空——故此处<strong>不做</strong>「版本==Current 即跳过」的早返回。
+	/// 未来新增 V2 时，在此 <c>switch</c> 注册 <c>UpgradeFromV1</c> 等转换
+	/// （字段重命名 / 默认值补全 / 结构迁移），并同步把新版本加入 <see cref="DslVersions.Supported"/>。
+	/// </remarks>
+	private static void Upgrade(DashboardDsl dsl)
+	{
+		switch (dsl.Version)
+		{
+			case DslVersions.V1:
+				NormalizeV1(dsl);
+				break;
+
+			default:
+				// 防御性分支：白名单已拦截未知版本，理论上不可达。
+				throw new InvalidOperationException($"未注册 DSL 升级路径：{dsl.Version}");
+		}
+
+		dsl.Version = DslVersions.Current;
+	}
+
+	/// <summary>V1 / 当前版本的结构归一化。</summary>
+	/// <remarks>
+	/// 当前 V1 与 Current 同构，此处做一项向前兼容的默认值物化：将缺失（<c>null</c>）
+	/// 的页面布局补全为默认 <see cref="LayoutKinds.Grid"/>（12 栅格），使内存模型始终完整、
+	/// 渲染器（<see cref="DashboardLowcodeRenderer"/>）无需再判空。未来 V2 演进时在此追加字段迁移。
+	/// </remarks>
+	private static void NormalizeV1(DashboardDsl dsl)
+	{
+		foreach (var page in dsl.Pages)
+		{
+			page.Layout ??= new LayoutDsl();
+		}
 	}
 
 	/// <inheritdoc />

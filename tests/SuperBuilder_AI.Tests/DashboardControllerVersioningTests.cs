@@ -66,6 +66,7 @@ public sealed class DashboardControllerVersioningTests
 					Id = "p1",
 					Name = "首页",
 					Order = 1,
+					Layout = new LayoutDsl(),
 					Widgets = new List<WidgetDsl> { new TextWidgetDsl { Id = "w1", Content = "hi", Markdown = true } }
 				}
 			}

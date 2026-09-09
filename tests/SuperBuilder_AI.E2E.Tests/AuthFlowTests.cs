@@ -17,7 +17,12 @@ public sealed class AuthFlowTests
         E2EConfig.Require(_fx.BaseUrl);
         var page = await _fx.NewPageAsync();
         await page.GotoAsync("/ask");
-        await page.WaitForURLAsync("**/login", new PageWaitForURLOptions { Timeout = 20000 });
+        // 鉴权跳转为 Blazor 客户端路由（AuthGuard.NavigateTo，无整页 Load），
+        // 不能用 WaitForURL(waitUntil:Load)，改为轮询 location 判定客户端导航完成。
+        await page.WaitForFunctionAsync(
+            "() => window.location.pathname.endsWith('/login')",
+            null,
+            new PageWaitForFunctionOptions { Timeout = 20000 });
         Assert.Contains("/login", page.Url);
     }
 

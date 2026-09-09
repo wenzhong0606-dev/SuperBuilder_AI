@@ -357,4 +357,49 @@ public class DashboardDslSerializerTests
         Assert.False(_serializer.TryDeserialize(json, out _, out var errors));
         Assert.NotEmpty(errors);
     }
+
+    [Fact]
+    public void TryDeserialize_SupportedV1Version_LoadsAndNormalizesToCurrent()
+    {
+        // M9-09：历史 V1 文档在反序列化时必须归一化为当前版本对象。
+        var dsl = BuildValidDsl();
+        dsl.Version = DslVersions.V1;
+
+        Assert.True(
+            _serializer.TryDeserialize(_serializer.Serialize(dsl), out var restored, out var errors),
+            string.Join("; ", errors));
+
+        Assert.NotNull(restored);
+        Assert.Equal(DslVersions.Current, restored!.Version);
+    }
+
+    [Theory]
+    [InlineData("9.9")]
+    [InlineData("0.5")]
+    public void TryDeserialize_UnsupportedVersion_IsRejected(string version)
+    {
+        // M9-09 回归：反序列化边界也须拦截不受支持的版本（此前仅在 Validate 层测试）。
+        var dsl = BuildValidDsl();
+        dsl.Version = version;
+
+        Assert.False(_serializer.TryDeserialize(_serializer.Serialize(dsl), out _, out var errors));
+        Assert.Contains(errors, e => e.Contains("不支持的 DSL 版本"));
+    }
+
+    [Fact]
+    public void TryDeserialize_NullPageLayout_IsNormalizedToDefault()
+    {
+        // M9-09：V1→Current 升级须物化缺省布局，使内存模型完整（渲染器无需再判空）。
+        var dsl = BuildValidDsl();
+        dsl.Pages[0].Layout = null;
+
+        Assert.True(
+            _serializer.TryDeserialize(_serializer.Serialize(dsl), out var restored, out var errors),
+            string.Join("; ", errors));
+
+        var layout = restored!.Pages[0].Layout;
+        Assert.NotNull(layout);
+        Assert.Equal(LayoutKinds.Grid, layout!.Kind);
+        Assert.Equal(12, layout.Columns);
+    }
 }
