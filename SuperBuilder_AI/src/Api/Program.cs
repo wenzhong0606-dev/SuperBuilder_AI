@@ -435,6 +435,22 @@ else
 		_ => new SuperBuilder_AI.Middleware.MemoryRateLimitStore());
 }
 
+// M9-07：统一 Dev/Test/Production 配置校验。
+// 非开发环境缺失关键配置（主库连接串 / LLM·Embedding 密钥 / 向量库端点）一律 fail-fast 拒绝启动；
+// 开发/测试环境降级为告警，不阻断启动。校验信息仅含配置键路径，绝不输出密钥值（防泄密）。
+var configReport = new SuperBuilder_AI.Application.Common.Configuration.StartupConfigurationValidator()
+	.Validate(builder.Configuration, builder.Environment);
+foreach (var w in configReport.Warnings)
+	Console.Error.WriteLine($"[配置告警] {w.Key}: {w.Message}");
+if (configReport.HasErrors)
+{
+	var detail = string.Join(
+		Environment.NewLine,
+		configReport.Errors.Select(e => $"  - {e.Key}: {e.Message}"));
+	throw new InvalidOperationException(
+		"启动配置校验失败：生产/预发环境缺失关键配置，已拒绝启动以防带不安全默认值运行。" + Environment.NewLine + detail);
+}
+
 var app = builder.Build();
 
 // M0-08：反向代理可信列表（仅信任明确配置的代理；默认 KnownProxies/KnownNetworks 为空，
