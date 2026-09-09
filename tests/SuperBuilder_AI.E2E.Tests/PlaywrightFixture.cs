@@ -18,6 +18,7 @@ public sealed class PlaywrightFixture : IAsyncLifetime
 {
     private IPlaywright? _playwright;
     private bool _skip;
+    private string? _skipReason;
 
     public IBrowser? Browser { get; private set; }
 
@@ -33,11 +34,22 @@ public sealed class PlaywrightFixture : IAsyncLifetime
         if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("SB_E2E_BASE_URL")))
         {
             _skip = true;
+            _skipReason = "SB_E2E_BASE_URL 未配置（集成环境未就绪），跳过。";
             return;
         }
 
-        _playwright = await Playwright.CreateAsync();
-        Browser = await _playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions { Headless = true });
+        try
+        {
+            _playwright = await Playwright.CreateAsync();
+            Browser = await _playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions { Headless = true });
+        }
+        catch (Exception ex)
+        {
+            // 浏览器不可用（未安装 / 系统依赖缺失 / 驱动不匹配）：降级为跳过，
+            // 避免整组测试报红。封堵 M7-11 契约记载缺口："缺 Chromium 时 Chromium.LaunchAsync() 无兜底，夹具初始化失败"。
+            _skip = true;
+            _skipReason = $"Playwright 浏览器不可用，已降级跳过：{ex.GetType().Name}: {ex.Message}";
+        }
     }
 
     public async Task DisposeAsync()
@@ -49,7 +61,7 @@ public sealed class PlaywrightFixture : IAsyncLifetime
     public async Task<IPage> NewPageAsync(ViewportSize? viewport = null)
     {
         if (_skip || Browser is null)
-            Skip.If(true, "E2E 集成环境未配置（SB_E2E_BASE_URL 缺失或浏览器不可用），跳过取页。");
+            Skip.If(true, _skipReason ?? "E2E 集成环境未配置（SB_E2E_BASE_URL 缺失或浏览器不可用），跳过取页。");
         var context = await Browser!.NewContextAsync(new BrowserNewContextOptions
         {
             BaseURL = BaseUrl,

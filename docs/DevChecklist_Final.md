@@ -110,7 +110,7 @@
 | **SB-P2-05** | P2 | Observability | Metrics 增加 QueryPlan latency、LLM latency、DB latency、Repair rate、Reject rate | ⬜ |
 | **SB-P2-06** | P2 | Error Handling | 统一前后端错误码体系，前端不再依赖错误字符串 | ⬜ |
 | **SB-P2-07** | P2 | Config | Development / Test / Production 配置校验统一化 | ✅ 已完成｜M9-07 统一配置校验框架（fail-fast + 不泄密）｜`StartupConfigurationValidator` 接入 `Program.cs` |
-| **SB-P2-08** | P2 | Testing | 增加 Web / Blazor UI 关键链路自动化测试 | ⬜ |
+| **SB-P2-08** | P2 | Testing | 增加 Web / Blazor UI 关键链路自动化测试 | ✅ |
 | **SB-P2-09** | P2 | Dashboard | DSL Schema Version 与兼容升级 | ⬜ |
 | **SB-P2-10** | P2 | App / Agent | DSL Schema Version 与兼容升级 | ⬜ |
 

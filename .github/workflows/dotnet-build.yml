@@ -176,3 +176,120 @@ jobs:
         run: |
           docker rm -f superbuilder-c13-3-sqlserver superbuilder-c13-3-qdrant || true
           if [ -f /tmp/superbuilder-api.pid ]; then kill $(cat /tmp/superbuilder-api.pid) || true; fi
+
+  e2e:
+    name: Web/Blazor E2E (Playwright)
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出源码
+        uses: actions/checkout@v4
+      - name: 设置 .NET 环境
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: 恢复 NuGet 依赖
+        run: dotnet restore
+      - name: Release 编译（含 E2E 工程）
+        run: dotnet build --configuration Release --no-restore
+      - name: 加全局工具到 PATH
+        run: echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
+      - name: 启动 SQL Server CI 容器
+        run: |
+          docker run -d --name superbuilder-e2e-sqlserver \
+            -e ACCEPT_EULA=Y \
+            -e MSSQL_SA_PASSWORD="${TEST_SQL_PASSWORD}" \
+            -p 1433:1433 \
+            mcr.microsoft.com/mssql/server:2022-latest
+      - name: 启动 Qdrant CI 容器
+        run: |
+          docker run -d --name superbuilder-e2e-qdrant \
+            -p 6333:6333 \
+            -p 6334:6334 \
+            qdrant/qdrant:v1.19.0
+      - name: 等待 SQL Server Ready
+        run: |
+          for i in $(seq 1 60); do
+            if docker exec superbuilder-e2e-sqlserver /opt/mssql-tools18/bin/sqlcmd \
+              -C -S localhost -U sa -P "${TEST_SQL_PASSWORD}" -Q "SELECT 1" -b -o /dev/null >/dev/null 2>&1; then
+              echo "SQL Server Ready"; exit 0
+            fi
+            sleep 2
+          done
+          docker logs superbuilder-e2e-sqlserver; exit 1
+      - name: 等待 Qdrant Ready
+        run: |
+          for i in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:6333/healthz >/dev/null 2>&1; then
+              echo "Qdrant Ready"; exit 0
+            fi
+            sleep 2
+          done
+          docker logs superbuilder-e2e-qdrant; exit 1
+      - name: 安装 EF Core CLI
+        run: dotnet tool install --global dotnet-ef --version 10.0.10
+      - name: 初始化 CI 元数据库
+        env:
+          ASPNETCORE_ENVIRONMENT: Development
+          ConnectionStrings__DefaultConnection: "Server=127.0.0.1,1433;Database=SuperBuilder_C13_3;User Id=sa;Password=${{ env.TEST_SQL_PASSWORD }};TrustServerCertificate=True;"
+        run: dotnet ef database update --project SuperBuilder_AI/SuperBuilder_AI.csproj --startup-project SuperBuilder_AI/SuperBuilder_AI.csproj --configuration Release
+      - name: 启动 Web API (5050)
+        env:
+          ASPNETCORE_ENVIRONMENT: Development
+          ConnectionStrings__DefaultConnection: "Server=127.0.0.1,1433;Database=SuperBuilder_C13_3;User Id=sa;Password=${{ env.TEST_SQL_PASSWORD }};TrustServerCertificate=True;"
+          Qdrant__Host: 127.0.0.1
+          Qdrant__Port: 6334
+          ASPNETCORE_URLS: http://127.0.0.1:5050
+        run: |
+          dotnet run --project SuperBuilder_AI/SuperBuilder_AI.csproj --configuration Release --no-restore --no-build --urls http://127.0.0.1:5050 > /tmp/sb-api.log 2>&1 &
+          echo $! > /tmp/sb-api.pid
+      - name: 启动 Web (Blazor Server, 5080)
+        env:
+          ASPNETCORE_ENVIRONMENT: Development
+          ConnectionStrings__DefaultConnection: "Server=127.0.0.1,1433;Database=SuperBuilder_C13_3;User Id=sa;Password=${{ env.TEST_SQL_PASSWORD }};TrustServerCertificate=True;"
+          ApiBaseUrl: http://127.0.0.1:5050
+          ASPNETCORE_URLS: http://127.0.0.1:5080
+        run: |
+          dotnet run --project SuperBuilder_AI.Web/SuperBuilder_AI.Web.csproj --configuration Release --no-restore --no-build --urls http://127.0.0.1:5080 > /tmp/sb-web.log 2>&1 &
+          echo $! > /tmp/sb-web.pid
+      - name: 等待 Web 就绪
+        run: |
+          for i in $(seq 1 40); do
+            if curl --fail --silent --show-error http://127.0.0.1:5080/ >/dev/null 2>&1; then
+              echo "Web Ready"; exit 0
+            fi
+            sleep 2
+          done
+          cat /tmp/sb-web.log; exit 1
+      - name: 安装 Playwright CLI 与 Chromium
+        run: |
+          dotnet tool install --global Microsoft.Playwright.CLI
+          playwright install --with-deps chromium
+      - name: 运行 E2E 测试
+        env:
+          SB_E2E_BASE_URL: http://127.0.0.1:5080
+          SB_E2E_USER: ${{ secrets.SB_E2E_USER }}
+          SB_E2E_PASSWORD: ${{ secrets.SB_E2E_PASSWORD }}
+          SB_E2E_TENANT: ${{ secrets.SB_E2E_TENANT }}
+          SB_E2E_READER_USER: ${{ secrets.SB_E2E_READER_USER }}
+          SB_E2E_READER_PASSWORD: ${{ secrets.SB_E2E_READER_PASSWORD }}
+          SB_E2E_READER_TENANT: ${{ secrets.SB_E2E_READER_TENANT }}
+        run: dotnet test tests/SuperBuilder_AI.E2E.Tests/SuperBuilder_AI.E2E.Tests.csproj --configuration Release --no-build
+      - name: 上传视觉基线产物
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-visual-baselines
+          path: tests/SuperBuilder_AI.E2E.Tests/artifacts/visual-baselines/
+          if-no-files-found: ignore
+      - name: 输出服务日志
+        if: always()
+        run: |
+          cat /tmp/sb-api.log || true
+          cat /tmp/sb-web.log || true
+      - name: 清理
+        if: always()
+        run: |
+          docker rm -f superbuilder-e2e-sqlserver superbuilder-e2e-qdrant || true
+          [ -f /tmp/sb-api.pid ] && kill "$(cat /tmp/sb-api.pid)" || true
+          [ -f /tmp/sb-web.pid ] && kill "$(cat /tmp/sb-web.pid)" || true
