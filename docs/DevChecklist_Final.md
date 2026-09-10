@@ -91,7 +91,7 @@
 | **SB-P1-09** | P1 | Cache | Ask Cache 完整上下文版本化 | P0-01 校正为 `ResolvedDataSourceId`；**安全维度不得等到 P1**：`PermissionFingerprint` 随 P0-05 落地，`DataPolicyVersion` 随 P0-06 落地。本项再补 `SemanticVersion`、`MetadataVersion`，统一稳定摘要算法、版本发布与淘汰机制，禁止拼接整串权限文本 | 权限、RLS/数据策略、语义模型或 metadata 任一变化后不会复用旧缓存；高权限结果不会返回给低权限主体 | ⬜ |
 | **SB-P1-10** | P1 | Golden | Production Feedback 闭环 | 用户反馈 → Golden Candidate → Review → Baseline → Regression | 线上错误问题可进入回归集 | ⬜ |
 | **SB-P1-11** | P1 | Testing | AI BI E2E 测试 | NL → API → QueryPlan → SQL → Test DB → Result 完整链路 | 至少覆盖单表、多表、权限、租户、错误修复 | ⬜ |
-| **SB-P1-12** | P1 | Database | Migration / Upgrade 体系 | 明确 EF Migration、Seed、Schema Version、升级与回退策略 | 新环境可自动初始化；旧环境升级可验证 | ⬜ |
+| **SB-P1-12** | P1 | Database | Migration / Upgrade 体系 | 明确 EF Migration、Seed、Schema Version、升级与回退策略 | 新环境可自动初始化；旧环境升级可验证 | ✅ 已完成｜M9-15 Migration/Seed/SchemaVersion/升级回退体系（42 迁移清单 + `schemaVersion`=最新迁移 ID；5 步种子策略含 2 项源码级幂等核实；升级/回退 runbook + 实产降级脚本；`verify-schema.ps1` 离线正向 42/42、负向可检漂移、在线检出真实 5 个 Pending；顺带修复 M9-13 引入的 `Microsoft.OpenApi` 高危漏洞 2.0.0→2.7.5，构建 0 错误+单测 1059/1059+契约零回归）｜`scripts/schema/*` / `docs/ops/migration-seed-schemaversion.md` |
 | **SB-P1-13** | P1 | Dashboard | Dashboard 生命周期 | Draft、Version、Publish、Rollback | 已发布版本与草稿隔离，可回滚 | ⬜ |
 | **SB-P1-14** | P1 | App Builder | App 生命周期 | Draft、Version、Publish、Rollback、Permission | App 发布可追踪版本，不直接覆盖线上 | ⬜ |
 | **SB-P1-15** | P1 | Agent | Agent Runtime 基础 | Tool Registry、权限、执行状态、Retry、Approval | Agent 不再只是 Planner，能安全执行受控工具 | ⬜ |

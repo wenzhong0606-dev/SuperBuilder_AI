@@ -34,6 +34,9 @@
     <PackageReference Include="Qdrant.Client" Version="1.19.0" />
     <PackageReference Include="StackExchange.Redis" Version="2.8.31" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.10" />
+    <!-- 安全：显式提升 Microsoft.OpenApi 以覆盖 Microsoft.AspNetCore.OpenApi 10.0.10 的传递依赖 2.0.0
+         （NuGet 审计 NU1903：Microsoft.OpenApi 2.0.0 存在已知高危漏洞 GHSA-v5pm-xwqc-g5wc）。 -->
+    <PackageReference Include="Microsoft.OpenApi" Version="2.7.5" />
   </ItemGroup>
 
   <ItemGroup>
