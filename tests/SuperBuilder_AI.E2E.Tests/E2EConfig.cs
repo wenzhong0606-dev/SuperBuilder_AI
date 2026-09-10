@@ -10,12 +10,18 @@ namespace SuperBuilder_AI.E2E;
 internal static class E2EConfig
 {
     public static string BaseUrl => Environment.GetEnvironmentVariable("SB_E2E_BASE_URL") ?? "http://localhost:5080";
+    /// <summary>后端 API 基地址。Playwright 的 <c>evaluate(fetch)</c> 是浏览器同源请求，
+    /// 而 Web 宿主（<see cref="BaseUrl"/>）不转发 <c>/api/**</c>，故必须显式指向 API。</summary>
+    public static string ApiUrl => Environment.GetEnvironmentVariable("SB_E2E_API_URL") ?? "http://localhost:5032";
     public static string? User => Environment.GetEnvironmentVariable("SB_E2E_USER");
     public static string? Password => Environment.GetEnvironmentVariable("SB_E2E_PASSWORD");
     public static string? Tenant => Environment.GetEnvironmentVariable("SB_E2E_TENANT");
     public static string? ReaderUser => Environment.GetEnvironmentVariable("SB_E2E_READER_USER");
     public static string? ReaderPassword => Environment.GetEnvironmentVariable("SB_E2E_READER_PASSWORD");
     public static string? ReaderTenant => Environment.GetEnvironmentVariable("SB_E2E_READER_TENANT");
+    /// <summary>平台管理员账号（属 <c>platform</c> 租户，须与业务管理员分开配置）。</summary>
+    public static string? PlatformUser => Environment.GetEnvironmentVariable("SB_E2E_PLATFORM_USER");
+    public static string? PlatformPassword => Environment.GetEnvironmentVariable("SB_E2E_PLATFORM_PASSWORD");
     public static string SwitchCulture => Environment.GetEnvironmentVariable("SB_E2E_SWITCH_CULTURE") ?? "en-US";
 
     public static void Require(params string?[] values)

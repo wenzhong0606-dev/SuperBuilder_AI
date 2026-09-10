@@ -1,6 +1,8 @@
 ﻿using Microsoft.Extensions.Options;
 using Qdrant.Client;
 using Qdrant.Client.Grpc;
+using Grpc.Net.Client;
+using System.Net.Http;
 using SuperBuilder_AI.Application.Common.Options;
 using SuperBuilder_AI.Interfaces;
 using SuperBuilder_AI.Models.AI;
@@ -27,10 +29,23 @@ public class QdrantService
 		_options =
 			options.Value;
 
+		// 使用自定义 HttpClient 连接 Qdrant：显式绕过系统代理。
+		// 若宿主环境设置了 HTTP_PROXY/HTTPS_PROXY（常见于开发机/CI），SocketsHttpHandler
+		// 会默认把 localhost 的 h2c gRPC 请求也发往代理，代理不支持明文 HTTP/2，
+		// 导致 "unable to establish HTTP/2 connection"。Qdrant 是本地/内网服务，
+		// 应始终直连，不走代理。
+		var handler = new SocketsHttpHandler
+		{
+			EnableMultipleHttp2Connections = true,
+			UseProxy = false,
+		};
+
 		_client =
 			new QdrantClient(
-				host: _options.Host,
-				port: _options.Port);
+				new QdrantGrpcClient(
+					GrpcChannel.ForAddress(
+						$"http://{_options.Host}:{_options.Port}",
+						new GrpcChannelOptions { HttpHandler = handler })));
 	}
 
 	/// <summary>

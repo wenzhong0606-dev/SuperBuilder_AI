@@ -19,11 +19,12 @@ public sealed class DataSourceApiClient : ApiClientBase, IDataSourceApiClient
     public async Task<(bool Ok, int Status, long? JobId, string? Error, string? Code)> StartScanAsync(long dataSourceId, CancellationToken ct = default)
     {
         var client = CreateClient();
+        var sentWithToken = !string.IsNullOrEmpty(AppState.Token);
         try
         {
             var resp = await client.PostAsJsonAsync($"api/data-sources/{dataSourceId}/metadata/scan", new { }, ct);
             var body = await resp.Content.ReadAsStringAsync(ct);
-            if (resp.StatusCode == HttpStatusCode.Unauthorized) OnUnauthorized();
+            if (resp.StatusCode == HttpStatusCode.Unauthorized) OnUnauthorized(sentWithToken);
             if (!resp.IsSuccessStatusCode)
             {
                 var (code, msg, _) = ParseApiError(body);

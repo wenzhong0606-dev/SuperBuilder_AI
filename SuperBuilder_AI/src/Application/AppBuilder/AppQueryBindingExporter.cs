@@ -54,7 +54,22 @@ public sealed class AppQueryBindingExporter : IAppQueryBindingExporter
 
 		var binding = new AppDataSourceBinding
 		{
-			Entity = string.IsNullOrWhiteSpace(mainTable.SemanticText) ? mainTable.TableName : mainTable.SemanticText,
+			// 实体标识优先取业务语义（语义文本 → 表注释 → 物理表名）。
+			//
+			// M7-11 修复：原先仅回退到 TableName（物理表名，如 wms_storage_receipt），
+			// 而运行时 AppQueryExecutor 会把该值当作检索问句交给向量检索选表。
+			// 纯物理表名在中文业务语义向量空间中区分度极低，
+			// 会召回无关表（实测：wms_storage_receipt → 命中 盘点单/盘点单明细/异常反馈），
+			// 使 Semantic/Table 证据归零、Confidence 跌至 Low 而被 Decision Gate 拒绝。
+			//
+			// 表注释（如「入库凭证」）才是语义检索的稳定锚点，故在物理名之前优先使用。
+			Entity = !string.IsNullOrWhiteSpace(mainTable.SemanticText)
+				? mainTable.SemanticText
+				: !string.IsNullOrWhiteSpace(mainTable.TableComment)
+					? mainTable.TableComment
+					: mainTable.TableName,
+			// 固化主表 Id：运行时据此硬锁定表，不再依赖概率性语义选表。
+			TableId = mainTable.MetadataTableId > 0 ? mainTable.MetadataTableId : null,
 			DataSourceId = snapshot.DataSourceId,
 			Limit = plan.Limit,
 		};

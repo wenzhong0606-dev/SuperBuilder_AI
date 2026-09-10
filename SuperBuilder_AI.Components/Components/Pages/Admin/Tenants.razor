@@ -5,7 +5,7 @@
 @using SuperBuilder_AI.Components.Shared
 
 <AuthGuard>
-    <PermissionGuard Require="@(new[]{ PermissionCodes.PlatformTenantView })">
+    <PermissionGuard Require="@(new[]{ PermissionCodes.PlatformTenantView })" RedirectToForbidden="true">
     <PageHead Icon="sb-ico-tenant" Key="Tenants" Title="租户管理" Desc="@L10n.T(Keys.Content.AdminTenantsDesc, "管理多租户：创建租户、配置隔离作用域与默认配额，平台运营入口。")" />
 
     <SbListPage TItem="JsonElement" Icon="sb-ico-tenant" Title="@L10n.T(Keys.Content.AdminTenantsListTitle, "租户列表")"

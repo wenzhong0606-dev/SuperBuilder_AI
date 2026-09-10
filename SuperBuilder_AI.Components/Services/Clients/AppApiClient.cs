@@ -21,6 +21,7 @@ public sealed class AppApiClient : ApiClientBase, IAppApiClient
         long tenantId, string dslJson, string? code, CancellationToken ct = default)
     {
         var client = CreateClient();
+        var sentWithToken = !string.IsNullOrEmpty(AppState.Token);
         var body = new { tenantId, dslJson, code };
         var resp = await client.PostAsJsonAsync("api/apps", body, ct);
         if (resp.IsSuccessStatusCode)
@@ -37,7 +38,7 @@ public sealed class AppApiClient : ApiClientBase, IAppApiClient
             }
         }
         var err = await resp.Content.ReadAsStringAsync(ct);
-        if (resp.StatusCode == HttpStatusCode.Unauthorized) OnUnauthorized();
+        if (resp.StatusCode == HttpStatusCode.Unauthorized) OnUnauthorized(sentWithToken);
         return (false, null, $"{(int)resp.StatusCode}: {err}");
     }
 
@@ -53,6 +54,7 @@ public sealed class AppApiClient : ApiClientBase, IAppApiClient
     public async Task<(bool Ok, int? Version, string? Error, int Status)> PublishExistingAsync(long tenantId, string code, CancellationToken ct = default)
     {
         var client = CreateClient();
+        var sentWithToken = !string.IsNullOrEmpty(AppState.Token);
         var resp = await client.PostAsync($"api/apps/{Uri.EscapeDataString(code)}/publish?tenantId={tenantId}", null, ct);
         var status = (int)resp.StatusCode;
         if (resp.IsSuccessStatusCode)
@@ -72,7 +74,7 @@ public sealed class AppApiClient : ApiClientBase, IAppApiClient
         }
 
         var body = await resp.Content.ReadAsStringAsync(ct);
-        if (resp.StatusCode == HttpStatusCode.Unauthorized) OnUnauthorized();
+        if (resp.StatusCode == HttpStatusCode.Unauthorized) OnUnauthorized(sentWithToken);
         var (message, _) = ParseError(body);
         return (false, null, message ?? body, status);
     }
@@ -80,6 +82,7 @@ public sealed class AppApiClient : ApiClientBase, IAppApiClient
     private async Task<AppRenderResult> RenderOrPreviewAsync(string action, long tenantId, string code, CancellationToken ct)
     {
         var client = CreateClient();
+        var sentWithToken = !string.IsNullOrEmpty(AppState.Token);
         var resp = await client.GetAsync($"api/apps/{Uri.EscapeDataString(code)}/{action}?tenantId={tenantId}", ct);
         if (resp.IsSuccessStatusCode)
         {
@@ -95,7 +98,7 @@ public sealed class AppApiClient : ApiClientBase, IAppApiClient
         }
 
         var body = await resp.Content.ReadAsStringAsync(ct);
-        if (resp.StatusCode == HttpStatusCode.Unauthorized) OnUnauthorized();
+        if (resp.StatusCode == HttpStatusCode.Unauthorized) OnUnauthorized(sentWithToken);
         var (message, errorCode) = ParseError(body);
         return new AppRenderResult(false, null, (int)resp.StatusCode, message, errorCode);
     }

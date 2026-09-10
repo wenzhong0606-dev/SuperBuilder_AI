@@ -26,7 +26,8 @@ public sealed class AskSessionRestoreTests : BunitContext
         Services.AddSingleton(new ToastService());
         JSInterop.Mode = JSRuntimeMode.Loose;
         var cut = Render<Ask>();
-        Assert.Contains("正在恢复登录会话", cut.Markup);
+        // T2 行为变更：Ask 现由 AuthGuard 包裹，首帧（会话未恢复）显示「正在校验会话…」而非旧手动文案。
+        Assert.Contains("正在校验会话", cut.Markup);
 
         await cut.InvokeAsync(() =>
         {
@@ -41,9 +42,10 @@ public sealed class AskSessionRestoreTests : BunitContext
 
         cut.WaitForAssertion(() =>
         {
-            Assert.DoesNotContain("正在恢复登录会话", cut.Markup);
+            // T2 行为变更：会话恢复后不再显示 AuthGuard 的校验文案。
+            Assert.DoesNotContain("正在校验会话", cut.Markup);
             if (authenticated) Assert.Single(cut.FindAll("[data-testid=ask-input]"));
-            else Assert.Contains("请先", cut.Markup);
+            else Assert.Contains("需要登录", cut.Markup); // AuthGuard 未登录内联提示
         });
     }
 

@@ -148,6 +148,18 @@ public sealed class AppDataSourceBinding
 	/// </summary>
 	public long? DataSourceId { get; set; }
 
+	/// <summary>
+	/// M7-11：运行时硬约束的元数据表 Id（来自 Ask 查询快照的主表，非语义名）。
+	///
+	/// <para>应用是「已固化的查询」，其目标表在导出时已确定，运行时<strong>不得</strong>再交由
+	/// 语义检索重新选表——语义检索是概率性的，对中文注释稀疏的数据源会召回无关表
+	/// （实测：实体「入库凭证」被召回为 盘点单/盘点单明细/异常反馈），
+	/// 导致语义证据归零、置信度跌至 Low 而被 Decision Gate 拒绝。</para>
+	///
+	/// <para>为 null 时保持既有语义解析行为（兼容历史 DSL 与手工编辑的应用）。</para>
+	/// </summary>
+	public long? TableId { get; set; }
+
 	/// <summary>指标集合（字段 + 聚合方式）。</summary>
 	public List<AppMetricBinding> Metrics { get; set; } = new();
 

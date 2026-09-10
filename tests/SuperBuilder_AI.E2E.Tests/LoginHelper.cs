@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -30,21 +31,32 @@ internal static class LoginHelper
     /// <summary>
     /// 经后端 <c>POST /api/auth/login</c> 直接登录并注入会话快照。
     /// <para>
-    /// 用于 <c>platform</c> 等被 UI 登录入口刻意排除的租户：UI 的 <c>login-options</c> / <c>tenant-by-code</c>
-    /// 两个 GET 辅助端点都排除 <c>platform</c> 租户，但登录 API 仅按数字 <c>TenantId</c> 校验、不排除 platform。
-    /// 因此管理员（platform-admin，TenantId=5）必须走此路径才能登录。注入 <c>sb_auth_v1</c> 快照后导航到
-    /// <c>/ask</c>，等价于 UI 登录完成态（MainLayout 自举还原 → ValidateAsync 调 /api/auth/me 通过）。
+    /// 用于绕开 UI 登录表单的形态差异与登录限流：UI 的 <c>login-options</c> / <c>tenant-by-code</c>
+    /// 两个 GET 辅助端点都排除 <c>platform</c> 租户，但登录 API 仅按数字 <c>TenantId</c> 校验、不排除 platform；
+    /// 且 <c>RateLimit:LoginLimit</c>（默认 10/60s）在 localhost 同 IP 下由多用例共用同一桶，易触发 429。
+    /// 注入 <c>sb_auth_v1</c> 快照后导航到 <c>/ask</c>，等价于 UI 登录完成态
+    /// （MainLayout 自举还原 → ValidateAsync 调 /api/auth/me 通过）。
+    /// </para>
+    /// <para>
+    /// <strong>为什么用绝对地址：</strong>前端 Web 宿主（默认 5080）只承载 Blazor UI，
+    /// <em>不</em>转发 <c>/api/**</c>——Blazor 组件通过注入的 HttpClient 打 API 绝对地址。
+    /// 而 Playwright 的 <c>page.evaluate(fetch)</c> 是<em>浏览器</em>发出的同源请求，
+    /// 用相对路径 <c>/api/auth/login</c> 会命中 Web 宿主并返回 400。
+    /// 因此这里必须显式指向 API 地址（<c>SB_E2E_API_URL</c>，默认 http://localhost:5032）。
     /// </para>
     /// </summary>
     public static async Task ApiLoginAsync(IPage page, string user, string password, long tenantId)
     {
-        // 先落到同源（/ 或重定向后的 /login），保证后续 fetch 与 localStorage 在同一 origin
+        // 先落到同源（/ 或重定向后的 /login），保证 localStorage 可写
         await page.GotoAsync("/");
+
+        // Web 宿主不转发 /api/**，浏览器侧 fetch 必须打 API 绝对地址
+        var apiBase = E2EConfig.ApiUrl.TrimEnd('/');
 
         // 经后端登录 API 取令牌；platform 租户仅被 UI 入口排除，API 层按数字 TenantId 校验，不排除
         var loginJson = await page.EvaluateAsync<string>(
             "async (c) => {" +
-            "  const r = await fetch('/api/auth/login', {" +
+            "  const r = await fetch(c.apiBase + '/api/auth/login', {" +
             "    method: 'POST'," +
             "    headers: { 'Content-Type': 'application/json' }," +
             "    body: JSON.stringify({ Username: c.user, TenantId: c.tenantId, Password: c.password })" +
@@ -53,7 +65,7 @@ internal static class LoginHelper
             "  if (!r.ok) throw new Error('login ' + r.status + ' ' + t);" +
             "  return t;" +
             "}",
-            new { user, password, tenantId });
+            new { apiBase, user, password, tenantId });
 
         using var doc = JsonDocument.Parse(loginJson);
         var root = doc.RootElement;

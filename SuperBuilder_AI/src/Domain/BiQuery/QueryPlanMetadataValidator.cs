@@ -308,6 +308,21 @@ public class QueryPlanMetadataValidator
 	/// QueryMetric
 	/// QueryFilter
 	///
+	/// 歧义消解（M7-11 修复）：
+	///
+	/// 多表场景下，同一列名（如 WMS 各业务表共有的 del_flag）会在多张表里重复出现。
+	/// QueryMetric / QueryFilter 只承载字段名（无 MetadataColumnId），若对全表做名称匹配
+	/// 就会产生 "字段存在多个匹配" 的伪歧义，导致本来合法的查询被拒。
+	///
+	/// 规则：<strong>主表优先</strong>。
+	///
+	/// - 若主表（<c>plan.Tables[0]</c>，即事实表）存在同名列 => 直接返回主表匹配，
+	///   不再把其他表（Join 维表 / 语义误召回的旁表）的同名列计入。
+	/// - 若主表无匹配 => 回退为全表搜索，保留原有的 "0 个 / 多个匹配" 校验语义，
+	///   绝不因该规则而放松对真正未解析字段的拦截。
+	///
+	/// 该规则不改变任何「字段确实存在于主表」的既有路径行为，
+	/// 只消除「主表已有唯一合理归属」时被旁表同名列污染的情形。
 	/// </summary>
 	private static List<MetadataColumn> FindColumns(
 		QueryPlan plan,
@@ -325,8 +340,50 @@ public class QueryPlanMetadataValidator
 		}
 
 
+		// ---------------------------------------------------------
+		// 1. 主表优先：事实表内的同名列即为权威归属。
+		// ---------------------------------------------------------
+
+		var mainTable =
+			plan.Tables
+				.FirstOrDefault();
+
+
+		if (mainTable is not null)
+		{
+			foreach (var column in context.GetColumns(
+				mainTable.MetadataTableId))
+			{
+				if (string.Equals(
+					column.ColumnName,
+					fieldName,
+					StringComparison.OrdinalIgnoreCase))
+				{
+					result.Add(column);
+				}
+			}
+
+
+			if (result.Count > 0)
+			{
+				return result;
+			}
+		}
+
+
+		// ---------------------------------------------------------
+		// 2. 主表无匹配：回退全表搜索，保留原有歧义检测。
+		// ---------------------------------------------------------
+
 		foreach (var table in plan.Tables)
 		{
+			if (mainTable is not null
+				&& table.MetadataTableId == mainTable.MetadataTableId)
+			{
+				continue;
+			}
+
+
 			foreach (var column in context.GetColumns(
 				table.MetadataTableId))
 			{

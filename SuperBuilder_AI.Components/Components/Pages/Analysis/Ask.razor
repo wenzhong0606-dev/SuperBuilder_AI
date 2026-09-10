@@ -12,18 +12,9 @@
 @inject FileDownloadService Download
 @inject ToastService Toast
 
-<h2>@L10n.T(Keys.Content.AskTitle, "Ask BI 智能问数（旗舰）")</h2>
+<AuthGuard AutoRedirect="true">
+    <h2>@L10n.T(Keys.Content.AskTitle, "Ask BI 智能问数（旗舰）")</h2>
 
-@if (!State.SessionRestored)
-{
-    <LoadingState Text="@L10n.T(Keys.Content.AskRestoringSession, "正在恢复登录会话…")" />
-}
-else if (!State.IsAuthenticated)
-{
-    <p class="muted">@L10n.T(Keys.Content.AskLoginHint, "请先")<a href="" @onclick="@(() => Nav.NavigateTo("/login"))">@L10n.T(Keys.Content.AskLoginLink, "登录")</a>@L10n.T(Keys.Content.AskLoginHint2, "后再问数。")</p>
-}
-else
-{
     <div class="card ask-bar">
         <div class="ask-bar-row">
             <div class="ask-ds">
@@ -60,7 +51,7 @@ else
     {
         <AskTurnCard Turn="tp.Turn" Index="tp.Index" CompareWith="tp.Parent" OnRefine="DoRefine" OnPublish="Publish" OnExport="Export" />
     }
-}
+</AuthGuard>
 
 @code {
     private string Question = "";

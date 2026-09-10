@@ -5,6 +5,7 @@
 @inject ToastService Toast
 @using SuperBuilder_AI.Components.Components.Constants
 @using SuperBuilder_AI.Components.Services.Models
+@implements IDisposable
 
 <PermissionGuard Require="@(new[] { PermissionCodes.AppEdit })">
     <PageHead Icon="sb-ico-eye" Title="@_title" Desc="@L10n.T(Keys.Content.AppPreviewDesc, "预览应用草稿（仅编辑者可见），使用当前访问者权限取数。")">
@@ -42,12 +43,33 @@
     private bool _noDraft;
     private string? _errorMsg;
     private AppRenderDto? _model;
+    private bool _started;
 
-    protected override void OnInitialized() => _title = L10n.T(Keys.Content.AppPreviewTitle, "预览应用");
+    protected override void OnInitialized()
+    {
+        _title = L10n.T(Keys.Content.AppPreviewTitle, "预览应用");
+        // 会话自举（localStorage → AppState）由 MainLayout 异步完成，晚于子组件首次渲染。
+        // 若在此前取数，TenantId 仍为 0，会导致请求携带 tenantId=0 或根本发不出去。
+        State.SessionRestoredChanged += OnSessionRestored;
+    }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (!firstRender) return;
+        if (State.SessionRestored) { await TryLoadAsync(); }
+        // 未就绪：等待 SessionRestoredChanged 事件触发后再取数。
+    }
+
+    private void OnSessionRestored() => _ = InvokeAsync(async () =>
+    {
+        await TryLoadAsync();
+        StateHasChanged();
+    });
+
+    private async Task TryLoadAsync()
+    {
+        if (_started || !State.SessionRestored) return;
+        _started = true;
         await Load();
     }
 
@@ -71,4 +93,6 @@
         _title = string.IsNullOrWhiteSpace(r.Model.Name) ? Code : r.Model.Name;
         StateHasChanged();
     }
+
+    public void Dispose() => State.SessionRestoredChanged -= OnSessionRestored;
 }

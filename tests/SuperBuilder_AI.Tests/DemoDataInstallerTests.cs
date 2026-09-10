@@ -83,8 +83,9 @@ public sealed class DemoDataInstallerTests
         Assert.True(tenant.Enabled);
 
         // M3-01：本地化配置以关系模型 TenantUiLanguage 落库（默认 zh-CN），不再写 localization:* JSON。
+        // T4 行为变更：安装器按平台全语言集播种（本 fixture 启用 2 种），默认语言仍为 zh-CN。
         Assert.Equal(0, await ctx.TenantSettings.CountAsync(s => s.TenantId == tenant.Id));
-        var demoLang = await ctx.TenantUiLanguages.SingleAsync(x => x.TenantId == tenant.Id);
+        var demoLang = await ctx.TenantUiLanguages.SingleAsync(x => x.TenantId == tenant.Id && x.IsDefault);
         Assert.True(demoLang.IsDefault);
         Assert.Equal("zh-CN", (await ctx.UiLanguages.FindAsync(demoLang.UiLanguageId))!.Culture);
 

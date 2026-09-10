@@ -595,12 +595,13 @@ app.UseMiddleware<ConcurrencyExceptionMiddleware>();
 app.UseMiddleware<AuditMiddleware>();
 // P11.0 安全轨道：CORS → 鉴权 → 限流（顺序：路由之后、授权之前；与 Observability/Audit 互不干扰）
 app.UseCors("P11Cors");
+// P10.5 可观测性中间件：前移到鉴权之前，使 401/403/429 在日志可见。
+// 权衡：前移后 REQ 日志读不到 AuthMiddleware 注入的租户上下文，但换来了鉴权失败的可见性（取证必需）。
+app.UseMiddleware<ObservabilityMiddleware>();
 // M0-08：鉴权先于限流，使限流键可基于已认证身份（TenantId+UserId）而非可伪造令牌头
 app.UseMiddleware<AuthMiddleware>();
 app.UseMiddleware<RateLimitMiddleware>();
 app.UseAuthorization();
-// P10.5 可观测性中间件（关联ID透传 + 请求/响应日志 + 耗时，非阻塞、异常静默，不影响 Golden 行为契约）
-app.UseMiddleware<ObservabilityMiddleware>();
 app.MapStaticAssets();
 app.MapControllerRoute(name: "default", pattern: "{controller=Home}/{action=Index}/{id?}").WithStaticAssets();
 app.MapOpenApi("/openapi/v1.json");

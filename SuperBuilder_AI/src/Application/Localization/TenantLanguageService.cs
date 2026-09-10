@@ -135,8 +135,29 @@ public sealed class TenantLanguageService : ITenantLanguageService
 
     public async Task EnsureTenantLanguagesAsync(long tenantId, CancellationToken ct = default)
     {
-        if (await _db.TenantUiLanguages.AsNoTracking().AnyAsync(x => x.TenantId == tenantId, ct))
-            return;
+        var existing = await _db.TenantUiLanguages.AsNoTracking().Where(x => x.TenantId == tenantId).ToListAsync(ct);
+        if (existing.Count > 0)
+        {
+            // 仅当"从未真正配置"——无 localization:availableCultures 设置，且只有一条默认 zh-CN 记录
+            // （旧回退逻辑遗留）——才视为未配置，清掉后以平台全语言集重建，避免租户语言恒为单一 zh-CN。
+            var hasExplicitConfig = await _db.TenantSettings.AsNoTracking()
+                .AnyAsync(s => s.TenantId == tenantId && s.Key == "localization:availableCultures", ct);
+            var zhCnId = await _db.UiLanguages.AsNoTracking()
+                .Where(u => u.Culture == "zh-CN").Select(u => u.Id).FirstOrDefaultAsync(ct);
+            var isDefaultOnlyZhCn = existing.Count == 1
+                && existing[0].IsDefault
+                && existing[0].UiLanguageId == zhCnId
+                && !hasExplicitConfig;
+            if (isDefaultOnlyZhCn)
+            {
+                foreach (var r in existing) _db.TenantUiLanguages.Remove(r);
+                await _db.SaveChangesAsync(ct);
+            }
+            else
+            {
+                return; // 视为已显式配置，尊重既有选择
+            }
+        }
 
         var json = await _db.TenantSettings.AsNoTracking()
             .Where(s => s.TenantId == tenantId && (s.Key == "localization:availableCultures" || s.Key == "localization:defaultCulture"))
@@ -181,11 +202,25 @@ public sealed class TenantLanguageService : ITenantLanguageService
 
         if (rows.Count == 0)
         {
-            var fallback = uiLangs.FirstOrDefault(u => string.Equals(u.Culture, "zh-CN", StringComparison.OrdinalIgnoreCase))
-                ?? uiLangs.FirstOrDefault(u => u.Enabled)
-                ?? uiLangs.FirstOrDefault();
-            if (fallback is not null)
-                rows.Add(new TenantUiLanguage { TenantId = tenantId, UiLanguageId = fallback.Id, Enabled = true, IsDefault = true, SortOrder = 0, CreatedBy = "system" });
+            // 无显式配置时继承平台全语言集（所有启用的平台语言），而非仅 zh-CN，
+            // 使语言切换器在全新安装中可用。
+            var platformLangs = uiLangs.Where(u => u.Enabled).OrderBy(u => u.SortOrder).ToList();
+            if (platformLangs.Count == 0) platformLangs = uiLangs.ToList();
+            var order = 0;
+            foreach (var u in platformLangs)
+            {
+                var isDefault = string.Equals(u.Culture, defaultCulture, StringComparison.OrdinalIgnoreCase)
+                    || (rows.Count == 0 && (string.IsNullOrWhiteSpace(defaultCulture) || string.Equals(u.Culture, "zh-CN", StringComparison.OrdinalIgnoreCase)));
+                rows.Add(new TenantUiLanguage
+                {
+                    TenantId = tenantId,
+                    UiLanguageId = u.Id,
+                    Enabled = true,
+                    IsDefault = isDefault,
+                    SortOrder = order++,
+                    CreatedBy = "system",
+                });
+            }
         }
 
         EnsureSingleDefault(rows);

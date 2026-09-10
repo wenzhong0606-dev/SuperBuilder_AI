@@ -19,13 +19,15 @@ public sealed class PlatformLoginE2ETests
     [SkippableFact]
     public async Task PlatformAdmin_Login_ByDedicatedEntry_ReachesTenantManagement()
     {
-        E2EConfig.Require(_fx.BaseUrl, E2EConfig.User, E2EConfig.Password, E2EConfig.Tenant);
+        // 必须使用 platform 租户下的管理员账号（SB_E2E_PLATFORM_USER/PASSWORD）：
+        // 业务管理员（SB_E2E_USER，如 e2eadmin@e2eapp）在 platform 租户中并不存在，登录必然失败。
+        E2EConfig.Require(_fx.BaseUrl, E2EConfig.PlatformUser, E2EConfig.PlatformPassword);
         var page = await _fx.NewPageAsync();
 
         // 平台管理员专属入口：业务登录页刻意排除 platform 租户，故走 /admin/login
         await page.GotoAsync("/admin/login");
-        await page.FillAsync("[data-testid=platform-login-username]", E2EConfig.User!);
-        await page.FillAsync("[data-testid=platform-login-password]", E2EConfig.Password!);
+        await page.FillAsync("[data-testid=platform-login-username]", E2EConfig.PlatformUser!);
+        await page.FillAsync("[data-testid=platform-login-password]", E2EConfig.PlatformPassword!);
         await page.ClickAsync("[data-testid=platform-login-submit]");
 
         // 登录成功应跳转至平台治理区租户管理页

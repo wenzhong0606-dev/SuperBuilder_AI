@@ -192,12 +192,15 @@ public sealed class PlatformLanguageServiceTests
         await using var _ = conn;
         await using var __ = db;
 
-        // 为租户 10 建立语言关系，并显式建立 en-US 关系设为默认（覆盖 Ensure 的单一默认回退），用于验证停用迁移
+        // 为租户 10 建立语言关系：T4 后 Ensure 已播种全部启用平台语言（zh-CN + en-US），
+        // 故直接修改既有 en-US 行为默认（覆盖 Ensure 的 zh-CN 默认），用于验证停用迁移。
+        // 注意：不可再 Add 重复 en-US 行，否则触发 (TenantId, UiLanguageId) 唯一约束。
         var tenantLang = new TenantLanguageService(db, new NoopAuditService());
         await tenantLang.EnsureTenantLanguagesAsync(10, CancellationToken.None);
         var zhRow = await db.TenantUiLanguages.SingleAsync(x => x.TenantId == 10 && x.UiLanguageId == 1, CancellationToken.None);
         zhRow.IsDefault = false;
-        db.TenantUiLanguages.Add(new TenantUiLanguage { TenantId = 10, UiLanguageId = 2, Enabled = true, IsDefault = true, SortOrder = 1, CreatedBy = "test" });
+        var enSetup = await db.TenantUiLanguages.SingleAsync(x => x.TenantId == 10 && x.UiLanguageId == 2, CancellationToken.None);
+        enSetup.IsDefault = true;
         await db.SaveChangesAsync();
 
         // 停用平台 en-US（Id=2）

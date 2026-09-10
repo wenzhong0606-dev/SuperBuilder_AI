@@ -38,28 +38,24 @@ public sealed class AdminApiClient : ApiClientBase, IAdminApiClient
     public async Task<(bool Ok, string? Error)> CreateLanguageAsync(AdminLanguageCreate model, CancellationToken ct = default)
     {
         var (ok, status, error, _) = await PostAsync("api/localization/languages", model, ct);
-        if (!ok && status == 401) OnUnauthorized();
         return (ok, error);
     }
 
     public async Task<(bool Ok, string? Error)> UpdateLanguageAsync(long id, AdminLanguageUpdate model, CancellationToken ct = default)
     {
         var (ok, status, error, _) = await PutAsync($"api/localization/languages/{id}", model, ct);
-        if (!ok && status == 401) OnUnauthorized();
         return (ok, error);
     }
 
     public async Task<(bool Ok, string? Error)> SetLanguageEnabledAsync(long id, bool enabled, CancellationToken ct = default)
     {
         var (ok, status, error, _) = await PostAsync($"api/localization/languages/{id}/enabled", new { enabled }, ct);
-        if (!ok && status == 401) OnUnauthorized();
         return (ok, error);
     }
 
     public async Task<(bool Ok, string? Error)> ReorderLanguagesAsync(IReadOnlyList<long> orderedIds, CancellationToken ct = default)
     {
         var (ok, status, error, _) = await PostAsync("api/localization/languages/reorder", new { orderedIds }, ct);
-        if (!ok && status == 401) OnUnauthorized();
         return (ok, error);
     }
 
@@ -103,14 +99,15 @@ public sealed class AdminApiClient : ApiClientBase, IAdminApiClient
 
     public async Task<(DemoInstallResult? Result, string? Error, string? Code)> InstallDemoDataAsync(CancellationToken ct = default)
     {
-        var client = Factory.CreateClient("SuperBuilderApi");
+        var client = CreateClient();
+        var sentWithToken = !string.IsNullOrEmpty(AppState.Token);
         try
         {
             var resp = await client.PostAsJsonAsync("api/demo-data/install", new { }, ct);
             if (!resp.IsSuccessStatusCode)
             {
                 var (code, msg, _) = ParseApiError(await resp.Content.ReadAsStringAsync(ct));
-                if (resp.StatusCode == HttpStatusCode.Unauthorized) OnUnauthorized();
+                if (resp.StatusCode == HttpStatusCode.Unauthorized) OnUnauthorized(sentWithToken);
                 return (null, msg ?? $"安装失败（{(int)resp.StatusCode}）。", code);
             }
             var r = await resp.Content.ReadFromJsonAsync<DemoInstallResult>(ct);

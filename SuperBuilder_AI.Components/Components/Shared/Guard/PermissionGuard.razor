@@ -32,6 +32,8 @@ else
     [Parameter] public RenderFragment? Fallback { get; set; }
     /// <summary>按钮级守卫：未授权时静默隐藏（不渲染空状态框）。页面级守卫保持 false 以显示空状态。</summary>
     [Parameter] public bool Silent { get; set; } = false;
+    /// <summary>页面级守卫：已登录但无权限时自动导航到 /forbidden（替代内联空状态）。默认 false（维持原内联提示行为）。</summary>
+    [Parameter] public bool RedirectToForbidden { get; set; } = false;
 
     private bool Allowed
     {
@@ -46,7 +48,24 @@ else
                 : Require.Any(p => owned.Contains(p));
         }
     }
-    protected override void OnInitialized() => State.PermissionsChanged += Refresh;
-    private void Refresh() => _ = InvokeAsync(StateHasChanged);
+    protected override void OnInitialized()
+    {
+        State.PermissionsChanged += Refresh;
+        TryRedirectToForbidden();
+    }
+    private void Refresh()
+    {
+        TryRedirectToForbidden();
+        _ = InvokeAsync(StateHasChanged);
+    }
+    /// <summary>已登录但无权限时，若开启 RedirectToForbidden 且无自定义 Fallback/非按钮级静默，则导航到 /forbidden。
+    /// 权限尚未加载（Permissions 为空）时暂不动，待 PermissionsChanged 触发后再判定，避免误跳。</summary>
+    private void TryRedirectToForbidden()
+    {
+        if (!RedirectToForbidden || Silent || Fallback is not null) return;
+        if (Allowed || !State.IsAuthenticated) return;
+        if ((State.Permissions?.Count ?? 0) == 0) return;
+        Nav.NavigateTo("/forbidden");
+    }
     public void Dispose() => State.PermissionsChanged -= Refresh;
 }

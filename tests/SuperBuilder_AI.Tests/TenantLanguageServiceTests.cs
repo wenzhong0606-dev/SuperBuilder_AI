@@ -182,12 +182,13 @@ public sealed class TenantLanguageServiceTests
         var (db, conn) = await CreateContextAsync();
         await using var _ = conn;
         await using var __ = db;
-        // 无 JSON、无关系行 → 回退平台默认 zh-CN
+        // 无 JSON、无关系行 → 继承平台全语言集（所有启用的平台语言），默认 zh-CN。
+        // T4 行为变更：旧逻辑仅回退单条 zh-CN，新逻辑播种全部启用平台语言，使语言切换器在全新安装可用。
         await Build(db).EnsureTenantLanguagesAsync(20, CancellationToken.None);
 
-        var rows = await db.TenantUiLanguages.Where(x => x.TenantId == 20).ToListAsync();
-        Assert.Single(rows);
-        Assert.True(rows[0].IsDefault && rows[0].UiLanguageId == 1);
+        var rows = await db.TenantUiLanguages.Where(x => x.TenantId == 20).OrderBy(x => x.SortOrder).ToListAsync();
+        Assert.Equal(5, rows.Count); // 平台 6 语言中 5 个启用（fr-FR 停用）
+        Assert.True(rows[0].IsDefault && rows[0].UiLanguageId == 1); // 默认 zh-CN
     }
 
     [Fact]
@@ -198,7 +199,9 @@ public sealed class TenantLanguageServiceTests
         await using var __ = db;
         await Build(db).EnsureTenantLanguagesAsync(10, CancellationToken.None);
         await Build(db).EnsureTenantLanguagesAsync(10, CancellationToken.None);
-        Assert.Equal(1, await db.TenantUiLanguages.CountAsync(x => x.TenantId == 10));
+        // T4 行为变更：无配置时播种全部启用平台语言（5 个），幂等不重复。
+        Assert.Equal(5, await db.TenantUiLanguages.CountAsync(x => x.TenantId == 10));
+        Assert.Equal("zh-CN", await Build(db).GetDefaultCultureAsync(10, CancellationToken.None));
     }
 
     [Fact]
@@ -208,8 +211,9 @@ public sealed class TenantLanguageServiceTests
         await using var _ = conn;
         await using var __ = db;
         await Build(db).EnsureAllTenantsLanguagesAsync(CancellationToken.None);
-        Assert.Equal(1, await db.TenantUiLanguages.CountAsync(x => x.TenantId == 10));
-        Assert.Equal(1, await db.TenantUiLanguages.CountAsync(x => x.TenantId == 20));
+        // T4 行为变更：每个租户继承全部启用平台语言（5 个），而非单条 zh-CN。
+        Assert.Equal(5, await db.TenantUiLanguages.CountAsync(x => x.TenantId == 10));
+        Assert.Equal(5, await db.TenantUiLanguages.CountAsync(x => x.TenantId == 20));
     }
 
     // === 平台语言停用迁移 ===

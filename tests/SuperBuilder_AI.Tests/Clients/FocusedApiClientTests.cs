@@ -117,6 +117,52 @@ public class FocusedApiClientTests
         Assert.False(app.IsAuthenticated);
         Assert.True(expiredRaised);
     }
+
+    /// <summary>
+    /// 回归（硬加载/F5 被登出）：请求在**会话自举完成前**发出（未携带令牌），
+    /// 其 401 在自举完成之后才被处理时，**不得**被误判为"已登录会话过期"。
+    /// 旧逻辑只看 <c>AppState.IsAuthenticated</c>，会清掉刚还原成功的有效会话并强制跳登录页。
+    /// </summary>
+    [Fact]
+    public async Task Tokenless_Request_401_Does_Not_Expire_Concurrently_Restored_Session()
+    {
+        AppState? appRef = null;
+        var handler = new StubHttpMessageHandler(_ =>
+        {
+            // 精确复现竞态：请求发出时无令牌；响应返回前，MainLayout 的自举已完成并写入令牌。
+            appRef!.Token = "restored-by-bootstrap";
+            return HttpTestDoubles.StatusResponse(HttpStatusCode.Unauthorized);
+        });
+        var client = HttpTestDoubles.BuildFocused<IdentityApiClient>(handler, out var app);
+        appRef = app;
+        var expiredRaised = false;
+        app.SessionExpired += () => expiredRaised = true;
+
+        await client.SwitchTenantAsync(7);
+
+        Assert.True(app.IsAuthenticated);   // 有效会话未被误清
+        Assert.False(expiredRaised);        // 未误报会话过期（不会跳登录页）
+    }
+
+    /// <summary>
+    /// 反向保障：携带令牌的 401 仍然必须视为真实会话过期（不可因上面的修复而漏回收）。
+    /// 本用例走<b>基类</b>的 <c>GetJsonAsync</c> 路径（上面那条走派生客户端的原生 HttpClient 路径），两条路径都要覆盖。
+    /// </summary>
+    [Fact]
+    public async Task Token_Carrying_401_On_Base_GetJson_Path_Still_Expires_Session()
+    {
+        var handler = new StubHttpMessageHandler(_ =>
+            HttpTestDoubles.StatusResponse(HttpStatusCode.Unauthorized));
+        var client = HttpTestDoubles.BuildFocused<AdminApiClient>(handler, out var app);
+        app.Token = "expired-token";
+        var expiredRaised = false;
+        app.SessionExpired += () => expiredRaised = true;
+
+        var (result, _) = await client.GetAdminLanguagesAsync();
+
+        Assert.Null(result);
+        Assert.True(expiredRaised);
+    }
     #endregion
 
     #region Admin

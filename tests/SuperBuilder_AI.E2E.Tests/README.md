@@ -19,14 +19,26 @@
 
 | 变量 | 说明 | 必填 |
 |---|---|---|
-| `SB_E2E_BASE_URL` | 被测基地址，默认 `http://localhost:5080` | 测试运行即需 |
+| `SB_E2E_BASE_URL` | 被测 Web 基地址，默认 `http://localhost:5080` | 测试运行即需 |
+| `SB_E2E_API_URL` | 后端 API 基地址，默认 `http://localhost:5032`。**Web 宿主不转发 `/api/**`**，浏览器侧 `fetch` 走绝对地址；不设即默认值 | 否 |
 | `SB_E2E_IGNORE_HTTPS_ERRORS` | 自签名证书场景置 `true` | 否 |
-| `SB_E2E_USER` / `SB_E2E_PASSWORD` / `SB_E2E_TENANT` | 常规登录凭据（登录/语言测试） | 对应测试需 |
-| `SB_E2E_READER_USER` / `SB_E2E_READER_PASSWORD` / `SB_E2E_READER_TENANT` | 低权限用户（权限拒绝测试） | 对应测试需 |
+| `SB_E2E_USER` / `SB_E2E_PASSWORD` / `SB_E2E_TENANT` | 业务管理员凭据。`TENANT` 为**租户编码或数字 Id**（`AppRuntime*` 走 API 登录须数字 Id） | 对应测试需 |
+| `SB_E2E_READER_USER` / `SB_E2E_READER_PASSWORD` / `SB_E2E_READER_TENANT` | 低权限用户（权限测试 + AppRuntime 读者用例） | 对应测试需 |
+| `SB_E2E_PLATFORM_USER` / `SB_E2E_PLATFORM_PASSWORD` | **平台**管理员凭据（属 `platform` 租户，走 `/admin/login`；与业务管理员不同账号） | 平台登录测试需 |
+| `SB_E2E_ASK_QUESTION` | Ask 用例的问句，默认「本月各品类销售额 Top 10」 | 否 |
 | `SB_E2E_SWITCH_CULTURE` | 语言切换目标文化，默认 `en-US` | 否 |
 
 > 任一必需环境变量缺失时，对应测试**自动跳过**（标记 Skipped，非失败）——这是 CI 前的诚实占位，
 > 不视为"假成功"。完整执行需在 CI 中注入凭据并起服务（归 M9-08 接入流水线）。
+
+### 关键数据前提（避坑）
+
+- **读者必须与管理员共用同一租户与数据源**：`ask-publish-box` 仅在 Ask 返回 `Rows.Count > 0` 时渲染；
+  若读者所在租户无数据源授权，Ask 返回 0 行 → 该元素永不出现 → 60s 超时（非 UI 缺陷）。
+- 读者账号须**不含 `app:publish`**、但含 `ask` 所需读权限，才能同时满足「有结果」与「无发布按钮」。
+- 平台管理员账号与业务管理员**必须分开配置**：业务管理员在 `platform` 租户中不存在，`/admin/login` 必然失败。
+- 语言切换器（`data-testid=language-switcher`）仅在 `AvailableCultures.Count > 1` 时渲染；
+  需在 `TenantUiLanguages` 为对应用户启用 ≥2 种语言，否则 `LanguageSwitchTests` 超时。
 
 ## 运行
 

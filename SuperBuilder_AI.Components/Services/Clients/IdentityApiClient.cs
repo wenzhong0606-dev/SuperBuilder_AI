@@ -52,11 +52,12 @@ public sealed class IdentityApiClient : ApiClientBase, IIdentityApiClient
     public async Task<(TenantSwitchResult? Result, string? Error, string? Code)> SwitchTenantAsync(long tenantId, CancellationToken ct = default)
     {
         var client = CreateClient();
+        var sentWithToken = !string.IsNullOrEmpty(AppState.Token);
         var resp = await client.PostAsJsonAsync("api/tenant-membership/switch", new { tenantId }, ct);
         if (!resp.IsSuccessStatusCode)
         {
             var (code, msg, _) = ParseApiError(await resp.Content.ReadAsStringAsync(ct));
-            if (resp.StatusCode == HttpStatusCode.Unauthorized) OnUnauthorized();
+            if (resp.StatusCode == HttpStatusCode.Unauthorized) OnUnauthorized(sentWithToken);
             return (null, msg ?? $"切换失败（{(int)resp.StatusCode}）。", code);
         }
             var r = await resp.Content.ReadFromJsonAsync<TenantSwitchResult>(ct);
@@ -133,13 +134,14 @@ public sealed class IdentityApiClient : ApiClientBase, IIdentityApiClient
     public async Task<(string? Culture, string? Error, string? Code)> SetUserLanguageAsync(string culture, CancellationToken ct = default)
     {
         var client = CreateClient();
+        var sentWithToken = !string.IsNullOrEmpty(AppState.Token);
         try
         {
             var resp = await client.PutAsJsonAsync("api/user/preferences/language", new { culture }, ct);
             if (!resp.IsSuccessStatusCode)
             {
                 var (code, msg, _) = ParseApiError(await resp.Content.ReadAsStringAsync(ct));
-                if (resp.StatusCode == HttpStatusCode.Unauthorized) OnUnauthorized();
+                if (resp.StatusCode == HttpStatusCode.Unauthorized) OnUnauthorized(sentWithToken);
                 return (null, msg ?? $"保存语言偏好失败（{(int)resp.StatusCode}）。", code);
             }
             var (data, _, err, _) = await GetJsonAsync("api/user/preferences/language", ct);

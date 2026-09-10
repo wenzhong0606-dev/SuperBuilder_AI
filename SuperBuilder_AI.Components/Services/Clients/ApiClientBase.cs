@@ -33,6 +33,7 @@ public abstract class ApiClientBase
         AppState = appState;
     }
 
+
     /// <summary>
     /// 创建注入鉴权头的 HttpClient。租户恒由令牌承载（SB-P0-02C 已移除 X-Tenant-Id 自动头）。
     /// </summary>
@@ -47,10 +48,20 @@ public abstract class ApiClientBase
 
     /// <summary>
     /// 会话失效回收：收到 401 时清空本地 token 并通知壳层跳登录。
-    /// 仅当当前确为已登录态才触发，避免重复通知。
+    /// 仅当「该请求发出时确实携带了令牌」且当前仍为已登录态才触发。
     /// </summary>
-    protected void OnUnauthorized()
+    /// <remarks>
+    /// <b>为什么必须校验"请求带了令牌"：</b>页面自身的 <c>OnAfterRenderAsync(firstRender)</c> 早于
+    /// <c>MainLayout</c> 的异步会话自举（子组件 <c>OnAfterRender</c> 先于父布局），此时
+    /// <see cref="AppState.Token"/> 尚为空 → 请求不带 Bearer → 服务端返回 401。
+    /// 若该 401 在自举完成之后才被处理，仅按 <c>IsAuthenticated</c> 判定就会把这个"未登录时发出的 401"
+    /// 当成"已登录会话过期"，从而 <b>清掉刚还原成功的有效会话并强制跳转登录页</b>——
+    /// 表现为硬加载 / F5 某些深层路由时被登出（非确定性竞态）。
+    /// </remarks>
+    protected void OnUnauthorized(bool requestCarriedToken)
     {
+        // 请求未携带令牌 → 401 只说明"当时未登录"，不能据此推断已登录会话已失效
+        if (!requestCarriedToken) return;
         if (!AppState.IsAuthenticated) return;
         AppState.ClearSession();
         AppState.NotifySessionExpired();
@@ -99,10 +110,11 @@ public abstract class ApiClientBase
     public async Task<T?> GetAsync<T>(string relativeUrl, CancellationToken ct = default) where T : class
     {
         var client = CreateClient();
+        var sentWithToken = !string.IsNullOrEmpty(AppState.Token);
         try
         {
             var resp = await client.GetAsync(relativeUrl, ct);
-            if (resp.StatusCode == HttpStatusCode.Unauthorized) OnUnauthorized();
+            if (resp.StatusCode == HttpStatusCode.Unauthorized) OnUnauthorized(sentWithToken);
             if (!resp.IsSuccessStatusCode) return null;
             var body = await resp.Content.ReadAsStringAsync(ct);
             if (string.IsNullOrWhiteSpace(body)) return null;
@@ -121,6 +133,7 @@ public abstract class ApiClientBase
     public async Task<(JsonElement? Data, int Status, string? Error, string? Code)> GetJsonAsync(string relativeUrl, CancellationToken ct = default)
     {
         var client = CreateClient();
+        var sentWithToken = !string.IsNullOrEmpty(AppState.Token);
         try
         {
             var resp = await client.GetAsync(relativeUrl, ct);
@@ -128,7 +141,7 @@ public abstract class ApiClientBase
             if (!resp.IsSuccessStatusCode)
             {
                 var (code, msg, _) = ParseApiError(body);
-                if (resp.StatusCode == HttpStatusCode.Unauthorized) OnUnauthorized();
+                if (resp.StatusCode == HttpStatusCode.Unauthorized) OnUnauthorized(sentWithToken);
                 return (null, (int)resp.StatusCode, msg ?? $"请求失败（{(int)resp.StatusCode}）。", code);
             }
             if (string.IsNullOrWhiteSpace(body))
@@ -147,13 +160,14 @@ public abstract class ApiClientBase
     public async Task<(string? Text, int Status, string? Error)> GetTextAsync(string relativeUrl, CancellationToken ct = default)
     {
         var client = CreateClient();
+        var sentWithToken = !string.IsNullOrEmpty(AppState.Token);
         try
         {
             var resp = await client.GetAsync(relativeUrl, ct);
             var body = await resp.Content.ReadAsStringAsync(ct);
             if (!resp.IsSuccessStatusCode)
             {
-                if (resp.StatusCode == HttpStatusCode.Unauthorized) OnUnauthorized();
+                if (resp.StatusCode == HttpStatusCode.Unauthorized) OnUnauthorized(sentWithToken);
                 return (null, (int)resp.StatusCode, $"请求失败（{(int)resp.StatusCode}）。");
             }
             return (body, (int)resp.StatusCode, null);
@@ -171,6 +185,7 @@ public abstract class ApiClientBase
         HttpMethod method, string relativeUrl, object? body = null, CancellationToken ct = default)
     {
         var client = CreateClient();
+        var sentWithToken = !string.IsNullOrEmpty(AppState.Token);
         try
         {
             using var req = new HttpRequestMessage(method, relativeUrl);
@@ -178,7 +193,7 @@ public abstract class ApiClientBase
                 req.Content = JsonContent.Create(body);
 
             var resp = await client.SendAsync(req, ct);
-            if (resp.StatusCode == HttpStatusCode.Unauthorized) OnUnauthorized();
+            if (resp.StatusCode == HttpStatusCode.Unauthorized) OnUnauthorized(sentWithToken);
             if (!resp.IsSuccessStatusCode)
             {
                 var raw = await resp.Content.ReadAsStringAsync(ct);

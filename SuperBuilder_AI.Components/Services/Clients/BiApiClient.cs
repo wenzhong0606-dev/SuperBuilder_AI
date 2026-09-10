@@ -20,12 +20,13 @@ public sealed class BiApiClient : ApiClientBase, IBiApiClient
     public async Task<string?> AskRawAsync(string question, long? dataSourceId, CancellationToken ct = default)
     {
         var client = CreateClient();
+        var sentWithToken = !string.IsNullOrEmpty(AppState.Token);
         var payload = new { question, dataSourceId = dataSourceId ?? 0L };
         var resp = await client.PostAsJsonAsync("api/ask", payload, ct);
         if (!resp.IsSuccessStatusCode)
         {
             var err = await resp.Content.ReadAsStringAsync(ct);
-            if (resp.StatusCode == HttpStatusCode.Unauthorized) OnUnauthorized();
+            if (resp.StatusCode == HttpStatusCode.Unauthorized) OnUnauthorized(sentWithToken);
             return "ERROR " + (int)resp.StatusCode + ": " + err;
         }
         return await resp.Content.ReadAsStringAsync(ct);
@@ -35,11 +36,12 @@ public sealed class BiApiClient : ApiClientBase, IBiApiClient
     public async Task<AskOutcome> AskAsync(string question, long? dataSourceId, string? conversationId = null, CancellationToken ct = default)
     {
         var client = CreateClient();
+        var sentWithToken = !string.IsNullOrEmpty(AppState.Token);
         var resp = await client.PostAsJsonAsync("api/ask", new { question, dataSourceId = dataSourceId ?? 0L, conversationId }, ct);
         if (!resp.IsSuccessStatusCode)
         {
             var (code, msg, trace) = ParseApiError(await resp.Content.ReadAsStringAsync(ct));
-            if (resp.StatusCode == HttpStatusCode.Unauthorized) OnUnauthorized();
+            if (resp.StatusCode == HttpStatusCode.Unauthorized) OnUnauthorized(sentWithToken);
             return new AskOutcome
             {
                 Code = code,
@@ -78,6 +80,7 @@ public sealed class BiApiClient : ApiClientBase, IBiApiClient
         CancellationToken ct = default)
     {
         var client = CreateClient();
+        var sentWithToken = !string.IsNullOrEmpty(AppState.Token);
         var payload = new
         {
             question,
@@ -90,7 +93,7 @@ public sealed class BiApiClient : ApiClientBase, IBiApiClient
         if (!resp.IsSuccessStatusCode)
         {
             var (code, msg, trace) = ParseApiError(await resp.Content.ReadAsStringAsync(ct));
-            if (resp.StatusCode == HttpStatusCode.Unauthorized) OnUnauthorized();
+            if (resp.StatusCode == HttpStatusCode.Unauthorized) OnUnauthorized(sentWithToken);
             return new AskOutcome
             {
                 Code = code,
