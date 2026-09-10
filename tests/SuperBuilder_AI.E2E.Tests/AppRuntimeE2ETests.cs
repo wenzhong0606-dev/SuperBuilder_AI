@@ -18,7 +18,7 @@ public sealed class AppRuntimeE2ETests
     public AppRuntimeE2ETests(PlaywrightFixture fx) => _fx = fx;
 
     private static string AskQuestion =>
-        Environment.GetEnvironmentVariable("SB_E2E_ASK_QUESTION") ?? "本月各品类销售额 Top 10";
+        Environment.GetEnvironmentVariable("SB_E2E_ASK_QUESTION") ?? "查询库存表中的物料库存数量";
 
     /// <summary>管理员：Ask → 两段式发布（草稿+发布）→ 运行渲染成功。核心验收路径零跳过。</summary>
     [SkippableFact]
@@ -70,5 +70,27 @@ public sealed class AppRuntimeE2ETests
 
         // 发布按钮被 PermissionGuard(app:publish) 隐藏，不渲染
         Assert.Equal(0, await page.Locator("[data-testid=ask-publish]").CountAsync());
+    }
+
+    /// <summary>
+    /// 优雅降级（用户原则）：未映射到元数据的问题（如尚未接入的销售业务）不应以 500 中断，
+    /// 而是反馈可执行的绑定 / 改述建议（"越用越聪明"）。
+    /// 明确使用未映射的销售类问题，与已映射的 E2E 默认问题解耦。
+    /// </summary>
+    [SkippableFact]
+    public async Task Admin_Ask_UnmappedBusiness_ReturnsFriendlyGuidance()
+    {
+        E2EConfig.Require(_fx.BaseUrl, E2EConfig.User, E2EConfig.Password, E2EConfig.Tenant);
+        var page = await _fx.NewPageAsync();
+        await LoginHelper.ApiLoginAsync(page, E2EConfig.User!, E2EConfig.Password!, long.Parse(E2EConfig.Tenant!));
+
+        // 明确使用未映射的销售类问题（即便 SB_E2E_ASK_QUESTION 指向已映射问题也不受影响）
+        await page.FillAsync("[data-testid=ask-input]", "本月各品类销售额 Top 10");
+        await page.ClickAsync("[data-testid=ask-submit]");
+
+        // 不应出现未捕获崩溃；应呈现"元数据未映射"的友好引导，而非执行中断
+        var guidance = page.GetByText("未找到与您的问题对应的业务元数据映射");
+        await guidance.First.WaitForAsync(new LocatorWaitForOptions { Timeout = 60000 });
+        Assert.True(await guidance.First.IsVisibleAsync());
     }
 }

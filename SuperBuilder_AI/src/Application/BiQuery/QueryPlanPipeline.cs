@@ -70,7 +70,17 @@ public sealed class QueryPlanPipeline : IQueryPlanPipeline
 
 			foreach (var stage in _stages)
 			{
-				await stage.ExecuteAsync(ctx);
+				try
+				{
+					await stage.ExecuteAsync(ctx);
+				}
+				catch (InvalidOperationException ex) when (IsQueryPlanValidationFailure(ex))
+				{
+					// 元数据未映射到用户问题（如相关业务尚未接入、字段不在语义层）。
+					// 按产品原则：不应以 500 中断执行，而是优雅反馈，引导用户绑定数据源或指定其他 metadata，
+					// 通过补全语义层实现「越用越聪明」。
+					ctx.EarlyResponse = BuildMetadataNotMappedResponse(question, ex.Message);
+				}
 
 				if (ctx.EarlyResponse is not null)
 				{
@@ -166,6 +176,40 @@ public sealed class QueryPlanPipeline : IQueryPlanPipeline
 			QueryPlanDecisionType.RequireApproval => AuditOutcome.RequiresApproval,
 			QueryPlanDecisionType.AskClarification => AuditOutcome.AskClarification,
 			_ => AuditOutcome.Executed
+		};
+	}
+
+	/// <summary>
+	/// 判定是否为 QueryPlan 验证失败抛出的异常。
+	/// 该异常由 <see cref="QueryPlanBuilder.BuildAsync"/> 在最终验证不通过时抛出，
+	/// 其消息前缀为 “QueryPlan验证失败”（见 <c>QueryPlanValidationResult.ToErrorMessage</c>）。
+	/// </summary>
+	private static bool IsQueryPlanValidationFailure(InvalidOperationException ex)
+	{
+		return ex.Message.StartsWith("QueryPlan验证失败", StringComparison.Ordinal);
+	}
+
+	/// <summary>
+	/// 构造「元数据未映射」的优雅降级响应。
+	/// 面向用户：告知未找到对应业务映射并给出可执行建议（绑定数据源 / 指定其他 metadata / 换用已接入术语），
+	/// 而非以 500 中断执行；通过补全语义层即可逐步覆盖更多问题。
+	/// </summary>
+	private static BIResponse BuildMetadataNotMappedResponse(
+		string question,
+		string detail)
+	{
+		const string guidance =
+			"未找到与您的问题对应的业务元数据映射，因此无法生成可执行的查询。" +
+			"您可以：① 在对应数据源中绑定相关业务表（或修正字段语义）；② 换用已接入的业务术语重新提问。" +
+			"随着元数据不断完善，我将能回答更多问题。";
+
+		return new BIResponse
+		{
+			Success = false,
+
+			Question = question,
+
+			ErrorMessage = guidance + "\n\n" + detail
 		};
 	}
 }
