@@ -160,6 +160,15 @@ public class SuperBIContext : DbContext
         public DbSet<UserTenant> UserTenants { get; set; }
         #endregion
 
+        #region M12-17 Identity Organization Directory
+        public DbSet<Organization> Organizations { get; set; }
+        public DbSet<Department> Departments { get; set; }
+        public DbSet<UserGroup> UserGroups { get; set; }
+        public DbSet<UserGroupMember> UserGroupMembers { get; set; }
+        public DbSet<UserGroupRole> UserGroupRoles { get; set; }
+        public DbSet<UserDepartmentMember> UserDepartmentMembers { get; set; }
+        #endregion
+
         #region P10.3 Audit
         public DbSet<AuditLog> AuditLogs { get; set; }
         #endregion
@@ -710,6 +719,64 @@ public class SuperBIContext : DbContext
 		builder.Entity<UserTenant>().HasOne<Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Cascade);
 		#endregion
 
+		#region M12-17 Identity 组织目录（Organization / Department / UserGroup）
+		// 组织：同租户内规范化编码唯一；租户隔离经查询过滤器。
+		builder.Entity<Organization>().ToTable(tb => tb.HasComment("组织（租户内组织结构单元）"));
+		builder.Entity<Organization>().HasIndex(x => new { x.TenantId, x.NormalizedCode }).IsUnique()
+			.HasDatabaseName("IX_Organizations_TenantId_NormalizedCode");
+		builder.Entity<Organization>().Property(x => x.Code).IsRequired().HasMaxLength(64).HasComment("组织编码");
+		builder.Entity<Organization>().Property(x => x.NormalizedCode).HasMaxLength(64).HasComment("规范化组织编码（小写，租户内唯一）");
+		builder.Entity<Organization>().Property(x => x.Name).IsRequired().HasMaxLength(128).HasComment("组织名称");
+		builder.Entity<Organization>().Property(x => x.Description).HasMaxLength(512).HasComment("描述");
+		builder.Entity<Organization>().Property(x => x.IsEnabled).HasDefaultValue(true).HasComment("是否启用");
+		builder.Entity<Organization>().HasOne<Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Cascade);
+
+		// 部门：归属于组织；ParentId 自引用构成树；同租户内规范化编码唯一。
+		builder.Entity<Department>().ToTable(tb => tb.HasComment("部门（隶属组织）"));
+		builder.Entity<Department>().HasIndex(x => new { x.TenantId, x.NormalizedCode }).IsUnique()
+			.HasDatabaseName("IX_Departments_TenantId_NormalizedCode");
+		builder.Entity<Department>().HasIndex(x => new { x.TenantId, x.OrganizationId });
+		builder.Entity<Department>().HasIndex(x => x.ParentId);
+		builder.Entity<Department>().Property(x => x.Code).IsRequired().HasMaxLength(64).HasComment("部门编码");
+		builder.Entity<Department>().Property(x => x.NormalizedCode).HasMaxLength(64).HasComment("规范化部门编码（小写，租户内唯一）");
+		builder.Entity<Department>().Property(x => x.Name).IsRequired().HasMaxLength(128).HasComment("部门名称");
+		builder.Entity<Department>().Property(x => x.Description).HasMaxLength(512).HasComment("描述");
+		builder.Entity<Department>().Property(x => x.IsEnabled).HasDefaultValue(true).HasComment("是否启用");
+		builder.Entity<Department>().HasOne<Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Cascade);
+		builder.Entity<Department>().HasOne<Organization>().WithMany().HasForeignKey(x => x.OrganizationId).OnDelete(DeleteBehavior.Restrict);
+
+		// 用户组：同租户内规范化编码唯一。
+		builder.Entity<UserGroup>().ToTable(tb => tb.HasComment("用户组"));
+		builder.Entity<UserGroup>().HasIndex(x => new { x.TenantId, x.NormalizedCode }).IsUnique()
+			.HasDatabaseName("IX_UserGroups_TenantId_NormalizedCode");
+		builder.Entity<UserGroup>().Property(x => x.Code).IsRequired().HasMaxLength(64).HasComment("用户组编码");
+		builder.Entity<UserGroup>().Property(x => x.NormalizedCode).HasMaxLength(64).HasComment("规范化用户组编码（小写，租户内唯一）");
+		builder.Entity<UserGroup>().Property(x => x.Name).IsRequired().HasMaxLength(128).HasComment("用户组名称");
+		builder.Entity<UserGroup>().Property(x => x.Description).HasMaxLength(512).HasComment("描述");
+		builder.Entity<UserGroup>().Property(x => x.IsEnabled).HasDefaultValue(true).HasComment("是否启用");
+		builder.Entity<UserGroup>().HasOne<Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Cascade);
+
+		// 组成员：同租户内 (Group, User) 唯一；级联删除保证引用完整性。
+		builder.Entity<UserGroupMember>().ToTable(tb => tb.HasComment("用户组成员"));
+		builder.Entity<UserGroupMember>().HasIndex(x => new { x.TenantId, x.UserGroupId, x.UserId }).IsUnique();
+		builder.Entity<UserGroupMember>().HasIndex(x => x.UserId);
+		builder.Entity<UserGroupMember>().HasOne<UserGroup>().WithMany().HasForeignKey(x => x.UserGroupId).OnDelete(DeleteBehavior.Cascade);
+		builder.Entity<UserGroupMember>().HasOne<User>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+
+		// 组-角色：同租户内 (Group, Role) 唯一；级联删除保证引用完整性。
+		builder.Entity<UserGroupRole>().ToTable(tb => tb.HasComment("用户组-角色关联"));
+		builder.Entity<UserGroupRole>().HasIndex(x => new { x.TenantId, x.UserGroupId, x.RoleId }).IsUnique();
+		builder.Entity<UserGroupRole>().HasOne<UserGroup>().WithMany().HasForeignKey(x => x.UserGroupId).OnDelete(DeleteBehavior.Cascade);
+		builder.Entity<UserGroupRole>().HasOne<Role>().WithMany().HasForeignKey(x => x.RoleId).OnDelete(DeleteBehavior.Cascade);
+
+		// 用户-部门归属：同租户内 (User, Department) 唯一；级联删除保证引用完整性。
+		builder.Entity<UserDepartmentMember>().ToTable(tb => tb.HasComment("用户-部门归属"));
+		builder.Entity<UserDepartmentMember>().HasIndex(x => new { x.TenantId, x.UserId, x.DepartmentId }).IsUnique();
+		builder.Entity<UserDepartmentMember>().HasIndex(x => x.DepartmentId);
+		builder.Entity<UserDepartmentMember>().HasOne<User>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+		builder.Entity<UserDepartmentMember>().HasOne<Department>().WithMany().HasForeignKey(x => x.DepartmentId).OnDelete(DeleteBehavior.Cascade);
+		#endregion
+
 		#region PhysicalBinding (M1-06)
 		builder.Entity<PhysicalBinding>().ToTable("PhysicalBindings");
 		builder.Entity<PhysicalBinding>().HasIndex(x => new { x.DataSourceId, x.MetadataTableId, x.MetadataColumnId });
@@ -822,6 +889,14 @@ public class SuperBIContext : DbContext
         // UiTextResource：同 SemanticLabel/Dashboard，放行 TenantId == 0 的平台基线（租户作用域内自动继承基线译文），
         // 同时仅可见本租户覆盖；租户作用域未开启时为 no-op，不影响平台治理/种子/Golden 路径。
         builder.Entity<UiTextResource>().HasQueryFilter(e => !_tenantFilterEnabled || e.TenantId == _scopedTenantId || e.TenantId == 0);
+
+        // M12-17 组织目录：均租户专属，不放行 TenantId == 0（组织/部门/用户组恒归属某一租户）。
+        builder.Entity<Organization>().HasQueryFilter(e => !_tenantFilterEnabled || e.TenantId == _scopedTenantId);
+        builder.Entity<Department>().HasQueryFilter(e => !_tenantFilterEnabled || e.TenantId == _scopedTenantId);
+        builder.Entity<UserGroup>().HasQueryFilter(e => !_tenantFilterEnabled || e.TenantId == _scopedTenantId);
+        builder.Entity<UserGroupMember>().HasQueryFilter(e => !_tenantFilterEnabled || e.TenantId == _scopedTenantId);
+        builder.Entity<UserGroupRole>().HasQueryFilter(e => !_tenantFilterEnabled || e.TenantId == _scopedTenantId);
+        builder.Entity<UserDepartmentMember>().HasQueryFilter(e => !_tenantFilterEnabled || e.TenantId == _scopedTenantId);
         #endregion
 
         // Phase 3.1：Business Entity 只持久化到 SuperBuilder Metadata DB。

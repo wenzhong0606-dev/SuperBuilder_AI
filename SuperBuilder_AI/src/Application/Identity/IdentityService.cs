@@ -281,10 +281,22 @@ public class IdentityService : IIdentityService
 
     public async Task<IReadOnlyList<string>> GetPermissionsAsync(long tenantId, long userId, CancellationToken ct = default)
     {
-        var roleIds = await _ctx.UserRoles
+        // 直接角色（User → UserRole → Role）。
+        var directRoleIds = await _ctx.UserRoles
             .Where(ur => ur.TenantId == tenantId && ur.UserId == userId)
             .Select(ur => ur.RoleId)
-            .Distinct().ToListAsync(ct);
+            .ToListAsync(ct);
+
+        // M12-17：并入「用户 → 用户组 → 角色」链路——用户组承载的角色对其成员生效。
+        // 有效角色 = 直接角色 ∪ 组角色；两者并集后统一解析权限码。
+        var groupRoleIds = await (
+            from m in _ctx.UserGroupMembers.IgnoreQueryFilters()
+            where m.TenantId == tenantId && m.UserId == userId
+            join gr in _ctx.UserGroupRoles.IgnoreQueryFilters() on m.UserGroupId equals gr.UserGroupId
+            where gr.TenantId == tenantId
+            select gr.RoleId).ToListAsync(ct);
+
+        var roleIds = directRoleIds.Concat(groupRoleIds).Distinct().ToList();
         if (roleIds.Count == 0) return Array.Empty<string>();
 
         var permIds = await _ctx.RolePermissions

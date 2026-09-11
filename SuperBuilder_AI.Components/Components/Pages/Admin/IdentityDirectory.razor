@@ -1,0 +1,548 @@
+@page "/admin/identity-directory"
+@inject IApiClient Api
+@inject AppState State
+@inject ToastService Toast
+@using System.Text.Json
+@using SuperBuilder_AI.Components.Shared
+
+<AuthGuard>
+    <PermissionGuard Require="@(new[]{ PermissionCodes.IdentityManage })">
+    <PageHead Icon="sb-ico-users" Key="IdentityDirectory" Title="组织目录" Desc="@L10n.T(Keys.Content.IdentityDirectoryDesc, "管理租户内的组织、部门与用户组；用户组承载角色，成员经组获得对应权限（与 RBAC 联动）。")">
+        <button class="btn btn-primary btn-sm" @onclick="OpenCreateOrg">@L10n.T(Keys.Content.IdentityDirectoryNewOrg, "新建组织")</button>
+        <button class="btn btn-outline-secondary btn-sm" @onclick="OpenCreateDepartment">@L10n.T(Keys.Content.IdentityDirectoryNewDepartment, "新建部门")</button>
+        <button class="btn btn-outline-secondary btn-sm" @onclick="OpenCreateGroup">@L10n.T(Keys.Content.IdentityDirectoryNewGroup, "新建用户组")</button>
+        <button class="btn btn-outline-secondary btn-sm" @onclick="Reload">@L10n.T(Keys.Content.CommonRefresh, "刷新")</button>
+    </PageHead>
+
+    @if (_loading)
+    {
+        <LoadingState Text="@L10n.T(Keys.Content.IdentityDirectoryLoading, "正在加载组织目录…")" />
+    }
+    else if (!string.IsNullOrWhiteSpace(_error))
+    {
+        <ErrorState Message="@_error" OnRetry="Reload" />
+    }
+    else
+    {
+        <div class="stat-grid">
+            <SbStatTile Label="@L10n.T(Keys.Content.IdentityDirectoryStatOrgs, "组织")" Value="@_orgs.Count" Sub="@L10n.T(Keys.Content.IdentityDirectoryStatOrgsSub, "租户内结构单元")" />
+            <SbStatTile Label="@L10n.T(Keys.Content.IdentityDirectoryStatDepartments, "部门")" Value="@_departments.Count" Sub="@L10n.T(Keys.Content.IdentityDirectoryStatDepartmentsSub, "隶属组织")" Accent="info" />
+            <SbStatTile Label="@L10n.T(Keys.Content.IdentityDirectoryStatGroups, "用户组")" Value="@_groups.Count" Sub="@L10n.T(Keys.Content.IdentityDirectoryStatGroupsSub, "承载角色授权")" Accent="warning" />
+        </div>
+
+        <SbTabs>
+            <SbTab Title="@L10n.T(Keys.Content.IdentityDirectoryTabOrgs, "组织")">
+                <SbPanel Icon="sb-ico-tenant" Title="@L10n.T(Keys.Content.IdentityDirectoryTabOrgs, "组织")" Flush="true">
+                    <Body>
+                        @if (_orgs.Count == 0)
+                        {
+                            <SbEmptyState Icon="sb-ico-tenant" Title="@L10n.T(Keys.Content.IdentityDirectoryEmptyOrgs, "暂无组织")" Text="@L10n.T(Keys.Content.IdentityDirectoryEmptyOrgsText, "组织是租户内的顶层结构单元，部门隶属组织。")" />
+                        }
+                        else
+                        {
+                            <SbDataTable Items="@_orgs" Columns="@OrgColumns" PageSize="20" EmptyTitle="@L10n.T(Keys.Content.IdentityDirectoryEmptyOrgs, "暂无组织")" />
+                        }
+                    </Body>
+                </SbPanel>
+            </SbTab>
+            <SbTab Title="@L10n.T(Keys.Content.IdentityDirectoryTabDepartments, "部门")">
+                <SbPanel Icon="sb-ico-users" Title="@L10n.T(Keys.Content.IdentityDirectoryTabDepartments, "部门")" Flush="true">
+                    <Body>
+                        @if (_departments.Count == 0)
+                        {
+                            <SbEmptyState Icon="sb-ico-users" Title="@L10n.T(Keys.Content.IdentityDirectoryEmptyDepartments, "暂无部门")" Text="@L10n.T(Keys.Content.IdentityDirectoryEmptyDepartmentsText, "部门隶属某个组织，用户可归属部门。")" />
+                        }
+                        else
+                        {
+                            <SbDataTable Items="@_departments" Columns="@DeptColumns" PageSize="20" EmptyTitle="@L10n.T(Keys.Content.IdentityDirectoryEmptyDepartments, "暂无部门")">
+                                <RowActions>
+                                    <button class="btn btn-sm btn-outline-secondary" @onclick='() => OpenAssignDept(context)'>@L10n.T(Keys.Content.IdentityDirectoryAssignDept, "分配成员")</button>
+                                </RowActions>
+                            </SbDataTable>
+                        }
+                    </Body>
+                </SbPanel>
+            </SbTab>
+            <SbTab Title="@L10n.T(Keys.Content.IdentityDirectoryTabGroups, "用户组")">
+                <SbPanel Icon="sb-ico-shield" Title="@L10n.T(Keys.Content.IdentityDirectoryTabGroups, "用户组")" Flush="true">
+                    <Body>
+                        <p class="muted">@L10n.T(Keys.Content.IdentityDirectoryGroupRoleHint, "用户组承载角色；组内成员经组角色获得权限（与直接角色并集）。")</p>
+                        @if (_groups.Count == 0)
+                        {
+                            <SbEmptyState Icon="sb-ico-shield" Title="@L10n.T(Keys.Content.IdentityDirectoryEmptyGroups, "暂无用户组")" Text="@L10n.T(Keys.Content.IdentityDirectoryEmptyGroupsText, "用户组是横切的职能集合，可承载角色并批量授权成员。")" />
+                        }
+                        else
+                        {
+                            <SbDataTable Items="@_groups" Columns="@GroupColumns" PageSize="20" EmptyTitle="@L10n.T(Keys.Content.IdentityDirectoryEmptyGroups, "暂无用户组")">
+                                <RowActions>
+                                    <button class="btn btn-sm btn-outline-secondary" @onclick='() => OpenEditRoles(context)'>@L10n.T(Keys.Content.IdentityDirectoryEditRoles, "编辑角色")</button>
+                                    <button class="btn btn-sm btn-outline-secondary" @onclick='() => OpenAddMember(context)'>@L10n.T(Keys.Content.IdentityDirectoryAddMember, "添加成员")</button>
+                                </RowActions>
+                            </SbDataTable>
+                        }
+                    </Body>
+                </SbPanel>
+            </SbTab>
+        </SbTabs>
+    }
+    </PermissionGuard>
+</AuthGuard>
+
+<SbModal Visible="@_orgModal" VisibleChanged="v => _orgModal = v" Title="@L10n.T(Keys.Content.IdentityDirectoryNewOrg, "新建组织")" Size="md">
+    <Body>
+        <div class="form-stack">
+            <SbField Label="@L10n.T(Keys.Content.IdentityDirectoryColCode, "编码")" Required="true" Error="@_orgErr">
+                <input class="form-control" @bind="_orgCode" placeholder="@L10n.T(Keys.Content.IdentityDirectoryOrgCodePh, "如 hq")" />
+            </SbField>
+            <SbField Label="@L10n.T(Keys.Content.CommonName, "名称")">
+                <input class="form-control" @bind="_orgName" placeholder="@L10n.T(Keys.Content.CommonOptional, "可选")" />
+            </SbField>
+            <SbField Label="@L10n.T(Keys.Content.CommonDescription, "描述")">
+                <input class="form-control" @bind="_orgDesc" placeholder="@L10n.T(Keys.Content.CommonOptional, "可选")" />
+            </SbField>
+        </div>
+    </Body>
+    <Footer>
+        <button class="btn btn-outline-secondary btn-sm" @onclick="() => _orgModal = false">@L10n.T(Keys.Content.CommonCancel, "取消")</button>
+        <button class="btn btn-primary btn-sm" @onclick="CreateOrg">@L10n.T(Keys.Content.CommonCreate, "创建")</button>
+    </Footer>
+</SbModal>
+
+<SbModal Visible="@_deptModal" VisibleChanged="v => _deptModal = v" Title="@L10n.T(Keys.Content.IdentityDirectoryNewDepartment, "新建部门")" Size="md">
+    <Body>
+        <div class="form-stack">
+            <SbField Label="@L10n.T(Keys.Content.IdentityDirectoryColOrganization, "所属组织")" Required="true" Error="@_deptErr">
+                <select class="form-select" @bind="_deptOrgId">
+                    <option value="0">@L10n.T(Keys.Content.IdentityDirectorySelectOrg, "— 选择组织 —")</option>
+                    @foreach (var org in _orgs)
+                    {
+                        <option value="@String(org, "id")">@String(org, "name")</option>
+                    }
+                </select>
+            </SbField>
+            <SbField Label="@L10n.T(Keys.Content.IdentityDirectoryColCode, "编码")" Required="true">
+                <input class="form-control" @bind="_deptCode" placeholder="@L10n.T(Keys.Content.IdentityDirectoryDeptCodePh, "如 sales")" />
+            </SbField>
+            <SbField Label="@L10n.T(Keys.Content.CommonName, "名称")">
+                <input class="form-control" @bind="_deptName" placeholder="@L10n.T(Keys.Content.CommonOptional, "可选")" />
+            </SbField>
+        </div>
+    </Body>
+    <Footer>
+        <button class="btn btn-outline-secondary btn-sm" @onclick="() => _deptModal = false">@L10n.T(Keys.Content.CommonCancel, "取消")</button>
+        <button class="btn btn-primary btn-sm" @onclick="CreateDepartment">@L10n.T(Keys.Content.CommonCreate, "创建")</button>
+    </Footer>
+</SbModal>
+
+<SbModal Visible="@_groupModal" VisibleChanged="v => _groupModal = v" Title="@L10n.T(Keys.Content.IdentityDirectoryNewGroup, "新建用户组")" Size="md">
+    <Body>
+        <div class="form-stack">
+            <SbField Label="@L10n.T(Keys.Content.IdentityDirectoryColCode, "编码")" Required="true" Error="@_groupErr">
+                <input class="form-control" @bind="_groupCode" placeholder="@L10n.T(Keys.Content.IdentityDirectoryGroupCodePh, "如 analysts")" />
+            </SbField>
+            <SbField Label="@L10n.T(Keys.Content.CommonName, "名称")">
+                <input class="form-control" @bind="_groupName" placeholder="@L10n.T(Keys.Content.CommonOptional, "可选")" />
+            </SbField>
+            <SbField Label="@L10n.T(Keys.Content.IdentityDirectoryColRoles, "角色")">
+                <div class="chk-grid">
+                    @foreach (var role in _roles)
+                    {
+                        var code = TablePresenter.Cell(role, "code");
+                        <label class="chk"><input type="checkbox" checked="@_newGroupRoles.Contains(code)" @onchange='(e) => ToggleSet(_newGroupRoles, code, (bool)e.Value!)' /> @TablePresenter.Cell(role, "name")</label>
+                    }
+                    @if (_roles.Count == 0)
+                    {
+                        <span class="muted">@L10n.T(Keys.Content.IdentityDirectoryNoRoles, "暂无可选角色")</span>
+                    }
+                </div>
+            </SbField>
+        </div>
+    </Body>
+    <Footer>
+        <button class="btn btn-outline-secondary btn-sm" @onclick="() => _groupModal = false">@L10n.T(Keys.Content.CommonCancel, "取消")</button>
+        <button class="btn btn-primary btn-sm" @onclick="CreateGroup">@L10n.T(Keys.Content.CommonCreate, "创建")</button>
+    </Footer>
+</SbModal>
+
+<SbModal Visible="@_rolesModal" VisibleChanged="v => _rolesModal = v" Title="@L10n.T(Keys.Content.IdentityDirectoryEditRoles, "编辑角色")" Size="md">
+    <Body>
+        <p class="muted">@string.Format(L10n.T(Keys.Content.IdentityDirectoryEditRolesHint, "用户组「{0}」承载的角色（全量替换）；组内成员经组角色获得权限。"), _editGroupName)</p>
+        <div class="chk-grid">
+            @foreach (var role in _roles)
+            {
+                var code = TablePresenter.Cell(role, "code");
+                <label class="chk"><input type="checkbox" checked="@_editGroupRoles.Contains(code)" @onchange='(e) => ToggleSet(_editGroupRoles, code, (bool)e.Value!)' /> @TablePresenter.Cell(role, "name")</label>
+            }
+            @if (_roles.Count == 0)
+            {
+                <span class="muted">@L10n.T(Keys.Content.IdentityDirectoryNoRoles, "暂无可选角色")</span>
+            }
+        </div>
+    </Body>
+    <Footer>
+        <button class="btn btn-outline-secondary btn-sm" @onclick="() => _rolesModal = false">@L10n.T(Keys.Content.CommonCancel, "取消")</button>
+        <button class="btn btn-primary btn-sm" @onclick="SaveGroupRoles">@L10n.T(Keys.Content.CommonSave, "保存")</button>
+    </Footer>
+</SbModal>
+
+<SbModal Visible="@_memberModal" VisibleChanged="v => _memberModal = v" Title="@L10n.T(Keys.Content.IdentityDirectoryAddMember, "添加成员")" Size="sm">
+    <Body>
+        <SbField Label="@L10n.T(Keys.Content.IdentityDirectorySelectUser, "选择用户")" Required="true" Error="@_memberErr">
+            <select class="form-select" @bind="_memberUserId">
+                <option value="0">@L10n.T(Keys.Content.IdentityDirectorySelectUser, "选择用户")</option>
+                @foreach (var user in _users)
+                {
+                    <option value="@String(user, "id")">@TablePresenter.Cell(user, "username")</option>
+                }
+            </select>
+        </SbField>
+        @if (_users.Count == 0)
+        {
+            <p class="muted">@L10n.T(Keys.Content.IdentityDirectoryNoUsers, "暂无可选用户")</p>
+        }
+    </Body>
+    <Footer>
+        <button class="btn btn-outline-secondary btn-sm" @onclick="() => _memberModal = false">@L10n.T(Keys.Content.CommonCancel, "取消")</button>
+        <button class="btn btn-primary btn-sm" @onclick="AddMember">@L10n.T(Keys.Content.CommonAdd, "添加")</button>
+    </Footer>
+</SbModal>
+
+<SbModal Visible="@_deptAssignModal" VisibleChanged="v => _deptAssignModal = v" Title="@L10n.T(Keys.Content.IdentityDirectoryAssignDept, "分配成员")" Size="sm">
+    <Body>
+        <p class="muted">@string.Format(L10n.T(Keys.Content.IdentityDirectoryAssignHint, "将用户归属到部门「{0}」（该用户的现有部门归属会被替换）。"), _assignDeptName)</p>
+        <SbField Label="@L10n.T(Keys.Content.IdentityDirectorySelectUser, "选择用户")" Required="true" Error="@_deptAssignErr">
+            <select class="form-select" @bind="_assignUserId">
+                <option value="0">@L10n.T(Keys.Content.IdentityDirectorySelectUser, "选择用户")</option>
+                @foreach (var user in _users)
+                {
+                    <option value="@String(user, "id")">@TablePresenter.Cell(user, "username")</option>
+                }
+            </select>
+        </SbField>
+        @if (_users.Count == 0)
+        {
+            <p class="muted">@L10n.T(Keys.Content.IdentityDirectoryNoUsers, "暂无可选用户")</p>
+        }
+    </Body>
+    <Footer>
+        <button class="btn btn-outline-secondary btn-sm" @onclick="() => _deptAssignModal = false">@L10n.T(Keys.Content.CommonCancel, "取消")</button>
+        <button class="btn btn-primary btn-sm" @onclick="AssignDept">@L10n.T(Keys.Content.CommonSave, "保存")</button>
+    </Footer>
+</SbModal>
+
+@code {
+    private List<JsonElement> _orgs = new();
+    private List<JsonElement> _departments = new();
+    private List<JsonElement> _groups = new();
+    private List<JsonElement> _roles = new();
+    private List<JsonElement> _users = new();
+    private string _error = "";
+    private bool _loading = true;
+
+    // 新建组织
+    private bool _orgModal;
+    private string _orgCode = "";
+    private string _orgName = "";
+    private string _orgDesc = "";
+    private string _orgErr = "";
+
+    // 新建部门
+    private bool _deptModal;
+    private long _deptOrgId;
+    private string _deptCode = "";
+    private string _deptName = "";
+    private string _deptErr = "";
+
+    // 新建用户组
+    private bool _groupModal;
+    private string _groupCode = "";
+    private string _groupName = "";
+    private HashSet<string> _newGroupRoles = new();
+    private string _groupErr = "";
+
+    // 编辑组角色
+    private bool _rolesModal;
+    private long _editGroupId;
+    private string _editGroupName = "";
+    private HashSet<string> _editGroupRoles = new();
+
+    // 添加成员
+    private bool _memberModal;
+    private long _memberGroupId;
+    private long _memberUserId;
+    private string _memberErr = "";
+
+    // 分配部门
+    private bool _deptAssignModal;
+    private long _assignDeptId;
+    private string _assignDeptName = "";
+    private long _assignUserId;
+    private string _deptAssignErr = "";
+
+    private List<SbColumn<JsonElement>> OrgColumns => new()
+    {
+        SbCol.Of<JsonElement>(L10n.T(Keys.Content.IdentityDirectoryColCode, "编码"), r => TablePresenter.Cell(r, "code")),
+        SbCol.Of<JsonElement>(L10n.T(Keys.Content.IdentityDirectoryColName, "名称"), r => TablePresenter.Cell(r, "name")),
+        SbCol.Of<JsonElement>(L10n.T(Keys.Content.IdentityDirectoryColDepartments, "部门数"), r => TablePresenter.Cell(r, "departmentCount")),
+    };
+
+    private List<SbColumn<JsonElement>> DeptColumns => new()
+    {
+        SbCol.Of<JsonElement>(L10n.T(Keys.Content.IdentityDirectoryColCode, "编码"), r => TablePresenter.Cell(r, "code")),
+        SbCol.Of<JsonElement>(L10n.T(Keys.Content.IdentityDirectoryColName, "名称"), r => TablePresenter.Cell(r, "name")),
+        SbCol.Of<JsonElement>(L10n.T(Keys.Content.IdentityDirectoryColOrganization, "所属组织"), r => TablePresenter.Cell(r, "organizationName")),
+        SbCol.Of<JsonElement>(L10n.T(Keys.Content.IdentityDirectoryColMembers, "成员数"), r => TablePresenter.Cell(r, "memberCount")),
+    };
+
+    private List<SbColumn<JsonElement>> GroupColumns => new()
+    {
+        SbCol.Of<JsonElement>(L10n.T(Keys.Content.IdentityDirectoryColCode, "编码"), r => TablePresenter.Cell(r, "code")),
+        SbCol.Of<JsonElement>(L10n.T(Keys.Content.IdentityDirectoryColName, "名称"), r => TablePresenter.Cell(r, "name")),
+        SbCol.Of<JsonElement>(L10n.T(Keys.Content.IdentityDirectoryColRoles, "角色"), JoinArray),
+        SbCol.Of<JsonElement>(L10n.T(Keys.Content.IdentityDirectoryColMembers, "成员数"), r => TablePresenter.Cell(r, "memberCount")),
+    };
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender) await Reload();
+    }
+
+    private async Task Reload()
+    {
+        _loading = true;
+        var tid = State.TenantId;
+        var (o, _, oErr, _) = await Api.GetJsonAsync($"api/identity-directory/organizations?tenantId={tid}");
+        _error = oErr ?? "";
+        _orgs = Array(o);
+        var (d, _, _, _) = await Api.GetJsonAsync($"api/identity-directory/departments?tenantId={tid}");
+        _departments = Array(d);
+        var (g, _, _, _) = await Api.GetJsonAsync($"api/identity-directory/user-groups?tenantId={tid}");
+        _groups = Array(g);
+        var (r, _, _, _) = await Api.GetJsonAsync($"api/identity/roles?tenantId={tid}");
+        _roles = Array(r);
+        var (u, _, _, _) = await Api.GetJsonAsync($"api/identity/users?tenantId={tid}");
+        _users = Array(u);
+        _loading = false;
+        StateHasChanged();
+    }
+
+    private static List<JsonElement> Array(JsonElement? e) =>
+        e is { ValueKind: JsonValueKind.Array } ? e.Value.EnumerateArray().ToList() : new();
+
+    private static string String(JsonElement e, string prop) => TablePresenter.Cell(e, prop);
+
+    private static string JoinArray(JsonElement e) =>
+        e.TryGetProperty("roleCodes", out var v) && v.ValueKind == JsonValueKind.Array
+            ? string.Join("、", v.EnumerateArray().Where(x => x.ValueKind == JsonValueKind.String).Select(x => x.GetString()))
+            : string.Empty;
+
+    private static void ToggleSet(HashSet<string> set, string code, bool on)
+    {
+        if (on) set.Add(code);
+        else set.Remove(code);
+    }
+
+    private static HashSet<string> ReadStringArray(JsonElement row, string prop)
+    {
+        var set = new HashSet<string>();
+        if (row.TryGetProperty(prop, out var v) && v.ValueKind == JsonValueKind.Array)
+            foreach (var item in v.EnumerateArray())
+                if (item.ValueKind == JsonValueKind.String) set.Add(item.GetString()!);
+        return set;
+    }
+
+    // ---- 新建组织 ----
+    private void OpenCreateOrg()
+    {
+        _orgCode = ""; _orgName = ""; _orgDesc = ""; _orgErr = "";
+        _orgModal = true;
+    }
+
+    private async Task CreateOrg()
+    {
+        if (string.IsNullOrWhiteSpace(_orgCode))
+        {
+            _orgErr = L10n.T(Keys.Content.IdentityDirectoryCodeRequired, "编码必填。");
+            return;
+        }
+        var (_, status, err, _) = await Api.PostAsync("api/identity-directory/organizations", new
+        {
+            tenantId = State.TenantId,
+            code = _orgCode,
+            name = string.IsNullOrWhiteSpace(_orgName) ? null : _orgName,
+            description = string.IsNullOrWhiteSpace(_orgDesc) ? null : _orgDesc
+        });
+        if (status is >= 200 and < 300)
+        {
+            Toast.Success(string.Format(L10n.T(Keys.Content.IdentityDirectoryOrgCreated, "组织 {0} 已创建。"), _orgCode));
+            _orgModal = false;
+            await Reload();
+        }
+        else
+        {
+            _orgErr = err ?? string.Format(L10n.T(Keys.Content.IdentityDirectoryCreateFailed, "创建失败（HTTP {0}）。"), status);
+        }
+    }
+
+    // ---- 新建部门 ----
+    private void OpenCreateDepartment()
+    {
+        _deptOrgId = _orgs.Count > 0 ? long.TryParse(String(_orgs[0], "id"), out var v) ? v : 0 : 0;
+        _deptCode = ""; _deptName = ""; _deptErr = "";
+        _deptModal = true;
+    }
+
+    private async Task CreateDepartment()
+    {
+        if (_deptOrgId <= 0)
+        {
+            _deptErr = L10n.T(Keys.Content.IdentityDirectorySelectOrgRequired, "请选择所属组织。");
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(_deptCode))
+        {
+            _deptErr = L10n.T(Keys.Content.IdentityDirectoryCodeRequired, "编码必填。");
+            return;
+        }
+        var (_, status, err, _) = await Api.PostAsync("api/identity-directory/departments", new
+        {
+            tenantId = State.TenantId,
+            organizationId = _deptOrgId,
+            code = _deptCode,
+            name = string.IsNullOrWhiteSpace(_deptName) ? null : _deptName
+        });
+        if (status is >= 200 and < 300)
+        {
+            Toast.Success(string.Format(L10n.T(Keys.Content.IdentityDirectoryDeptCreated, "部门 {0} 已创建。"), _deptCode));
+            _deptModal = false;
+            await Reload();
+        }
+        else
+        {
+            _deptErr = err ?? string.Format(L10n.T(Keys.Content.IdentityDirectoryCreateFailed, "创建失败（HTTP {0}）。"), status);
+        }
+    }
+
+    // ---- 新建用户组 ----
+    private void OpenCreateGroup()
+    {
+        _groupCode = ""; _groupName = ""; _newGroupRoles.Clear(); _groupErr = "";
+        _groupModal = true;
+    }
+
+    private async Task CreateGroup()
+    {
+        if (string.IsNullOrWhiteSpace(_groupCode))
+        {
+            _groupErr = L10n.T(Keys.Content.IdentityDirectoryCodeRequired, "编码必填。");
+            return;
+        }
+        var (_, status, err, _) = await Api.PostAsync("api/identity-directory/user-groups", new
+        {
+            tenantId = State.TenantId,
+            code = _groupCode,
+            name = string.IsNullOrWhiteSpace(_groupName) ? null : _groupName,
+            roleCodes = _newGroupRoles.ToArray()
+        });
+        if (status is >= 200 and < 300)
+        {
+            Toast.Success(string.Format(L10n.T(Keys.Content.IdentityDirectoryGroupCreated, "用户组 {0} 已创建。"), _groupCode));
+            _groupModal = false;
+            await Reload();
+        }
+        else
+        {
+            _groupErr = err ?? string.Format(L10n.T(Keys.Content.IdentityDirectoryCreateFailed, "创建失败（HTTP {0}）。"), status);
+        }
+    }
+
+    // ---- 编辑组角色 ----
+    private void OpenEditRoles(JsonElement row)
+    {
+        _editGroupId = long.TryParse(TablePresenter.Cell(row, "id"), out var id) ? id : 0;
+        _editGroupName = TablePresenter.Cell(row, "name");
+        _editGroupRoles = ReadStringArray(row, "roleCodes");
+        _rolesModal = true;
+    }
+
+    private async Task SaveGroupRoles()
+    {
+        var (_, status, err, _) = await Api.PutAsync($"api/identity-directory/user-groups/{_editGroupId}/roles?tenantId={State.TenantId}", new
+        {
+            roleCodes = _editGroupRoles.ToArray()
+        });
+        if (status is >= 200 and < 300)
+        {
+            Toast.Success(L10n.T(Keys.Content.IdentityDirectoryRolesUpdated, "用户组角色已更新。"));
+            _rolesModal = false;
+            await Reload();
+        }
+        else
+        {
+            Toast.Error(err ?? string.Format(L10n.T(Keys.Content.IdentityDirectoryCreateFailed, "创建失败（HTTP {0}）。"), status));
+        }
+    }
+
+    // ---- 添加成员 ----
+    private void OpenAddMember(JsonElement row)
+    {
+        _memberGroupId = long.TryParse(TablePresenter.Cell(row, "id"), out var id) ? id : 0;
+        _memberUserId = 0; _memberErr = "";
+        _memberModal = true;
+    }
+
+    private async Task AddMember()
+    {
+        if (_memberUserId <= 0)
+        {
+            _memberErr = L10n.T(Keys.Content.IdentityDirectorySelectUser, "选择用户");
+            return;
+        }
+        var (_, status, err, _) = await Api.PostAsync($"api/identity-directory/user-groups/{_memberGroupId}/members?tenantId={State.TenantId}", new
+        {
+            userId = _memberUserId
+        });
+        if (status is >= 200 and < 300)
+        {
+            Toast.Success(L10n.T(Keys.Content.IdentityDirectoryMemberAdded, "成员已加入用户组。"));
+            _memberModal = false;
+            await Reload();
+        }
+        else
+        {
+            _memberErr = err ?? string.Format(L10n.T(Keys.Content.IdentityDirectoryCreateFailed, "创建失败（HTTP {0}）。"), status);
+        }
+    }
+
+    // ---- 分配部门 ----
+    private void OpenAssignDept(JsonElement row)
+    {
+        _assignDeptId = long.TryParse(TablePresenter.Cell(row, "id"), out var id) ? id : 0;
+        _assignDeptName = TablePresenter.Cell(row, "name");
+        _assignUserId = 0; _deptAssignErr = "";
+        _deptAssignModal = true;
+    }
+
+    private async Task AssignDept()
+    {
+        if (_assignUserId <= 0)
+        {
+            _deptAssignErr = L10n.T(Keys.Content.IdentityDirectorySelectUser, "选择用户");
+            return;
+        }
+        var (_, status, err, _) = await Api.PutAsync($"api/identity-directory/users/{_assignUserId}/department?tenantId={State.TenantId}", new
+        {
+            departmentId = _assignDeptId
+        });
+        if (status is >= 200 and < 300)
+        {
+            Toast.Success(string.Format(L10n.T(Keys.Content.IdentityDirectoryDeptAssigned, "已将用户归属到部门「{0}」。"), _assignDeptName));
+            _deptAssignModal = false;
+            await Reload();
+        }
+        else
+        {
+            _deptAssignErr = err ?? string.Format(L10n.T(Keys.Content.IdentityDirectoryCreateFailed, "创建失败（HTTP {0}）。"), status);
+        }
+    }
+}

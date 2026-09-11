@@ -316,6 +316,8 @@ builder.Services.AddScoped<IAgentRuntime, AgentRuntime>();
 
 // P10.1 Identity / RBAC（确定性，不调 LLM）
 builder.Services.AddScoped<IIdentityService, IdentityService>();
+// M12-17：Identity 组织目录（组织/部门/用户组，与 RBAC 关联）
+builder.Services.AddScoped<IIdentityDirectoryService, IdentityDirectoryService>();
 builder.Services.AddScoped<ITenantMembershipService, TenantMembershipService>();
 builder.Services.AddScoped<ISelfRegistrationService, SelfRegistrationService>();
 builder.Services.AddScoped<IDemoDataInstaller, DemoDataInstaller>();

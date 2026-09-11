@@ -1,4 +1,4 @@
-namespace SuperBuilder_AI.Models.Localization;
+﻿namespace SuperBuilder_AI.Models.Localization;
 
 /// <summary>
 /// 界面资源键权威注册表（M3-G0「稳定资源键」；M3-04 增补模块/页面/默认值/废弃元数据）。
@@ -283,6 +283,54 @@ public static class ResourceKeys
         public const string MetricCenterColDimension = "Content.MetricCenterColDimension";
         public const string MetricCenterColDescription = "Content.MetricCenterColDescription";
         public const string MetricCenterEditHint = "Content.MetricCenterEditHint";
+        public const string IdentityDirectoryDesc = "Content.IdentityDirectoryDesc";
+        public const string IdentityDirectoryNewOrg = "Content.IdentityDirectoryNewOrg";
+        public const string IdentityDirectoryNewDepartment = "Content.IdentityDirectoryNewDepartment";
+        public const string IdentityDirectoryNewGroup = "Content.IdentityDirectoryNewGroup";
+        public const string IdentityDirectoryLoading = "Content.IdentityDirectoryLoading";
+        public const string IdentityDirectoryStatOrgs = "Content.IdentityDirectoryStatOrgs";
+        public const string IdentityDirectoryStatOrgsSub = "Content.IdentityDirectoryStatOrgsSub";
+        public const string IdentityDirectoryStatDepartments = "Content.IdentityDirectoryStatDepartments";
+        public const string IdentityDirectoryStatDepartmentsSub = "Content.IdentityDirectoryStatDepartmentsSub";
+        public const string IdentityDirectoryStatGroups = "Content.IdentityDirectoryStatGroups";
+        public const string IdentityDirectoryStatGroupsSub = "Content.IdentityDirectoryStatGroupsSub";
+        public const string IdentityDirectoryTabOrgs = "Content.IdentityDirectoryTabOrgs";
+        public const string IdentityDirectoryTabDepartments = "Content.IdentityDirectoryTabDepartments";
+        public const string IdentityDirectoryTabGroups = "Content.IdentityDirectoryTabGroups";
+        public const string IdentityDirectoryEmptyOrgs = "Content.IdentityDirectoryEmptyOrgs";
+        public const string IdentityDirectoryEmptyOrgsText = "Content.IdentityDirectoryEmptyOrgsText";
+        public const string IdentityDirectoryEmptyDepartments = "Content.IdentityDirectoryEmptyDepartments";
+        public const string IdentityDirectoryEmptyDepartmentsText = "Content.IdentityDirectoryEmptyDepartmentsText";
+        public const string IdentityDirectoryEmptyGroups = "Content.IdentityDirectoryEmptyGroups";
+        public const string IdentityDirectoryEmptyGroupsText = "Content.IdentityDirectoryEmptyGroupsText";
+        public const string IdentityDirectoryGroupRoleHint = "Content.IdentityDirectoryGroupRoleHint";
+        public const string IdentityDirectoryEditRoles = "Content.IdentityDirectoryEditRoles";
+        public const string IdentityDirectoryEditRolesHint = "Content.IdentityDirectoryEditRolesHint";
+        public const string IdentityDirectoryAddMember = "Content.IdentityDirectoryAddMember";
+        public const string IdentityDirectoryAssignDept = "Content.IdentityDirectoryAssignDept";
+        public const string IdentityDirectoryAssignHint = "Content.IdentityDirectoryAssignHint";
+        public const string IdentityDirectorySelectUser = "Content.IdentityDirectorySelectUser";
+        public const string IdentityDirectorySelectOrg = "Content.IdentityDirectorySelectOrg";
+        public const string IdentityDirectorySelectOrgRequired = "Content.IdentityDirectorySelectOrgRequired";
+        public const string IdentityDirectoryNoRoles = "Content.IdentityDirectoryNoRoles";
+        public const string IdentityDirectoryNoUsers = "Content.IdentityDirectoryNoUsers";
+        public const string IdentityDirectoryColCode = "Content.IdentityDirectoryColCode";
+        public const string IdentityDirectoryColName = "Content.IdentityDirectoryColName";
+        public const string IdentityDirectoryColOrganization = "Content.IdentityDirectoryColOrganization";
+        public const string IdentityDirectoryColDepartments = "Content.IdentityDirectoryColDepartments";
+        public const string IdentityDirectoryColRoles = "Content.IdentityDirectoryColRoles";
+        public const string IdentityDirectoryColMembers = "Content.IdentityDirectoryColMembers";
+        public const string IdentityDirectoryOrgCodePh = "Content.IdentityDirectoryOrgCodePh";
+        public const string IdentityDirectoryDeptCodePh = "Content.IdentityDirectoryDeptCodePh";
+        public const string IdentityDirectoryGroupCodePh = "Content.IdentityDirectoryGroupCodePh";
+        public const string IdentityDirectoryCodeRequired = "Content.IdentityDirectoryCodeRequired";
+        public const string IdentityDirectoryOrgCreated = "Content.IdentityDirectoryOrgCreated";
+        public const string IdentityDirectoryDeptCreated = "Content.IdentityDirectoryDeptCreated";
+        public const string IdentityDirectoryGroupCreated = "Content.IdentityDirectoryGroupCreated";
+        public const string IdentityDirectoryCreateFailed = "Content.IdentityDirectoryCreateFailed";
+        public const string IdentityDirectoryRolesUpdated = "Content.IdentityDirectoryRolesUpdated";
+        public const string IdentityDirectoryMemberAdded = "Content.IdentityDirectoryMemberAdded";
+        public const string IdentityDirectoryDeptAssigned = "Content.IdentityDirectoryDeptAssigned";
 
         // BusinessModelEntityDetail（实体详情）
         public const string BusinessModelEntityLoading = "Content.BusinessModelEntityLoading";
@@ -1609,6 +1657,7 @@ public static class ResourceKeys
         public const string SemanticLabels = "Nav.SemanticLabels";
         public const string BusinessModel = "Nav.BusinessModel";
         public const string MetricCenter = "Nav.MetricCenter";
+        public const string IdentityDirectory = "Nav.IdentityDirectory";
         public const string Components = "Nav.Components";
         public const string ThemeEditor = "Nav.ThemeEditor";
         public const string DataSources = "Nav.DataSources";
@@ -1889,6 +1938,54 @@ public static class ResourceKeys
         [Content.MetricCenterColDimension] = new("Content", Page: "MetricCenter", DefaultValue: "Dimension"),
         [Content.MetricCenterColDescription] = new("Content", Page: "MetricCenter", DefaultValue: "Description"),
         [Content.MetricCenterEditHint] = new("Content", Page: "MetricCenter", DefaultValue: "This page is a read-only governance view; editing metrics and dimensions is planned for a later milestone."),
+        [Content.IdentityDirectoryDesc] = new("Content", Page: "IdentityDirectory", DefaultValue: "Manage organizations, departments and user groups in this tenant; groups carry roles so members gain matching permissions (RBAC-linked)."),
+        [Content.IdentityDirectoryNewOrg] = new("Content", Page: "IdentityDirectory", DefaultValue: "New organization"),
+        [Content.IdentityDirectoryNewDepartment] = new("Content", Page: "IdentityDirectory", DefaultValue: "New department"),
+        [Content.IdentityDirectoryNewGroup] = new("Content", Page: "IdentityDirectory", DefaultValue: "New user group"),
+        [Content.IdentityDirectoryLoading] = new("Content", Page: "IdentityDirectory", DefaultValue: "Loading directory…"),
+        [Content.IdentityDirectoryStatOrgs] = new("Content", Page: "IdentityDirectory", DefaultValue: "Organizations"),
+        [Content.IdentityDirectoryStatOrgsSub] = new("Content", Page: "IdentityDirectory", DefaultValue: "Structural units"),
+        [Content.IdentityDirectoryStatDepartments] = new("Content", Page: "IdentityDirectory", DefaultValue: "Departments"),
+        [Content.IdentityDirectoryStatDepartmentsSub] = new("Content", Page: "IdentityDirectory", DefaultValue: "Under organizations"),
+        [Content.IdentityDirectoryStatGroups] = new("Content", Page: "IdentityDirectory", DefaultValue: "User groups"),
+        [Content.IdentityDirectoryStatGroupsSub] = new("Content", Page: "IdentityDirectory", DefaultValue: "Carry role grants"),
+        [Content.IdentityDirectoryTabOrgs] = new("Content", Page: "IdentityDirectory", DefaultValue: "Organizations"),
+        [Content.IdentityDirectoryTabDepartments] = new("Content", Page: "IdentityDirectory", DefaultValue: "Departments"),
+        [Content.IdentityDirectoryTabGroups] = new("Content", Page: "IdentityDirectory", DefaultValue: "User groups"),
+        [Content.IdentityDirectoryEmptyOrgs] = new("Content", Page: "IdentityDirectory", DefaultValue: "No organizations"),
+        [Content.IdentityDirectoryEmptyOrgsText] = new("Content", Page: "IdentityDirectory", DefaultValue: "Organizations are the top-level structural units; departments belong to them."),
+        [Content.IdentityDirectoryEmptyDepartments] = new("Content", Page: "IdentityDirectory", DefaultValue: "No departments"),
+        [Content.IdentityDirectoryEmptyDepartmentsText] = new("Content", Page: "IdentityDirectory", DefaultValue: "Departments belong to an organization; users can be assigned to a department."),
+        [Content.IdentityDirectoryEmptyGroups] = new("Content", Page: "IdentityDirectory", DefaultValue: "No user groups"),
+        [Content.IdentityDirectoryEmptyGroupsText] = new("Content", Page: "IdentityDirectory", DefaultValue: "User groups are cross-cutting function sets that carry roles and grant them to members."),
+        [Content.IdentityDirectoryGroupRoleHint] = new("Content", Page: "IdentityDirectory", DefaultValue: "Groups carry roles; members gain permissions through group roles (unioned with direct roles)."),
+        [Content.IdentityDirectoryEditRoles] = new("Content", Page: "IdentityDirectory", DefaultValue: "Edit roles"),
+        [Content.IdentityDirectoryEditRolesHint] = new("Content", Page: "IdentityDirectory", DefaultValue: "Roles carried by group {0} (full replacement); members gain permissions through group roles."),
+        [Content.IdentityDirectoryAddMember] = new("Content", Page: "IdentityDirectory", DefaultValue: "Add member"),
+        [Content.IdentityDirectoryAssignDept] = new("Content", Page: "IdentityDirectory", DefaultValue: "Assign member"),
+        [Content.IdentityDirectoryAssignHint] = new("Content", Page: "IdentityDirectory", DefaultValue: "Assign the user to department {0} (their current department assignment is replaced)."),
+        [Content.IdentityDirectorySelectUser] = new("Content", Page: "IdentityDirectory", DefaultValue: "Select user"),
+        [Content.IdentityDirectorySelectOrg] = new("Content", Page: "IdentityDirectory", DefaultValue: "— Select organization —"),
+        [Content.IdentityDirectorySelectOrgRequired] = new("Content", Page: "IdentityDirectory", DefaultValue: "Please select an organization."),
+        [Content.IdentityDirectoryNoRoles] = new("Content", Page: "IdentityDirectory", DefaultValue: "No roles available"),
+        [Content.IdentityDirectoryNoUsers] = new("Content", Page: "IdentityDirectory", DefaultValue: "No users available"),
+        [Content.IdentityDirectoryColCode] = new("Content", Page: "IdentityDirectory", DefaultValue: "Code"),
+        [Content.IdentityDirectoryColName] = new("Content", Page: "IdentityDirectory", DefaultValue: "Name"),
+        [Content.IdentityDirectoryColOrganization] = new("Content", Page: "IdentityDirectory", DefaultValue: "Organization"),
+        [Content.IdentityDirectoryColDepartments] = new("Content", Page: "IdentityDirectory", DefaultValue: "Departments"),
+        [Content.IdentityDirectoryColRoles] = new("Content", Page: "IdentityDirectory", DefaultValue: "Roles"),
+        [Content.IdentityDirectoryColMembers] = new("Content", Page: "IdentityDirectory", DefaultValue: "Members"),
+        [Content.IdentityDirectoryOrgCodePh] = new("Content", Page: "IdentityDirectory", DefaultValue: "e.g. hq"),
+        [Content.IdentityDirectoryDeptCodePh] = new("Content", Page: "IdentityDirectory", DefaultValue: "e.g. sales"),
+        [Content.IdentityDirectoryGroupCodePh] = new("Content", Page: "IdentityDirectory", DefaultValue: "e.g. analysts"),
+        [Content.IdentityDirectoryCodeRequired] = new("Content", Page: "IdentityDirectory", DefaultValue: "Code is required."),
+        [Content.IdentityDirectoryOrgCreated] = new("Content", Page: "IdentityDirectory", DefaultValue: "Organization {0} created."),
+        [Content.IdentityDirectoryDeptCreated] = new("Content", Page: "IdentityDirectory", DefaultValue: "Department {0} created."),
+        [Content.IdentityDirectoryGroupCreated] = new("Content", Page: "IdentityDirectory", DefaultValue: "User group {0} created."),
+        [Content.IdentityDirectoryCreateFailed] = new("Content", Page: "IdentityDirectory", DefaultValue: "Create failed (HTTP {0})."),
+        [Content.IdentityDirectoryRolesUpdated] = new("Content", Page: "IdentityDirectory", DefaultValue: "User group roles updated."),
+        [Content.IdentityDirectoryMemberAdded] = new("Content", Page: "IdentityDirectory", DefaultValue: "Member added to the user group."),
+        [Content.IdentityDirectoryDeptAssigned] = new("Content", Page: "IdentityDirectory", DefaultValue: "User assigned to department {0}."),
 
         [Content.BusinessModelEntityLoading] = new("Content", Page: "BusinessModelEntityDetail", DefaultValue: "Loading entity details…"),
         [Content.BusinessModelEntityPanelDetail] = new("Content", Page: "BusinessModelEntityDetail", DefaultValue: "Details"),
@@ -2103,6 +2200,7 @@ public static class ResourceKeys
         [Nav.SemanticLabels] = new("Nav", Page: "SemanticLabels", DefaultValue: "Semantic Labels"),
         [Nav.BusinessModel] = new("Nav", Page: "BusinessModel", DefaultValue: "Semantic Model"),
         [Nav.MetricCenter] = new("Nav", Page: "MetricCenter", DefaultValue: "Metric Center"),
+        [Nav.IdentityDirectory] = new("Nav", Page: "IdentityDirectory", DefaultValue: "Organization Directory"),
         [Nav.Components] = new("Nav", Page: "Components", DefaultValue: "Component Library"),
         [Nav.ThemeEditor] = new("Nav", Page: "ThemeEditor", DefaultValue: "Theme Editor"),
         [Nav.ModelAccounts] = new("Nav", Page: "ModelAccounts", DefaultValue: "Models & Accounts"),

@@ -1,4 +1,4 @@
-namespace SuperBuilder_AI.Components.Localization;
+﻿namespace SuperBuilder_AI.Components.Localization;
 
 /// <summary>
 /// 前端资源键常量（RCL 内部副本）。
@@ -187,6 +187,7 @@ public static class Keys
         public const string SemanticLabels = "Nav.SemanticLabels";
         public const string BusinessModel = "Nav.BusinessModel";
         public const string MetricCenter = "Nav.MetricCenter";
+        public const string IdentityDirectory = "Nav.IdentityDirectory";
         public const string Components = "Nav.Components";
         public const string ThemeEditor = "Nav.ThemeEditor";
         public const string DataSources = "Nav.DataSources";
@@ -316,6 +317,54 @@ public static class Keys
         public const string MetricCenterColDimension = "Content.MetricCenterColDimension";
         public const string MetricCenterColDescription = "Content.MetricCenterColDescription";
         public const string MetricCenterEditHint = "Content.MetricCenterEditHint";
+        public const string IdentityDirectoryDesc = "Content.IdentityDirectoryDesc";
+        public const string IdentityDirectoryNewOrg = "Content.IdentityDirectoryNewOrg";
+        public const string IdentityDirectoryNewDepartment = "Content.IdentityDirectoryNewDepartment";
+        public const string IdentityDirectoryNewGroup = "Content.IdentityDirectoryNewGroup";
+        public const string IdentityDirectoryLoading = "Content.IdentityDirectoryLoading";
+        public const string IdentityDirectoryStatOrgs = "Content.IdentityDirectoryStatOrgs";
+        public const string IdentityDirectoryStatOrgsSub = "Content.IdentityDirectoryStatOrgsSub";
+        public const string IdentityDirectoryStatDepartments = "Content.IdentityDirectoryStatDepartments";
+        public const string IdentityDirectoryStatDepartmentsSub = "Content.IdentityDirectoryStatDepartmentsSub";
+        public const string IdentityDirectoryStatGroups = "Content.IdentityDirectoryStatGroups";
+        public const string IdentityDirectoryStatGroupsSub = "Content.IdentityDirectoryStatGroupsSub";
+        public const string IdentityDirectoryTabOrgs = "Content.IdentityDirectoryTabOrgs";
+        public const string IdentityDirectoryTabDepartments = "Content.IdentityDirectoryTabDepartments";
+        public const string IdentityDirectoryTabGroups = "Content.IdentityDirectoryTabGroups";
+        public const string IdentityDirectoryEmptyOrgs = "Content.IdentityDirectoryEmptyOrgs";
+        public const string IdentityDirectoryEmptyOrgsText = "Content.IdentityDirectoryEmptyOrgsText";
+        public const string IdentityDirectoryEmptyDepartments = "Content.IdentityDirectoryEmptyDepartments";
+        public const string IdentityDirectoryEmptyDepartmentsText = "Content.IdentityDirectoryEmptyDepartmentsText";
+        public const string IdentityDirectoryEmptyGroups = "Content.IdentityDirectoryEmptyGroups";
+        public const string IdentityDirectoryEmptyGroupsText = "Content.IdentityDirectoryEmptyGroupsText";
+        public const string IdentityDirectoryGroupRoleHint = "Content.IdentityDirectoryGroupRoleHint";
+        public const string IdentityDirectoryEditRoles = "Content.IdentityDirectoryEditRoles";
+        public const string IdentityDirectoryEditRolesHint = "Content.IdentityDirectoryEditRolesHint";
+        public const string IdentityDirectoryAddMember = "Content.IdentityDirectoryAddMember";
+        public const string IdentityDirectoryAssignDept = "Content.IdentityDirectoryAssignDept";
+        public const string IdentityDirectoryAssignHint = "Content.IdentityDirectoryAssignHint";
+        public const string IdentityDirectorySelectUser = "Content.IdentityDirectorySelectUser";
+        public const string IdentityDirectorySelectOrg = "Content.IdentityDirectorySelectOrg";
+        public const string IdentityDirectorySelectOrgRequired = "Content.IdentityDirectorySelectOrgRequired";
+        public const string IdentityDirectoryNoRoles = "Content.IdentityDirectoryNoRoles";
+        public const string IdentityDirectoryNoUsers = "Content.IdentityDirectoryNoUsers";
+        public const string IdentityDirectoryColCode = "Content.IdentityDirectoryColCode";
+        public const string IdentityDirectoryColName = "Content.IdentityDirectoryColName";
+        public const string IdentityDirectoryColOrganization = "Content.IdentityDirectoryColOrganization";
+        public const string IdentityDirectoryColDepartments = "Content.IdentityDirectoryColDepartments";
+        public const string IdentityDirectoryColRoles = "Content.IdentityDirectoryColRoles";
+        public const string IdentityDirectoryColMembers = "Content.IdentityDirectoryColMembers";
+        public const string IdentityDirectoryOrgCodePh = "Content.IdentityDirectoryOrgCodePh";
+        public const string IdentityDirectoryDeptCodePh = "Content.IdentityDirectoryDeptCodePh";
+        public const string IdentityDirectoryGroupCodePh = "Content.IdentityDirectoryGroupCodePh";
+        public const string IdentityDirectoryCodeRequired = "Content.IdentityDirectoryCodeRequired";
+        public const string IdentityDirectoryOrgCreated = "Content.IdentityDirectoryOrgCreated";
+        public const string IdentityDirectoryDeptCreated = "Content.IdentityDirectoryDeptCreated";
+        public const string IdentityDirectoryGroupCreated = "Content.IdentityDirectoryGroupCreated";
+        public const string IdentityDirectoryCreateFailed = "Content.IdentityDirectoryCreateFailed";
+        public const string IdentityDirectoryRolesUpdated = "Content.IdentityDirectoryRolesUpdated";
+        public const string IdentityDirectoryMemberAdded = "Content.IdentityDirectoryMemberAdded";
+        public const string IdentityDirectoryDeptAssigned = "Content.IdentityDirectoryDeptAssigned";
 
         // BusinessModelEntityDetail（实体详情）
         public const string BusinessModelEntityLoading = "Content.BusinessModelEntityLoading";
@@ -1792,6 +1841,7 @@ public static class Keys
         [Nav.SemanticLabels] = new("语义标签", "Semantic Labels"),
         [Nav.BusinessModel] = new("语义模型", "Semantic Model"),
         [Nav.MetricCenter] = new("指标中心", "Metric Center"),
+        [Nav.IdentityDirectory] = new("组织目录", "Organization Directory"),
         [Nav.Components] = new("组件库", "Component Library"),
         [Nav.ThemeEditor] = new("主题编辑器", "Theme Editor"),
         [Nav.DataSources] = new("数据源", "Data Sources"),
@@ -1908,6 +1958,54 @@ public static class Keys
         [Content.MetricCenterColDimension] = new("维度", "Dimension"),
         [Content.MetricCenterColDescription] = new("描述", "Description"),
         [Content.MetricCenterEditHint] = new("本页为只读治理视图；指标与维度的编辑（含计算口径）将随后续里程碑开放。", "This page is a read-only governance view; editing metrics and dimensions is planned for a later milestone."),
+        [Content.IdentityDirectoryDesc] = new("管理租户内的组织、部门与用户组；用户组承载角色，成员经组获得对应权限（与 RBAC 联动）。", "Manage organizations, departments and user groups in this tenant; groups carry roles so members gain matching permissions (RBAC-linked)."),
+        [Content.IdentityDirectoryNewOrg] = new("新建组织", "New organization"),
+        [Content.IdentityDirectoryNewDepartment] = new("新建部门", "New department"),
+        [Content.IdentityDirectoryNewGroup] = new("新建用户组", "New user group"),
+        [Content.IdentityDirectoryLoading] = new("正在加载组织目录…", "Loading directory…"),
+        [Content.IdentityDirectoryStatOrgs] = new("组织", "Organizations"),
+        [Content.IdentityDirectoryStatOrgsSub] = new("租户内结构单元", "Structural units"),
+        [Content.IdentityDirectoryStatDepartments] = new("部门", "Departments"),
+        [Content.IdentityDirectoryStatDepartmentsSub] = new("隶属组织", "Under organizations"),
+        [Content.IdentityDirectoryStatGroups] = new("用户组", "User groups"),
+        [Content.IdentityDirectoryStatGroupsSub] = new("承载角色授权", "Carry role grants"),
+        [Content.IdentityDirectoryTabOrgs] = new("组织", "Organizations"),
+        [Content.IdentityDirectoryTabDepartments] = new("部门", "Departments"),
+        [Content.IdentityDirectoryTabGroups] = new("用户组", "User groups"),
+        [Content.IdentityDirectoryEmptyOrgs] = new("暂无组织", "No organizations"),
+        [Content.IdentityDirectoryEmptyOrgsText] = new("组织是租户内的顶层结构单元，部门隶属组织。", "Organizations are the top-level structural units; departments belong to them."),
+        [Content.IdentityDirectoryEmptyDepartments] = new("暂无部门", "No departments"),
+        [Content.IdentityDirectoryEmptyDepartmentsText] = new("部门隶属某个组织，用户可归属部门。", "Departments belong to an organization; users can be assigned to a department."),
+        [Content.IdentityDirectoryEmptyGroups] = new("暂无用户组", "No user groups"),
+        [Content.IdentityDirectoryEmptyGroupsText] = new("用户组是横切的职能集合，可承载角色并批量授权成员。", "User groups are cross-cutting function sets that carry roles and grant them to members."),
+        [Content.IdentityDirectoryGroupRoleHint] = new("用户组承载角色；组内成员经组角色获得权限（与直接角色并集）。", "Groups carry roles; members gain permissions through group roles (unioned with direct roles)."),
+        [Content.IdentityDirectoryEditRoles] = new("编辑角色", "Edit roles"),
+        [Content.IdentityDirectoryEditRolesHint] = new("用户组「{0}」承载的角色（全量替换）；组内成员经组角色获得权限。", "Roles carried by group {0} (full replacement); members gain permissions through group roles."),
+        [Content.IdentityDirectoryAddMember] = new("添加成员", "Add member"),
+        [Content.IdentityDirectoryAssignDept] = new("分配成员", "Assign member"),
+        [Content.IdentityDirectoryAssignHint] = new("将用户归属到部门「{0}」（该用户的现有部门归属会被替换）。", "Assign the user to department {0} (their current department assignment is replaced)."),
+        [Content.IdentityDirectorySelectUser] = new("选择用户", "Select user"),
+        [Content.IdentityDirectorySelectOrg] = new("— 选择组织 —", "— Select organization —"),
+        [Content.IdentityDirectorySelectOrgRequired] = new("请选择所属组织。", "Please select an organization."),
+        [Content.IdentityDirectoryNoRoles] = new("暂无可选角色", "No roles available"),
+        [Content.IdentityDirectoryNoUsers] = new("暂无可选用户", "No users available"),
+        [Content.IdentityDirectoryColCode] = new("编码", "Code"),
+        [Content.IdentityDirectoryColName] = new("名称", "Name"),
+        [Content.IdentityDirectoryColOrganization] = new("所属组织", "Organization"),
+        [Content.IdentityDirectoryColDepartments] = new("部门数", "Departments"),
+        [Content.IdentityDirectoryColRoles] = new("角色", "Roles"),
+        [Content.IdentityDirectoryColMembers] = new("成员数", "Members"),
+        [Content.IdentityDirectoryOrgCodePh] = new("如 hq", "e.g. hq"),
+        [Content.IdentityDirectoryDeptCodePh] = new("如 sales", "e.g. sales"),
+        [Content.IdentityDirectoryGroupCodePh] = new("如 analysts", "e.g. analysts"),
+        [Content.IdentityDirectoryCodeRequired] = new("编码必填。", "Code is required."),
+        [Content.IdentityDirectoryOrgCreated] = new("组织 {0} 已创建。", "Organization {0} created."),
+        [Content.IdentityDirectoryDeptCreated] = new("部门 {0} 已创建。", "Department {0} created."),
+        [Content.IdentityDirectoryGroupCreated] = new("用户组 {0} 已创建。", "User group {0} created."),
+        [Content.IdentityDirectoryCreateFailed] = new("创建失败（HTTP {0}）。", "Create failed (HTTP {0})."),
+        [Content.IdentityDirectoryRolesUpdated] = new("用户组角色已更新。", "User group roles updated."),
+        [Content.IdentityDirectoryMemberAdded] = new("成员已加入用户组。", "Member added to the user group."),
+        [Content.IdentityDirectoryDeptAssigned] = new("已将用户归属到部门「{0}」。", "User assigned to department {0}."),
 
         [Content.BusinessModelEntityLoading] = new("正在加载实体详情…", "Loading entity details…"),
         [Content.BusinessModelEntityPanelDetail] = new("详情", "Details"),
