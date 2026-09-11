@@ -106,6 +106,11 @@ jobs:
           ConnectionStrings__DefaultConnection: "Server=127.0.0.1,1433;Database=SuperBuilder_C13_3;User Id=sa;Password=${{ env.TEST_SQL_PASSWORD }};TrustServerCertificate=True;"
           Qdrant__Host: 127.0.0.1
           Qdrant__Port: 6334
+          # V2.6 修复：/api/metadata-vector/rebuild 受 DiagnosticsAccessPolicy 保护，需 platform:diagnostics:manage。
+          # CI 此前匿名调用返回 401。经 PlatformBootstrap 配置落地一名平台管理员（幂等），
+          # 供本 job 登录后持令牌调用该管理端点。仅 CI 测试环境使用。
+          PlatformBootstrap__Username: "ci-platform-admin"
+          PlatformBootstrap__Password: "C13_3_CI_Admin_Pass_2026"
         run: |
           dotnet run --project SuperBuilder_AI/SuperBuilder_AI.csproj --configuration Release --no-restore --no-build --urls http://127.0.0.1:5050 > /tmp/superbuilder-api.log 2>&1 &
           echo $! > /tmp/superbuilder-api.pid
@@ -123,9 +128,27 @@ jobs:
         run: |
           curl --fail --silent --show-error http://127.0.0.1:5050/evaluation/diagnostics/metadata-fixture/import | tee /tmp/metadata-fixture.json
           grep -q '"passed":true' /tmp/metadata-fixture.json
-      - name: 通过现有 Controller 重建 Metadata Vector
+      - name: 获取平台管理员令牌（platform:diagnostics:manage）
         run: |
-          curl --fail --silent --show-error http://127.0.0.1:5050/api/metadata-vector/rebuild | tee /tmp/metadata-rebuild.json
+          # platform 租户在全新 CI 库由 IdentityService 种子首位创建；经 SQL 容器直接读取 Id，避免硬编码。
+          TID=$(docker exec superbuilder-c13-3-sqlserver /opt/mssql-tools18/bin/sqlcmd \
+            -C -S localhost -U sa -P "${{ env.TEST_SQL_PASSWORD }}" \
+            -d SuperBuilder_C13_3 -h -1 -W \
+            -Q "SELECT Id FROM dbo.Tenants WHERE TenantCode='platform'" | tr -d '[:space:]')
+          echo "Platform tenant id = $TID"
+          [ -n "$TID" ] || { echo "::error::未能解析 platform 租户 ID"; exit 1; }
+
+          LOGIN_BODY=$(jq -n --arg u "ci-platform-admin" --argjson t "$TID" --arg p "C13_3_CI_Admin_Pass_2026" \
+            '{username:$u, tenantId:$t, password:$p}')
+          TOKEN=$(curl --fail --silent --show-error -X POST http://127.0.0.1:5050/api/auth/login \
+            -H 'Content-Type: application/json' -d "$LOGIN_BODY" | jq -r '.token')
+          [ -n "$TOKEN" ] && [ "$TOKEN" != "null" ] || { echo "::error::平台管理员登录失败，未获取到令牌"; exit 1; }
+          echo "::add-mask::$TOKEN"
+          echo "CI_PLATFORM_TOKEN=$TOKEN" >> "$GITHUB_ENV"
+      - name: 通过现有 Controller 重建 Metadata Vector（持令牌）
+        run: |
+          curl --fail --silent --show-error -H "Authorization: Bearer ${{ env.CI_PLATFORM_TOKEN }}" \
+            http://127.0.0.1:5050/api/metadata-vector/rebuild | tee /tmp/metadata-rebuild.json
           grep -q '"success":true' /tmp/metadata-rebuild.json
           test "$(jq '.tableCount' /tmp/metadata-rebuild.json)" -gt 0
           test "$(jq '.columnVectorCount' /tmp/metadata-rebuild.json)" -gt 0
