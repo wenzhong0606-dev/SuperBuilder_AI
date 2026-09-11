@@ -1,0 +1,286 @@
+@page "/agent/runs/{Id}"
+@inject IApiClient Api
+@inject AppState State
+@inject NavigationManager Nav
+@inject ToastService Toast
+@using System.Text.Json
+@using SuperBuilder_AI.Components.Shared
+
+<AuthGuard>
+    <PageHead Icon="sb-ico-agent" Title="@L10n.T(Keys.Content.AgentRunTitle, "智能体运行")"
+              Desc="@L10n.T(Keys.Content.AgentRunDesc, "查看单次运行的执行历史、工具调用、时长与错误。")">
+        <button class="btn btn-outline-secondary btn-sm" @onclick='() => Nav.NavigateTo("agent")'>@L10n.T(Keys.Content.AgentPlanDetailBack, "返回列表")</button>
+        <button class="btn btn-outline-secondary btn-sm" @onclick="() => Load()">@L10n.T(Keys.Content.CommonRefresh, "刷新")</button>
+        @if (_isApprovalPending)
+        {
+            <PermissionGuard Require="@(new[] { PermissionCodes.AgentManage })" Silent>
+                <button class="btn btn-success btn-sm" @onclick="Approve" disabled="@_acting">@L10n.T(Keys.Content.AgentRunApprove, "通过")</button>
+                <button class="btn btn-danger btn-sm" @onclick="Reject" disabled="@_acting">@L10n.T(Keys.Content.AgentRunReject, "拒绝")</button>
+            </PermissionGuard>
+        }
+    </PageHead>
+
+    @if (_loading)
+    {
+        <LoadingState Text="@L10n.T(Keys.Content.AgentRunLoadingText, "正在加载运行…")" />
+    }
+    else if (_notFound)
+    {
+        <ErrorState Message="@L10n.T(Keys.Content.AgentRunNotFound, "未找到该运行记录。")" OnRetry="() => Load()" />
+    }
+    else if (_error is not null)
+    {
+        <ErrorState Message="@_error" OnRetry="() => Load()" />
+    }
+    else
+    {
+        <SbPanel Icon="sb-ico-agent" Title="@L10n.T(Keys.Content.AgentRunInfoPanel, "运行信息")">
+            <Body>
+                <div class="run-head">
+                    <SbBadge Tone="@StatusTone(_status)">@StatusLabel(_status)</SbBadge>
+                    <span class="run-plan">@_planCode</span>
+                </div>
+                <SbKeyValue Items="@_header" />
+                @if (!string.IsNullOrWhiteSpace(_resultSummary))
+                {
+                    <div class="run-summary"><strong>@L10n.T(Keys.Content.AgentRunResultSummary, "结果摘要")</strong>：@_resultSummary</div>
+                }
+            </Body>
+        </SbPanel>
+
+        <SbPanel Icon="sb-ico-play" Title="@L10n.T(Keys.Content.AgentRunSteps, "执行历史")" Flush="true">
+            <Body>
+                @if (_steps.Count == 0)
+                {
+                    <div class="panel-body">
+                        <SbEmptyState Icon="sb-ico-play" Title="@L10n.T(Keys.Content.AgentRunNoSteps, "该运行暂无步骤记录。")" />
+                    </div>
+                }
+                else
+                {
+                    <div class="row-list">
+                        @foreach (var s in _steps)
+                        {
+                            <div class="row-item">
+                                <span class="ri-ico"><svg><use href="#sb-ico-play" /></svg></span>
+                                <div class="ri-main">
+                                    <div class="ri-title">
+                                        <span class="ri-order">#@s.Order</span> @s.Tool
+                                        <SbBadge Tone="@RiskTone(s.Risk)">@RiskLabel(s.Risk)</SbBadge>
+                                        <SbBadge Tone="@ModeTone(s.Mode)">@ModeLabel(s.Mode)</SbBadge>
+                                        @if (s.Succeeded)
+                                        {
+                                            <SbBadge Tone="success">@L10n.T(Keys.Content.AgentRunStepSucceeded, "成功")</SbBadge>
+                                        }
+                                        else if (!s.PendingApproval)
+                                        {
+                                            <SbBadge Tone="danger">@L10n.T(Keys.Content.AgentRunStepFailed, "失败")</SbBadge>
+                                        }
+                                        @if (s.PendingApproval)
+                                        {
+                                            <SbBadge Tone="warning">@L10n.T(Keys.Content.AgentRunStepPendingApproval, "待审批")</SbBadge>
+                                        }
+                                    </div>
+                                    <div class="ri-sub">
+                                        @L10n.T(Keys.Content.AgentRunStepAttempts, "尝试")：@s.Attempts
+                                        @if (!string.IsNullOrWhiteSpace(s.Output))
+                                        {
+                                            <span> · @L10n.T(Keys.Content.AgentRunStepOutput, "输出")：<code>@Truncate(s.Output)</code></span>
+                                        }
+                                        @if (!string.IsNullOrWhiteSpace(s.Error))
+                                        {
+                                            <span class="text-danger"> · @L10n.T(Keys.Content.AgentRunStepError, "错误")：@s.Error</span>
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+            </Body>
+        </SbPanel>
+    }
+</AuthGuard>
+
+@code {
+    [Parameter] public string Id { get; set; } = "";
+
+    private string _planCode = "";
+    private string _status = "";
+    private string _actor = "";
+    private string _started = "";
+    private string _finished = "";
+    private string _duration = "";
+    private string _resultSummary = "";
+    private List<RunStep> _steps = new();
+    private string? _error;
+    private bool _loading = true;
+    private bool _notFound;
+    private bool _acting;
+
+    private bool _isApprovalPending => string.Equals(_status, "approval_pending", StringComparison.OrdinalIgnoreCase);
+
+    private List<KeyValuePair<string, string>> _header => new()
+    {
+        new(L10n.T(Keys.Content.AgentRunPlanCode, "智能体"), _planCode),
+        new(L10n.T(Keys.Content.AgentRunActor, "触发者"), string.IsNullOrWhiteSpace(_actor) ? "—" : _actor),
+        new(L10n.T(Keys.Content.AgentRunStarted, "开始时间"), _started),
+        new(L10n.T(Keys.Content.AgentRunFinished, "结束时间"), _finished),
+        new(L10n.T(Keys.Content.AgentRunDuration, "时长"), _duration),
+    };
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender) await Load();
+    }
+
+    private async Task Load()
+    {
+        _loading = true;
+        _error = null;
+        _notFound = false;
+        StateHasChanged();
+
+        var (data, status, err, _) = await Api.GetJsonAsync($"api/agent/runs/{Uri.EscapeDataString(Id)}?tenantId={State.TenantId}");
+        if (data is null)
+        {
+            _loading = false;
+            if (status == 404) _notFound = true;
+            else _error = string.Format(L10n.T(Keys.Content.AgentRunLoadError, "加载运行失败：{0}"), err ?? status.ToString());
+            StateHasChanged();
+            return;
+        }
+
+        var root = data.Value;
+        _planCode = root.TryGetProperty("planCode", out var pc) ? pc.GetString() ?? "" : "";
+        _status = root.TryGetProperty("status", out var st) ? st.GetString() ?? "" : "";
+        _actor = root.TryGetProperty("actor", out var ac) ? ac.GetString() ?? "" : "";
+        var started = root.TryGetProperty("startedAt", out var sa) ? sa.GetString() : null;
+        var finished = root.TryGetProperty("finishedAt", out var fi) ? fi.GetString() : null;
+        _resultSummary = root.TryGetProperty("resultSummary", out var rs) ? rs.GetString() ?? "" : "";
+
+        _started = FormatDateTime(started);
+        _finished = FormatDateTime(finished);
+        _duration = FormatDuration(started, finished);
+
+        _steps = new List<RunStep>();
+        if (root.TryGetProperty("steps", out var stepsEl) && stepsEl.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var s in stepsEl.EnumerateArray())
+            {
+                var order = s.TryGetProperty("order", out var o) ? o.GetInt32() : 0;
+                var tool = s.TryGetProperty("tool", out var t) ? t.GetString() ?? "" : "";
+                var risk = s.TryGetProperty("risk", out var r) ? r.GetString() ?? "" : "";
+                var succeeded = s.TryGetProperty("succeeded", out var su) && su.GetBoolean();
+                var attempts = s.TryGetProperty("attempts", out var at) ? at.GetInt32() : 0;
+                var output = s.TryGetProperty("output", out var op) ? op.GetString() : null;
+                var error = s.TryGetProperty("error", out var er) ? er.GetString() : null;
+                var mode = s.TryGetProperty("mode", out var mo) ? mo.GetString() ?? "" : "";
+                var pending = s.TryGetProperty("pendingApproval", out var pa) && pa.GetBoolean();
+                _steps.Add(new RunStep(order, tool, risk, succeeded, attempts, output, error, mode, pending));
+            }
+        }
+
+        _loading = false;
+        StateHasChanged();
+    }
+
+    private async Task Approve()
+    {
+        await Act("approve", L10n.T(Keys.Content.AgentRunApproveSuccess, "已通过审批，恢复执行。"));
+    }
+
+    private async Task Reject()
+    {
+        await Act("reject", L10n.T(Keys.Content.AgentRunRejectSuccess, "已拒绝，运行终止。"));
+    }
+
+    private async Task Act(string verb, string okMsg)
+    {
+        _acting = true;
+        StateHasChanged();
+        var (data, _, err, _) = await Api.PostJsonAsync($"api/agent/runs/{Uri.EscapeDataString(Id)}/{verb}?tenantId={State.TenantId}");
+        _acting = false;
+        if (data is null)
+        {
+            Toast.Error(string.Format(L10n.T(Keys.Content.AgentRunActionFailed, "操作失败：{0}"), err ?? verb));
+            StateHasChanged();
+            return;
+        }
+        Toast.Success(okMsg);
+        await Load();
+    }
+
+    private string FormatDateTime(string? iso)
+    {
+        if (string.IsNullOrWhiteSpace(iso)) return "—";
+        return DateTime.TryParse(iso, out var dt) ? dt.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss") : iso;
+    }
+
+    private string FormatDuration(string? started, string? finished)
+    {
+        if (string.IsNullOrWhiteSpace(started) || string.IsNullOrWhiteSpace(finished)) return "—";
+        if (!DateTime.TryParse(started, out var s) || !DateTime.TryParse(finished, out var f)) return "—";
+        var ts = f - s;
+        return ts.TotalSeconds < 60
+            ? $"{ts.TotalSeconds:0.0} s"
+            : $"{ts.TotalMinutes:0.0} min";
+    }
+
+    private static string Truncate(string? s, int max = 240)
+        => string.IsNullOrWhiteSpace(s) || s.Length <= max ? s ?? "" : s[..max] + "…";
+
+    private string StatusTone(string s) => s.ToLowerInvariant() switch
+    {
+        "succeeded" => "success",
+        "failed" => "danger",
+        "running" => "info",
+        "approval_pending" => "warning",
+        "approved" => "primary",
+        "rejected" => "danger",
+        _ => "muted"
+    };
+
+    private string StatusLabel(string s) => s.ToLowerInvariant() switch
+    {
+        "queued" => L10n.T(Keys.Content.AgentRunStatusQueued, "已排队"),
+        "running" => L10n.T(Keys.Content.AgentRunStatusRunning, "执行中"),
+        "succeeded" => L10n.T(Keys.Content.AgentRunStatusSucceeded, "成功"),
+        "failed" => L10n.T(Keys.Content.AgentRunStatusFailed, "失败"),
+        "approval_pending" => L10n.T(Keys.Content.AgentRunStatusApprovalPending, "待审批"),
+        "approved" => L10n.T(Keys.Content.AgentRunStatusApproved, "已审批"),
+        "rejected" => L10n.T(Keys.Content.AgentRunStatusRejected, "已拒绝"),
+        _ => s
+    };
+
+    private string RiskTone(string r) => r.ToLowerInvariant() switch
+    {
+        "safe" => "success",
+        "read" => "info",
+        "write" => "warning",
+        _ => "muted"
+    };
+
+    private string RiskLabel(string r) => r.ToLowerInvariant() switch
+    {
+        "safe" => L10n.T(Keys.Content.AgentRunRiskSafe, "安全"),
+        "read" => L10n.T(Keys.Content.AgentRunRiskRead, "只读"),
+        "write" => L10n.T(Keys.Content.AgentRunRiskWrite, "写入"),
+        _ => r
+    };
+
+    private string ModeTone(string m) => m.ToLowerInvariant() switch
+    {
+        "live" => "primary",
+        _ => "muted"
+    };
+
+    private string ModeLabel(string m) => m.ToLowerInvariant() switch
+    {
+        "live" => L10n.T(Keys.Content.AgentRunModeLive, "实时"),
+        "controlled" => L10n.T(Keys.Content.AgentRunModeControlled, "受控"),
+        _ => m
+    };
+
+    private sealed record RunStep(int Order, string Tool, string Risk, bool Succeeded, int Attempts, string? Output, string? Error, string Mode, bool PendingApproval);
+}

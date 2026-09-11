@@ -152,7 +152,12 @@
             Toast.Info(string.Format(L10n.T(Keys.Content.AgentRunApprovalPending, "运行已提交，等待审批（运行 ID {0}）。"), runId));
         else
             Toast.Success(string.Format(L10n.T(Keys.Content.AgentRunTriggered, "已触发运行：{0}"), name));
-        await Reload();
+
+        // M12-11：触发后跳转到运行详情页，查看执行历史 / 工具调用 / 时长 / 错误。
+        if (runId > 0)
+            Nav.NavigateTo($"agent/runs/{runId}");
+        else
+            await Reload();
     }
 
     // M12-09：新建智能体 → 真实 POST api/agent/plan，成功后跳转到编辑器。
