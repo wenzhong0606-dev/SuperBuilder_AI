@@ -33,4 +33,14 @@ public sealed class BusinessEntityRegistryService(
         long tenantId,
         CancellationToken cancellationToken = default) =>
         await repository.ListRelationshipsAsync(tenantId, cancellationToken);
+
+    public async Task<IReadOnlyList<BusinessMetricView>> ListMetricsAsync(
+        long tenantId,
+        CancellationToken cancellationToken = default) =>
+        await repository.ListMetricsAsync(tenantId, cancellationToken);
+
+    public async Task<IReadOnlyList<BusinessDimensionView>> ListDimensionsByTenantAsync(
+        long tenantId,
+        CancellationToken cancellationToken = default) =>
+        await repository.ListDimensionsByTenantAsync(tenantId, cancellationToken);
 }

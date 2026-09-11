@@ -186,6 +186,7 @@ public static class Keys
         public const string Agent = "Nav.Agent";
         public const string SemanticLabels = "Nav.SemanticLabels";
         public const string BusinessModel = "Nav.BusinessModel";
+        public const string MetricCenter = "Nav.MetricCenter";
         public const string Components = "Nav.Components";
         public const string ThemeEditor = "Nav.ThemeEditor";
         public const string DataSources = "Nav.DataSources";
@@ -284,6 +285,37 @@ public static class Keys
         public const string BusinessModelGraphEmpty = "Content.BusinessModelGraphEmpty";
         public const string BusinessModelGraphNoRelationships = "Content.BusinessModelGraphNoRelationships";
         public const string BusinessModelGraphClickHint = "Content.BusinessModelGraphClickHint";
+
+        // M12-16 指标中心（Metric Center）
+        public const string MetricCenterTitle = "Content.MetricCenterTitle";
+        public const string MetricCenterDesc = "Content.MetricCenterDesc";
+        public const string MetricCenterTabMetrics = "Content.MetricCenterTabMetrics";
+        public const string MetricCenterTabDimensions = "Content.MetricCenterTabDimensions";
+        public const string MetricCenterTabCalculated = "Content.MetricCenterTabCalculated";
+        public const string MetricCenterStatMetrics = "Content.MetricCenterStatMetrics";
+        public const string MetricCenterStatMetricsSub = "Content.MetricCenterStatMetricsSub";
+        public const string MetricCenterStatCalculated = "Content.MetricCenterStatCalculated";
+        public const string MetricCenterStatCalculatedSub = "Content.MetricCenterStatCalculatedSub";
+        public const string MetricCenterStatBound = "Content.MetricCenterStatBound";
+        public const string MetricCenterStatBoundSub = "Content.MetricCenterStatBoundSub";
+        public const string MetricCenterSearchPlaceholder = "Content.MetricCenterSearchPlaceholder";
+        public const string MetricCenterEmptyMetricsTitle = "Content.MetricCenterEmptyMetricsTitle";
+        public const string MetricCenterEmptyMetricsText = "Content.MetricCenterEmptyMetricsText";
+        public const string MetricCenterEmptyDimensionsTitle = "Content.MetricCenterEmptyDimensionsTitle";
+        public const string MetricCenterEmptyDimensionsText = "Content.MetricCenterEmptyDimensionsText";
+        public const string MetricCenterEmptyCalculatedTitle = "Content.MetricCenterEmptyCalculatedTitle";
+        public const string MetricCenterEmptyCalculatedText = "Content.MetricCenterEmptyCalculatedText";
+        public const string MetricCenterNoMatch = "Content.MetricCenterNoMatch";
+        public const string MetricCenterColEntity = "Content.MetricCenterColEntity";
+        public const string MetricCenterColMetric = "Content.MetricCenterColMetric";
+        public const string MetricCenterColSemanticType = "Content.MetricCenterColSemanticType";
+        public const string MetricCenterColAggregation = "Content.MetricCenterColAggregation";
+        public const string MetricCenterColCalculated = "Content.MetricCenterColCalculated";
+        public const string MetricCenterColBindings = "Content.MetricCenterColBindings";
+        public const string MetricCenterColDomain = "Content.MetricCenterColDomain";
+        public const string MetricCenterColDimension = "Content.MetricCenterColDimension";
+        public const string MetricCenterColDescription = "Content.MetricCenterColDescription";
+        public const string MetricCenterEditHint = "Content.MetricCenterEditHint";
 
         // BusinessModelEntityDetail（实体详情）
         public const string BusinessModelEntityLoading = "Content.BusinessModelEntityLoading";
@@ -1759,6 +1791,7 @@ public static class Keys
         [Nav.Agent] = new("智能体 / Copilot", "Agent / Copilot"),
         [Nav.SemanticLabels] = new("语义标签", "Semantic Labels"),
         [Nav.BusinessModel] = new("语义模型", "Semantic Model"),
+        [Nav.MetricCenter] = new("指标中心", "Metric Center"),
         [Nav.Components] = new("组件库", "Component Library"),
         [Nav.ThemeEditor] = new("主题编辑器", "Theme Editor"),
         [Nav.DataSources] = new("数据源", "Data Sources"),
@@ -1846,6 +1879,35 @@ public static class Keys
         [Content.BusinessModelGraphEmpty] = new("暂无实体，请先在「实体」中新建。", "No entities yet. Create one in the Entities tab first."),
         [Content.BusinessModelGraphNoRelationships] = new("当前实体之间尚未定义关系；关系编辑将随后续里程碑开放。", "No relationships are defined between entities yet; relationship editing will open in a later milestone."),
         [Content.BusinessModelGraphClickHint] = new("点击任意实体查看详情。", "Click any entity to view its details."),
+        [Content.MetricCenterTitle] = new("指标中心", "Metric Center"),
+        [Content.MetricCenterDesc] = new("治理指标、维度与计算字段口径，让自然语言问数有据可依。", "Govern metrics, dimensions and calculated fields so natural-language queries stay grounded."),
+        [Content.MetricCenterTabMetrics] = new("指标", "Metrics"),
+        [Content.MetricCenterTabDimensions] = new("维度", "Dimensions"),
+        [Content.MetricCenterTabCalculated] = new("计算字段", "Calculated Fields"),
+        [Content.MetricCenterStatMetrics] = new("指标总数", "Total Metrics"),
+        [Content.MetricCenterStatMetricsSub] = new("已定义口径", "Defined"),
+        [Content.MetricCenterStatCalculated] = new("计算字段", "Calculated Fields"),
+        [Content.MetricCenterStatCalculatedSub] = new("派生指标", "Derived"),
+        [Content.MetricCenterStatBound] = new("已绑定物理列", "Physically Bound"),
+        [Content.MetricCenterStatBoundSub] = new("可直接下推", "Push-down ready"),
+        [Content.MetricCenterSearchPlaceholder] = new("搜索指标或实体…", "Search metrics or entities..."),
+        [Content.MetricCenterEmptyMetricsTitle] = new("暂无指标", "No metrics yet"),
+        [Content.MetricCenterEmptyMetricsText] = new("指标来自业务实体（如「销售额」「库存量」），实体语义建模完成后自动出现在此处。", "Metrics come from business entities and appear here once entity modelling is complete."),
+        [Content.MetricCenterEmptyDimensionsTitle] = new("暂无维度", "No dimensions yet"),
+        [Content.MetricCenterEmptyDimensionsText] = new("维度用于分组与切片（如「仓库」「入库日期」），随业务域维度定义出现。", "Dimensions are used for grouping and slicing, and appear once defined per business domain."),
+        [Content.MetricCenterEmptyCalculatedTitle] = new("暂无计算字段", "No calculated fields"),
+        [Content.MetricCenterEmptyCalculatedText] = new("计算字段是由其他指标派生的指标；口径编辑将随后续里程碑开放。", "Calculated fields are derived from other metrics; editing is planned for a later milestone."),
+        [Content.MetricCenterNoMatch] = new("无匹配项", "No matches"),
+        [Content.MetricCenterColEntity] = new("所属实体", "Entity"),
+        [Content.MetricCenterColMetric] = new("指标", "Metric"),
+        [Content.MetricCenterColSemanticType] = new("语义类型", "Semantic Type"),
+        [Content.MetricCenterColAggregation] = new("聚合方式", "Aggregation"),
+        [Content.MetricCenterColCalculated] = new("计算字段", "Calculated"),
+        [Content.MetricCenterColBindings] = new("物理绑定", "Bindings"),
+        [Content.MetricCenterColDomain] = new("业务域", "Domain"),
+        [Content.MetricCenterColDimension] = new("维度", "Dimension"),
+        [Content.MetricCenterColDescription] = new("描述", "Description"),
+        [Content.MetricCenterEditHint] = new("本页为只读治理视图；指标与维度的编辑（含计算口径）将随后续里程碑开放。", "This page is a read-only governance view; editing metrics and dimensions is planned for a later milestone."),
 
         [Content.BusinessModelEntityLoading] = new("正在加载实体详情…", "Loading entity details…"),
         [Content.BusinessModelEntityPanelDetail] = new("详情", "Details"),

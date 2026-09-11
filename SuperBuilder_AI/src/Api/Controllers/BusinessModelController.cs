@@ -51,6 +51,24 @@ public sealed class BusinessModelController : ControllerBase
 		return Ok(await _registry.ListRelationshipsAsync(resolution.EffectiveTenantId, cancellationToken));
 	}
 
+	/// <summary>M12-16：按租户列举指标治理视图（指标中心）。租户隔离由注册表服务经所属实体的 TenantId 保证。</summary>
+	[HttpGet("metrics")]
+	public async Task<IActionResult> ListMetrics([FromQuery] long? tenantId, CancellationToken cancellationToken = default)
+	{
+		var resolution = TenantDataPlanePolicy.Resolve(User, tenantId);
+		if (!resolution.Authorized) return TenantMismatch();
+		return Ok(await _registry.ListMetricsAsync(resolution.EffectiveTenantId, cancellationToken));
+	}
+
+	/// <summary>M12-16：按租户列举维度治理视图（指标中心）。</summary>
+	[HttpGet("dimensions")]
+	public async Task<IActionResult> ListDimensionsByTenant([FromQuery] long? tenantId, CancellationToken cancellationToken = default)
+	{
+		var resolution = TenantDataPlanePolicy.Resolve(User, tenantId);
+		if (!resolution.Authorized) return TenantMismatch();
+		return Ok(await _registry.ListDimensionsByTenantAsync(resolution.EffectiveTenantId, cancellationToken));
+	}
+
     [HttpGet("resolve")]
     public async Task<IActionResult> Resolve(
         [FromQuery] long? tenantId,

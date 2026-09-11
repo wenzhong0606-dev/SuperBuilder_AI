@@ -131,6 +131,12 @@ public sealed class TenantDataPlanePolicyTests
 
 		public Task<IReadOnlyList<BusinessEntityRelationship>> ListRelationshipsAsync(long tenantId, CancellationToken cancellationToken = default)
 			=> Task.FromResult<IReadOnlyList<BusinessEntityRelationship>>(Array.Empty<BusinessEntityRelationship>());
+
+		public Task<IReadOnlyList<BusinessMetricView>> ListMetricsAsync(long tenantId, CancellationToken cancellationToken = default)
+			=> Task.FromResult<IReadOnlyList<BusinessMetricView>>(Array.Empty<BusinessMetricView>());
+
+		public Task<IReadOnlyList<BusinessDimensionView>> ListDimensionsByTenantAsync(long tenantId, CancellationToken cancellationToken = default)
+			=> Task.FromResult<IReadOnlyList<BusinessDimensionView>>(Array.Empty<BusinessDimensionView>());
 	}
 
 	private sealed class MapperStub : IBusinessSemanticMappingService

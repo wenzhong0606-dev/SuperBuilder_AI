@@ -253,6 +253,37 @@ public static class ResourceKeys
         public const string BusinessModelGraphNoRelationships = "Content.BusinessModelGraphNoRelationships";
         public const string BusinessModelGraphClickHint = "Content.BusinessModelGraphClickHint";
 
+        // M12-16 指标中心（Metric Center）
+        public const string MetricCenterTitle = "Content.MetricCenterTitle";
+        public const string MetricCenterDesc = "Content.MetricCenterDesc";
+        public const string MetricCenterTabMetrics = "Content.MetricCenterTabMetrics";
+        public const string MetricCenterTabDimensions = "Content.MetricCenterTabDimensions";
+        public const string MetricCenterTabCalculated = "Content.MetricCenterTabCalculated";
+        public const string MetricCenterStatMetrics = "Content.MetricCenterStatMetrics";
+        public const string MetricCenterStatMetricsSub = "Content.MetricCenterStatMetricsSub";
+        public const string MetricCenterStatCalculated = "Content.MetricCenterStatCalculated";
+        public const string MetricCenterStatCalculatedSub = "Content.MetricCenterStatCalculatedSub";
+        public const string MetricCenterStatBound = "Content.MetricCenterStatBound";
+        public const string MetricCenterStatBoundSub = "Content.MetricCenterStatBoundSub";
+        public const string MetricCenterSearchPlaceholder = "Content.MetricCenterSearchPlaceholder";
+        public const string MetricCenterEmptyMetricsTitle = "Content.MetricCenterEmptyMetricsTitle";
+        public const string MetricCenterEmptyMetricsText = "Content.MetricCenterEmptyMetricsText";
+        public const string MetricCenterEmptyDimensionsTitle = "Content.MetricCenterEmptyDimensionsTitle";
+        public const string MetricCenterEmptyDimensionsText = "Content.MetricCenterEmptyDimensionsText";
+        public const string MetricCenterEmptyCalculatedTitle = "Content.MetricCenterEmptyCalculatedTitle";
+        public const string MetricCenterEmptyCalculatedText = "Content.MetricCenterEmptyCalculatedText";
+        public const string MetricCenterNoMatch = "Content.MetricCenterNoMatch";
+        public const string MetricCenterColEntity = "Content.MetricCenterColEntity";
+        public const string MetricCenterColMetric = "Content.MetricCenterColMetric";
+        public const string MetricCenterColSemanticType = "Content.MetricCenterColSemanticType";
+        public const string MetricCenterColAggregation = "Content.MetricCenterColAggregation";
+        public const string MetricCenterColCalculated = "Content.MetricCenterColCalculated";
+        public const string MetricCenterColBindings = "Content.MetricCenterColBindings";
+        public const string MetricCenterColDomain = "Content.MetricCenterColDomain";
+        public const string MetricCenterColDimension = "Content.MetricCenterColDimension";
+        public const string MetricCenterColDescription = "Content.MetricCenterColDescription";
+        public const string MetricCenterEditHint = "Content.MetricCenterEditHint";
+
         // BusinessModelEntityDetail（实体详情）
         public const string BusinessModelEntityLoading = "Content.BusinessModelEntityLoading";
         public const string BusinessModelEntityPanelDetail = "Content.BusinessModelEntityPanelDetail";
@@ -1577,6 +1608,7 @@ public static class ResourceKeys
         public const string Agent = "Nav.Agent";
         public const string SemanticLabels = "Nav.SemanticLabels";
         public const string BusinessModel = "Nav.BusinessModel";
+        public const string MetricCenter = "Nav.MetricCenter";
         public const string Components = "Nav.Components";
         public const string ThemeEditor = "Nav.ThemeEditor";
         public const string DataSources = "Nav.DataSources";
@@ -1828,6 +1860,35 @@ public static class ResourceKeys
         [Content.BusinessModelGraphEmpty] = new("Content", Page: "BusinessModel", DefaultValue: "No entities yet. Create one in the Entities tab first."),
         [Content.BusinessModelGraphNoRelationships] = new("Content", Page: "BusinessModel", DefaultValue: "No relationships are defined between entities yet; relationship editing will open in a later milestone."),
         [Content.BusinessModelGraphClickHint] = new("Content", Page: "BusinessModel", DefaultValue: "Click any entity to view its details."),
+        [Content.MetricCenterTitle] = new("Content", Page: "MetricCenter", DefaultValue: "Metric Center"),
+        [Content.MetricCenterDesc] = new("Content", Page: "MetricCenter", DefaultValue: "Govern metrics, dimensions and calculated fields so natural-language queries stay grounded."),
+        [Content.MetricCenterTabMetrics] = new("Content", Page: "MetricCenter", DefaultValue: "Metrics"),
+        [Content.MetricCenterTabDimensions] = new("Content", Page: "MetricCenter", DefaultValue: "Dimensions"),
+        [Content.MetricCenterTabCalculated] = new("Content", Page: "MetricCenter", DefaultValue: "Calculated Fields"),
+        [Content.MetricCenterStatMetrics] = new("Content", Page: "MetricCenter", DefaultValue: "Total Metrics"),
+        [Content.MetricCenterStatMetricsSub] = new("Content", Page: "MetricCenter", DefaultValue: "Defined"),
+        [Content.MetricCenterStatCalculated] = new("Content", Page: "MetricCenter", DefaultValue: "Calculated Fields"),
+        [Content.MetricCenterStatCalculatedSub] = new("Content", Page: "MetricCenter", DefaultValue: "Derived"),
+        [Content.MetricCenterStatBound] = new("Content", Page: "MetricCenter", DefaultValue: "Physically Bound"),
+        [Content.MetricCenterStatBoundSub] = new("Content", Page: "MetricCenter", DefaultValue: "Push-down ready"),
+        [Content.MetricCenterSearchPlaceholder] = new("Content", Page: "MetricCenter", DefaultValue: "Search metrics or entities..."),
+        [Content.MetricCenterEmptyMetricsTitle] = new("Content", Page: "MetricCenter", DefaultValue: "No metrics yet"),
+        [Content.MetricCenterEmptyMetricsText] = new("Content", Page: "MetricCenter", DefaultValue: "Metrics come from business entities and appear here once entity modelling is complete."),
+        [Content.MetricCenterEmptyDimensionsTitle] = new("Content", Page: "MetricCenter", DefaultValue: "No dimensions yet"),
+        [Content.MetricCenterEmptyDimensionsText] = new("Content", Page: "MetricCenter", DefaultValue: "Dimensions are used for grouping and slicing, and appear once defined per business domain."),
+        [Content.MetricCenterEmptyCalculatedTitle] = new("Content", Page: "MetricCenter", DefaultValue: "No calculated fields"),
+        [Content.MetricCenterEmptyCalculatedText] = new("Content", Page: "MetricCenter", DefaultValue: "Calculated fields are derived from other metrics; editing is planned for a later milestone."),
+        [Content.MetricCenterNoMatch] = new("Content", Page: "MetricCenter", DefaultValue: "No matches"),
+        [Content.MetricCenterColEntity] = new("Content", Page: "MetricCenter", DefaultValue: "Entity"),
+        [Content.MetricCenterColMetric] = new("Content", Page: "MetricCenter", DefaultValue: "Metric"),
+        [Content.MetricCenterColSemanticType] = new("Content", Page: "MetricCenter", DefaultValue: "Semantic Type"),
+        [Content.MetricCenterColAggregation] = new("Content", Page: "MetricCenter", DefaultValue: "Aggregation"),
+        [Content.MetricCenterColCalculated] = new("Content", Page: "MetricCenter", DefaultValue: "Calculated"),
+        [Content.MetricCenterColBindings] = new("Content", Page: "MetricCenter", DefaultValue: "Bindings"),
+        [Content.MetricCenterColDomain] = new("Content", Page: "MetricCenter", DefaultValue: "Domain"),
+        [Content.MetricCenterColDimension] = new("Content", Page: "MetricCenter", DefaultValue: "Dimension"),
+        [Content.MetricCenterColDescription] = new("Content", Page: "MetricCenter", DefaultValue: "Description"),
+        [Content.MetricCenterEditHint] = new("Content", Page: "MetricCenter", DefaultValue: "This page is a read-only governance view; editing metrics and dimensions is planned for a later milestone."),
 
         [Content.BusinessModelEntityLoading] = new("Content", Page: "BusinessModelEntityDetail", DefaultValue: "Loading entity details…"),
         [Content.BusinessModelEntityPanelDetail] = new("Content", Page: "BusinessModelEntityDetail", DefaultValue: "Details"),
@@ -2041,6 +2102,7 @@ public static class ResourceKeys
         [Nav.Agent] = new("Nav", Page: "Agent", DefaultValue: "Agent / Copilot"),
         [Nav.SemanticLabels] = new("Nav", Page: "SemanticLabels", DefaultValue: "Semantic Labels"),
         [Nav.BusinessModel] = new("Nav", Page: "BusinessModel", DefaultValue: "Semantic Model"),
+        [Nav.MetricCenter] = new("Nav", Page: "MetricCenter", DefaultValue: "Metric Center"),
         [Nav.Components] = new("Nav", Page: "Components", DefaultValue: "Component Library"),
         [Nav.ThemeEditor] = new("Nav", Page: "ThemeEditor", DefaultValue: "Theme Editor"),
         [Nav.ModelAccounts] = new("Nav", Page: "ModelAccounts", DefaultValue: "Models & Accounts"),

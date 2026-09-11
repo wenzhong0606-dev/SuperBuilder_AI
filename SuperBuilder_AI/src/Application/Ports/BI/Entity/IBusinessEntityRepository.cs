@@ -20,4 +20,10 @@ public interface IBusinessEntityRepository
 
     /// <summary>M12-15：按租户列举业务实体之间的语义关系（Source/Target 实体均须属于该租户），用于关系图。</summary>
     Task<IReadOnlyList<BusinessEntityRelationship>> ListRelationshipsAsync(long tenantId, CancellationToken cancellationToken = default);
+
+    /// <summary>M12-16：按租户列举全部业务实体指标（经 BusinessEntity.TenantId 过滤，附实体名/业务域/物理绑定计数），用于指标中心。</summary>
+    Task<IReadOnlyList<BusinessMetricView>> ListMetricsAsync(long tenantId, CancellationToken cancellationToken = default);
+
+    /// <summary>M12-16：按租户列举全部业务维度（附所属业务域名），用于指标中心。</summary>
+    Task<IReadOnlyList<BusinessDimensionView>> ListDimensionsByTenantAsync(long tenantId, CancellationToken cancellationToken = default);
 }

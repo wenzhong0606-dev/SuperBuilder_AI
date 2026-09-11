@@ -13,4 +13,10 @@ public interface IBusinessEntityRegistryService
     Task<IReadOnlyList<BusinessDomain>> ListDomainsAsync(long tenantId, CancellationToken cancellationToken = default);
     Task<BusinessEntity?> GetAsync(long tenantId, long id, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<BusinessEntityRelationship>> ListRelationshipsAsync(long tenantId, CancellationToken cancellationToken = default);
+
+    /// <summary>M12-16：按租户列举指标治理视图。</summary>
+    Task<IReadOnlyList<BusinessMetricView>> ListMetricsAsync(long tenantId, CancellationToken cancellationToken = default);
+
+    /// <summary>M12-16：按租户列举维度治理视图。</summary>
+    Task<IReadOnlyList<BusinessDimensionView>> ListDimensionsByTenantAsync(long tenantId, CancellationToken cancellationToken = default);
 }

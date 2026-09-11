@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
@@ -41,6 +42,10 @@ public class BusinessModelControllerTests
 			=> Task.FromResult(_store.TryGetValue(id, out var e) && e.TenantId == tenantId ? e : null);
 		public Task<IReadOnlyList<BusinessEntityRelationship>> ListRelationshipsAsync(long tenantId, CancellationToken ct = default)
 			=> Task.FromResult<IReadOnlyList<BusinessEntityRelationship>>(new List<BusinessEntityRelationship>());
+		public Task<IReadOnlyList<BusinessMetricView>> ListMetricsAsync(long tenantId, CancellationToken ct = default)
+			=> Task.FromResult<IReadOnlyList<BusinessMetricView>>(new List<BusinessMetricView>());
+		public Task<IReadOnlyList<BusinessDimensionView>> ListDimensionsByTenantAsync(long tenantId, CancellationToken ct = default)
+			=> Task.FromResult<IReadOnlyList<BusinessDimensionView>>(new List<BusinessDimensionView>());
 	}
 
 	private sealed class FakeMapper : IBusinessSemanticMappingService
@@ -196,6 +201,141 @@ public class BusinessModelControllerTests
 		Assert.NotNull(result);
 		var rels = Assert.IsAssignableFrom<IReadOnlyList<BusinessEntityRelationship>>(result!.Value);
 		Assert.Empty(rels);
+	}
+
+	#endregion
+
+	#region M12-16 指标 / 维度治理端点契约（真实持久化）
+
+	/// <summary>种一个业务域 + 一个实体 + 两个指标（其一为计算字段）+ 一个维度。</summary>
+	private static async Task SeedGovernance(SuperBIContext db, long tid)
+	{
+		var domain = new BusinessDomain { TenantId = tid, Name = "仓储域", Description = "库存与出入库" };
+		db.BusinessDomains.Add(domain);
+		await db.SaveChangesAsync();
+
+		var entity = new BusinessEntity
+		{
+			TenantId = tid,
+			BusinessKey = "bk_stock",
+			Name = "库存",
+			DisplayName = "库存实体",
+			BusinessDomain = "仓储域",
+		};
+		db.BusinessEntities.Add(entity);
+		await db.SaveChangesAsync();
+
+		db.BusinessEntityMetrics.Add(new BusinessEntityMetric
+		{
+			BusinessEntityId = entity.Id,
+			Name = "库存量",
+			DisplayName = "库存量",
+			SemanticType = "quantity",
+			Aggregation = "sum",
+		});
+		db.BusinessEntityMetrics.Add(new BusinessEntityMetric
+		{
+			BusinessEntityId = entity.Id,
+			Name = "周转率",
+			SemanticType = "ratio",
+			Aggregation = "avg",
+			IsCalculated = true,
+		});
+		db.BusinessEntityDimensions.Add(new BusinessEntityDimension
+		{
+			TenantId = tid,
+			BusinessDomainId = domain.Id,
+			Name = "仓库",
+			Description = "仓库维度",
+		});
+		await db.SaveChangesAsync();
+	}
+
+	[Fact]
+	public async Task ListMetrics_Returns_403_WhenCrossTenant()
+	{
+		var controller = Build(new FakeRegistry(), AsTenant(Tenant5));
+
+		var result = await controller.ListMetrics(7, CancellationToken.None);
+		var obj = Assert.IsType<ObjectResult>(result);
+		Assert.Equal(403, obj.StatusCode);
+	}
+
+	[Fact]
+	public async Task ListMetrics_Returns_200_And_Projects_Entity_And_Flags()
+	{
+		var db = CreateDb(out var connection);
+		await SeedTenant(db, Tenant5);
+		await SeedGovernance(db, Tenant5);
+
+		var controller = BuildWithRealRegistry(NewContext(connection), AsTenant(Tenant5));
+		var result = await controller.ListMetrics(Tenant5, CancellationToken.None) as OkObjectResult;
+		Assert.NotNull(result);
+		var metrics = Assert.IsAssignableFrom<IReadOnlyList<BusinessMetricView>>(result!.Value);
+		Assert.Equal(2, metrics.Count);
+
+		var stock = Assert.Single(metrics, m => m.Name == "库存量");
+		Assert.Equal("库存", stock.EntityName);
+		Assert.Equal("库存实体", stock.EntityDisplayName);
+		Assert.Equal("仓储域", stock.BusinessDomain);
+		Assert.Equal("sum", stock.Aggregation);
+		Assert.False(stock.IsCalculated);
+		Assert.Equal(0, stock.PhysicalBindingCount);
+
+		var ratio = Assert.Single(metrics, m => m.Name == "周转率");
+		Assert.True(ratio.IsCalculated);
+	}
+
+	[Fact]
+	public async Task ListMetrics_Excludes_Other_Tenant()
+	{
+		var db = CreateDb(out var connection);
+		await SeedTenant(db, Tenant5);
+		// 第二个租户需显式 TenantCode：Tenants.TenantCode 唯一约束，默认空串会冲突。
+		db.Tenants.Add(new Tenant { Id = 7, TenantCode = "t7" });
+		await db.SaveChangesAsync();
+		await SeedGovernance(db, Tenant5);
+		await SeedGovernance(db, 7);
+
+		var controller = BuildWithRealRegistry(NewContext(connection), AsTenant(7));
+		var result = await controller.ListMetrics(7, CancellationToken.None) as OkObjectResult;
+		Assert.NotNull(result);
+		var metrics = Assert.IsAssignableFrom<IReadOnlyList<BusinessMetricView>>(result!.Value);
+
+		// 两租户各 2 条同名指标：隔离正确时应恰好返回本租户的 2 条，且实体归属为本租户实体。
+		Assert.Equal(2, metrics.Count);
+		var entityIds = metrics.Select(m => m.BusinessEntityId).Distinct().ToList();
+		Assert.Single(entityIds);
+		var ownEntityIds = await NewContext(connection).BusinessEntities
+			.Where(e => e.TenantId == 7).Select(e => e.Id).ToListAsync();
+		Assert.Contains(entityIds[0], ownEntityIds);
+	}
+
+	[Fact]
+	public async Task ListDimensions_Returns_200_With_Domain_Name()
+	{
+		var db = CreateDb(out var connection);
+		await SeedTenant(db, Tenant5);
+		await SeedGovernance(db, Tenant5);
+
+		var controller = BuildWithRealRegistry(NewContext(connection), AsTenant(Tenant5));
+		var result = await controller.ListDimensionsByTenant(Tenant5, CancellationToken.None) as OkObjectResult;
+		Assert.NotNull(result);
+		var dims = Assert.IsAssignableFrom<IReadOnlyList<BusinessDimensionView>>(result!.Value);
+		var dim = Assert.Single(dims);
+		Assert.Equal("仓库", dim.Name);
+		Assert.Equal("仓储域", dim.DomainName);
+		Assert.Equal("仓库维度", dim.Description);
+	}
+
+	[Fact]
+	public async Task ListDimensions_Returns_403_WhenCrossTenant()
+	{
+		var controller = Build(new FakeRegistry(), AsTenant(Tenant5));
+
+		var result = await controller.ListDimensionsByTenant(7, CancellationToken.None);
+		var obj = Assert.IsType<ObjectResult>(result);
+		Assert.Equal(403, obj.StatusCode);
 	}
 
 	#endregion

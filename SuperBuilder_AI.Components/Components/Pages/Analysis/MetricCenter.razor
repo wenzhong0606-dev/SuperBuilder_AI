@@ -1,0 +1,201 @@
+@page "/metrics"
+@inject IApiClient Api
+@inject AppState State
+@inject NavigationManager Nav
+@using System.Text.Json
+@using SuperBuilder_AI.Components.Shared
+
+<AuthGuard>
+    <PageHead Icon="sb-ico-model" Key="MetricCenter" Title="指标中心"
+              Desc="治理指标、维度与计算字段口径，让自然语言问数有据可依。" />
+
+    <div class="stat-grid">
+        <SbStatTile Label="@L10n.T(Keys.Content.MetricCenterStatMetrics, "指标总数")" Value="@_metrics.Count"
+                    Sub="@L10n.T(Keys.Content.MetricCenterStatMetricsSub, "已定义口径")" />
+        <SbStatTile Label="@L10n.T(Keys.Content.MetricCenterStatCalculated, "计算字段")" Value="@Calculated.Count"
+                    Sub="@L10n.T(Keys.Content.MetricCenterStatCalculatedSub, "派生指标")" Accent="info" />
+        <SbStatTile Label="@L10n.T(Keys.Content.MetricCenterStatBound, "已绑定物理列")" Value="@BoundCount"
+                    Sub="@L10n.T(Keys.Content.MetricCenterStatBoundSub, "可直接下推")" Accent="success" />
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(_error))
+    {
+        <div class="alert alert-danger tiny">@_error</div>
+    }
+
+    <SbTabs>
+        <SbTab Title="@L10n.T(Keys.Content.MetricCenterTabMetrics, "指标")" Badge="@_metrics.Count.ToString()">
+            <SbToolbar>
+                <Left>
+                    <SbSearch Value="@_query" ValueChanged="OnQueryChanged"
+                              Placeholder="@L10n.T(Keys.Content.MetricCenterSearchPlaceholder, "搜索指标或实体…")" />
+                </Left>
+            </SbToolbar>
+            <SbPanel Icon="sb-ico-model" Title="@L10n.T(Keys.Content.MetricCenterTabMetrics, "指标")" Flush="true">
+                <Body>
+                    @if (_metrics.Count == 0)
+                    {
+                        <SbEmptyState Icon="sb-ico-model" Title="@L10n.T(Keys.Content.MetricCenterEmptyMetricsTitle, "暂无指标")"
+                                      Text="@L10n.T(Keys.Content.MetricCenterEmptyMetricsText, "指标来自业务实体（如「销售额」「库存量」），实体语义建模完成后自动出现在此处。")" />
+                    }
+                    else
+                    {
+                        <SbDataTable Items="@MetricsFiltered" Columns="@MetricColumns" PageSize="20" Loading="_loading"
+                                     EmptyTitle="@L10n.T(Keys.Content.MetricCenterNoMatch, "无匹配项")" RowActions="MetricActions" />
+                    }
+                </Body>
+            </SbPanel>
+        </SbTab>
+
+        <SbTab Title="@L10n.T(Keys.Content.MetricCenterTabDimensions, "维度")" Badge="@_dimensions.Count.ToString()">
+            <SbToolbar>
+                <Left>
+                    <SbSearch Value="@_query" ValueChanged="OnQueryChanged"
+                              Placeholder="@L10n.T(Keys.Content.MetricCenterSearchPlaceholder, "搜索指标或实体…")" />
+                </Left>
+            </SbToolbar>
+            <SbPanel Icon="sb-ico-tag" Title="@L10n.T(Keys.Content.MetricCenterTabDimensions, "维度")" Flush="true">
+                <Body>
+                    @if (_dimensions.Count == 0)
+                    {
+                        <SbEmptyState Icon="sb-ico-tag" Title="@L10n.T(Keys.Content.MetricCenterEmptyDimensionsTitle, "暂无维度")"
+                                      Text="@L10n.T(Keys.Content.MetricCenterEmptyDimensionsText, "维度用于分组与切片（如「仓库」「入库日期」），随业务域维度定义出现。")" />
+                    }
+                    else
+                    {
+                        <SbDataTable Items="@DimensionsFiltered" Columns="@DimensionColumns" PageSize="20" Loading="_loading"
+                                     EmptyTitle="@L10n.T(Keys.Content.MetricCenterNoMatch, "无匹配项")" />
+                    }
+                </Body>
+            </SbPanel>
+        </SbTab>
+
+        <SbTab Title="@L10n.T(Keys.Content.MetricCenterTabCalculated, "计算字段")" Badge="@Calculated.Count.ToString()">
+            <SbPanel Icon="sb-ico-model" Title="@L10n.T(Keys.Content.MetricCenterTabCalculated, "计算字段")" Flush="true">
+                <Body>
+                    @if (Calculated.Count == 0)
+                    {
+                        <SbEmptyState Icon="sb-ico-model" Title="@L10n.T(Keys.Content.MetricCenterEmptyCalculatedTitle, "暂无计算字段")"
+                                      Text="@L10n.T(Keys.Content.MetricCenterEmptyCalculatedText, "计算字段是由其他指标派生的指标；口径编辑将随后续里程碑开放。")" />
+                    }
+                    else
+                    {
+                        <SbDataTable Items="@Calculated" Columns="@MetricColumns" PageSize="20" Loading="_loading"
+                                     EmptyTitle="@L10n.T(Keys.Content.MetricCenterNoMatch, "无匹配项")" RowActions="MetricActions" />
+                    }
+                </Body>
+            </SbPanel>
+        </SbTab>
+    </SbTabs>
+
+    <p class="sb-graph-note">@L10n.T(Keys.Content.MetricCenterEditHint, "本页为只读治理视图；指标与维度的编辑（含计算口径）将随后续里程碑开放。")</p>
+</AuthGuard>
+
+@code {
+    private List<JsonElement> _metrics = new();
+    private List<JsonElement> _dimensions = new();
+    private string _error = "";
+    private bool _loading = true;
+    private string _query = "";
+
+    private List<JsonElement> Calculated =>
+        _metrics.Where(m => IsTrue(m, "isCalculated")).ToList();
+
+    private int BoundCount => _metrics.Count(m => IntProp(m, "physicalBindingCount") > 0);
+
+    private List<JsonElement> MetricsFiltered =>
+        string.IsNullOrWhiteSpace(_query)
+            ? _metrics
+            : _metrics.Where(m => CellsContain(m, "entityName", "entityDisplayName", "name", "displayName", "semanticType", "aggregation")).ToList();
+
+    private List<JsonElement> DimensionsFiltered =>
+        string.IsNullOrWhiteSpace(_query)
+            ? _dimensions
+            : _dimensions.Where(d => CellsContain(d, "name", "domainName", "description")).ToList();
+
+    private List<SbColumn<JsonElement>> MetricColumns => new()
+    {
+        SbCol.Of<JsonElement>(L10n.T(Keys.Content.MetricCenterColEntity, "所属实体"),
+            r => NonEmpty(TablePresenter.Cell(r, "entityDisplayName"), TablePresenter.Cell(r, "entityName"))),
+        SbCol.Of<JsonElement>(L10n.T(Keys.Content.MetricCenterColMetric, "指标"),
+            r => NonEmpty(TablePresenter.Cell(r, "displayName"), TablePresenter.Cell(r, "name"))),
+        SbCol.Of<JsonElement>(L10n.T(Keys.Content.MetricCenterColSemanticType, "语义类型"),
+            r => TablePresenter.Cell(r, "semanticType")),
+        SbCol.Of<JsonElement>(L10n.T(Keys.Content.MetricCenterColAggregation, "聚合方式"),
+            r => TablePresenter.Cell(r, "aggregation")),
+        SbCol.Of<JsonElement>(L10n.T(Keys.Content.MetricCenterColCalculated, "计算字段"),
+            r => IsTrue(r, "isCalculated") ? "✓" : "—", align: "center"),
+        SbCol.Of<JsonElement>(L10n.T(Keys.Content.MetricCenterColBindings, "物理绑定"),
+            r => IntProp(r, "physicalBindingCount").ToString(), align: "right"),
+    };
+
+    private List<SbColumn<JsonElement>> DimensionColumns => new()
+    {
+        SbCol.Of<JsonElement>(L10n.T(Keys.Content.MetricCenterColDomain, "业务域"),
+            r => TablePresenter.Cell(r, "domainName")),
+        SbCol.Of<JsonElement>(L10n.T(Keys.Content.MetricCenterColDimension, "维度"),
+            r => TablePresenter.Cell(r, "name")),
+        SbCol.Of<JsonElement>(L10n.T(Keys.Content.MetricCenterColDescription, "描述"),
+            r => TablePresenter.Cell(r, "description")),
+    };
+
+    private RenderFragment<JsonElement> MetricActions =>
+        row => __builder =>
+        {
+            var eid = TablePresenter.Cell(row, "businessEntityId");
+            if (!string.IsNullOrWhiteSpace(eid))
+            {
+                <button class="btn btn-sm btn-outline-secondary" @onclick='() => Nav.NavigateTo($"business-model/entities/{eid}")'>@L10n.T(Keys.Content.BusinessModelDetail, "详情")</button>
+            }
+        };
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender) await Reload();
+    }
+
+    private async Task Reload()
+    {
+        _loading = true;
+        var tid = State.TenantId;
+        var (met, _, mErr, _) = await Api.GetJsonAsync($"api/business-model/metrics?tenantId={tid}");
+        var (dim, _, _, _) = await Api.GetJsonAsync($"api/business-model/dimensions?tenantId={tid}");
+        _error = mErr ?? "";
+        _metrics = met is { ValueKind: JsonValueKind.Array } ? met.Value.EnumerateArray().ToList() : new();
+        _dimensions = dim is { ValueKind: JsonValueKind.Array } ? dim.Value.EnumerateArray().ToList() : new();
+        _loading = false;
+        StateHasChanged();
+    }
+
+    private void OnQueryChanged(string value) => _query = value;
+
+    private bool CellsContain(JsonElement row, params string[] keys)
+        => keys.Any(k => TablePresenter.Cell(row, k).Contains(_query, StringComparison.OrdinalIgnoreCase));
+
+    private static string NonEmpty(string primary, string fallback)
+        => string.IsNullOrWhiteSpace(primary) ? fallback : primary;
+
+    private static JsonElement? Prop(JsonElement row, string key)
+    {
+        if (row.ValueKind != JsonValueKind.Object) return null;
+        foreach (var p in row.EnumerateObject())
+        {
+            if (string.Equals(p.Name, key, StringComparison.OrdinalIgnoreCase)) return p.Value;
+        }
+        return null;
+    }
+
+    private static bool IsTrue(JsonElement row, string key)
+    {
+        var v = Prop(row, key);
+        return v is { } value && value.ValueKind == JsonValueKind.True;
+    }
+
+    private static int IntProp(JsonElement row, string key)
+    {
+        var v = Prop(row, key);
+        if (v is not { } value) return 0;
+        if (value.ValueKind == JsonValueKind.Number && value.TryGetInt32(out var n)) return n;
+        return int.TryParse(value.ToString(), out var parsed) ? parsed : 0;
+    }
+}

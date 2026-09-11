@@ -106,4 +106,49 @@ public sealed class BusinessEntityRepository(SuperBIContext db) : IBusinessEntit
                         && x.TargetEntity != null && x.TargetEntity.TenantId == tenantId)
             .OrderBy(x => x.Id)
             .ToListAsync(cancellationToken);
+
+    /// <summary>
+    /// M12-16：列举租户内全部指标。BusinessEntityMetric 本身无 TenantId，
+    /// 租户隔离经所属 BusinessEntity 过滤（EF 翻译为 INNER JOIN）；投影同时带出实体名与物理绑定计数。
+    /// </summary>
+    public async Task<IReadOnlyList<BusinessMetricView>> ListMetricsAsync(
+        long tenantId,
+        CancellationToken cancellationToken = default) =>
+        await db.BusinessEntityMetrics
+            .AsNoTracking()
+            .Where(m => m.BusinessEntity!.TenantId == tenantId)
+            .OrderBy(m => m.BusinessEntityId)
+            .ThenBy(m => m.Name)
+            .ThenBy(m => m.Id)
+            .Select(m => new BusinessMetricView(
+                m.Id,
+                m.BusinessEntityId,
+                m.BusinessEntity!.Name,
+                m.BusinessEntity.DisplayName,
+                m.BusinessEntity.BusinessDomain,
+                m.Name,
+                m.DisplayName,
+                m.Description,
+                m.SemanticType,
+                m.Aggregation,
+                m.IsCalculated,
+                m.PhysicalBindings.Count))
+            .ToListAsync(cancellationToken);
+
+    /// <summary>M12-16：列举租户内全部维度（附所属业务域名）。维度自带 TenantId，直接过滤。</summary>
+    public async Task<IReadOnlyList<BusinessDimensionView>> ListDimensionsByTenantAsync(
+        long tenantId,
+        CancellationToken cancellationToken = default) =>
+        await db.BusinessEntityDimensions
+            .AsNoTracking()
+            .Where(x => x.TenantId == tenantId)
+            .OrderBy(x => x.Name)
+            .ThenBy(x => x.Id)
+            .Select(x => new BusinessDimensionView(
+                x.Id,
+                x.BusinessDomainId,
+                x.Domain != null ? x.Domain.Name : null,
+                x.Name,
+                x.Description))
+            .ToListAsync(cancellationToken);
 }

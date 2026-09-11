@@ -64,7 +64,8 @@ public static class NavMenuItems
                 new NavItem { Href = "apps", Title = "应用工厂", Key = Keys.Nav.Apps, Icon = "sb-ico-app", Permission = "app:view" },
                 new NavItem { Href = "agent", Title = "智能体 / Copilot", Key = Keys.Nav.Agent, Icon = "sb-ico-agent", Permission = "agent:view" },
                 new NavItem { Href = "semantic-labels", Title = "语义标签", Key = Keys.Nav.SemanticLabels, Icon = "sb-ico-tag", Permission = "metadata:view" },
-                new NavItem { Href = "business-model", Title = "语义模型", Key = Keys.Nav.BusinessModel, Icon = "sb-ico-model", Permission = "metadata:view" }
+                new NavItem { Href = "business-model", Title = "语义模型", Key = Keys.Nav.BusinessModel, Icon = "sb-ico-model", Permission = "metadata:view" },
+                new NavItem { Href = "metrics", Title = "指标中心", Key = Keys.Nav.MetricCenter, Icon = "sb-ico-model", Permission = "metadata:view" }
             }
         },
         new NavGroup
