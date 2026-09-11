@@ -14,9 +14,17 @@
 - E2E 账号真值：管理员 `e2eadmin`=用户4/租户4；读者 `e2ereader`=用户5/租户4（**须共用租户4 数据源**，租户3 无数据源 → Ask 必 0 行）。
 - Python venv：`~/.workbuddy/binaries/python/envs/default`（pymysql；无 mysql CLI，脚本 `/c/tmp/checkwms.py`）。
 - sqlcmd：`/c/Program Files/Microsoft SQL Server/Client SDK/ODBC/170/Tools/Binn/sqlcmd`，**用 stdin 重定向**（`-i` 被 MSYS 破坏），且须 `-I`。
+- **无 `gh` CLI**。触发/轮询 CI 走 REST API：令牌取自 `git credential fill`（GCM 持有的 `gho_*`），勿 echo。脚本 `C:/tmp/ci_check.py`（列最近 run）/ `ci_jobs.py <run_id>`（job+失败步骤）。⚠️ 后台 shell 里给 python 管道 `| head` 会零输出（块缓冲）——须前台跑。
+- ⚠️ 传脚本路径给 python 必须写 `"C:/tmp/x.py"`；`/c/tmp/x.py` 被 MSYS 转成 `C:\c\tmp\x.py` → file not found。
+- ⚠️ 构建报 `MSB3027/MSB3021` 文件锁（`.NET Host (pid)`）多为**自己先前起的宿主进程**。Git Bash 下 `taskkill //F` 会报无效参数，须 `MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' taskkill /F /PID <pid>`。
+
+## i18n 四处一致（CI 护栏 `ResourceKeyRegistryTests`）
+- 四处：`ResourceKeys.cs`(const+Catalog) / `Keys.cs`(const+Defaults) / `LocalizationSeedService.cs`(ZhCnDefaults) / 消费的 razor（`L10n.T(Keys.Content.X, "中文兜底")`，禁裸中文）。
+- **不变量易错点**：后端 Catalog 的 `DefaultValue` = **en-US**；RCL `new(zh, en)` 首参 = **zh**；seed = zh。故须断言 `be.DefaultValue == rcl.en` 与 `seed == rcl.zh`。拿 be 比 rcl 的 zh 会得到「全量键失败」的假象。
+- 删除死键须四地同步删；同文件两处**不可并行 Edit**（后者覆盖前者）。校验脚本样例 `C:/tmp/verify_designer_i18n2.py`。
 
 ## 测试基线
-- 单测 `SuperBuilder_AI.Tests` **1061/1061 绿**（2026-09-11）。⚠️ `RateLimitMiddlewareTests.Expired_Windows_Are_Evicted...` 时间敏感 flaky（全量偶发失败、单跑 7/7 绿）。
+- 单测 `SuperBuilder_AI.Tests` **1073/1073 绿**（2026-09-11，基线随 M12-11/12/13 递增：1061→1071→1073）。⚠️ `RateLimitMiddlewareTests.Expired_Windows_Are_Evicted...` 时间敏感 flaky（全量偶发失败、单跑 7/7 绿）。
 - E2E `tests/SuperBuilder_AI.E2E.Tests`：**上次记录 10 通过 / 1 跳过（axe 按设计）/ 0 失败**（需 `SB_E2E_BASE_URL`+`SB_E2E_API_URL`+Chromium）。限流依赖 gitignored `appsettings.Local.json`（LoginLimit=500/GlobalLimit=1000）。⚠️ 09-11 新增 `PermissionMatrixE2ETests.cs`（M12-P0 权限矩阵，17 用例：7 管理可见+8 读者隐藏双向+Agent Run 专项×2），编译通过、env 缺失时全跳过；**已本地拉起整套栈经 `dotnet vstest` 实跑 = 15 通过 / 1 失败(`/themes` 测试时序耦合) / 1 跳过（无智能体种子），时序修复已落源码，并已接 CI（51b0d16：E2ESandboxSeedService 建 e2eapp 租户+e2eadmin/e2ereader，E2E_SEED=true + 过滤 PermissionMatrixE2ETests 类），待 CI 实跑确认全绿**。
 - **CI 实跑根因已定位（run 34566854796：17 总数 / 5 通过 / 12 失败）**：
   1. **登录 429（主因，12 例全因此）**：默认 `LoginLimit=10`/`GlobalLimit=120`（见 `RateLimitOptions.cs`）在 CI 无 `appsettings.Local.json` 时生效；所有 E2E 登录同源自 `127.0.0.1`+相同 UA → 共用一个限流桶（键 `ip:127.0.0.1:<uahash>`），矩阵 ~19 次登录瞬间触顶 → 后续用例 `SB_TOO_MANY_REQUESTS` 429。已于 `.github/workflows/dotnet-build.yml` 的「启动 Web API」步骤注入 `RateLimit__LoginLimit=500`/`RateLimit__GlobalLimit=1000`（与 Local 配置等价，仅 CI）。
