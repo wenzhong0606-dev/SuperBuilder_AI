@@ -46,6 +46,9 @@ public interface IApiClient
     /// <summary>DELETE。</summary>
     Task<(bool Ok, int Status, string? Error, string? Code)> DeleteAsync(string relativeUrl, CancellationToken ct = default);
 
+    /// <summary>POST 并读取响应体（如创建后返回的资源详情），供需要解析返回内容的写操作使用。</summary>
+    Task<(JsonElement? Data, int Status, string? Error, string? Code)> PostJsonAsync(string relativeUrl, object? body = null, CancellationToken ct = default);
+
     /// <summary>M2-05 切换生效租户：校验成员资格后由后端重签令牌，返回新令牌与切换后端租户上下文。</summary>
     Task<(TenantSwitchResult? Result, string? Error, string? Code)> SwitchTenantAsync(long tenantId, CancellationToken ct = default);
 

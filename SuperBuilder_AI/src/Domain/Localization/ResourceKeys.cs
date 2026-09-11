@@ -1154,6 +1154,14 @@ public static class ResourceKeys
         public const string AgentDeleteMissingCode = "Content.AgentDeleteMissingCode";
         public const string AgentDeleteFailed = "Content.AgentDeleteFailed";
         public const string AgentDeleted = "Content.AgentDeleted";
+        // M12-09：Agent 新建（接真实 API）弹窗文案
+        public const string AgentCreateIntentLabel = "Content.AgentCreateIntentLabel";
+        public const string AgentCreateIntentPlaceholder = "Content.AgentCreateIntentPlaceholder";
+        public const string AgentCreateIntentRequired = "Content.AgentCreateIntentRequired";
+        public const string AgentCreateFailed = "Content.AgentCreateFailed";
+        // M12-10：Agent Run（接真实 API）反馈文案
+        public const string AgentRunApprovalPending = "Content.AgentRunApprovalPending";
+        public const string AgentRunFailed = "Content.AgentRunFailed";
         public const string DashboardDetailDesc = "Content.DashboardDetailDesc";
         public const string DashboardDetailBack = "Content.DashboardDetailBack";
         public const string DashboardDetailLoading = "Content.DashboardDetailLoading";
@@ -2570,6 +2578,12 @@ public static class ResourceKeys
         [Content.AgentDeleteMissingCode] = new("Content", Page: "Agent", DefaultValue: "This record is missing a code and cannot be deleted."),
         [Content.AgentDeleteFailed] = new("Content", Page: "Agent", DefaultValue: "Deletion failed."),
         [Content.AgentDeleted] = new("Content", Page: "Agent", DefaultValue: "Agent plan deleted."),
+        [Content.AgentCreateIntentLabel] = new("Content", Page: "Agent", DefaultValue: "Intent / goal"),
+        [Content.AgentCreateIntentPlaceholder] = new("Content", Page: "Agent", DefaultValue: "Describe in one sentence what this agent should accomplish, e.g. analyze last month's sales decline and draft a report"),
+        [Content.AgentCreateIntentRequired] = new("Content", Page: "Agent", DefaultValue: "Please provide the agent intent."),
+        [Content.AgentCreateFailed] = new("Content", Page: "Agent", DefaultValue: "Creation failed ({0})."),
+        [Content.AgentRunApprovalPending] = new("Content", Page: "Agent", DefaultValue: "Run submitted, awaiting approval (run ID {0})."),
+        [Content.AgentRunFailed] = new("Content", Page: "Agent", DefaultValue: "Failed to trigger run ({0})."),
         [Content.DashboardDetailDesc] = new("Content", Page: "Dashboards", DefaultValue: "Dashboard details: basic info, component structure, and render results."),
         [Content.DashboardDetailBack] = new("Content", Page: "Dashboards", DefaultValue: "Back to list"),
         [Content.DashboardDetailLoading] = new("Content", Page: "Dashboards", DefaultValue: "Loading dashboard…"),

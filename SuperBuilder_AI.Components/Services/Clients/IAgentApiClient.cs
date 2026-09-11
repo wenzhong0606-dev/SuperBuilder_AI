@@ -1,4 +1,5 @@
 using System.Net.Http;
+using System.Text.Json;
 
 namespace SuperBuilder_AI.Components.Services;
 
@@ -23,4 +24,7 @@ public interface IAgentApiClient
 
     /// <summary>DELETE。</summary>
     Task<(bool Ok, int Status, string? Error, string? Code)> DeleteAsync(string relativeUrl, CancellationToken ct = default);
+
+    /// <summary>POST 并读取响应体（如创建后返回的资源详情），供需要解析返回内容的写操作使用。</summary>
+    Task<(JsonElement? Data, int Status, string? Error, string? Code)> PostJsonAsync(string relativeUrl, object? body = null, CancellationToken ct = default);
 }

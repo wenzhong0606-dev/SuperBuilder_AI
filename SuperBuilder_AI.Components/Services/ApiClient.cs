@@ -82,6 +82,9 @@ public sealed class ApiClient : IApiClient
     public Task<(bool Ok, int Status, string? Error, string? Code)> DeleteAsync(string relativeUrl, CancellationToken ct = default)
         => _agent.DeleteAsync(relativeUrl, ct);
 
+    public Task<(JsonElement? Data, int Status, string? Error, string? Code)> PostJsonAsync(string relativeUrl, object? body = null, CancellationToken ct = default)
+        => _agent.PostJsonAsync(relativeUrl, body, ct);
+
     public Task<(TenantSwitchResult? Result, string? Error, string? Code)> SwitchTenantAsync(long tenantId, CancellationToken ct = default)
         => _identity.SwitchTenantAsync(tenantId, ct);
 

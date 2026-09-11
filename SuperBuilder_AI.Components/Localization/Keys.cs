@@ -1196,6 +1196,14 @@ public static class Keys
         public const string AgentDeleteMissingCode = "Content.AgentDeleteMissingCode";
         public const string AgentDeleteFailed = "Content.AgentDeleteFailed";
         public const string AgentDeleted = "Content.AgentDeleted";
+        // M12-09：Agent 新建（接真实 API）弹窗文案
+        public const string AgentCreateIntentLabel = "Content.AgentCreateIntentLabel";
+        public const string AgentCreateIntentPlaceholder = "Content.AgentCreateIntentPlaceholder";
+        public const string AgentCreateIntentRequired = "Content.AgentCreateIntentRequired";
+        public const string AgentCreateFailed = "Content.AgentCreateFailed";
+        // M12-10：Agent Run（接真实 API）反馈文案
+        public const string AgentRunApprovalPending = "Content.AgentRunApprovalPending";
+        public const string AgentRunFailed = "Content.AgentRunFailed";
         public const string DashboardDetailDesc = "Content.DashboardDetailDesc";
         public const string DashboardDetailBack = "Content.DashboardDetailBack";
         public const string DashboardDetailLoading = "Content.DashboardDetailLoading";
@@ -2558,6 +2566,12 @@ public static class Keys
         [Content.AgentDeleteMissingCode] = new("该记录缺少 code，无法删除。", "This record is missing a code and cannot be deleted."),
         [Content.AgentDeleteFailed] = new("删除失败。", "Deletion failed."),
         [Content.AgentDeleted] = new("智能体计划已删除。", "Agent plan deleted."),
+        [Content.AgentCreateIntentLabel] = new("意图 / 目标", "Intent / goal"),
+        [Content.AgentCreateIntentPlaceholder] = new("用一句话描述该智能体要完成的任务，例如：分析上月销售额下滑原因并生成报告", "Describe in one sentence what this agent should accomplish, e.g. analyze last month's sales decline and draft a report"),
+        [Content.AgentCreateIntentRequired] = new("请填写智能体意图。", "Please provide the agent intent."),
+        [Content.AgentCreateFailed] = new("创建失败（{0}）。", "Creation failed ({0})."),
+        [Content.AgentRunApprovalPending] = new("运行已提交，等待审批（运行 ID {0}）。", "Run submitted, awaiting approval (run ID {0})."),
+        [Content.AgentRunFailed] = new("运行触发失败（{0}）。", "Failed to trigger run ({0})."),
         [Content.DashboardDetailDesc] = new("仪表盘详情：基本信息、组件构成与渲染结果。", "Dashboard details: basic info, component structure, and render results."),
         [Content.DashboardDetailBack] = new("返回列表", "Back to list"),
         [Content.DashboardDetailLoading] = new("正在加载仪表盘…", "Loading dashboard…"),

@@ -17,7 +17,7 @@
 
         <Actions>
             <PermissionGuard Require="@(new[] { PermissionCodes.AgentCreate })" Silent>
-                <button class="btn btn-primary btn-sm" @onclick="Create">
+                <button class="btn btn-primary btn-sm" @onclick="OpenCreate">
                     <svg class="btn-ico"><use href="#sb-ico-plus" /></svg> @L10n.T(Keys.Content.AgentCreate, "新建智能体")
                 </button>
             </PermissionGuard>
@@ -67,6 +67,20 @@
             </Body>
         </SbPanel>
     }
+
+    <SbModal Visible="@_createModal" VisibleChanged="v => _createModal = v" Title="@L10n.T(Keys.Content.AgentCreate, "新建智能体")" Size="md">
+        <Body>
+            <div class="form-stack">
+                <SbField Label="@L10n.T(Keys.Content.AgentCreateIntentLabel, "意图 / 目标")" Required="true" Error="@_createErr">
+                    <textarea class="form-control" @bind="_newIntent" rows="3" placeholder="@L10n.T(Keys.Content.AgentCreateIntentPlaceholder, "用一句话描述该智能体要完成的任务，例如：分析上月销售额下滑原因并生成报告")"></textarea>
+                </SbField>
+            </div>
+        </Body>
+        <Footer>
+            <button class="btn btn-outline-secondary btn-sm" @onclick="() => _createModal = false">@L10n.T(Keys.Content.CommonCancel, "取消")</button>
+            <button class="btn btn-primary btn-sm" @onclick="CreateAgent" disabled="@_creating">@L10n.T(Keys.Content.CommonCreate, "创建")</button>
+        </Footer>
+    </SbModal>
 </AuthGuard>
 
 @code {
@@ -117,13 +131,68 @@
         Nav.NavigateTo($"agent/plans/{Uri.EscapeDataString(code)}");
     }
 
-    private void Run(JsonElement row)
+    private async Task Run(JsonElement row)
     {
+        var code = TablePresenter.Cell(row, "code");
+        if (string.IsNullOrWhiteSpace(code))
+        {
+            Toast.Warning(L10n.T(Keys.Content.AgentOpenMissingCode, "该记录缺少 code，无法打开计划详情。"));
+            return;
+        }
         var name = TablePresenter.Cell(row, "name");
-        Toast.Info(string.IsNullOrWhiteSpace(name) ? L10n.T(Keys.Content.AgentRunQueued, "运行已排队。") : string.Format(L10n.T(Keys.Content.AgentRunTriggered, "已触发运行：{0}"), name));
+        var (data, status, err, _) = await Api.PostJsonAsync($"api/agent/plans/{Uri.EscapeDataString(code)}/run", new { tenantId = State.TenantId });
+        if (data is null)
+        {
+            Toast.Error(string.Format(L10n.T(Keys.Content.AgentRunFailed, "运行触发失败（{0}）。"), err ?? status.ToString()));
+            return;
+        }
+        var runId = data is { ValueKind: JsonValueKind.Object } && data.Value.TryGetProperty("id", out var idEl) ? idEl.GetInt64() : 0;
+        var runStatus = data is { ValueKind: JsonValueKind.Object } && data.Value.TryGetProperty("status", out var stEl) ? stEl.GetString() : "";
+        if (string.Equals(runStatus, "approval_pending", StringComparison.OrdinalIgnoreCase))
+            Toast.Info(string.Format(L10n.T(Keys.Content.AgentRunApprovalPending, "运行已提交，等待审批（运行 ID {0}）。"), runId));
+        else
+            Toast.Success(string.Format(L10n.T(Keys.Content.AgentRunTriggered, "已触发运行：{0}"), name));
+        await Reload();
     }
 
-    private void Create() => Toast.Info(L10n.T(Keys.Content.AgentComposerPending, "智能体编排器将在 S2 阶段接入。"));
+    // M12-09：新建智能体 → 真实 POST api/agent/plan，成功后跳转到编辑器。
+    private bool _createModal;
+    private string _newIntent = "";
+    private string _createErr = "";
+    private bool _creating;
+
+    private void OpenCreate()
+    {
+        _newIntent = "";
+        _createErr = "";
+        _createModal = true;
+    }
+
+    private async Task CreateAgent()
+    {
+        if (string.IsNullOrWhiteSpace(_newIntent))
+        {
+            _createErr = L10n.T(Keys.Content.AgentCreateIntentRequired, "请填写智能体意图。");
+            return;
+        }
+        _creating = true;
+        _createErr = "";
+        var (data, status, err, _) = await Api.PostJsonAsync("api/agent/plan", new { tenantId = State.TenantId, intent = _newIntent });
+        _creating = false;
+        if (data is null)
+        {
+            _createErr = string.Format(L10n.T(Keys.Content.AgentCreateFailed, "创建失败（{0}）。"), err ?? status.ToString());
+            return;
+        }
+        var code = data is { ValueKind: JsonValueKind.Object } && data.Value.TryGetProperty("code", out var c) ? c.GetString() : null;
+        if (string.IsNullOrWhiteSpace(code))
+        {
+            _createErr = L10n.T(Keys.Content.AgentCreateFailed, "创建失败（{0}）。");
+            return;
+        }
+        _createModal = false;
+        Nav.NavigateTo($"agent/plans/{Uri.EscapeDataString(code)}");
+    }
 
     private bool _confirm = false;
     private string? _confirmCode;

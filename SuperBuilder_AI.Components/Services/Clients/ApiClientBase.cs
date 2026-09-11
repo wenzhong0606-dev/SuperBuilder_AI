@@ -156,6 +156,38 @@ public abstract class ApiClientBase
         }
     }
 
+    /// <summary>
+    /// 松类型写入并读取响应体：POST 任意端点，成功时以 <see cref="JsonElement"/> 返回响应体（如创建后返回的资源详情）。
+    /// 与 <see cref="GetJsonAsync"/> 一致：不抛异常，非 2xx 通过 err 返回并透传后端错误码 <c>code</c>。
+    /// </summary>
+    public async Task<(JsonElement? Data, int Status, string? Error, string? Code)> PostJsonAsync(string relativeUrl, object? body = null, CancellationToken ct = default)
+    {
+        var client = CreateClient();
+        var sentWithToken = !string.IsNullOrEmpty(AppState.Token);
+        try
+        {
+            using var req = new HttpRequestMessage(HttpMethod.Post, relativeUrl);
+            if (body is not null) req.Content = JsonContent.Create(body);
+            var resp = await client.SendAsync(req, ct);
+            var raw = await resp.Content.ReadAsStringAsync(ct);
+            if (resp.StatusCode == HttpStatusCode.Unauthorized) OnUnauthorized(sentWithToken);
+            if (!resp.IsSuccessStatusCode)
+            {
+                var (code, msg, _) = ParseApiError(raw);
+                return (null, (int)resp.StatusCode, msg ?? $"请求失败（{(int)resp.StatusCode}）。", code);
+            }
+            if (string.IsNullOrWhiteSpace(raw))
+                return (null, (int)resp.StatusCode, null, null);
+            using var doc = JsonDocument.Parse(raw);
+            var el = doc.RootElement.Clone();
+            return (el, (int)resp.StatusCode, null, null);
+        }
+        catch (Exception ex)
+        {
+            return (null, 0, "网络或解析错误：" + ex.Message, null);
+        }
+    }
+
     /// <summary>纯文本读取：不解析 JSON，供 /health、/metrics 等非 JSON 端点使用。</summary>
     public async Task<(string? Text, int Status, string? Error)> GetTextAsync(string relativeUrl, CancellationToken ct = default)
     {
