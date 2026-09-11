@@ -30,9 +30,9 @@ jobs:
       - name: 输出 .NET 版本
         run: dotnet --info
       - name: 恢复 NuGet 依赖
-        run: dotnet restore
+        run: dotnet restore SuperBuilder_AI.CI.slnf
       - name: Release 编译
-        run: dotnet build --configuration Release --no-restore
+        run: dotnet build SuperBuilder_AI.CI.slnf --configuration Release --no-restore
       - name: 输出编译完成信息
         if: success()
         run: echo "SuperBuilder AI Release 编译通过"
@@ -49,7 +49,7 @@ jobs:
         with:
           dotnet-version: '10.0.x'
       - name: 恢复 Runtime NuGet 依赖
-        run: dotnet restore
+        run: dotnet restore SuperBuilder_AI.CI.slnf
       - name: 启动 SQL Server CI 容器
         run: |
           docker run -d --name superbuilder-c13-3-sqlserver \
@@ -99,7 +99,7 @@ jobs:
         run: |
           dotnet ef database update --project SuperBuilder_AI/SuperBuilder_AI.csproj --startup-project SuperBuilder_AI/SuperBuilder_AI.csproj --configuration Release
       - name: Release 编译 Runtime 应用
-        run: dotnet build --configuration Release --no-restore
+        run: dotnet build SuperBuilder_AI.CI.slnf --configuration Release --no-restore
       - name: 启动 Web API
         env:
           ASPNETCORE_ENVIRONMENT: Development
@@ -189,9 +189,9 @@ jobs:
         with:
           dotnet-version: '10.0.x'
       - name: 恢复 NuGet 依赖
-        run: dotnet restore
+        run: dotnet restore SuperBuilder_AI.CI.slnf
       - name: Release 编译（含 E2E 工程）
-        run: dotnet build --configuration Release --no-restore
+        run: dotnet build SuperBuilder_AI.CI.slnf --configuration Release --no-restore
       - name: 加全局工具到 PATH
         run: echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
       - name: 启动 SQL Server CI 容器

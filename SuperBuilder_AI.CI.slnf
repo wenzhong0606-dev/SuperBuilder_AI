@@ -1,0 +1,11 @@
+{
+  "solution": {
+    "path": "SuperBulider_AI.slnx",
+    "projects": [
+      "SuperBuilder_AI/SuperBuilder_AI.csproj",
+      "SuperBuilder_AI.Components/SuperBuilder_AI.Components.csproj",
+      "SuperBuilder_AI.Web/SuperBuilder_AI.Web.csproj",
+      "tests/SuperBuilder_AI.E2E.Tests/SuperBuilder_AI.E2E.Tests.csproj"
+    ]
+  }
+}
