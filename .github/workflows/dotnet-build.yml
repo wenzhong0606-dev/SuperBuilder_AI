@@ -264,9 +264,9 @@ jobs:
           done
           cat /tmp/sb-web.log; exit 1
       - name: 安装 Playwright CLI 与 Chromium
-        run: |
-          dotnet tool install --global Microsoft.Playwright.CLI
-          playwright install --with-deps chromium
+        # Microsoft.Playwright.CLI 已废弃（最新 1.2.3，不随 Microsoft.Playwright 版本走）；
+        # .NET 绑定 Microsoft.Playwright 1.50.0 对应 Playwright 1.50.0，用匹配的 npm 包安装浏览器最可靠。
+        run: npx -y playwright@1.50.0 install --with-deps chromium
       - name: 运行 E2E 测试（M12-P0 权限矩阵）
         env:
           # 账号由 API 的 E2E_SEED 种子创建，凭据与 E2ESandboxSeedService 硬编码一致；
