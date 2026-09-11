@@ -12,6 +12,9 @@
             <button class="btn btn-primary btn-sm" @onclick='() => Nav.NavigateTo($"apps/{Uri.EscapeDataString(Code)}/run")'>@L10n.T(Keys.Content.AppDetailRun, "运行")</button>
         </PermissionGuard>
         <PermissionGuard Require="@(new[] { PermissionCodes.AppEdit })">
+            <button class="btn btn-outline-secondary btn-sm" @onclick='() => Nav.NavigateTo($"apps/{Uri.EscapeDataString(Code)}/design")'>@L10n.T(Keys.Content.AppsDesignerDesignMode, "设计")</button>
+        </PermissionGuard>
+        <PermissionGuard Require="@(new[] { PermissionCodes.AppEdit })">
             <button class="btn btn-outline-secondary btn-sm" @onclick='() => Nav.NavigateTo($"apps/{Uri.EscapeDataString(Code)}/preview")'>@L10n.T(Keys.Content.AppDetailPreview, "预览")</button>
         </PermissionGuard>
         <button class="btn btn-outline-secondary btn-sm" @onclick="() => Load()">@L10n.T(Keys.Content.AppDetailRefresh, "刷新")</button>

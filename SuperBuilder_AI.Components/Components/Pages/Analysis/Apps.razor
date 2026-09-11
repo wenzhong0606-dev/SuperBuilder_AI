@@ -56,6 +56,9 @@
                     <span style="margin-left:auto; display:inline-flex; gap:6px">
                         <button class="btn btn-sm btn-outline-primary" @onclick="e => OpenRun(context)" @onclick:stopPropagation="true">@L10n.T(Keys.Content.AppsRun, "运行")</button>
                         <PermissionGuard Require="@(new[] { PermissionCodes.AppEdit })" Silent>
+                            <button class="btn btn-sm btn-outline-secondary" @onclick="e => OpenDesign(context)" @onclick:stopPropagation="true">@L10n.T(Keys.Content.AppsDesignerDesignMode, "设计")</button>
+                        </PermissionGuard>
+                        <PermissionGuard Require="@(new[] { PermissionCodes.AppEdit })" Silent>
                             <button class="btn btn-sm btn-outline-secondary" @onclick="e => OpenDsl(context)" @onclick:stopPropagation="true">@L10n.T(Keys.Content.AppsEdit, "编辑")</button>
                         </PermissionGuard>
                         <PermissionGuard Require="@(new[] { PermissionCodes.AppDelete })" Silent>
@@ -166,6 +169,18 @@
             return;
         }
         Nav.NavigateTo($"apps/{Uri.EscapeDataString(code)}/run");
+    }
+
+    /// <summary>打开应用可视化设计器；缺少 code 时提示。</summary>
+    private void OpenDesign(JsonElement row)
+    {
+        var code = Cell(row, "code");
+        if (string.IsNullOrWhiteSpace(code))
+        {
+            Toast.Warning(L10n.T(Keys.Content.AppsMissingCodeEdit, "该记录缺少 code，无法设计。"));
+            return;
+        }
+        Nav.NavigateTo($"apps/{Uri.EscapeDataString(code)}/design");
     }
 
     // ---- 新建（描述生成） ----

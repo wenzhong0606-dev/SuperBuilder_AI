@@ -1,0 +1,938 @@
+@page "/apps/{Code}/design"
+@inject IApiClient Api
+@inject AppState State
+@inject NavigationManager Nav
+@inject ToastService Toast
+@inject IJSRuntime JS
+@using System.Text.Json
+@using System.Text.Json.Nodes
+@using JsonValue = System.Text.Json.Nodes.JsonValue
+@using System.Linq
+@using SuperBuilder_AI.Components.Shared
+@implements IAsyncDisposable
+
+<AuthGuard>
+    <PageHead Icon="sb-ico-app" Title="@L10n.T(Keys.Content.AppsDesignerTitle, "应用设计器")"
+              Desc="@L10n.T(Keys.Content.AppsDesignerSourceHint, "可视化编排页面、组件、数据绑定与主题。")">
+        <button class="btn btn-outline-secondary btn-sm" @onclick='() => Nav.NavigateTo($"apps/{Uri.EscapeDataString(Code)}")'>@L10n.T(Keys.Content.AppDetailBack, "返回")</button>
+        <div class="sb-dz-mode-toggle btn-group btn-group-sm">
+            <button class="btn @(_mode == DMode.Design ? "btn-primary" : "btn-outline-secondary")" @onclick="() => SwitchMode(DMode.Design)">@L10n.T(Keys.Content.AppsDesignerDesignMode, "设计")</button>
+            <button class="btn @(_mode == DMode.Source ? "btn-primary" : "btn-outline-secondary")" @onclick="() => SwitchMode(DMode.Source)">@L10n.T(Keys.Content.AppsDesignerSourceMode, "源码")</button>
+        </div>
+        <PermissionGuard Require="@(new[] { PermissionCodes.AppEdit })" Silent>
+            <button class="btn btn-primary btn-sm" @onclick="Save" disabled="@_saving">@(_saving ? L10n.T(Keys.Content.AppsDesignerSaving, "保存中…") : L10n.T(Keys.Content.AppsDesignerSave, "保存"))</button>
+        </PermissionGuard>
+        <PermissionGuard Require="@(new[] { PermissionCodes.AppPublish })" Silent>
+            <button class="btn btn-outline-secondary btn-sm" @onclick="Publish" disabled="@_publishing">@(_publishing ? L10n.T(Keys.Content.AppsDesignerPublishing, "发布中…") : L10n.T(Keys.Content.AppsDesignerPublish, "发布"))</button>
+        </PermissionGuard>
+    </PageHead>
+
+    @if (_loading)
+    {
+        <LoadingState Text="@L10n.T(Keys.Content.AppsDesignerLoading, "正在加载应用设计器…")" />
+    }
+    else if (_error is not null)
+    {
+        <ErrorState Message="@_error" OnRetry="() => _ = Load()" />
+    }
+    else if (_mode == DMode.Source)
+    {
+        <div class="sb-dz-source">
+            <SbPanel Title="@L10n.T(Keys.Content.AppsDesignerSourceMode, "源码")">
+                <Body>
+                    <p class="muted">@L10n.T(Keys.Content.AppsDesignerSourceHint, "在此直接编辑 AppDsl JSON。保存前会校验结构。")</p>
+                    <textarea class="form-control sb-pre" rows="26" @bind="_sourceJson"></textarea>
+                </Body>
+            </SbPanel>
+        </div>
+    }
+    else
+    {
+        <div class="sb-dz-layout app-designer-layout">
+            @* 左：组件树 *@
+            <aside class="sb-dz-panel sb-dz-tree">
+                <div class="sb-dz-panel-head">
+                    <span>@L10n.T(Keys.Content.AppsDesignerTreeTitle, "组件树")</span>
+                    <button class="btn btn-sm btn-outline-primary" @onclick="AddPage">+ @L10n.T(Keys.Content.AppsDesignerAddPage, "新增页面")</button>
+                </div>
+                <div class="sb-dz-tree-body">
+                    @foreach (var page in Pages())
+                    {
+                        var pid = GetStr(page, P.PageId);
+                        var isActive = pid == _activePageId;
+                        <div class="sb-dz-tree-page @(isActive ? "active" : "")">
+                            <div class="sb-dz-tree-row">
+                                <button class="sb-dz-tree-toggle" @onclick="() => _activePageId = pid">@GetStr(page, P.PageName)</button>
+                                <button class="btn btn-sm btn-link text-danger" @onclick="() => RemovePage(pid)">@L10n.T(Keys.Content.AppsDesignerDelete, "删除")</button>
+                            </div>
+                            @if (isActive)
+                            {
+                                var comps = ComponentsOf(page);
+                                <div class="sb-dz-tree-comps">
+                                    @foreach (var c in comps)
+                                    {
+                                        var cid = GetStr(c as JsonObject, P.CompId);
+                                        <div class="sb-dz-tree-comp @(_selectedId == cid ? "selected" : "")" @onclick="() => SelectInTree(pid, cid)">
+                                            <span class="sb-dz-tree-comp-type">@TypeLabel(GetStr(c as JsonObject, P.Type))</span>
+                                            <span class="sb-dz-tree-comp-title">@(GetStr(c as JsonObject, P.Title) is { Length: > 0 } ? GetStr(c as JsonObject, P.Title) : GetStr(c as JsonObject, P.CompId))</span>
+                                        </div>
+                                    }
+                                    @if (comps.Count == 0)
+                                    {
+                                        <div class="sb-dz-tree-empty">@L10n.T(Keys.Content.AppsDesignerEmptyApp, "该页面还没有组件。")</div>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            </aside>
+
+            @* 中：调色板 + 画布 *@
+            <main class="sb-dz-canvas-wrap">
+                <div class="sb-dz-palette">
+                    @foreach (var t in ComponentTypes)
+                    {
+                        <div class="sb-dz-palette-item" draggable="true"
+                             ondragstart="event.dataTransfer.setData('text/sb-widget','@t.Type');event.dataTransfer.effectAllowed='copy';"
+                             @onclick="() => AddComponent(t.Type)">@TypeLabel(t.Type)</div>
+                    }
+                </div>
+                <div class="sb-dz-canvas" @ref="_canvas">
+                    @foreach (var comp in ActiveComponents())
+                    {
+                        var cid = GetStr(comp, P.CompId);
+                        var type = GetStr(comp, P.Type);
+                        var (x, y, w, h) = Pos(comp);
+                        <div class="sb-dz-widget @(_selectedId == cid ? "selected" : "")"
+                             data-id="@cid" data-x="@x" data-y="@y" data-w="@w" data-h="@h"
+                             style="@($"grid-column:{x + 1} / span {w}; grid-row:{y + 1} / span {h};")"
+                             @onclick="() => Select(cid)">
+                            <div class="sb-dz-widget-head">
+                                <span class="sb-dz-widget-title">@(GetStr(comp, P.Title) is { Length: > 0 } ? GetStr(comp, P.Title) : TypeLabel(type))</span>
+                                <span class="sb-dz-widget-badge">@TypeLabel(type)</span>
+                            </div>
+                            <div class="sb-dz-widget-body">@ComponentSummary(comp)</div>
+                            <div class="sb-dz-resize"></div>
+                        </div>
+                    }
+                    @if (ActiveComponents().Count == 0)
+                    {
+                        <div class="sb-dz-canvas-empty">@L10n.T(Keys.Content.AppsDesignerEmptyApp, "该应用还没有页面，点击「新增页面」开始。")</div>
+                    }
+                </div>
+            </main>
+
+            @* 右：属性面板 *@
+            <aside class="sb-dz-panel sb-dz-props">
+                <SbPanel Title="@L10n.T(Keys.Content.AppsDesignerAppName, "应用设置")">
+                    <Body>
+                        <SbField Label="@L10n.T(Keys.Content.AppsDesignerAppName, "应用名称")">
+                            <input class="form-control" value="@GetStr(_root, P.Name)" @oninput="e => SetStr(_root, P.Name, e.Value?.ToString() ?? string.Empty)" />
+                        </SbField>
+                        <SbField Label="@L10n.T(Keys.Content.AppsDesignerAppDescription, "应用描述")">
+                            <input class="form-control" value="@GetStr(_root, P.Description)" @oninput="e => SetStr(_root, P.Description, e.Value?.ToString() ?? string.Empty)" />
+                        </SbField>
+                        <SbField Label="@L10n.T(Keys.Content.AppsDesignerTheme, "主题")" Hint="@L10n.T(Keys.Content.ThemeReuseHint, "保存后进入草稿；发布时随版本快照固化。")">
+                            <select class="form-select" value="@GetStr(_root, P.ThemeKey)" @onchange="e => SetStr(_root, P.ThemeKey, e.Value?.ToString() ?? string.Empty)">
+                                <option value="">@L10n.T(Keys.Content.AppsDesignerThemeDefault, "跟随租户默认主题")</option>
+                                @foreach (var theme in _themes)
+                                {
+                                    <option value="@theme.Key">@theme.Name</option>
+                                }
+                            </select>
+                        </SbField>
+                    </Body>
+                </SbPanel>
+
+                @if (SelectedComp() is { } sc)
+                {
+                    var type = GetStr(sc, P.Type);
+                    <SbPanel Title="@L10n.T(Keys.Content.AppsDesignerSectionGeneral, "常规")">
+                        <Body>
+                            <SbField Label="@L10n.T(Keys.Content.AppsDesignerFieldType, "类型")">
+                                <input class="form-control" value="@TypeLabel(type)" disabled />
+                            </SbField>
+                            <SbField Label="@L10n.T(Keys.Content.AppsDesignerFieldId, "标识")">
+                                <input class="form-control" value="@GetStr(sc, P.CompId)" disabled />
+                            </SbField>
+                            <SbField Label="@L10n.T(Keys.Content.AppsDesignerFieldTitle, "标题")">
+                                <input class="form-control" value="@GetStr(sc, P.Title)" @oninput="e => UpdStr(sc, P.Title, e.Value?.ToString() ?? string.Empty)" />
+                            </SbField>
+                            <SbField Label="@L10n.T(Keys.Content.AppsDesignerFieldOrder, "顺序")">
+                                <input class="form-control" type="number" value="@GetInt(sc, P.Order)" @oninput="e => UpdInt(sc, P.Order, e.Value?.ToString() ?? string.Empty)" />
+                            </SbField>
+                            <SbField Label="@L10n.T(Keys.Content.AppsDesignerFieldPosition, "位置 (X/Y/W/H)")">
+                                <div class="sb-dz-pos">
+                                    @{
+                                        var (px, py, pw, ph) = Pos(sc);
+                                    }
+                                    <input class="form-control" type="number" value="@px" @oninput="e => SetPos(sc, nameof(P.X), e.Value?.ToString() ?? string.Empty)" />
+                                    <input class="form-control" type="number" value="@py" @oninput="e => SetPos(sc, nameof(P.Y), e.Value?.ToString() ?? string.Empty)" />
+                                    <input class="form-control" type="number" value="@pw" @oninput="e => SetPos(sc, nameof(P.W), e.Value?.ToString() ?? string.Empty)" />
+                                    <input class="form-control" type="number" value="@ph" @oninput="e => SetPos(sc, P.Hh, e.Value?.ToString() ?? string.Empty)" />
+                                </div>
+                            </SbField>
+                            <div class="sb-dz-prop-actions">
+                                <button class="btn btn-sm btn-outline-secondary" @onclick="() => DuplicateSelected()">@L10n.T(Keys.Content.AppsDesignerDuplicate, "复制")</button>
+                                <button class="btn btn-sm btn-outline-danger" @onclick="() => RemoveSelected()">@L10n.T(Keys.Content.AppsDesignerDelete, "删除")</button>
+                            </div>
+                        </Body>
+                    </SbPanel>
+
+                    @if (!string.Equals(type, "text", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var bind = EnsureBinding(sc);
+                        <SbPanel Title="@L10n.T(Keys.Content.AppsDesignerSectionBinding, "数据绑定")">
+                            <Body>
+                                <SbField Label="@L10n.T(Keys.Content.AppsDesignerFieldEntity, "业务实体")">
+                                    <input class="form-control" value="@GetStr(bind, P.Entity)" @oninput="e => SetStr(bind, P.Entity, e.Value?.ToString() ?? string.Empty)" />
+                                </SbField>
+                                <SbField Label="@L10n.T(Keys.Content.AppsDesignerFieldDataSourceId, "数据源 Id")">
+                                    <input class="form-control" type="number" value="@GetInt(bind, P.DataSourceId)" @oninput="e => SetInt(bind, P.DataSourceId, e.Value?.ToString() ?? string.Empty)" />
+                                </SbField>
+                                <SbField Label="@L10n.T(Keys.Content.AppsDesignerFieldTableId, "主表 Id")">
+                                    <input class="form-control" type="number" value="@GetInt(bind, P.TableId)" @oninput="e => SetInt(bind, P.TableId, e.Value?.ToString() ?? string.Empty)" />
+                                </SbField>
+
+                                @* 指标 *@
+                                <SbField Label="@L10n.T(Keys.Content.AppsDesignerFieldMetrics, "指标")">
+                                    @{
+                                        var metrics = bind[P.Metrics] as JsonArray ?? new JsonArray();
+                                    }
+                                    @for (var mi = 0; mi < metrics.Count; mi++)
+                                    {
+                                        var midx = mi;
+                                        var m = metrics[midx] as JsonObject ?? new JsonObject();
+                                        <div class="sb-dz-field-row">
+                                            <input class="form-control" value="@GetStr(m, P.Field)" @oninput="e => SetMetricField(midx, P.Field, e.Value?.ToString() ?? string.Empty)" placeholder="field" />
+                                            <select class="form-select" value="@GetStr(m, P.Aggregation)" @onchange="e => SetMetricField(midx, P.Aggregation, e.Value?.ToString() ?? string.Empty)">
+                                                @foreach (var a in AggregateTypes) { <option value="@a">@a</option> }
+                                            </select>
+                                            <button class="btn btn-sm btn-link text-danger" @onclick="() => RemoveMetric(midx)">@L10n.T(Keys.Content.AppsDesignerDelete, "删除")</button>
+                                        </div>
+                                    }
+                                    <button class="btn btn-sm btn-outline-primary" @onclick="AddMetric">+ @L10n.T(Keys.Content.AppsDesignerFieldMetrics, "指标")</button>
+                                </SbField>
+
+                                @* 维度 *@
+                                <SbField Label="@L10n.T(Keys.Content.AppsDesignerFieldDimensions, "维度")">
+                                    @{
+                                        var dims = bind[P.Dimensions] as JsonArray ?? new JsonArray();
+                                    }
+                                    @for (var di = 0; di < dims.Count; di++)
+                                    {
+                                        var didx = di;
+                                        <div class="sb-dz-field-row">
+                                            <input class="form-control" value="@(dims[didx]?.GetValue<string>() ?? string.Empty)" @oninput="e => SetDim(didx, e.Value?.ToString() ?? string.Empty)" />
+                                            <button class="btn btn-sm btn-link text-danger" @onclick="() => RemoveDim(didx)">@L10n.T(Keys.Content.AppsDesignerDelete, "删除")</button>
+                                        </div>
+                                    }
+                                    <button class="btn btn-sm btn-outline-primary" @onclick="AddDim">+ @L10n.T(Keys.Content.AppsDesignerFieldDimensions, "维度")</button>
+                                </SbField>
+
+                                @* 筛选 *@
+                                <SbField Label="@L10n.T(Keys.Content.AppsDesignerFieldFilters, "筛选")">
+                                    @{
+                                        var filters = bind[P.Filters] as JsonArray ?? new JsonArray();
+                                    }
+                                    @for (var fi = 0; fi < filters.Count; fi++)
+                                    {
+                                        var fidx = fi;
+                                        var f = filters[fidx] as JsonObject ?? new JsonObject();
+                                        <div class="sb-dz-field-row">
+                                            <input class="form-control" value="@GetStr(f, P.Field)" @oninput="e => SetFilterField(fidx, P.Field, e.Value?.ToString() ?? string.Empty)" placeholder="field" />
+                                            <select class="form-select" value="@GetStr(f, P.Operator)" @onchange="e => SetFilterField(fidx, P.Operator, e.Value?.ToString() ?? string.Empty)">
+                                                @foreach (var o in FilterOperators) { <option value="@o">@o</option> }
+                                            </select>
+                                            <input class="form-control" value="@GetStr(f, P.Value)" @oninput="e => SetFilterField(fidx, P.Value, e.Value?.ToString() ?? string.Empty)" placeholder="value" />
+                                            <button class="btn btn-sm btn-link text-danger" @onclick="() => RemoveFilter(fidx)">@L10n.T(Keys.Content.AppsDesignerDelete, "删除")</button>
+                                        </div>
+                                    }
+                                    <button class="btn btn-sm btn-outline-primary" @onclick="AddFilter">+ @L10n.T(Keys.Content.AppsDesignerFieldFilters, "筛选")</button>
+                                </SbField>
+
+                                @* 排序 *@
+                                <SbField Label="@L10n.T(Keys.Content.AppsDesignerFieldSort, "排序")">
+                                    @{
+                                        var sorts = bind[P.Sort] as JsonArray ?? new JsonArray();
+                                    }
+                                    @for (var si = 0; si < sorts.Count; si++)
+                                    {
+                                        var sidx = si;
+                                        var s = sorts[sidx] as JsonObject ?? new JsonObject();
+                                        <div class="sb-dz-field-row">
+                                            <input class="form-control" value="@GetStr(s, P.Field)" @oninput="e => SetSortField(sidx, P.Field, e.Value?.ToString() ?? string.Empty)" placeholder="field" />
+                                            <select class="form-select" value="@GetStr(s, P.Direction)" @onchange="e => SetSortField(sidx, P.Direction, e.Value?.ToString() ?? string.Empty)">
+                                                @foreach (var d in SortDirections) { <option value="@d">@d</option> }
+                                            </select>
+                                            <button class="btn btn-sm btn-link text-danger" @onclick="() => RemoveSort(sidx)">@L10n.T(Keys.Content.AppsDesignerDelete, "删除")</button>
+                                        </div>
+                                    }
+                                    <button class="btn btn-sm btn-outline-primary" @onclick="AddSort">+ @L10n.T(Keys.Content.AppsDesignerFieldSort, "排序")</button>
+                                </SbField>
+
+                                <SbField Label="@L10n.T(Keys.Content.AppsDesignerFieldLimit, "返回行数上限")">
+                                    <input class="form-control" type="number" value="@GetInt(bind, P.Limit)" @oninput="e => SetInt(bind, P.Limit, e.Value?.ToString() ?? string.Empty)" />
+                                </SbField>
+                            </Body>
+                        </SbPanel>
+                    }
+
+                    @* 呈现参数 *@
+                    <SbPanel Title="@L10n.T(Keys.Content.AppsDesignerSectionProperties, "呈现参数")">
+                        <Body>
+                            @{
+                                var props = sc[P.Properties] as JsonObject ?? new JsonObject();
+                                var propKeys = props.Select(kv => kv.Key).ToList();
+                            }
+                            @for (var pi = 0; pi < propKeys.Count; pi++)
+                            {
+                                var pidx = pi;
+                                var pk = propKeys[pidx];
+                                <div class="sb-dz-field-row">
+                                    <input class="form-control" value="@pk" disabled />
+                                    <input class="form-control" value="@(props[pk]?.GetValue<string>() ?? string.Empty)" @oninput="e => SetProp(pk, e.Value?.ToString() ?? string.Empty)" />
+                                    <button class="btn btn-sm btn-link text-danger" @onclick="() => RemoveProp(pk)">@L10n.T(Keys.Content.AppsDesignerDelete, "删除")</button>
+                                </div>
+                            }
+                            <div class="sb-dz-field-row">
+                                <input class="form-control" placeholder="key" @bind="_newPropKey" />
+                                <input class="form-control" placeholder="value" @bind="_newPropVal" />
+                                <button class="btn btn-sm btn-outline-primary" @onclick="AddProp">+ @L10n.T(Keys.Content.AppsDesignerAddComponent, "添加")</button>
+                            </div>
+                        </Body>
+                    </SbPanel>
+
+                    @* 样式 *@
+                    <SbPanel Title="@L10n.T(Keys.Content.AppsDesignerSectionStyle, "样式")">
+                        <Body>
+                            @{
+                                var style = EnsureStyle(sc);
+                            }
+                            <SbField Label="@L10n.T(Keys.Content.AppsDesignerFieldPalette, "色板")">
+                                <select class="form-select" value="@GetStr(style, P.Palette)" @onchange="e => SetStr(style, P.Palette, e.Value?.ToString() ?? string.Empty)">
+                                    <option value=""></option>
+                                    @foreach (var p in PaletteKeys) { <option value="@p">@p</option> }
+                                </select>
+                            </SbField>
+                            <SbField Label="@L10n.T(Keys.Content.AppsDesignerFieldBackground, "背景")">
+                                <select class="form-select" value="@GetStr(style, P.Background)" @onchange="e => SetStr(style, P.Background, e.Value?.ToString() ?? string.Empty)">
+                                    <option value=""></option>
+                                    @foreach (var p in PaletteKeys) { <option value="@p">@p</option> }
+                                </select>
+                            </SbField>
+                            <SbField Label="@L10n.T(Keys.Content.AppsDesignerFieldShowBorder, "显示边框")">
+                                <input type="checkbox" checked="@GetBool(style, P.ShowBorder)" @onchange="e => SetBool(style, P.ShowBorder, e.Value is true)" />
+                            </SbField>
+                            <SbField Label="@L10n.T(Keys.Content.AppsDesignerFieldPadding, "内边距")">
+                                <select class="form-select" value="@GetStr(style, P.Padding)" @onchange="e => SetStr(style, P.Padding, e.Value?.ToString() ?? string.Empty)">
+                                    <option value=""></option>
+                                    @foreach (var p in PaddingKeys) { <option value="@p">@p</option> }
+                                </select>
+                            </SbField>
+                        </Body>
+                    </SbPanel>
+                }
+                else
+                {
+                    <div class="sb-dz-empty-panel">@L10n.T(Keys.Content.AppsDesignerNoSelection, "未选择组件。在画布或组件树中选择一个组件以编辑其属性。")</div>
+                }
+
+                <SbPanel Title="@L10n.T(Keys.Content.AppsDesignerSectionPermissions, "权限")">
+                    <Body><div class="sb-dz-empty">@L10n.T(Keys.Content.AppsDesignerPermissionsHint, "应用的访问由租户 RBAC 控制：查看=app:view，编辑=app:edit，发布=app:publish，删除=app:delete。权限在租户角色中分配，不在应用 DSL 内定义。")</div></Body>
+                </SbPanel>
+            </aside>
+        </div>
+    }
+</AuthGuard>
+
+@code {
+    private enum DMode { Design, Source }
+
+    /// <summary>App DSL 字段名常量（camelCase，与 AppDslSerializer 一致）。</summary>
+    private static class P
+    {
+        public const string Version = "version";
+        public const string Code = "code";
+        public const string Name = "name";
+        public const string Description = "description";
+        public const string ThemeKey = "themeKey";
+        public const string Pages = "pages";
+        public const string PageId = "id";
+        public const string PageName = "name";
+        public const string PageOrder = "order";
+        public const string Components = "components";
+        public const string Type = "type";
+        public const string CompId = "id";
+        public const string Title = "title";
+        public const string Order = "order";
+        public const string Position = "position";
+        public const string Binding = "binding";
+        public const string Properties = "properties";
+        public const string Style = "style";
+        public const string X = "x";
+        public const string Y = "y";
+        public const string W = "w";
+        public const string Hh = "h";
+        public const string Entity = "entity";
+        public const string DataSourceId = "dataSourceId";
+        public const string TableId = "tableId";
+        public const string Metrics = "metrics";
+        public const string Dimensions = "dimensions";
+        public const string Filters = "filters";
+        public const string Sort = "sort";
+        public const string Limit = "limit";
+        public const string Field = "field";
+        public const string Aggregation = "aggregation";
+        public const string Operator = "operator";
+        public const string Value = "value";
+        public const string Direction = "direction";
+        public const string Palette = "palette";
+        public const string Background = "background";
+        public const string ShowBorder = "showBorder";
+        public const string Padding = "padding";
+    }
+
+    private sealed record CompType(string Type, string Key);
+
+    private static readonly CompType[] ComponentTypes =
+    {
+        new("chart", Keys.Content.AppsDesignerTypeChart),
+        new("table", Keys.Content.AppsDesignerTypeTable),
+        new("kpi", Keys.Content.AppsDesignerTypeKpi),
+        new("text", Keys.Content.AppsDesignerTypeText),
+        new("filter", Keys.Content.AppsDesignerTypeFilter),
+        new("form", Keys.Content.AppsDesignerTypeForm),
+    };
+    private static readonly string[] AggregateTypes = { "sum", "avg", "count", "min", "max" };
+    private static readonly string[] FilterOperators = { "eq", "neq", "gt", "lt", "in", "like" };
+    private static readonly string[] SortDirections = { "ASC", "DESC" };
+    private static readonly string[] PaletteKeys = { "primary", "success", "warning", "danger", "neutral" };
+    private static readonly string[] PaddingKeys = { "compact", "normal", "loose" };
+    private static readonly Dictionary<string, string> TypeKeyMap = ComponentTypes.ToDictionary(t => t.Type, t => t.Key);
+
+    [Parameter] public string Code { get; set; } = "";
+
+    private JsonObject? _root;
+    private string _activePageId = "";
+    private string _selectedId = "";
+    private DMode _mode = DMode.Design;
+    private string _sourceJson = "";
+    private string? _error;
+    private bool _loading = true;
+    private bool _dirty;
+    private bool _saving, _publishing;
+    private bool _attached;
+    private ElementReference _canvas;
+    private DotNetObjectReference<AppDesigner>? _selfRef;
+
+    private sealed record ThemeChoice(string Key, string Name);
+    private List<ThemeChoice> _themes = new();
+
+    private string _newPropKey = "";
+    private string _newPropVal = "";
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _selfRef = DotNetObjectReference.Create(this);
+            await Load();
+            StateHasChanged();
+            return;
+        }
+        if (_mode == DMode.Design && !_attached && _canvas.Id is not null && _root is not null)
+        {
+            await JS.InvokeVoidAsync("SuperBuilder.designer.attach", _canvas, _selfRef);
+            _attached = true;
+        }
+    }
+
+    private async Task Load()
+    {
+        _loading = true;
+        _error = null;
+        var (data, status, err, code) = await Api.GetJsonAsync($"api/apps/{Uri.EscapeDataString(Code)}?tenantId={State.TenantId}");
+        if (data is null)
+        {
+            _error = err is null
+                ? string.Format(L10n.T(Keys.Content.AppsDesignerLoadFailed, "加载应用失败（{0}）。"), status)
+                : L10n.Friendly(code, err);
+            _loading = false;
+            return;
+        }
+        var dsl = data.Value.TryGetProperty("dslJson", out var dj) && dj.ValueKind == JsonValueKind.String
+            ? dj.GetString()!
+            : data.Value.GetRawText();
+        _root = JsonNode.Parse(dsl)?.AsObject() ?? new JsonObject();
+        EnsureDefaults();
+        _sourceJson = _root.ToJsonString();
+        await LoadThemes();
+        _loading = false;
+        StateHasChanged();
+    }
+
+    private async Task LoadThemes()
+    {
+        var (data, _, _, _) = await Api.GetJsonAsync($"api/themes?tenantId={State.TenantId}");
+        _themes = data is { ValueKind: JsonValueKind.Array }
+            ? data.Value.EnumerateArray()
+                .Select(x => new ThemeChoice(
+                    Cell(x, "key"),
+                    Cell(x, "key").Equals("default", StringComparison.OrdinalIgnoreCase)
+                        ? L10n.T(Keys.Content.AppsDesignerThemeDefault, "跟随租户默认主题")
+                        : Cell(x, "name")))
+                .Where(x => !string.IsNullOrWhiteSpace(x.Key)).ToList()
+            : new();
+    }
+
+    private static string Cell(JsonElement row, string col)
+    {
+        if (row.TryGetProperty(col, out var v) && v.ValueKind == JsonValueKind.String) return v.GetString()!;
+        return "";
+    }
+
+    // ---- 结构保障 ----
+    private JsonArray EnsurePages()
+    {
+        if (_root![P.Pages] is not JsonArray pages)
+        {
+            pages = new JsonArray();
+            _root[P.Pages] = pages;
+        }
+        return pages;
+    }
+
+    private JsonArray EnsureComponents(JsonObject page)
+    {
+        if (page[P.Components] is not JsonArray comps)
+        {
+            comps = new JsonArray();
+            page[P.Components] = comps;
+        }
+        return comps;
+    }
+
+    private void EnsureDefaults()
+    {
+        if (string.IsNullOrEmpty(GetStr(_root, P.Version))) _root![P.Version] = "1.0";
+        var pages = EnsurePages();
+        if (pages.Count == 0)
+        {
+            var p = new JsonObject
+            {
+                [P.PageId] = "page1",
+                [P.PageName] = "Page 1",
+                [P.PageOrder] = 0,
+                [P.Components] = new JsonArray()
+            };
+            pages.Add(p);
+        }
+        _activePageId = GetStr(pages[0] as JsonObject, P.PageId);
+    }
+
+    private List<JsonObject> Pages()
+    {
+        var list = new List<JsonObject>();
+        if (_root?[P.Pages] is JsonArray pages)
+            foreach (var p in pages)
+                if (p is JsonObject po) list.Add(po);
+        return list;
+    }
+
+    private JsonObject? ActivePage()
+    {
+        foreach (var p in Pages())
+            if (GetStr(p, P.PageId) == _activePageId) return p;
+        return Pages().FirstOrDefault();
+    }
+
+    private JsonArray ComponentsOf(JsonObject page) => page[P.Components] as JsonArray ?? new JsonArray();
+
+    private List<JsonObject> ActiveComponents()
+    {
+        var page = ActivePage();
+        var list = new List<JsonObject>();
+        if (page is null) return list;
+        foreach (var c in ComponentsOf(page))
+            if (c is JsonObject co) list.Add(co);
+        return list;
+    }
+
+    private JsonObject? SelectedComp()
+    {
+        foreach (var c in ActiveComponents())
+            if (GetStr(c, P.CompId) == _selectedId) return c;
+        return null;
+    }
+
+    // ---- 选择 / 增删 ----
+    private void Select(string id) { _selectedId = id; StateHasChanged(); }
+
+    private void SelectInTree(string pageId, string compId)
+    {
+        _activePageId = pageId;
+        _selectedId = compId;
+        StateHasChanged();
+    }
+
+    private void SwitchMode(DMode mode)
+    {
+        if (mode == DMode.Source) _sourceJson = _root?.ToJsonString() ?? "{}";
+        _mode = mode;
+        StateHasChanged();
+    }
+
+    private void AddPage()
+    {
+        var pages = EnsurePages();
+        var n = pages.Count + 1;
+        var id = NewId("page", pages, P.PageId);
+        var p = new JsonObject
+        {
+            [P.PageId] = id,
+            [P.PageName] = "Page " + n,
+            [P.PageOrder] = n - 1,
+            [P.Components] = new JsonArray()
+        };
+        pages.Add(p);
+        _activePageId = id;
+        _selectedId = "";
+        _dirty = true;
+        StateHasChanged();
+    }
+
+    private void RemovePage(string pageId)
+    {
+        var pages = EnsurePages();
+        for (var i = pages.Count - 1; i >= 0; i--)
+            if (GetStr(pages[i] as JsonObject, P.PageId) == pageId) pages.RemoveAt(i);
+        if (GetStr(ActivePage(), P.PageId) == pageId)
+            _activePageId = Pages().Count > 0 ? GetStr(Pages()[0], P.PageId) : "";
+        _selectedId = "";
+        _dirty = true;
+        StateHasChanged();
+    }
+
+    private void AddComponent(string type)
+    {
+        var page = ActivePage();
+        if (page is null) return;
+        var comps = EnsureComponents(page);
+        var id = NewId("c", comps, P.CompId);
+        var c = new JsonObject
+        {
+            [P.Type] = type,
+            [P.CompId] = id,
+            [P.Title] = "",
+            [P.Order] = comps.Count,
+            [P.Position] = new JsonObject { [P.X] = 0, [P.Y] = 0, [P.W] = 4, [P.Hh] = 3 }
+        };
+        comps.Add(c);
+        _selectedId = id;
+        _dirty = true;
+        StateHasChanged();
+    }
+
+    private void RemoveSelected()
+    {
+        var page = ActivePage();
+        if (page is null) return;
+        var comps = ComponentsOf(page);
+        for (var i = comps.Count - 1; i >= 0; i--)
+            if (GetStr(comps[i] as JsonObject, P.CompId) == _selectedId) comps.RemoveAt(i);
+        _selectedId = "";
+        _dirty = true;
+        StateHasChanged();
+    }
+
+    private void DuplicateSelected()
+    {
+        var page = ActivePage();
+        if (page is null || SelectedComp() is not { } src) return;
+        var comps = EnsureComponents(page);
+        var id = NewId("c", comps, P.CompId);
+        var copy = JsonNode.Parse(src.ToJsonString())!.AsObject();
+        copy[P.CompId] = id;
+        copy[P.Order] = comps.Count;
+        if (copy[P.Position] is JsonObject pos)
+        {
+            var (x, y, w, h) = Pos(copy);
+            pos[P.X] = x + w < 12 ? x + w : 0;
+        }
+        comps.Add(copy);
+        _selectedId = id;
+        _dirty = true;
+        StateHasChanged();
+    }
+
+    // ---- JS 回调 ----
+    [JSInvokable]
+    public void OnPaletteDrop(string type, int x, int y)
+    {
+        var page = ActivePage();
+        if (page is null) return;
+        var comps = EnsureComponents(page);
+        var id = NewId("c", comps, P.CompId);
+        var c = new JsonObject
+        {
+            [P.Type] = type,
+            [P.CompId] = id,
+            [P.Title] = "",
+            [P.Order] = comps.Count,
+            [P.Position] = new JsonObject { [P.X] = x, [P.Y] = y, [P.W] = 4, [P.Hh] = 3 }
+        };
+        comps.Add(c);
+        _selectedId = id;
+        _dirty = true;
+        StateHasChanged();
+    }
+
+    [JSInvokable]
+    public void OnWidgetGridChanged(string id, int x, int y, int w, int h)
+    {
+        var comp = ActiveComponents().FirstOrDefault(c => GetStr(c, P.CompId) == id);
+        if (comp is null) return;
+        var pos = comp[P.Position] as JsonObject ?? new JsonObject();
+        pos[P.X] = x; pos[P.Y] = y; pos[P.W] = w; pos[P.Hh] = h;
+        comp[P.Position] = pos;
+        _dirty = true;
+        StateHasChanged();
+    }
+
+    // ---- 保存 / 发布 ----
+    private async Task Save()
+    {
+        if (_mode == DMode.Source && !ApplySource()) return;
+        var dslJson = _root!.ToJsonString();
+        _saving = true;
+        var (ok, status, err, code) = await Api.PutAsync($"api/apps/{Uri.EscapeDataString(Code)}", new { dslJson });
+        _saving = false;
+        if (!ok)
+        {
+            Toast.Error(err is null
+                ? string.Format(L10n.T(Keys.Content.AppsDesignerSaveFailed, "保存失败（HTTP {0}）。"), status)
+                : L10n.Friendly(code, err));
+            return;
+        }
+        _dirty = false;
+        _sourceJson = dslJson;
+        Toast.Success(L10n.T(Keys.Content.AppsDesignerSaved, "应用已保存。"));
+        StateHasChanged();
+    }
+
+    private async Task Publish()
+    {
+        if (_mode == DMode.Source && !ApplySource()) return;
+        _publishing = true;
+        var (data, status, err, code) = await Api.PostJsonAsync($"api/apps/{Uri.EscapeDataString(Code)}/publish?tenantId={State.TenantId}");
+        _publishing = false;
+        if (data is not { ValueKind: JsonValueKind.Object })
+        {
+            Toast.Error(err is null
+                ? string.Format(L10n.T(Keys.Content.AppsDesignerPublishFailed, "发布失败（HTTP {0}）。"), status)
+                : L10n.Friendly(code, err));
+            return;
+        }
+        var ver = JsonRows.Scalar(data, "version");
+        Toast.Success(string.Format(L10n.T(Keys.Content.AppsDesignerPublished, "已发布版本 {0}。"), ver));
+        StateHasChanged();
+    }
+
+    private bool ApplySource()
+    {
+        try
+        {
+            var node = JsonNode.Parse(_sourceJson);
+            if (node is null) { Toast.Error(L10n.T(Keys.Content.AppsDesignerSourceInvalid, "JSON 解析失败：空内容")); return false; }
+            _root = node.AsObject();
+            EnsureDefaults();
+            _dirty = true;
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Toast.Error(string.Format(L10n.T(Keys.Content.AppsDesignerSourceInvalid, "JSON 解析失败：{0}"), ex.Message));
+            return false;
+        }
+    }
+
+    // ---- JSON 读写助手 ----
+    private static string GetStr(JsonObject? o, string k) =>
+        o is not null && o.TryGetPropertyValue(k, out var v) && v is JsonValue jv && jv.TryGetValue<string>(out var s) ? s : "";
+
+    private static int GetInt(JsonObject? o, string k)
+    {
+        if (o is not null && o.TryGetPropertyValue(k, out var v) && v is JsonValue jv && jv.TryGetValue<int>(out var n)) return n;
+        return 0;
+    }
+
+    private static bool GetBool(JsonObject? o, string k)
+    {
+        if (o is not null && o.TryGetPropertyValue(k, out var v) && v is JsonValue jv && jv.TryGetValue<bool>(out var b)) return b;
+        return false;
+    }
+
+    private void SetStr(JsonObject? o, string k, string v)
+    {
+        if (o is null) return;
+        if (string.IsNullOrEmpty(v)) o.Remove(k);
+        else o[k] = v;
+        _dirty = true;
+    }
+
+    private void SetInt(JsonObject? o, string k, string v)
+    {
+        if (o is null) return;
+        if (string.IsNullOrWhiteSpace(v)) o.Remove(k);
+        else if (int.TryParse(v, out var n)) o[k] = n;
+        _dirty = true;
+    }
+
+    private void SetBool(JsonObject? o, string k, bool v)
+    {
+        if (o is null) return;
+        o[k] = v;
+        _dirty = true;
+    }
+
+    private void UpdStr(JsonObject o, string k, string v)
+    {
+        if (string.IsNullOrEmpty(v)) o.Remove(k);
+        else o[k] = v;
+        _dirty = true;
+    }
+
+    private void UpdInt(JsonObject o, string k, string v)
+    {
+        if (string.IsNullOrWhiteSpace(v)) o.Remove(k);
+        else if (int.TryParse(v, out var n)) o[k] = n;
+        _dirty = true;
+    }
+
+    private void Dirty() => _dirty = true;
+
+    private static (int x, int y, int w, int h) Pos(JsonObject? c)
+    {
+        if (c is null || c[P.Position] is not JsonObject pos) return (0, 0, 4, 3);
+        return (GetInt(pos, P.X), GetInt(pos, P.Y), GetInt(pos, P.W) == 0 ? 4 : GetInt(pos, P.W), GetInt(pos, P.Hh) == 0 ? 3 : GetInt(pos, P.Hh));
+    }
+
+    private void SetPos(JsonObject c, string dim, string v)
+    {
+        var pos = c[P.Position] as JsonObject ?? new JsonObject();
+        if (int.TryParse(v, out var n))
+        {
+            if (dim == nameof(P.X)) pos[P.X] = n;
+            else if (dim == nameof(P.Y)) pos[P.Y] = n;
+            else if (dim == nameof(P.W)) pos[P.W] = n;
+            else if (dim == nameof(P.Hh)) pos[P.Hh] = n;
+        }
+        c[P.Position] = pos;
+        _dirty = true;
+    }
+
+    private JsonObject EnsureBinding(JsonObject comp)
+    {
+        if (comp[P.Binding] is not JsonObject b)
+        {
+            b = new JsonObject
+            {
+                [P.Metrics] = new JsonArray(),
+                [P.Dimensions] = new JsonArray(),
+                [P.Filters] = new JsonArray(),
+                [P.Sort] = new JsonArray()
+            };
+            comp[P.Binding] = b;
+            _dirty = true;
+        }
+        return b;
+    }
+
+    private JsonObject EnsureStyle(JsonObject comp)
+    {
+        if (comp[P.Style] is not JsonObject s)
+        {
+            s = new JsonObject();
+            comp[P.Style] = s;
+            _dirty = true;
+        }
+        return s;
+    }
+
+    private JsonArray EnsureBindingArray(JsonObject bind, string key)
+    {
+        if (bind[key] is not JsonArray a)
+        {
+            a = new JsonArray();
+            bind[key] = a;
+            _dirty = true;
+        }
+        return a;
+    }
+
+    // 指标
+    private void AddMetric() { var b = SelectedBind(); if (b is null) return; EnsureBindingArray(b, P.Metrics).Add(new JsonObject { [P.Field] = "", [P.Aggregation] = "sum" }); _dirty = true; StateHasChanged(); }
+    private void SetMetricField(int i, string f, string v) { var b = SelectedBind(); if (b is null) return; var a = EnsureBindingArray(b, P.Metrics); if (a[i] is JsonObject m) m[f] = v; _dirty = true; StateHasChanged(); }
+    private void RemoveMetric(int i) { var b = SelectedBind(); if (b is null) return; EnsureBindingArray(b, P.Metrics).RemoveAt(i); _dirty = true; StateHasChanged(); }
+
+    // 维度
+    private void AddDim() { var b = SelectedBind(); if (b is null) return; EnsureBindingArray(b, P.Dimensions).Add(""); _dirty = true; StateHasChanged(); }
+    private void SetDim(int i, string v) { var b = SelectedBind(); if (b is null) return; var a = EnsureBindingArray(b, P.Dimensions); a[i] = v; _dirty = true; StateHasChanged(); }
+    private void RemoveDim(int i) { var b = SelectedBind(); if (b is null) return; EnsureBindingArray(b, P.Dimensions).RemoveAt(i); _dirty = true; StateHasChanged(); }
+
+    // 筛选
+    private void AddFilter() { var b = SelectedBind(); if (b is null) return; EnsureBindingArray(b, P.Filters).Add(new JsonObject { [P.Field] = "", [P.Operator] = "eq", [P.Value] = "" }); _dirty = true; StateHasChanged(); }
+    private void SetFilterField(int i, string f, string v) { var b = SelectedBind(); if (b is null) return; var a = EnsureBindingArray(b, P.Filters); if (a[i] is JsonObject m) m[f] = v; _dirty = true; StateHasChanged(); }
+    private void RemoveFilter(int i) { var b = SelectedBind(); if (b is null) return; EnsureBindingArray(b, P.Filters).RemoveAt(i); _dirty = true; StateHasChanged(); }
+
+    // 排序
+    private void AddSort() { var b = SelectedBind(); if (b is null) return; EnsureBindingArray(b, P.Sort).Add(new JsonObject { [P.Field] = "", [P.Direction] = "ASC" }); _dirty = true; StateHasChanged(); }
+    private void SetSortField(int i, string f, string v) { var b = SelectedBind(); if (b is null) return; var a = EnsureBindingArray(b, P.Sort); if (a[i] is JsonObject m) m[f] = v; _dirty = true; StateHasChanged(); }
+    private void RemoveSort(int i) { var b = SelectedBind(); if (b is null) return; EnsureBindingArray(b, P.Sort).RemoveAt(i); _dirty = true; StateHasChanged(); }
+
+    private JsonObject? SelectedBind() => SelectedComp() is { } c ? EnsureBinding(c) : null;
+
+    // 呈现参数
+    private void AddProp()
+    {
+        if (SelectedComp() is not { } c) return;
+        var props = c[P.Properties] as JsonObject ?? new JsonObject();
+        if (!string.IsNullOrWhiteSpace(_newPropKey)) props[_newPropKey] = _newPropVal;
+        c[P.Properties] = props;
+        _newPropKey = ""; _newPropVal = "";
+        _dirty = true; StateHasChanged();
+    }
+    private void SetProp(string k, string v) { if (SelectedComp() is not { } c) return; var props = c[P.Properties] as JsonObject ?? new JsonObject(); props[k] = v; c[P.Properties] = props; _dirty = true; StateHasChanged(); }
+    private void RemoveProp(string k) { if (SelectedComp() is not { } c) return; var props = c[P.Properties] as JsonObject ?? new JsonObject(); props.Remove(k); c[P.Properties] = props; _dirty = true; StateHasChanged(); }
+
+    private static string NewId(string prefix, JsonArray arr, string idKey)
+    {
+        var max = 0;
+        foreach (var it in arr)
+            if (it is JsonObject o && GetStr(o, idKey).StartsWith(prefix) && int.TryParse(GetStr(o, idKey).Substring(prefix.Length), out var n) && n > max)
+                max = n;
+        return prefix + (max + 1);
+    }
+
+    private string TypeLabel(string type) =>
+        TypeKeyMap.TryGetValue(type, out var key) ? L10n.T(key, type) : type;
+
+    private string ComponentSummary(JsonObject comp)
+    {
+        var type = GetStr(comp, P.Type);
+        var bind = comp[P.Binding] as JsonObject;
+        if (bind is null) return TypeLabel(type);
+        var entity = GetStr(bind, P.Entity);
+        var metrics = bind[P.Metrics] as JsonArray;
+        var m = metrics is null ? 0 : metrics.Count;
+        return (string.IsNullOrEmpty(entity) ? TypeLabel(type) : entity) + (m > 0 ? $" · {m} 指标" : "");
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try { if (_selfRef is not null) await JS.InvokeVoidAsync("SuperBuilder.designer.detach"); } catch { }
+        _selfRef?.Dispose();
+    }
+}
