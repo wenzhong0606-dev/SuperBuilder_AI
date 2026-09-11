@@ -6,6 +6,7 @@
 @using System.Text.Json.Nodes
 @using System.Text.RegularExpressions
 @using SuperBuilder_AI.Components.Shared
+@implements IDisposable
 
 <AuthGuard>
     <PermissionGuard Require="@(new[] { PermissionCodes.ThemeView })">
@@ -135,7 +136,9 @@ else
 </AuthGuard>
 
 @code {
-    private Dictionary<string, string> _tokens = new();
+    // 防御性初始化：保证 TokenOrder 中每个键都存在，避免蓝图加载失败（如会话未就绪导致 401）
+    // 时调色板渲染 _tokens[key] 抛 KeyNotFoundException。
+    private Dictionary<string, string> _tokens = TokenOrder.ToDictionary(k => k, k => "");
     private string _mode = "light";
     private bool _loading = true;
     private bool _saving;
@@ -177,9 +180,28 @@ else
 
     private sealed record ThemeListItem(string Key, string Name, bool IsBuiltIn);
 
+    protected override void OnInitialized()
+    {
+        // 会话自举（localStorage → AppState）由 MainLayout 异步完成，晚于子组件首次渲染。
+        // 若在此前取数，TenantId 仍为 0 且请求不带令牌，会导致蓝图 401、_tokens 为空并崩页。
+        State.SessionRestoredChanged += OnSessionRestored;
+    }
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (!firstRender) return;
+        if (State.SessionRestored) { await LoadAsync(); return; }
+        // 未就绪：等待 SessionRestoredChanged 事件触发后再取数。
+    }
+
+    private void OnSessionRestored() => _ = InvokeAsync(async () => { await LoadAsync(); });
+
+    private bool _started;
+
+    private async Task LoadAsync()
+    {
+        if (_started || !State.SessionRestored) return;
+        _started = true;
         _loading = true;
         StateHasChanged();
         try
@@ -198,6 +220,8 @@ else
         _loading = false;
         StateHasChanged();
     }
+
+    public void Dispose() => State.SessionRestoredChanged -= OnSessionRestored;
 
     private async Task LoadThemesAsync()
     {

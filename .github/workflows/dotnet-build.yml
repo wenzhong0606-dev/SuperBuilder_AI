@@ -242,6 +242,11 @@ jobs:
           ASPNETCORE_URLS: http://127.0.0.1:5050
           # M12-P0：触发 API 启动序列中的 E2E 沙箱种子（创建 e2eapp 租户 + e2eadmin/e2ereader 账号）。
           E2E_SEED: "true"
+          # 限流：本地 gitignored appsettings.Local.json（LoginLimit=500/GlobalLimit=1000）在 CI 不存在，
+          # 回退默认值 LoginLimit=10/60s 会因所有 E2E 登录同源自 127.0.0.1 共用一个限流桶而 429，
+          # 导致权限矩阵大部分用例登录即被限流失败。此处用环境变量注入等价的高阈值（仅 CI 测试环境）。
+          RateLimit__LoginLimit: "500"
+          RateLimit__GlobalLimit: "1000"
         run: |
           dotnet run --project SuperBuilder_AI/SuperBuilder_AI.csproj --configuration Release --no-restore --no-build --urls http://127.0.0.1:5050 > /tmp/sb-api.log 2>&1 &
           echo $! > /tmp/sb-api.pid
