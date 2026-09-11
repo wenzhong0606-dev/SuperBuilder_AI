@@ -134,7 +134,8 @@ jobs:
           TID=$(docker exec superbuilder-c13-3-sqlserver /opt/mssql-tools18/bin/sqlcmd \
             -C -S localhost -U sa -P "${{ env.TEST_SQL_PASSWORD }}" \
             -d SuperBuilder_C13_3 -h -1 -W \
-            -Q "SELECT Id FROM dbo.Tenants WHERE TenantCode='platform'" | tr -d '[:space:]')
+            -Q "SET NOCOUNT ON; SELECT Id FROM dbo.Tenants WHERE TenantCode='platform'" \
+            | tr -d '[:space:]' | grep -E '^[0-9]+$')
           echo "Platform tenant id = $TID"
           [ -n "$TID" ] || { echo "::error::未能解析 platform 租户 ID"; exit 1; }
 
