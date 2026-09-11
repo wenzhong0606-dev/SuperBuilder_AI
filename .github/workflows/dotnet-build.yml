@@ -277,7 +277,12 @@ jobs:
           SB_E2E_PASSWORD: longping00
           SB_E2E_READER_USER: e2ereader
           SB_E2E_READER_PASSWORD: longping00
-        run: dotnet test tests/SuperBuilder_AI.E2E.Tests/SuperBuilder_AI.E2E.Tests.csproj --configuration Release --no-build --filter "FullyQualifiedName~PermissionMatrixE2ETests"
+        # 注意：不能用 --no-build。slnf 编译携带的全局 -p:TargetFrameworks=net10.0
+        # 会抑制 xunit 测试适配器（xunit.runner.visualstudio）部署目标，导致 bin 下
+        # 缺适配器 DLL、dotnet test --no-build 报“No test is available”（假绿）。
+        # 改为由 dotnet test 自行以标准方式重建测试工程（适配器正常部署、可被发现）。
+        # 测试工程无 ProjectReference，不会触发 Components 的 android/ios workload。
+        run: dotnet test tests/SuperBuilder_AI.E2E.Tests/SuperBuilder_AI.E2E.Tests.csproj --configuration Release --no-restore --filter "FullyQualifiedName~PermissionMatrixE2ETests" --logger "console;verbosity=normal"
       - name: 上传视觉基线产物
         if: always()
         uses: actions/upload-artifact@v4
