@@ -1194,3 +1194,49 @@ button.mini { padding: 4px 10px; font-size: 12px; border-radius: var(--sb-radius
 
 /* ThemeEditor 深色预览（仅预览辅助，不落库；预览容器内联 --sb-* 变量，整体反相近似深色观感） */
 .sb-preview-dark { filter: invert(0.92) hue-rotate(180deg); }
+
+/* ============================================================
+   M12-13 仪表盘可视化设计器（拖拽画布 + 源码模式）
+   全部复用 --sb-* 主题令牌，浅/深主题自动适配。
+   ============================================================ */
+.sb-dz-toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+.sb-dz-toolbar .sb-dz-spacer{flex:1}
+.sb-dz-mode-toggle{display:inline-flex;border:1px solid var(--sb-border);border-radius:999px;overflow:hidden;background:var(--sb-surface)}
+.sb-dz-mode-toggle button{border:0;background:transparent;color:var(--sb-muted);padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer}
+.sb-dz-mode-toggle button.active{background:var(--sb-primary);color:#fff}
+.sb-dz-layout{display:grid;grid-template-columns:210px minmax(0,1fr) 300px;gap:16px;align-items:start}
+.sb-dz-panel{border:1px solid var(--sb-border);background:var(--sb-surface);border-radius:var(--sb-radius-lg);box-shadow:var(--sb-shadow-sm);overflow:hidden}
+.sb-dz-panel-head{padding:12px 14px;font-weight:700;font-size:13px;border-bottom:1px solid var(--sb-border);display:flex;align-items:center;gap:8px}
+.sb-dz-panel-head small{display:block;font-weight:400;color:var(--sb-muted);font-size:11px;margin-top:2px}
+.sb-dz-panel-body{padding:12px 14px;max-height:calc(100vh - 220px);overflow:auto}
+.sb-dz-palette-item{width:100%;display:flex;align-items:center;gap:10px;border:1px solid var(--sb-border);background:var(--sb-surface-2);color:var(--sb-text);border-radius:var(--sb-radius);padding:10px 12px;margin-bottom:8px;cursor:grab;text-align:left;font-size:13px}
+.sb-dz-palette-item:hover{border-color:var(--sb-primary);background:var(--sb-primary-soft)}
+.sb-dz-palette-item svg{width:18px;height:18px;color:var(--sb-primary);flex:none}
+.sb-dz-canvas{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));grid-auto-rows:64px;gap:12px;padding:12px;border:1px dashed var(--sb-border);border-radius:var(--sb-radius-lg);background:
+    linear-gradient(90deg,color-mix(in srgb,var(--sb-primary) 6%,transparent) 1px,transparent 1px) 0 0/calc(100%/12) 100%,
+    var(--sb-bg);min-height:420px}
+.sb-dz-empty{grid-column:1 / -1;grid-row:1 / span 4;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:var(--sb-muted);text-align:center;pointer-events:none}
+.sb-dz-empty svg{width:34px;height:34px;opacity:.5}
+.sb-dz-widget{position:relative;border:1px solid var(--sb-border);background:var(--sb-surface);border-radius:var(--sb-radius);box-shadow:var(--sb-shadow-sm);display:flex;flex-direction:column;overflow:hidden;min-width:0;touch-action:none;user-select:none}
+.sb-dz-widget.selected{border-color:var(--sb-primary);box-shadow:var(--sb-ring),var(--sb-shadow-sm)}
+.sb-dz-widget-head{display:flex;align-items:center;gap:8px;padding:7px 10px;border-bottom:1px solid var(--sb-border);background:var(--sb-surface-2);cursor:move;font-size:12px;font-weight:600}
+.sb-dz-widget-head .sb-dz-type{margin-left:auto}
+.sb-dz-widget-body{flex:1;min-height:0;padding:10px;display:flex;align-items:center;justify-content:center;color:var(--sb-muted);font-size:12px;overflow:hidden}
+.sb-dz-widget-body .sb-dz-schematic{width:100%;height:100%;display:flex;align-items:flex-end;gap:6px;padding:6px 2px}
+.sb-dz-widget-body .sb-dz-schematic i{flex:1;background:color-mix(in srgb,var(--sb-primary) 45%,transparent);border-radius:3px 3px 0 0}
+.sb-dz-widget-body .sb-dz-kpi{font-size:22px;font-weight:800;color:var(--sb-text)}
+.sb-dz-tools{display:flex;gap:4px}
+.sb-dz-tools button{border:0;background:transparent;color:var(--sb-muted);cursor:pointer;padding:2px 4px;border-radius:6px;line-height:1}
+.sb-dz-tools button:hover{background:var(--sb-surface);color:var(--sb-primary)}
+.sb-dz-tools button.danger:hover{color:var(--sb-accent)}
+.sb-dz-resize{position:absolute;right:0;bottom:0;width:14px;height:14px;cursor:nwse-resize;background:linear-gradient(135deg,transparent 45%,color-mix(in srgb,var(--sb-primary) 55%,transparent) 50%);border-bottom-right-radius:var(--sb-radius)}
+.sb-dz-field{margin-bottom:10px}
+.sb-dz-field label{display:block;font-size:11px;color:var(--sb-muted);margin-bottom:4px}
+.sb-dz-field input,.sb-dz-field select,.sb-dz-field textarea{width:100%}
+.sb-dz-field .row2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.sb-dz-field .row4{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.sb-dz-check{display:flex;align-items:center;gap:8px;font-size:12px;margin-bottom:8px}
+.sb-dz-check input{width:auto}
+.sb-dz-source textarea{width:100%;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;line-height:1.5}
+.sb-dz-meta{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--sb-muted);margin-bottom:12px}
+@media(max-width:1100px){.sb-dz-layout{grid-template-columns:1fr}.sb-dz-panel-body{max-height:none}}

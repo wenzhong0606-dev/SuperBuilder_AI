@@ -39,6 +39,9 @@
         <RowActions>
             <button class="btn btn-sm btn-outline-secondary" @onclick="() => Open(context)">@L10n.T(Keys.Content.DashboardsRowDetail, "详情")</button>
             <PermissionGuard Require="@(new[] { PermissionCodes.DashboardEdit })" Silent>
+                <button class="btn btn-sm btn-outline-secondary" @onclick="() => OpenDesign(context)">@L10n.T(Keys.Content.DashboardDesignerModeDesign, "设计")</button>
+            </PermissionGuard>
+            <PermissionGuard Require="@(new[] { PermissionCodes.DashboardEdit })" Silent>
                 <button class="btn btn-sm btn-outline-secondary" @onclick="() => OpenEdit(context)">@L10n.T(Keys.Content.ThemeReuseEditDashboard, "编辑与主题")</button>
             </PermissionGuard>
             <PermissionGuard Require="@(new[] { PermissionCodes.DashboardDelete })" Silent>
@@ -115,6 +118,17 @@
             return;
         }
         Nav.NavigateTo($"dashboards/{id}");
+    }
+
+    private void OpenDesign(JsonElement row)
+    {
+        var id = TablePresenter.Cell(row, "id");
+        if (string.IsNullOrWhiteSpace(id))
+        {
+            Toast.Warning(L10n.T(Keys.Content.DashboardsMissingIdOpen, "该记录缺少 id，无法打开详情。"));
+            return;
+        }
+        Nav.NavigateTo($"dashboards/{id}/design");
     }
 
     private bool _confirm = false;

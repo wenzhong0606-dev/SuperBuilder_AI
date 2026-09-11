@@ -1,0 +1,752 @@
+@page "/dashboards/{Id:long}/design"
+@inject IApiClient Api
+@inject AppState State
+@inject NavigationManager Nav
+@inject ToastService Toast
+@inject IJSRuntime JS
+@using System.Text.Json
+@using System.Text.Json.Nodes
+@using JsonValue = System.Text.Json.Nodes.JsonValue
+@using SuperBuilder_AI.Components.Shared
+@implements IAsyncDisposable
+
+<AuthGuard>
+    <PageHead Icon="sb-ico-dash" Title="@_title" Desc="@L10n.T(Keys.Content.DashboardDesignerDesc, "拖拽画布布局组件；需要精确控制时可切到源码模式编辑 DSL。")">
+        <button class="btn btn-outline-secondary btn-sm" @onclick='() => Nav.NavigateTo("dashboards")'>@L10n.T(Keys.Content.DashboardDesignerBack, "返回列表")</button>
+    </PageHead>
+
+    @if (_loading)
+    {
+        <LoadingState Text="@L10n.T(Keys.Content.DashboardDesignerLoading, "正在加载设计…")" />
+    }
+    else if (_error is not null)
+    {
+        <ErrorState Message="@_error" OnRetry="Load" />
+    }
+    else
+    {
+        <div class="sb-dz-toolbar">
+            <div class="sb-dz-mode-toggle">
+                <button class="@DesignClass" @onclick="ShowDesign">@L10n.T(Keys.Content.DashboardDesignerModeDesign, "设计")</button>
+                <button class="@SourceClass" @onclick="ShowSource">@L10n.T(Keys.Content.DashboardDesignerModeSource, "源码")</button>
+            </div>
+            <span class="sb-dz-meta">
+                @L10n.T(Keys.Content.DashboardDesignerStatus, "状态")<SbBadge Tone="@StatusTone">@_status</SbBadge>
+                @if (_dirty) { <SbBadge Tone="warning">@L10n.T(Keys.Content.DashboardDesignerDirty, "未保存")</SbBadge> }
+            </span>
+            <span class="sb-dz-spacer"></span>
+            <span class="sb-dz-meta">@string.Format(L10n.T(Keys.Content.DashboardDesignerWidgetCount, "共 {0} 个组件"), _widgets.Count)</span>
+            <PermissionGuard Require="@(new[] { PermissionCodes.DashboardPublish })" Silent>
+                <button class="btn btn-outline-secondary btn-sm" @onclick="Publish" disabled="@(_publishing || _saving)">
+                    @(_publishing ? L10n.T(Keys.Content.DashboardDesignerPublishing, "发布中…") : L10n.T(Keys.Content.DashboardDesignerPublish, "发布"))
+                </button>
+            </PermissionGuard>
+            <PermissionGuard Require="@(new[] { PermissionCodes.DashboardEdit })" Silent>
+                <button class="btn btn-primary btn-sm" @onclick="Save" disabled="@(_saving || _publishing)">
+                    @(_saving ? L10n.T(Keys.Content.DashboardDesignerSaving, "保存中…") : L10n.T(Keys.Content.DashboardDesignerSave, "保存"))
+                </button>
+            </PermissionGuard>
+        </div>
+
+        @if (IsDesign)
+        {
+            <div class="sb-dz-layout">
+                <div class="sb-dz-panel">
+                    <div class="sb-dz-panel-head">
+                        <div>
+                            @L10n.T(Keys.Content.DashboardDesignerPalette, "组件库")
+                            <small>@L10n.T(Keys.Content.DashboardDesignerPaletteHint, "点击添加，或拖拽到画布目标位置。")</small>
+                        </div>
+                    </div>
+                    <div class="sb-dz-panel-body">
+                        <button type="button" class="sb-dz-palette-item" draggable="true"
+                                ondragstart="event.dataTransfer.setData('text/sb-widget','chart');event.dataTransfer.effectAllowed='copy';"
+                                @onclick='() => AddWidget("chart")'>
+                            <svg><use href="#sb-ico-activity" /></svg>@L10n.T(Keys.Content.DashboardDesignerWidgetChart, "图表")
+                        </button>
+                        <button type="button" class="sb-dz-palette-item" draggable="true"
+                                ondragstart="event.dataTransfer.setData('text/sb-widget','table');event.dataTransfer.effectAllowed='copy';"
+                                @onclick='() => AddWidget("table")'>
+                            <svg><use href="#sb-ico-model" /></svg>@L10n.T(Keys.Content.DashboardDesignerWidgetTable, "表格")
+                        </button>
+                        <button type="button" class="sb-dz-palette-item" draggable="true"
+                                ondragstart="event.dataTransfer.setData('text/sb-widget','kpi');event.dataTransfer.effectAllowed='copy';"
+                                @onclick='() => AddWidget("kpi")'>
+                            <svg><use href="#sb-ico-quota" /></svg>@L10n.T(Keys.Content.DashboardDesignerWidgetKpi, "指标卡")
+                        </button>
+                        <button type="button" class="sb-dz-palette-item" draggable="true"
+                                ondragstart="event.dataTransfer.setData('text/sb-widget','filter');event.dataTransfer.effectAllowed='copy';"
+                                @onclick='() => AddWidget("filter")'>
+                            <svg><use href="#sb-ico-search" /></svg>@L10n.T(Keys.Content.DashboardDesignerWidgetFilter, "筛选器")
+                        </button>
+                        <button type="button" class="sb-dz-palette-item" draggable="true"
+                                ondragstart="event.dataTransfer.setData('text/sb-widget','text');event.dataTransfer.effectAllowed='copy';"
+                                @onclick='() => AddWidget("text")'>
+                            <svg><use href="#sb-ico-edit" /></svg>@L10n.T(Keys.Content.DashboardDesignerWidgetText, "文本")
+                        </button>
+                        <button type="button" class="sb-dz-palette-item" draggable="true"
+                                ondragstart="event.dataTransfer.setData('text/sb-widget','aiInsight');event.dataTransfer.effectAllowed='copy';"
+                                @onclick='() => AddWidget("aiInsight")'>
+                            <svg><use href="#sb-ico-ask" /></svg>@L10n.T(Keys.Content.DashboardDesignerWidgetAiInsight, "AI 洞察")
+                        </button>
+                    </div>
+                </div>
+
+                <div class="sb-dz-panel">
+                    <div class="sb-dz-panel-head">
+                        <div>
+                            @L10n.T(Keys.Content.DashboardDesignerCanvas, "画布")
+                            <small>@L10n.T(Keys.Content.DashboardDesignerModeHint, "拖动组件标题栏移动，右下角手柄调整大小。")</small>
+                        </div>
+                    </div>
+                    <div class="sb-dz-panel-body">
+                        <div class="sb-dz-canvas" @ref="_canvas">
+                            @if (_widgets.Count == 0)
+                            {
+                                <div class="sb-dz-empty">
+                                    <svg><use href="#sb-ico-comp" /></svg>
+                                    <span>@L10n.T(Keys.Content.DashboardDesignerCanvasEmpty, "画布为空，请从左侧组件库添加组件。")</span>
+                                </div>
+                            }
+                            @foreach (var node in _widgets)
+                            {
+                                if (node is not JsonObject w) { continue; }
+                                var wid = GetStr(w, P.Id);
+                                var wtype = GetStr(w, P.Type);
+                                <div class='@WidgetClass(wid)' data-id="@wid" data-x="@PosRead(w, P.X, 0)" data-y="@PosRead(w, P.Y, 0)" data-w="@PosRead(w, P.W, 4)" data-h="@PosRead(w, P.Hh, 3)" style="@GridStyle(w)" @onclick="() => Select(wid)">
+                                    <div class="sb-dz-widget-head">
+                                        <svg style="width:14px;height:14px"><use href="#sb-ico-comp" /></svg>
+                                        <span>@(string.IsNullOrWhiteSpace(GetStr(w, P.Title)) ? wtype : GetStr(w, P.Title))</span>
+                                        <span class="sb-dz-type"><SbBadge Tone="info">@wtype</SbBadge></span>
+                                        <span class="sb-dz-tools">
+                                            <button type="button" title="@L10n.T(Keys.Content.DashboardDesignerDuplicate, "复制")" @onclick="() => Duplicate(wid)" @onclick:stopPropagation="true">⧉</button>
+                                            <button type="button" class="danger" title="@L10n.T(Keys.Content.DashboardDesignerDelete, "删除")" @onclick="() => Remove(wid)" @onclick:stopPropagation="true">✕</button>
+                                        </span>
+                                    </div>
+                                    <div class="sb-dz-widget-body">
+                                        @if (wtype == "chart")
+                                        {
+                                            <div class="sb-dz-schematic"><i style="height:40%"></i><i style="height:70%"></i><i style="height:55%"></i><i style="height:85%"></i></div>
+                                        }
+                                        else if (wtype == "kpi")
+                                        {
+                                            <span class="sb-dz-kpi">128.6</span>
+                                        }
+                                        else if (wtype == "text")
+                                        {
+                                            <span>@Truncate(GetStr(w, P.Content), 60)</span>
+                                        }
+                                        else
+                                        {
+                                            <span>@Truncate(QueryText(w), 60)</span>
+                                        }
+                                    </div>
+                                    <span class="sb-dz-resize sb-dz-nodrag"></span>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+
+                <div class="sb-dz-panel">
+                    <div class="sb-dz-panel-head">
+                        <div>
+                            @L10n.T(Keys.Content.DashboardDesignerInspector, "属性")
+                            <small>@L10n.T(Keys.Content.DashboardDesignerInspectorEmpty, "选择一个组件以编辑其属性。")</small>
+                        </div>
+                    </div>
+                    <div class="sb-dz-panel-body">
+                        @if (Selected is null)
+                        {
+                            <p class="text-muted small">@L10n.T(Keys.Content.DashboardDesignerInspectorEmpty, "选择一个组件以编辑其属性。")</p>
+                        }
+                        else
+                        {
+                            var w = Selected!;
+                            var wtype = GetStr(w, P.Type);
+                            <div class="sb-dz-field">
+                                <label>@L10n.T(Keys.Content.DashboardDesignerFieldId, "标识")</label>
+                                <input value="@GetStr(w, P.Id)" disabled />
+                            </div>
+                            <div class="sb-dz-field">
+                                <label>@L10n.T(Keys.Content.DashboardDesignerFieldTitle, "标题")</label>
+                                <input value="@GetStr(w, P.Title)" @oninput="e => UpdStr(w, P.Title, e.Value?.ToString())" />
+                            </div>
+                            <div class="sb-dz-field">
+                                <label>@L10n.T(Keys.Content.DashboardDesignerFieldPosition, "位置（列 / 行 / 宽 / 高）")</label>
+                                <div class="row4">
+                                    <input type="number" min="0" value="@PosRead(w, P.X, 0)" @oninput="e => UpdPos(w, P.X, e.Value?.ToString())" />
+                                    <input type="number" min="0" value="@PosRead(w, P.Y, 0)" @oninput="e => UpdPos(w, P.Y, e.Value?.ToString())" />
+                                    <input type="number" min="1" max="12" value="@PosRead(w, P.W, 4)" @oninput="e => UpdPos(w, P.W, e.Value?.ToString())" />
+                                    <input type="number" min="1" value="@PosRead(w, P.Hh, 3)" @oninput="e => UpdPos(w, P.Hh, e.Value?.ToString())" />
+                                </div>
+                            </div>
+                            <div class="sb-dz-field">
+                                <label>@L10n.T(Keys.Content.DashboardDesignerFieldOrder, "顺序")</label>
+                                <input type="number" min="0" value="@GetInt(w, P.Order, 0)" @oninput="e => UpdInt(w, P.Order, e.Value?.ToString())" />
+                            </div>
+                            <div class="sb-dz-field">
+                                <label>@L10n.T(Keys.Content.DashboardDesignerFieldQuestion, "取数问句")</label>
+                                <input value="@QueryGet(w, P.Question)" placeholder="@L10n.T(Keys.Content.DashboardDesignerFieldQuestionHint, "自然语言问句；留空则使用显式语义配置。")" @oninput="e => QuerySet(w, P.Question, e.Value?.ToString())" />
+                            </div>
+
+                            @if (wtype == "chart")
+                            {
+                                <div class="sb-dz-field">
+                                    <label>@L10n.T(Keys.Content.DashboardDesignerFieldChartType, "图表类型")</label>
+                                    <select class="form-select" value="@GetStr(w, P.ChartType)" @onchange="e => UpdStr(w, P.ChartType, e.Value?.ToString())">
+                                        <option value="column">column</option>
+                                        <option value="bar">bar</option>
+                                        <option value="line">line</option>
+                                        <option value="area">area</option>
+                                        <option value="pie">pie</option>
+                                        <option value="scatter">scatter</option>
+                                    </select>
+                                </div>
+                                <div class="sb-dz-field">
+                                    <label>@L10n.T(Keys.Content.DashboardDesignerFieldCategory, "分类轴字段")</label>
+                                    <input value="@GetStr(w, P.CategoryField)" @oninput="e => UpdStr(w, P.CategoryField, e.Value?.ToString())" />
+                                </div>
+                                <div class="sb-dz-field">
+                                    <label>@L10n.T(Keys.Content.DashboardDesignerFieldValues, "数值轴字段")</label>
+                                    <input value="@GetList(w, P.ValueFields)" placeholder="@L10n.T(Keys.Content.DashboardDesignerFieldValuesHint, "多个字段用逗号分隔。")" @oninput="e => UpdList(w, P.ValueFields, e.Value?.ToString())" />
+                                </div>
+                                <div class="sb-dz-field">
+                                    <label>@L10n.T(Keys.Content.DashboardDesignerFieldSeries, "分系列字段")</label>
+                                    <input value="@GetStr(w, P.SeriesField)" @oninput="e => UpdStr(w, P.SeriesField, e.Value?.ToString())" />
+                                </div>
+                                <label class="sb-dz-check"><input type="checkbox" checked="@GetBool(w, P.Stacked)" @onchange="e => UpdBool(w, P.Stacked, e.Value is bool b && b)" />@L10n.T(Keys.Content.DashboardDesignerFieldStacked, "堆叠")</label>
+                                <label class="sb-dz-check"><input type="checkbox" checked="@GetBool(w, P.ShowLegend)" @onchange="e => UpdBool(w, P.ShowLegend, e.Value is bool b && b)" />@L10n.T(Keys.Content.DashboardDesignerFieldLegend, "显示图例")</label>
+                            }
+                            else if (wtype == "kpi")
+                            {
+                                <div class="sb-dz-field">
+                                    <label>@L10n.T(Keys.Content.DashboardDesignerFieldValue, "指标字段")</label>
+                                    <input value="@GetStr(w, P.ValueField)" @oninput="e => UpdStr(w, P.ValueField, e.Value?.ToString())" />
+                                </div>
+                                <div class="sb-dz-field">
+                                    <label>@L10n.T(Keys.Content.DashboardDesignerFieldFormat, "数值格式")</label>
+                                    <input value="@GetStr(w, P.Format)" @oninput="e => UpdStr(w, P.Format, e.Value?.ToString())" />
+                                </div>
+                                <div class="sb-dz-field">
+                                    <label>@L10n.T(Keys.Content.DashboardDesignerFieldTarget, "目标值")</label>
+                                    <input value="@GetStr(w, P.Target)" @oninput="e => UpdStr(w, P.Target, e.Value?.ToString())" />
+                                </div>
+                            }
+                            else if (wtype == "table")
+                            {
+                                <div class="sb-dz-field">
+                                    <label>@L10n.T(Keys.Content.DashboardDesignerFieldPageSize, "每页行数")</label>
+                                    <input type="number" min="0" value="@GetInt(w, P.PageSize, 0)" @oninput="e => UpdInt(w, P.PageSize, e.Value?.ToString())" />
+                                </div>
+                                <label class="sb-dz-check"><input type="checkbox" checked="@GetBool(w, P.ShowTotal)" @onchange="e => UpdBool(w, P.ShowTotal, e.Value is bool b && b)" />@L10n.T(Keys.Content.DashboardDesignerFieldShowTotal, "显示合计")</label>
+                                <label class="sb-dz-check"><input type="checkbox" checked="@GetBool(w, P.Striped)" @onchange="e => UpdBool(w, P.Striped, e.Value is bool b && b)" />@L10n.T(Keys.Content.DashboardDesignerFieldStriped, "斑马纹")</label>
+                            }
+                            else if (wtype == "filter")
+                            {
+                                <div class="sb-dz-field">
+                                    <label>@L10n.T(Keys.Content.DashboardDesignerFieldField, "绑定字段")</label>
+                                    <input value="@GetStr(w, P.Field)" @oninput="e => UpdStr(w, P.Field, e.Value?.ToString())" />
+                                </div>
+                                <div class="sb-dz-field">
+                                    <label>@L10n.T(Keys.Content.DashboardDesignerFieldControl, "控件形态")</label>
+                                    <select class="form-select" value="@GetStr(w, P.Control)" @onchange="e => UpdStr(w, P.Control, e.Value?.ToString())">
+                                        <option value="select">select</option>
+                                        <option value="date-range">date-range</option>
+                                        <option value="number-range">number-range</option>
+                                        <option value="text">text</option>
+                                    </select>
+                                </div>
+                                <label class="sb-dz-check"><input type="checkbox" checked="@GetBool(w, P.Multiple)" @onchange="e => UpdBool(w, P.Multiple, e.Value is bool b && b)" />@L10n.T(Keys.Content.DashboardDesignerFieldMultiple, "允许多选")</label>
+                            }
+                            else if (wtype == "text")
+                            {
+                                <div class="sb-dz-field">
+                                    <label>@L10n.T(Keys.Content.DashboardDesignerFieldContent, "文本内容")</label>
+                                    <input value="@GetStr(w, P.Content)" @oninput="e => UpdStr(w, P.Content, e.Value?.ToString())" />
+                                </div>
+                                <div class="sb-dz-field">
+                                    <label>@L10n.T(Keys.Content.DashboardDesignerFieldLevel, "字号级别")</label>
+                                    <select class="form-select" value="@GetStr(w, P.Level)" @onchange="e => UpdStr(w, P.Level, e.Value?.ToString())">
+                                        <option value="title">title</option>
+                                        <option value="subtitle">subtitle</option>
+                                        <option value="body">body</option>
+                                        <option value="caption">caption</option>
+                                    </select>
+                                </div>
+                                <label class="sb-dz-check"><input type="checkbox" checked="@GetBool(w, P.Markdown)" @onchange="e => UpdBool(w, P.Markdown, e.Value is bool b && b)" />@L10n.T(Keys.Content.DashboardDesignerFieldMarkdown, "按 Markdown 解释")</label>
+                            }
+                            else if (wtype == "aiInsight")
+                            {
+                                <div class="sb-dz-field">
+                                    <label>@L10n.T(Keys.Content.DashboardDesignerFieldPrompt, "洞察提示")</label>
+                                    <input value="@GetStr(w, P.Prompt)" @oninput="e => UpdStr(w, P.Prompt, e.Value?.ToString())" />
+                                </div>
+                                <div class="sb-dz-field">
+                                    <label>@L10n.T(Keys.Content.DashboardDesignerFieldMaxInsights, "最多条数")</label>
+                                    <input type="number" min="1" value="@GetInt(w, P.MaxInsights, 3)" @oninput="e => UpdInt(w, P.MaxInsights, e.Value?.ToString())" />
+                                </div>
+                                <div class="sb-dz-field">
+                                    <label>@L10n.T(Keys.Content.DashboardDesignerFieldPerspective, "分析视角")</label>
+                                    <select class="form-select" value="@GetStr(w, P.Perspective)" @onchange="e => UpdStr(w, P.Perspective, e.Value?.ToString())">
+                                        <option value="trend">trend</option>
+                                        <option value="anomaly">anomaly</option>
+                                        <option value="contribution">contribution</option>
+                                        <option value="comparison">comparison</option>
+                                    </select>
+                                </div>
+                            }
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+        else
+        {
+            <div class="sb-dz-panel sb-dz-source">
+                <div class="sb-dz-panel-head">
+                    <div>
+                        @L10n.T(Keys.Content.DashboardDesignerSourceTitle, "DSL 源码")
+                        <small>@L10n.T(Keys.Content.DashboardDesignerSourceHint, "声明式 DashboardDsl（JSON）。应用后回到设计模式。")</small>
+                    </div>
+                    <span class="sb-dz-spacer"></span>
+                    <button class="btn btn-outline-secondary btn-sm" @onclick="ApplySource">@L10n.T(Keys.Content.DashboardDesignerApply, "应用")</button>
+                </div>
+                <div class="sb-dz-panel-body">
+                    <textarea class="form-control sb-pre" rows="24" @bind="_sourceJson"></textarea>
+                    @if (_sourceError is not null) { <div class="alert alert-danger tiny" style="margin-top:12px">@_sourceError</div> }
+                </div>
+            </div>
+        }
+    }
+</AuthGuard>
+
+@code {
+    [Parameter] public long Id { get; set; }
+
+    private string _title = "";
+    private string _status = "draft";
+    private bool _loading = true;
+    private bool _saving;
+    private bool _publishing;
+    private bool _dirty;
+    private bool _attached;
+    private string? _error;
+
+    private JsonObject _root = new();
+    private JsonArray _widgets = new();
+    private string? _selectedId;
+    private string _sourceJson = "";
+    private string? _sourceError;
+
+    private ElementReference _canvas;
+    private DotNetObjectReference<DashboardDesigner>? _selfRef;
+
+    private enum DMode { Design, Source }
+    private DMode _mode = DMode.Design;
+
+    private bool IsDesign => _mode == DMode.Design;
+    private string DesignClass => _mode == DMode.Design ? "active" : "";
+    private string SourceClass => _mode == DMode.Source ? "active" : "";
+    private string StatusTone => _status == "published" ? "success" : "muted";
+
+    private JsonObject? Selected => _selectedId is null
+        ? null
+        : _widgets.FirstOrDefault(n => n is JsonObject o && GetStr(o, P.Id) == _selectedId) as JsonObject;
+
+    protected override void OnInitialized()
+    {
+        _title = L10n.T(Keys.Content.DashboardDesignerTitle, "仪表盘设计器");
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _selfRef = DotNetObjectReference.Create(this);
+            await Load();
+            StateHasChanged();
+        }
+        if (IsDesign && !_loading && _error is null && !_attached && _canvas.Id is not null)
+        {
+            await AttachAsync();
+        }
+    }
+
+    private async Task Load()
+    {
+        _loading = true;
+        _error = null;
+        var (data, _, err, _) = await Api.GetJsonAsync($"api/dashboards/{Id}?tenantId={State.TenantId}");
+        if (data is not { ValueKind: JsonValueKind.Object })
+        {
+            _error = err ?? L10n.T(Keys.Content.DashboardDesignerLoadFailed, "加载失败。");
+            _loading = false;
+            return;
+        }
+        var el = data.Value;
+        _title = JsonRows.Scalar(el, "title", "name", "code");
+        if (string.IsNullOrWhiteSpace(_title)) _title = L10n.T(Keys.Content.DashboardDesignerTitle, "仪表盘设计器");
+        _status = JsonRows.Scalar(el, "status");
+        if (string.IsNullOrWhiteSpace(_status)) _status = "draft";
+        var dsl = el.TryGetProperty("dslJson", out var d) && d.ValueKind == JsonValueKind.String ? d.GetString() : null;
+        BindDsl(dsl);
+        _dirty = false;
+        _loading = false;
+    }
+
+    private void BindDsl(string? dsl)
+    {
+        _root = SafeParse(dsl) ?? new JsonObject();
+        var pages = _root[P.Pages] as JsonArray;
+        if (pages is null || pages.Count == 0)
+        {
+            pages = new JsonArray();
+            _root[P.Pages] = pages;
+        }
+        if (pages[0] is not JsonObject first)
+        {
+            first = new JsonObject { [P.Id] = "page-1", ["name"] = "Overview", [P.Order] = 1, [P.Widgets] = new JsonArray() };
+            pages.Insert(0, first);
+        }
+        if (first[P.Widgets] is not JsonArray) first[P.Widgets] = new JsonArray();
+        _widgets = (JsonArray)first[P.Widgets]!;
+        _selectedId = null;
+    }
+
+    private static JsonObject? SafeParse(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json)) return null;
+        try { return JsonNode.Parse(json) as JsonObject; } catch { return null; }
+    }
+
+    private Task ShowDesign()
+    {
+        _mode = DMode.Design;
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    private async Task ShowSource()
+    {
+        await DetachAsync();
+        _sourceJson = _root.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
+        _sourceError = null;
+        _mode = DMode.Source;
+        StateHasChanged();
+    }
+
+    private void ApplySource()
+    {
+        _sourceError = null;
+        JsonObject? parsed;
+        try { parsed = JsonNode.Parse(_sourceJson) as JsonObject; }
+        catch (Exception ex)
+        {
+            _sourceError = string.Format(L10n.T(Keys.Content.DashboardDesignerApplyInvalid, "DSL JSON 无效：{0}"), ex.Message);
+            return;
+        }
+        if (parsed is null)
+        {
+            _sourceError = string.Format(L10n.T(Keys.Content.DashboardDesignerApplyInvalid, "DSL JSON 无效：{0}"), "root must be an object");
+            return;
+        }
+        _root = parsed;
+        BindDsl(_root.ToJsonString());
+        _dirty = true;
+        _mode = DMode.Design;
+        StateHasChanged();
+    }
+
+    private void Select(string id) => _selectedId = id;
+
+    private void AddWidget(string type) => InsertWidget(type, 0, NextRow());
+
+    [JSInvokable]
+    public Task OnPaletteDrop(string type, int x, int y)
+    {
+        InsertWidget(type, x, y, dropped: true);
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    [JSInvokable]
+    public Task OnWidgetGridChanged(string id, int x, int y, int w, int h)
+    {
+        if (Find(id) is { } o)
+        {
+            var pos = Pos(o);
+            pos[P.X] = x; pos[P.Y] = y; pos[P.W] = w; pos[P.Hh] = h;
+            _dirty = true;
+            StateHasChanged();
+        }
+        return Task.CompletedTask;
+    }
+
+    private void InsertWidget(string type, int x, int y, bool dropped = false)
+    {
+        var id = NewId(type);
+        var w = new JsonObject
+        {
+            [P.Type] = type,
+            [P.Id] = id,
+            [P.Position] = new JsonObject { [P.X] = x, [P.Y] = y, [P.W] = 4, [P.Hh] = 3 },
+        };
+        switch (type)
+        {
+            case "chart": w[P.ChartType] = "column"; w[P.ValueFields] = new JsonArray(); break;
+            case "kpi": w[P.ValueField] = ""; break;
+            case "filter": w[P.Control] = "select"; break;
+            case "text": w[P.Content] = ""; w[P.Markdown] = true; break;
+            case "aiInsight": w[P.MaxInsights] = 3; break;
+        }
+        _widgets.Add(w);
+        _selectedId = id;
+        _dirty = true;
+        Toast.Info(dropped
+            ? L10n.T(Keys.Content.DashboardDesignerDropped, "组件已放置。")
+            : L10n.T(Keys.Content.DashboardDesignerAdded, "已添加组件。"));
+    }
+
+    private void Duplicate(string id)
+    {
+        if (Find(id) is not { } src) return;
+        var copy = (JsonObject)src.DeepClone();
+        copy[P.Id] = NewId(GetStr(copy, P.Type));
+        var pos = Pos(copy);
+        pos[P.Y] = GetInt(pos, P.Y, 0) + 1;
+        _widgets.Add(copy);
+        _selectedId = GetStr(copy, P.Id);
+        _dirty = true;
+    }
+
+    private void Remove(string id)
+    {
+        if (Find(id) is not { } o) return;
+        _widgets.Remove(o);
+        if (_selectedId == id) _selectedId = null;
+        _dirty = true;
+        Toast.Info(L10n.T(Keys.Content.DashboardDesignerRemoved, "组件已删除。"));
+    }
+
+    private JsonObject? Find(string id)
+        => _widgets.FirstOrDefault(n => n is JsonObject o && GetStr(o, P.Id) == id) as JsonObject;
+
+    private int NextRow()
+    {
+        var max = 0;
+        foreach (var n in _widgets)
+            if (n is JsonObject o) max = Math.Max(max, PosRead(o, P.Y, 0) + PosRead(o, P.Hh, 3));
+        return max;
+    }
+
+    private static string NewId(string type) => $"{type}-{Guid.NewGuid().ToString("N")[..6]}";
+
+    private async Task Save()
+    {
+        _saving = true;
+        try
+        {
+            var dslJson = _root.ToJsonString();
+            var (ok, status, err, code) = await Api.PutAsync($"api/dashboards/{Id}?tenantId={State.TenantId}",
+                new { tenantId = State.TenantId, dslJson, status = _status });
+            if (!ok)
+            {
+                Toast.Error(err is null
+                    ? string.Format(L10n.T(Keys.Content.DashboardDesignerSaveFailedHttp, "保存失败（HTTP {0}）。"), status)
+                    : L10n.Friendly(code, err));
+                return;
+            }
+            _dirty = false;
+            Toast.Success(L10n.T(Keys.Content.DashboardDesignerSaved, "设计已保存。"));
+            StateHasChanged();
+        }
+        catch (Exception)
+        {
+            Toast.Error(L10n.T(Keys.Content.DashboardDesignerSaveFailed, "保存失败。"));
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private async Task Publish()
+    {
+        _publishing = true;
+        try
+        {
+            var (data, status, err, code) = await Api.PostJsonAsync($"api/dashboards/{Id}/publish?tenantId={State.TenantId}");
+            if (data is not { ValueKind: JsonValueKind.Object })
+            {
+                Toast.Error(err is null
+                    ? string.Format(L10n.T(Keys.Content.DashboardDesignerPublishFailedHttp, "发布失败（HTTP {0}）。"), status)
+                    : L10n.Friendly(code, err));
+                return;
+            }
+            _status = "published";
+            var version = JsonRows.Scalar(data, "version");
+            Toast.Success(string.Format(L10n.T(Keys.Content.DashboardDesignerPublished, "已发布版本 {0}。"), version));
+            StateHasChanged();
+        }
+        catch (Exception)
+        {
+            Toast.Error(L10n.T(Keys.Content.DashboardDesignerPublishFailed, "发布失败。"));
+        }
+        finally
+        {
+            _publishing = false;
+        }
+    }
+
+    private async Task AttachAsync()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("SuperBuilder.designer.attach", _canvas, _selfRef);
+        }
+        catch
+        {
+            // 脚本不可用时静默降级：仍可编辑属性与源码
+        }
+        _attached = true;
+    }
+
+    private async Task DetachAsync()
+    {
+        if (!_attached) return;
+        await JS.InvokeVoidAsync("SuperBuilder.designer.detach");
+        _attached = false;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            if (_attached) await JS.InvokeVoidAsync("SuperBuilder.designer.detach");
+        }
+        catch { }
+        _selfRef?.Dispose();
+    }
+
+    // ---- DSL JSON 访问助手 ----
+    private static class P
+    {
+        public const string Type = "type";
+        public const string Id = "id";
+        public const string Title = "title";
+        public const string Position = "position";
+        public const string Order = "order";
+        public const string Query = "query";
+        public const string Question = "question";
+        public const string ChartType = "chartType";
+        public const string CategoryField = "categoryField";
+        public const string ValueFields = "valueFields";
+        public const string SeriesField = "seriesField";
+        public const string Stacked = "stacked";
+        public const string ShowLegend = "showLegend";
+        public const string ValueField = "valueField";
+        public const string Format = "format";
+        public const string Target = "target";
+        public const string Content = "content";
+        public const string Level = "level";
+        public const string Markdown = "markdown";
+        public const string Field = "field";
+        public const string Control = "control";
+        public const string Multiple = "multiple";
+        public const string ShowTotal = "showTotal";
+        public const string Striped = "striped";
+        public const string PageSize = "pageSize";
+        public const string Prompt = "prompt";
+        public const string MaxInsights = "maxInsights";
+        public const string Perspective = "perspective";
+        public const string Pages = "pages";
+        public const string Widgets = "widgets";
+        public const string X = "x";
+        public const string Y = "y";
+        public const string W = "w";
+        public const string Hh = "h";
+    }
+
+    private static string GetStr(JsonObject o, string name)
+        => o.TryGetPropertyValue(name, out var v) && v is JsonValue jv && jv.TryGetValue<string>(out var s) ? s ?? "" : "";
+
+    private static bool GetBool(JsonObject o, string name)
+        => o.TryGetPropertyValue(name, out var v) && v is JsonValue jv && jv.TryGetValue<bool>(out var b) && b;
+
+    private static int GetInt(JsonObject o, string name, int def)
+    {
+        if (o.TryGetPropertyValue(name, out var v) && v is JsonValue jv)
+        {
+            if (jv.TryGetValue<int>(out var i)) return i;
+            if (jv.TryGetValue<long>(out var l)) return (int)l;
+            if (jv.TryGetValue<string>(out var s) && int.TryParse(s, out var p)) return p;
+        }
+        return def;
+    }
+
+    private static string GetList(JsonObject o, string name)
+        => o.TryGetPropertyValue(name, out var v) && v is JsonArray a
+            ? string.Join(", ", a.Select(x => x?.GetValue<string>() ?? "").Where(s => s.Length > 0))
+            : "";
+
+    private static JsonObject? PosOrNull(JsonObject w)
+        => w.TryGetPropertyValue(P.Position, out var v) && v is JsonObject po ? po : null;
+
+    private static JsonObject Pos(JsonObject w)
+    {
+        if (PosOrNull(w) is { } po) return po;
+        var np = new JsonObject { [P.X] = 0, [P.Y] = 0, [P.W] = 4, [P.Hh] = 3 };
+        w[P.Position] = np;
+        return np;
+    }
+
+    private static int PosRead(JsonObject w, string name, int def)
+        => PosOrNull(w) is { } po ? GetInt(po, name, def) : def;
+
+    private string GridStyle(JsonObject w)
+    {
+        var x = PosRead(w, P.X, 0);
+        var y = PosRead(w, P.Y, 0);
+        var ww = Math.Clamp(PosRead(w, P.W, 4), 1, 12);
+        var hh = Math.Max(1, PosRead(w, P.Hh, 3));
+        return $"grid-column:{x + 1} / span {ww};grid-row:{y + 1} / span {hh}";
+    }
+
+    private string WidgetClass(string id) => "sb-dz-widget" + (_selectedId == id ? " selected" : "");
+
+    private static string QueryText(JsonObject w)
+        => w.TryGetPropertyValue(P.Query, out var q) && q is JsonObject qo ? GetStr(qo, P.Question) : "";
+
+    private static string QueryGet(JsonObject w, string name)
+        => w.TryGetPropertyValue(P.Query, out var q) && q is JsonObject qo ? GetStr(qo, name) : "";
+
+    private void QuerySet(JsonObject w, string name, string? val)
+    {
+        if (w.TryGetPropertyValue(P.Query, out var q) && q is JsonObject qo) SetStr(qo, name, val);
+        else if (!string.IsNullOrEmpty(val)) w[P.Query] = new JsonObject { [name] = val };
+        _dirty = true;
+    }
+
+    private static void SetStr(JsonObject o, string name, string? val)
+    {
+        if (string.IsNullOrEmpty(val)) { if (o.ContainsKey(name)) o.Remove(name); return; }
+        o[name] = val;
+    }
+
+    private static void SetList(JsonObject o, string name, string? csv)
+    {
+        var items = (csv ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (items.Length == 0) { if (o.ContainsKey(name)) o.Remove(name); return; }
+        o[name] = new JsonArray(items.Select(s => (JsonNode)JsonValue.Create(s)!).ToArray());
+    }
+
+    private void UpdStr(JsonObject w, string name, string? val) { SetStr(w, name, val); _dirty = true; }
+    private void UpdBool(JsonObject w, string name, bool val) { w[name] = val; _dirty = true; }
+    private void UpdInt(JsonObject w, string name, string? s) { if (int.TryParse(s, out var i)) { w[name] = i; _dirty = true; } }
+    private void UpdPos(JsonObject w, string name, string? s) { if (int.TryParse(s, out var i)) { Pos(w)[name] = i; _dirty = true; } }
+    private void UpdList(JsonObject w, string name, string? csv) { SetList(w, name, csv); _dirty = true; }
+
+    private static string Truncate(string? s, int max)
+        => string.IsNullOrEmpty(s) ? "" : (s.Length <= max ? s : s[..max] + "…");
+}
