@@ -40,7 +40,13 @@
                         }
                         else
                         {
-                            <SbDataTable Items="@_orgs" Columns="@OrgColumns" PageSize="20" EmptyTitle="@L10n.T(Keys.Content.IdentityDirectoryEmptyOrgs, "暂无组织")" />
+                            <SbDataTable Items="@_orgs" Columns="@OrgColumns" PageSize="20" EmptyTitle="@L10n.T(Keys.Content.IdentityDirectoryEmptyOrgs, "暂无组织")">
+                                <RowActions>
+                                    <button class="btn btn-sm btn-outline-secondary" @onclick='() => OpenRename("org", context)'>@L10n.T(Keys.Content.IdentityDirectoryRename, "重命名")</button>
+                                    <button class="btn btn-sm btn-outline-secondary" @onclick='() => ToggleEnabled("org", context)'>@(IsEnabled(context) ? L10n.T(Keys.Content.IdentityDirectoryDisable, "停用") : L10n.T(Keys.Content.IdentityDirectoryEnable, "启用"))</button>
+                                    <button class="btn btn-sm btn-outline-danger" @onclick='() => Remove("org", context)'>@L10n.T(Keys.Content.CommonDelete, "删除")</button>
+                                </RowActions>
+                            </SbDataTable>
                         }
                     </Body>
                 </SbPanel>
@@ -56,7 +62,10 @@
                         {
                             <SbDataTable Items="@_departments" Columns="@DeptColumns" PageSize="20" EmptyTitle="@L10n.T(Keys.Content.IdentityDirectoryEmptyDepartments, "暂无部门")">
                                 <RowActions>
+                                    <button class="btn btn-sm btn-outline-secondary" @onclick='() => OpenRename("dept", context)'>@L10n.T(Keys.Content.IdentityDirectoryRename, "重命名")</button>
+                                    <button class="btn btn-sm btn-outline-secondary" @onclick='() => ToggleEnabled("dept", context)'>@(IsEnabled(context) ? L10n.T(Keys.Content.IdentityDirectoryDisable, "停用") : L10n.T(Keys.Content.IdentityDirectoryEnable, "启用"))</button>
                                     <button class="btn btn-sm btn-outline-secondary" @onclick='() => OpenAssignDept(context)'>@L10n.T(Keys.Content.IdentityDirectoryAssignDept, "分配成员")</button>
+                                    <button class="btn btn-sm btn-outline-danger" @onclick='() => Remove("dept", context)'>@L10n.T(Keys.Content.CommonDelete, "删除")</button>
                                 </RowActions>
                             </SbDataTable>
                         }
@@ -75,8 +84,11 @@
                         {
                             <SbDataTable Items="@_groups" Columns="@GroupColumns" PageSize="20" EmptyTitle="@L10n.T(Keys.Content.IdentityDirectoryEmptyGroups, "暂无用户组")">
                                 <RowActions>
+                                    <button class="btn btn-sm btn-outline-secondary" @onclick='() => OpenRename("group", context)'>@L10n.T(Keys.Content.IdentityDirectoryRename, "重命名")</button>
                                     <button class="btn btn-sm btn-outline-secondary" @onclick='() => OpenEditRoles(context)'>@L10n.T(Keys.Content.IdentityDirectoryEditRoles, "编辑角色")</button>
                                     <button class="btn btn-sm btn-outline-secondary" @onclick='() => OpenAddMember(context)'>@L10n.T(Keys.Content.IdentityDirectoryAddMember, "添加成员")</button>
+                                    <button class="btn btn-sm btn-outline-secondary" @onclick='() => ToggleEnabled("group", context)'>@(IsEnabled(context) ? L10n.T(Keys.Content.IdentityDirectoryDisable, "停用") : L10n.T(Keys.Content.IdentityDirectoryEnable, "启用"))</button>
+                                    <button class="btn btn-sm btn-outline-danger" @onclick='() => Remove("group", context)'>@L10n.T(Keys.Content.CommonDelete, "删除")</button>
                                 </RowActions>
                             </SbDataTable>
                         }
@@ -230,6 +242,25 @@
     </Footer>
 </SbModal>
 
+@if (_renameModal)
+{
+    <SbModal Title="@L10n.T(Keys.Content.IdentityDirectoryRenameTitle, "重命名")" OnClose="() => _renameModal = false">
+        <Body>
+            <p class="muted">@L10n.T(Keys.Content.IdentityDirectoryRenameHint, "编码创建后不可修改；停用/删除会影响其关联对象。") @_renameCode</p>
+            <SbField Label="@L10n.T(Keys.Content.IdentityDirectoryColName, "名称")" Required="true" Error="@_renameErr">
+                <input class="form-control" @bind="_renameName" />
+            </SbField>
+            <SbField Label="@L10n.T(Keys.Content.IdentityDirectoryColDescription, "描述")">
+                <textarea class="form-control" rows="2" @bind="_renameDesc"></textarea>
+            </SbField>
+        </Body>
+        <Footer>
+            <button class="btn btn-outline-secondary btn-sm" @onclick="() => _renameModal = false">@L10n.T(Keys.Content.CommonCancel, "取消")</button>
+            <button class="btn btn-primary btn-sm" @onclick="SaveRename">@L10n.T(Keys.Content.CommonSave, "保存")</button>
+        </Footer>
+    </SbModal>
+}
+
 @code {
     private List<JsonElement> _orgs = new();
     private List<JsonElement> _departments = new();
@@ -279,6 +310,15 @@
     private long _assignUserId;
     private string _deptAssignErr = "";
 
+    // M12 增量：重命名（组织 / 部门 / 用户组通用）
+    private bool _renameModal;
+    private string _renameKind = "org";
+    private long _renameId;
+    private string _renameCode = "";
+    private string _renameName = "";
+    private string _renameDesc = "";
+    private string _renameErr = "";
+
     private List<SbColumn<JsonElement>> OrgColumns => new()
     {
         SbCol.Of<JsonElement>(L10n.T(Keys.Content.IdentityDirectoryColCode, "编码"), r => TablePresenter.Cell(r, "code")),
@@ -313,11 +353,11 @@
         var tid = State.TenantId;
         var (o, _, oErr, _) = await Api.GetJsonAsync($"api/identity-directory/organizations?tenantId={tid}");
         _error = oErr ?? "";
-        _orgs = Array(o);
+        _orgs = ItemsOf(o);
         var (d, _, _, _) = await Api.GetJsonAsync($"api/identity-directory/departments?tenantId={tid}");
-        _departments = Array(d);
+        _departments = ItemsOf(d);
         var (g, _, _, _) = await Api.GetJsonAsync($"api/identity-directory/user-groups?tenantId={tid}");
-        _groups = Array(g);
+        _groups = ItemsOf(g);
         var (r, _, _, _) = await Api.GetJsonAsync($"api/identity/roles?tenantId={tid}");
         _roles = Array(r);
         var (u, _, _, _) = await Api.GetJsonAsync($"api/identity/users?tenantId={tid}");
@@ -328,6 +368,18 @@
 
     private static List<JsonElement> Array(JsonElement? e) =>
         e is { ValueKind: JsonValueKind.Array } ? e.Value.EnumerateArray().ToList() : new();
+
+    /// <summary>
+    /// M12 增量：目录列表端点返回分页信封 <c>{ items, total, page, pageSize }</c>；
+    /// 此处兼容纯数组（历史形态），统一取条目集合。
+    /// </summary>
+    private static List<JsonElement> ItemsOf(JsonElement? e)
+    {
+        if (e is not { ValueKind: JsonValueKind.Object }) return Array(e);
+        if (e.Value.TryGetProperty("items", out var items) && items.ValueKind == JsonValueKind.Array)
+            return items.EnumerateArray().ToList();
+        return new();
+    }
 
     private static string String(JsonElement e, string prop) => TablePresenter.Cell(e, prop);
 
@@ -543,6 +595,105 @@
         else
         {
             _deptAssignErr = err ?? string.Format(L10n.T(Keys.Content.IdentityDirectoryCreateFailed, "创建失败（HTTP {0}）。"), status);
+        }
+    }
+
+    // ---------------- M12 增量：重命名 / 启停 / 删除 ----------------
+
+    private static bool IsEnabled(JsonElement row) =>
+        !row.TryGetProperty("isEnabled", out var v) || v.ValueKind != JsonValueKind.False;
+
+    private static string KindSegment(string kind) => kind switch
+    {
+        "dept" => "departments",
+        "group" => "user-groups",
+        _ => "organizations",
+    };
+
+    private static string KindLabel(string kind) => kind switch
+    {
+        "dept" => "部门",
+        "group" => "用户组",
+        _ => "组织",
+    };
+
+    private void OpenRename(string kind, JsonElement row)
+    {
+        _renameKind = kind;
+        _renameId = long.TryParse(TablePresenter.Cell(row, "id"), out var id) ? id : 0;
+        _renameCode = TablePresenter.Cell(row, "code");
+        _renameName = TablePresenter.Cell(row, "name");
+        _renameDesc = TablePresenter.Cell(row, "description");
+        _renameErr = "";
+        _renameModal = true;
+    }
+
+    private async Task SaveRename()
+    {
+        if (string.IsNullOrWhiteSpace(_renameName))
+        {
+            _renameErr = L10n.T(Keys.Content.IdentityDirectoryNameRequired, "名称必填。");
+            return;
+        }
+
+        var body = _renameKind == "dept"
+            ? (object)new { name = _renameName, description = _renameDesc }
+            : new { name = _renameName, description = _renameDesc };
+
+        var (_, status, err, _) = await Api.PutAsync(
+            $"api/identity-directory/{KindSegment(_renameKind)}/{_renameId}?tenantId={State.TenantId}", body);
+
+        if (status is >= 200 and < 300)
+        {
+            Toast.Success(L10n.T(Keys.Content.CommonSaveSuccess, "已保存。"));
+            _renameModal = false;
+            await Reload();
+        }
+        else
+        {
+            _renameErr = err ?? string.Format(L10n.T(Keys.Content.IdentityDirectoryCreateFailed, "创建失败（HTTP {0}）。"), status);
+        }
+    }
+
+    private async Task ToggleEnabled(string kind, JsonElement row)
+    {
+        var id = long.TryParse(TablePresenter.Cell(row, "id"), out var v) ? v : 0;
+        if (id <= 0) return;
+
+        var enabled = !IsEnabled(row);
+        var (_, status, err, _) = await Api.PutAsync(
+            $"api/identity-directory/{KindSegment(kind)}/{id}/enabled?tenantId={State.TenantId}", new { enabled });
+
+        if (status is >= 200 and < 300)
+        {
+            Toast.Success(enabled
+                ? L10n.T(Keys.Content.IdentityDirectoryEnabled, "已启用。")
+                : L10n.T(Keys.Content.IdentityDirectoryDisabled, "已停用。"));
+            await Reload();
+        }
+        else
+        {
+            Toast.Error(err ?? string.Format(L10n.T(Keys.Content.IdentityDirectoryCreateFailed, "创建失败（HTTP {0}）。"), status));
+        }
+    }
+
+    private async Task Remove(string kind, JsonElement row)
+    {
+        var id = long.TryParse(TablePresenter.Cell(row, "id"), out var v) ? v : 0;
+        if (id <= 0) return;
+
+        var name = TablePresenter.Cell(row, "name");
+        var (_, status, err, _) = await Api.DeleteAsync(
+            $"api/identity-directory/{KindSegment(kind)}/{id}?tenantId={State.TenantId}");
+
+        if (status is >= 200 and < 300)
+        {
+            Toast.Success(string.Format(L10n.T(Keys.Content.IdentityDirectoryDeleted, "已删除「{0}」。"), name));
+            await Reload();
+        }
+        else
+        {
+            Toast.Error(err ?? string.Format(L10n.T(Keys.Content.IdentityDirectoryDeleteFailed, "删除失败（HTTP {0}）。"), status));
         }
     }
 }

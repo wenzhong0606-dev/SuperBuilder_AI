@@ -16,18 +16,27 @@ namespace SuperBuilder_AI.Tests;
 /// </summary>
 public class IdentityDirectoryUiTests : BunitContext
 {
-    private static JsonElement Orgs() => JsonSerializer.SerializeToElement(new[]
+    /// <summary>M12 增量：目录列表端点返回分页信封，页面须解析 <c>items</c>。</summary>
+    private static JsonElement Page(object[] items) => JsonSerializer.SerializeToElement(new
+    {
+        items,
+        total = items.Length,
+        page = 1,
+        pageSize = items.Length,
+    });
+
+    private static JsonElement Orgs() => Page(new[]
     {
         new { id = 1, code = "hq", name = "总部", description = "", isEnabled = true, departmentCount = 2 },
         new { id = 2, code = "branch", name = "分部", description = "", isEnabled = true, departmentCount = 0 },
     });
 
-    private static JsonElement Departments() => JsonSerializer.SerializeToElement(new[]
+    private static JsonElement Departments() => Page(new[]
     {
         new { id = 1, organizationId = 1, organizationName = "总部", parentId = (long?)null, code = "sales", name = "销售部", description = "", isEnabled = true, memberCount = 1 },
     });
 
-    private static JsonElement Groups() => JsonSerializer.SerializeToElement(new[]
+    private static JsonElement Groups() => Page(new[]
     {
         new { id = 1, code = "analysts", name = "分析师", description = "", isEnabled = true, roleCodes = new[] { "viewer", "member" }, memberCount = 3 },
     });
@@ -92,7 +101,16 @@ public class IdentityDirectoryUiTests : BunitContext
         page.FindAll(".sb-tab")[2].Click();
 
         page.WaitForAssertion(() =>
-            Assert.Equal(2, page.FindAll(".sb-row-actions button").Count));
+            // M12 增量：用户组行操作 = 重命名 / 编辑角色 / 添加成员 / 启停 / 删除
+            Assert.Equal(5, page.FindAll(".sb-row-actions button").Count));
+    }
+
+    [Fact]
+    public void Directory_Parses_PagedEnvelope_Items()
+    {
+        var page = RenderDirectory();
+        // 替身返回分页信封 { items, total, page, pageSize }；页面须正确取 items 渲染。
+        page.WaitForAssertion(() => Assert.Contains("hq", page.Markup));
     }
 
     [Fact]

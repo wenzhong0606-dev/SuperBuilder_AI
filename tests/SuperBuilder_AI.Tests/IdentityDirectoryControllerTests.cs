@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Security.Claims;
@@ -97,10 +97,10 @@ public class IdentityDirectoryControllerTests
 
 		var id = await CreateOrgAsync(ctx, Tenant5, "hq");
 		var ctrl = Build(ctx, Tenant5);
-		var list = await ctrl.ListOrganizations(Tenant5, CancellationToken.None) as OkObjectResult;
+		var list = await ctrl.ListOrganizations(Tenant5, 0, 0, CancellationToken.None) as OkObjectResult;
 
 		Assert.NotNull(list);
-		var items = Assert.IsAssignableFrom<IEnumerable<OrganizationView>>(list!.Value).ToList();
+		var items = Assert.IsType<DirectoryPage<OrganizationView>>(list!.Value).Items.ToList();
 		Assert.Single(items);
 		Assert.Equal(id, items[0].Id);
 		Assert.Equal("hq", items[0].Code);
@@ -133,7 +133,7 @@ public class IdentityDirectoryControllerTests
 		await CreateOrgAsync(ctx, Tenant6, "hq6");
 		var ctrl = Build(ctx, Tenant5); // 令牌租户 5，请求租户 6
 		var ex = await Assert.ThrowsAsync<SuperBuilderException>(
-			() => ctrl.ListOrganizations(Tenant6, CancellationToken.None));
+			() => ctrl.ListOrganizations(Tenant6, 0, 0, CancellationToken.None));
 		Assert.Equal(403, ex.StatusCode);
 		Assert.Equal(ErrorCodes.TenantIsolated, ex.ErrorCode);
 	}
@@ -146,7 +146,7 @@ public class IdentityDirectoryControllerTests
 		await using var __ = ctx;
 
 		var ctrl = Build(ctx, Tenant5, withPermission: false);
-		var res = await ctrl.ListOrganizations(Tenant5, CancellationToken.None) as ObjectResult;
+		var res = await ctrl.ListOrganizations(Tenant5, 0, 0, CancellationToken.None) as ObjectResult;
 		Assert.NotNull(res);
 		Assert.Equal(403, res!.StatusCode);
 	}
@@ -161,9 +161,9 @@ public class IdentityDirectoryControllerTests
 		await CreateOrgAsync(ctx, Tenant5, "hq5");
 		await CreateOrgAsync(ctx, Tenant6, "hq6");
 		var ctrl = Build(ctx, Tenant5);
-		var list = await ctrl.ListOrganizations(Tenant5, CancellationToken.None) as OkObjectResult;
+		var list = await ctrl.ListOrganizations(Tenant5, 0, 0, CancellationToken.None) as OkObjectResult;
 
-		var items = Assert.IsAssignableFrom<IEnumerable<OrganizationView>>(list!.Value).ToList();
+		var items = Assert.IsType<DirectoryPage<OrganizationView>>(list!.Value).Items.ToList();
 		Assert.Single(items);
 		Assert.Equal("hq5", items[0].Code);
 	}
@@ -185,8 +185,8 @@ public class IdentityDirectoryControllerTests
 		var ok = Assert.IsType<ObjectResult>(res);
 		Assert.Equal(201, ok.StatusCode);
 
-		var list = await ctrl.ListDepartments(Tenant5, CancellationToken.None) as OkObjectResult;
-		var items = Assert.IsAssignableFrom<IEnumerable<DepartmentView>>(list!.Value).ToList();
+		var list = await ctrl.ListDepartments(Tenant5, 0, 0, CancellationToken.None) as OkObjectResult;
+		var items = Assert.IsType<DirectoryPage<DepartmentView>>(list!.Value).Items.ToList();
 		Assert.Single(items);
 		Assert.Equal("sales", items[0].Code);
 		Assert.Equal(orgId, items[0].OrganizationId);
@@ -228,15 +228,15 @@ public class IdentityDirectoryControllerTests
 			userId, new IdentityDirectoryController.SetUserDepartmentRequest(deptId), Tenant5, CancellationToken.None);
 		Assert.IsType<OkObjectResult>(set);
 
-		var list = await ctrl.ListDepartments(Tenant5, CancellationToken.None) as OkObjectResult;
-		Assert.Equal(1, Assert.IsAssignableFrom<IEnumerable<DepartmentView>>(list!.Value).Single().MemberCount);
+		var list = await ctrl.ListDepartments(Tenant5, 0, 0, CancellationToken.None) as OkObjectResult;
+		Assert.Equal(1, Assert.IsType<DirectoryPage<DepartmentView>>(list!.Value).Items.Single().MemberCount);
 
 		var clear = await ctrl.SetUserDepartment(
 			userId, new IdentityDirectoryController.SetUserDepartmentRequest(null), Tenant5, CancellationToken.None);
 		Assert.IsType<OkObjectResult>(clear);
 
-		var list2 = await ctrl.ListDepartments(Tenant5, CancellationToken.None) as OkObjectResult;
-		Assert.Equal(0, Assert.IsAssignableFrom<IEnumerable<DepartmentView>>(list2!.Value).Single().MemberCount);
+		var list2 = await ctrl.ListDepartments(Tenant5, 0, 0, CancellationToken.None) as OkObjectResult;
+		Assert.Equal(0, Assert.IsType<DirectoryPage<DepartmentView>>(list2!.Value).Items.Single().MemberCount);
 	}
 
 	// ---------------- 用户组（RBAC 关联）----------------
@@ -255,8 +255,8 @@ public class IdentityDirectoryControllerTests
 		var ok = Assert.IsType<ObjectResult>(res);
 		Assert.Equal(201, ok.StatusCode);
 
-		var list = await ctrl.ListUserGroups(Tenant5, CancellationToken.None) as OkObjectResult;
-		var items = Assert.IsAssignableFrom<IEnumerable<UserGroupView>>(list!.Value).ToList();
+		var list = await ctrl.ListUserGroups(Tenant5, 0, 0, CancellationToken.None) as OkObjectResult;
+		var items = Assert.IsType<DirectoryPage<UserGroupView>>(list!.Value).Items.ToList();
 		Assert.Single(items);
 		Assert.Equal(new[] { "member", "viewer" }, items[0].RoleCodes.OrderBy(x => x).ToArray());
 		Assert.Equal(0, items[0].MemberCount);
@@ -353,9 +353,248 @@ public class IdentityDirectoryControllerTests
 		await c5.CreateUserGroup(new IdentityDirectoryController.CreateUserGroupRequest(Tenant5, "g5"), CancellationToken.None);
 		await c6.CreateUserGroup(new IdentityDirectoryController.CreateUserGroupRequest(Tenant6, "g6"), CancellationToken.None);
 
-		var list = await c5.ListUserGroups(Tenant5, CancellationToken.None) as OkObjectResult;
-		var items = Assert.IsAssignableFrom<IEnumerable<UserGroupView>>(list!.Value).ToList();
+		var list = await c5.ListUserGroups(Tenant5, 0, 0, CancellationToken.None) as OkObjectResult;
+		var items = Assert.IsType<DirectoryPage<UserGroupView>>(list!.Value).Items.ToList();
 		Assert.Single(items);
 		Assert.Equal("g5", items[0].Code);
+	}
+
+	// ---------------- M12 增量：重命名 / 启停 / 删除 / 分页 ----------------
+
+	[Fact]
+	public async Task UpdateOrganization_Renames_And_Updates_Description()
+	{
+		var ctx = CreateContext(out var connection);
+		await using var _ = connection;
+		await using var __ = ctx;
+
+		var id = await CreateOrgAsync(ctx, Tenant5, "hq");
+		var ctrl = Build(ctx, Tenant5);
+		var res = await ctrl.UpdateOrganization(
+			id, new IdentityDirectoryController.UpdateOrganizationRequest("总部", "集团总部"), Tenant5, CancellationToken.None);
+		Assert.IsType<OkObjectResult>(res);
+
+		var list = await ctrl.ListOrganizations(Tenant5, 0, 0, CancellationToken.None) as OkObjectResult;
+		var items = Assert.IsType<DirectoryPage<OrganizationView>>(list!.Value).Items.ToList();
+		Assert.Equal("总部", items[0].Name);
+		Assert.Equal("集团总部", items[0].Description);
+		Assert.Equal("hq", items[0].Code); // 编码不可变
+	}
+
+	[Fact]
+	public async Task SetOrganizationEnabled_Flips_IsEnabled()
+	{
+		var ctx = CreateContext(out var connection);
+		await using var _ = connection;
+		await using var __ = ctx;
+
+		var id = await CreateOrgAsync(ctx, Tenant5, "hq");
+		var ctrl = Build(ctx, Tenant5);
+		Assert.IsType<OkObjectResult>(await ctrl.SetOrganizationEnabled(
+			id, new IdentityDirectoryController.SetEnabledRequest(false), Tenant5, CancellationToken.None));
+
+		var list = await ctrl.ListOrganizations(Tenant5, 0, 0, CancellationToken.None) as OkObjectResult;
+		Assert.False(Assert.IsType<DirectoryPage<OrganizationView>>(list!.Value).Items.Single().IsEnabled);
+	}
+
+	[Fact]
+	public async Task DeleteOrganization_WithDepartments_Rejected()
+	{
+		var ctx = CreateContext(out var connection);
+		await using var _ = connection;
+		await using var __ = ctx;
+
+		var orgId = await CreateOrgAsync(ctx, Tenant5, "hq");
+		var ctrl = Build(ctx, Tenant5);
+		await ctrl.CreateDepartment(
+			new IdentityDirectoryController.CreateDepartmentRequest(Tenant5, orgId, null, "it"), CancellationToken.None);
+
+		var res = await ctrl.DeleteOrganization(orgId, Tenant5, CancellationToken.None);
+		Assert.IsType<BadRequestObjectResult>(res);
+	}
+
+	[Fact]
+	public async Task DeleteOrganization_Empty_Succeeds()
+	{
+		var ctx = CreateContext(out var connection);
+		await using var _ = connection;
+		await using var __ = ctx;
+
+		var orgId = await CreateOrgAsync(ctx, Tenant5, "hq");
+		var ctrl = Build(ctx, Tenant5);
+		Assert.IsType<NoContentResult>(await ctrl.DeleteOrganization(orgId, Tenant5, CancellationToken.None));
+
+		var list = await ctrl.ListOrganizations(Tenant5, 0, 0, CancellationToken.None) as OkObjectResult;
+		Assert.Empty(Assert.IsType<DirectoryPage<OrganizationView>>(list!.Value).Items);
+	}
+
+	[Fact]
+	public async Task ListOrganizations_Paged_Returns_Total_And_Slice()
+	{
+		var ctx = CreateContext(out var connection);
+		await using var _ = connection;
+		await using var __ = ctx;
+
+		var ctrl = Build(ctx, Tenant5);
+		foreach (var code in new[] { "a", "b", "c", "d", "e" })
+			await ctrl.CreateOrganization(new IdentityDirectoryController.CreateOrganizationRequest(Tenant5, code), CancellationToken.None);
+
+		var page2 = await ctrl.ListOrganizations(Tenant5, 2, 2, CancellationToken.None) as OkObjectResult;
+		var paged = Assert.IsType<DirectoryPage<OrganizationView>>(page2!.Value);
+		Assert.Equal(5, paged.Total);
+		Assert.Equal(2, paged.Page);
+		Assert.Equal(2, paged.PageSize);
+		Assert.Equal(new[] { "c", "d" }, paged.Items.Select(x => x.Code).ToArray());
+
+		var all = await ctrl.ListOrganizations(Tenant5, 0, 0, CancellationToken.None) as OkObjectResult;
+		var unpaged = Assert.IsType<DirectoryPage<OrganizationView>>(all!.Value);
+		Assert.Equal(5, unpaged.Items.Count);
+		Assert.Equal(5, unpaged.Total);
+	}
+
+	[Fact]
+	public async Task UpdateDepartment_Moves_To_Other_Organization()
+	{
+		var ctx = CreateContext(out var connection);
+		await using var _ = connection;
+		await using var __ = ctx;
+
+		var orgA = await CreateOrgAsync(ctx, Tenant5, "org-a");
+		var orgB = await CreateOrgAsync(ctx, Tenant5, "org-b");
+		var ctrl = Build(ctx, Tenant5);
+		var created = await ctrl.CreateDepartment(
+			new IdentityDirectoryController.CreateDepartmentRequest(Tenant5, orgA, null, "it"), CancellationToken.None);
+		var deptId = (long)Assert.IsType<ObjectResult>(created).Value!.GetType().GetProperty("id")!.GetValue(Assert.IsType<ObjectResult>(created).Value)!;
+
+		var res = await ctrl.UpdateDepartment(
+			deptId,
+			new IdentityDirectoryController.UpdateDepartmentRequest("IT 部", null, orgB, null),
+			Tenant5, CancellationToken.None);
+		Assert.IsType<OkObjectResult>(res);
+
+		var list = await ctrl.ListDepartments(Tenant5, 0, 0, CancellationToken.None) as OkObjectResult;
+		var item = Assert.IsType<DirectoryPage<DepartmentView>>(list!.Value).Items.Single();
+		Assert.Equal(orgB, item.OrganizationId);
+		Assert.Equal("IT 部", item.Name);
+	}
+
+	[Fact]
+	public async Task UpdateDepartment_CrossTenant_Organization_Rejected()
+	{
+		var ctx = CreateContext(out var connection);
+		await using var _ = connection;
+		await using var __ = ctx;
+
+		var orgA = await CreateOrgAsync(ctx, Tenant5, "org-a");
+		var orgB = await CreateOrgAsync(ctx, Tenant6, "org-b");
+		var ctrl = Build(ctx, Tenant5);
+		var created = await ctrl.CreateDepartment(
+			new IdentityDirectoryController.CreateDepartmentRequest(Tenant5, orgA, null, "it"), CancellationToken.None);
+		var deptId = (long)Assert.IsType<ObjectResult>(created).Value!.GetType().GetProperty("id")!.GetValue(Assert.IsType<ObjectResult>(created).Value)!;
+
+		var res = await ctrl.UpdateDepartment(
+			deptId, new IdentityDirectoryController.UpdateDepartmentRequest(null, null, orgB, null), Tenant5, CancellationToken.None);
+		Assert.IsType<BadRequestObjectResult>(res);
+	}
+
+	[Fact]
+	public async Task DeleteDepartment_WithMembers_Rejected()
+	{
+		var ctx = CreateContext(out var connection);
+		await using var _ = connection;
+		await using var __ = ctx;
+
+		var orgId = await CreateOrgAsync(ctx, Tenant5, "hq");
+		var userId = await CreateUserAsync(ctx, Tenant5, "u1");
+		var ctrl = Build(ctx, Tenant5);
+		var created = await ctrl.CreateDepartment(
+			new IdentityDirectoryController.CreateDepartmentRequest(Tenant5, orgId, null, "it"), CancellationToken.None);
+		var deptId = (long)Assert.IsType<ObjectResult>(created).Value!.GetType().GetProperty("id")!.GetValue(Assert.IsType<ObjectResult>(created).Value)!;
+		await ctrl.SetUserDepartment(userId, new IdentityDirectoryController.SetUserDepartmentRequest(deptId), Tenant5, CancellationToken.None);
+
+		Assert.IsType<BadRequestObjectResult>(await ctrl.DeleteDepartment(deptId, Tenant5, CancellationToken.None));
+
+		// 移出成员后可删
+		await ctrl.SetUserDepartment(userId, new IdentityDirectoryController.SetUserDepartmentRequest(null), Tenant5, CancellationToken.None);
+		Assert.IsType<NoContentResult>(await ctrl.DeleteDepartment(deptId, Tenant5, CancellationToken.None));
+	}
+
+	[Fact]
+	public async Task SetDepartmentEnabled_Flips_IsEnabled()
+	{
+		var ctx = CreateContext(out var connection);
+		await using var _ = connection;
+		await using var __ = ctx;
+
+		var orgId = await CreateOrgAsync(ctx, Tenant5, "hq");
+		var ctrl = Build(ctx, Tenant5);
+		var created = await ctrl.CreateDepartment(
+			new IdentityDirectoryController.CreateDepartmentRequest(Tenant5, orgId, null, "it"), CancellationToken.None);
+		var deptId = (long)Assert.IsType<ObjectResult>(created).Value!.GetType().GetProperty("id")!.GetValue(Assert.IsType<ObjectResult>(created).Value)!;
+
+		await ctrl.SetDepartmentEnabled(deptId, new IdentityDirectoryController.SetEnabledRequest(false), Tenant5, CancellationToken.None);
+		var list = await ctrl.ListDepartments(Tenant5, 0, 0, CancellationToken.None) as OkObjectResult;
+		Assert.False(Assert.IsType<DirectoryPage<DepartmentView>>(list!.Value).Items.Single().IsEnabled);
+	}
+
+	[Fact]
+	public async Task UpdateUserGroup_Renames_And_Toggles_Enabled()
+	{
+		var ctx = CreateContext(out var connection);
+		await using var _ = connection;
+		await using var __ = ctx;
+
+		var ctrl = Build(ctx, Tenant5);
+		var created = await ctrl.CreateUserGroup(new IdentityDirectoryController.CreateUserGroupRequest(Tenant5, "analysts"), CancellationToken.None);
+		var groupId = (long)Assert.IsType<ObjectResult>(created).Value!.GetType().GetProperty("id")!.GetValue(Assert.IsType<ObjectResult>(created).Value)!;
+
+		Assert.IsType<OkObjectResult>(await ctrl.UpdateUserGroup(
+			groupId, new IdentityDirectoryController.UpdateUserGroupRequest("分析师组", "只读分析"), Tenant5, CancellationToken.None));
+		await ctrl.SetUserGroupEnabled(groupId, new IdentityDirectoryController.SetEnabledRequest(false), Tenant5, CancellationToken.None);
+
+		var list = await ctrl.ListUserGroups(Tenant5, 0, 0, CancellationToken.None) as OkObjectResult;
+		var item = Assert.IsType<DirectoryPage<UserGroupView>>(list!.Value).Items.Single();
+		Assert.Equal("分析师组", item.Name);
+		Assert.Equal("只读分析", item.Description);
+		Assert.False(item.IsEnabled);
+	}
+
+	[Fact]
+	public async Task DeleteUserGroup_Cascades_Members_And_Roles()
+	{
+		var ctx = CreateContext(out var connection);
+		await using var _ = connection;
+		await using var __ = ctx;
+
+		var userId = await CreateUserAsync(ctx, Tenant5, "u1");
+		var ctrl = Build(ctx, Tenant5);
+		var created = await ctrl.CreateUserGroup(
+			new IdentityDirectoryController.CreateUserGroupRequest(Tenant5, "analysts", null, null, new[] { "viewer" }), CancellationToken.None);
+		var groupId = (long)Assert.IsType<ObjectResult>(created).Value!.GetType().GetProperty("id")!.GetValue(Assert.IsType<ObjectResult>(created).Value)!;
+		await ctrl.AddUserGroupMember(groupId, new IdentityDirectoryController.AddGroupMemberRequest(userId), Tenant5, CancellationToken.None);
+
+		Assert.IsType<NoContentResult>(await ctrl.DeleteUserGroup(groupId, Tenant5, CancellationToken.None));
+
+		Assert.Empty(await ctx.UserGroupMembers.IgnoreQueryFilters().ToListAsync());
+		Assert.Empty(await ctx.UserGroupRoles.IgnoreQueryFilters().ToListAsync());
+		Assert.Empty(await ctx.UserGroups.IgnoreQueryFilters().ToListAsync());
+	}
+
+	[Fact]
+	public async Task ListUserGroups_Paged_Returns_Total()
+	{
+		var ctx = CreateContext(out var connection);
+		await using var _ = connection;
+		await using var __ = ctx;
+
+		var ctrl = Build(ctx, Tenant5);
+		foreach (var code in new[] { "g1", "g2", "g3" })
+			await ctrl.CreateUserGroup(new IdentityDirectoryController.CreateUserGroupRequest(Tenant5, code), CancellationToken.None);
+
+		var first = await ctrl.ListUserGroups(Tenant5, 1, 2, CancellationToken.None) as OkObjectResult;
+		var paged = Assert.IsType<DirectoryPage<UserGroupView>>(first!.Value);
+		Assert.Equal(3, paged.Total);
+		Assert.Equal(2, paged.Items.Count);
+		Assert.Equal(new[] { "g1", "g2" }, paged.Items.Select(x => x.Code).ToArray());
 	}
 }

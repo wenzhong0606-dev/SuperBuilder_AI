@@ -29,23 +29,38 @@ public sealed class IdentityDirectoryService : IIdentityDirectoryService
 
     // ---------------- 组织 ----------------
 
-    public async Task<IReadOnlyList<OrganizationView>> ListOrganizationsAsync(long tenantId, CancellationToken ct = default)
+    public async Task<DirectoryPage<OrganizationView>> ListOrganizationsAsync(long tenantId, int page = 0, int pageSize = 0, CancellationToken ct = default)
     {
-        var orgs = await _ctx.Organizations.IgnoreQueryFilters().AsNoTracking()
+        var query = _ctx.Organizations.IgnoreQueryFilters().AsNoTracking()
             .Where(x => x.TenantId == tenantId)
-            .OrderBy(x => x.Code).ThenBy(x => x.Id)
-            .ToListAsync(ct);
+            .OrderBy(x => x.Code).ThenBy(x => x.Id);
 
-        var deptCounts = await _ctx.Departments.IgnoreQueryFilters().AsNoTracking()
-            .Where(x => x.TenantId == tenantId)
-            .GroupBy(x => x.OrganizationId)
-            .Select(g => new { OrganizationId = g.Key, Count = g.Count() })
-            .ToListAsync(ct);
+        var total = await query.CountAsync(ct);
+        if (pageSize <= 0) pageSize = 0;
 
-        var map = deptCounts.ToDictionary(x => x.OrganizationId, x => x.Count);
-        return orgs.Select(o => new OrganizationView(
+        var orgs = pageSize > 0
+            ? await query.Skip(Math.Max(0, page - 1) * pageSize).Take(pageSize).ToListAsync(ct)
+            : await query.ToListAsync(ct);
+
+        // 计数只针对当前页涉及的实体，避免全量分组。
+        var ids = orgs.Select(o => o.Id).ToList();
+        var map = new Dictionary<long, int>();
+        if (ids.Count > 0)
+        {
+            map = (await _ctx.Departments.IgnoreQueryFilters().AsNoTracking()
+                .Where(x => x.TenantId == tenantId && ids.Contains(x.OrganizationId))
+                .GroupBy(x => x.OrganizationId)
+                .Select(g => new { OrganizationId = g.Key, Count = g.Count() })
+                .ToListAsync(ct)).ToDictionary(x => x.OrganizationId, x => x.Count);
+        }
+
+        var items = orgs.Select(o => new OrganizationView(
             o.Id, o.Code, o.Name, o.Description, o.IsEnabled,
             map.TryGetValue(o.Id, out var c) ? c : 0)).ToList();
+
+        return pageSize > 0
+            ? new DirectoryPage<OrganizationView>(items, total, Math.Max(1, page), pageSize)
+            : DirectoryPage<OrganizationView>.OfAll(items);
     }
 
     public async Task<IdentityResult> CreateOrganizationAsync(long tenantId, string code, string? name, string? description, CancellationToken ct = default)
@@ -72,32 +87,84 @@ public sealed class IdentityDirectoryService : IIdentityDirectoryService
         return IdentityResult.Ok(org.Id);
     }
 
+    // ---------------- 组织：M12 增量（重命名 / 启停 / 删除） ----------------
+
+    public async Task<IdentityResult> UpdateOrganizationAsync(long tenantId, long id, string? name, string? description, CancellationToken ct = default)
+    {
+        var org = await _ctx.Organizations.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(x => x.Id == id && x.TenantId == tenantId, ct);
+        if (org is null) return IdentityResult.Fail("组织不存在或不属于当前租户。");
+
+        if (name is not null && !string.IsNullOrWhiteSpace(name)) org.Name = name.Trim();
+        if (description is not null) org.Description = description.Trim();
+        await _ctx.SaveChangesAsync(ct);
+        return IdentityResult.Ok(org.Id);
+    }
+
+    public async Task<IdentityResult> SetOrganizationEnabledAsync(long tenantId, long id, bool enabled, CancellationToken ct = default)
+    {
+        var org = await _ctx.Organizations.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(x => x.Id == id && x.TenantId == tenantId, ct);
+        if (org is null) return IdentityResult.Fail("组织不存在或不属于当前租户。");
+
+        org.IsEnabled = enabled;
+        await _ctx.SaveChangesAsync(ct);
+        return IdentityResult.Ok(org.Id);
+    }
+
+    public async Task<IdentityResult> DeleteOrganizationAsync(long tenantId, long id, CancellationToken ct = default)
+    {
+        var org = await _ctx.Organizations.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(x => x.Id == id && x.TenantId == tenantId, ct);
+        if (org is null) return IdentityResult.Fail("组织不存在或不属于当前租户。");
+
+        var deptCount = await _ctx.Departments.IgnoreQueryFilters()
+            .CountAsync(x => x.TenantId == tenantId && x.OrganizationId == id, ct);
+        if (deptCount > 0) return IdentityResult.Fail($"组织下仍有 {deptCount} 个部门，请先删除或移出。");
+
+        _ctx.Organizations.Remove(org);
+        await _ctx.SaveChangesAsync(ct);
+        return IdentityResult.Ok(id);
+    }
+
     // ---------------- 部门 ----------------
 
-    public async Task<IReadOnlyList<DepartmentView>> ListDepartmentsAsync(long tenantId, CancellationToken ct = default)
+    public async Task<DirectoryPage<DepartmentView>> ListDepartmentsAsync(long tenantId, int page = 0, int pageSize = 0, CancellationToken ct = default)
     {
-        var depts = await _ctx.Departments.IgnoreQueryFilters().AsNoTracking()
+        var query = _ctx.Departments.IgnoreQueryFilters().AsNoTracking()
             .Where(x => x.TenantId == tenantId)
-            .OrderBy(x => x.OrganizationId).ThenBy(x => x.Code).ThenBy(x => x.Id)
-            .ToListAsync(ct);
+            .OrderBy(x => x.OrganizationId).ThenBy(x => x.Code).ThenBy(x => x.Id);
+
+        var total = await query.CountAsync(ct);
+        var depts = pageSize > 0
+            ? await query.Skip(Math.Max(0, page - 1) * pageSize).Take(pageSize).ToListAsync(ct)
+            : await query.ToListAsync(ct);
 
         var orgNames = await _ctx.Organizations.IgnoreQueryFilters().AsNoTracking()
             .Where(x => x.TenantId == tenantId)
             .Select(x => new { x.Id, x.Name })
             .ToDictionaryAsync(x => x.Id, x => x.Name, ct);
 
-        var memberCounts = await _ctx.UserDepartmentMembers.IgnoreQueryFilters().AsNoTracking()
-            .Where(x => x.TenantId == tenantId)
-            .GroupBy(x => x.DepartmentId)
-            .Select(g => new { DepartmentId = g.Key, Count = g.Count() })
-            .ToListAsync(ct);
-        var countMap = memberCounts.ToDictionary(x => x.DepartmentId, x => x.Count);
+        var ids = depts.Select(d => d.Id).ToList();
+        var countMap = new Dictionary<long, int>();
+        if (ids.Count > 0)
+        {
+            countMap = (await _ctx.UserDepartmentMembers.IgnoreQueryFilters().AsNoTracking()
+                .Where(x => x.TenantId == tenantId && ids.Contains(x.DepartmentId))
+                .GroupBy(x => x.DepartmentId)
+                .Select(g => new { DepartmentId = g.Key, Count = g.Count() })
+                .ToListAsync(ct)).ToDictionary(x => x.DepartmentId, x => x.Count);
+        }
 
-        return depts.Select(d => new DepartmentView(
+        var items = depts.Select(d => new DepartmentView(
             d.Id, d.OrganizationId,
             orgNames.TryGetValue(d.OrganizationId, out var n) ? n : string.Empty,
             d.ParentId, d.Code, d.Name, d.Description, d.IsEnabled,
             countMap.TryGetValue(d.Id, out var c) ? c : 0)).ToList();
+
+        return pageSize > 0
+            ? new DirectoryPage<DepartmentView>(items, total, Math.Max(1, page), pageSize)
+            : DirectoryPage<DepartmentView>.OfAll(items);
     }
 
     public async Task<IdentityResult> CreateDepartmentAsync(long tenantId, long organizationId, long? parentId, string code, string? name, string? description, CancellationToken ct = default)
@@ -138,14 +205,81 @@ public sealed class IdentityDirectoryService : IIdentityDirectoryService
         return IdentityResult.Ok(dept.Id);
     }
 
+    // ---------------- 部门：M12 增量（重命名 / 启停 / 删除） ----------------
+
+    public async Task<IdentityResult> UpdateDepartmentAsync(
+        long tenantId, long id, string? name, string? description, long? organizationId, long? parentId, CancellationToken ct = default)
+    {
+        var dept = await _ctx.Departments.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(x => x.Id == id && x.TenantId == tenantId, ct);
+        if (dept is null) return IdentityResult.Fail("部门不存在或不属于当前租户。");
+
+        var targetOrgId = organizationId ?? dept.OrganizationId;
+        if (targetOrgId != dept.OrganizationId)
+        {
+            var orgOk = await _ctx.Organizations.IgnoreQueryFilters()
+                .AnyAsync(x => x.Id == targetOrgId && x.TenantId == tenantId, ct);
+            if (!orgOk) return IdentityResult.Fail("目标组织不存在或不属于当前租户。");
+            dept.OrganizationId = targetOrgId;
+        }
+
+        if (parentId.HasValue)
+        {
+            if (parentId.Value == id) return IdentityResult.Fail("上级部门不能是自身。");
+            var parentOk = await _ctx.Departments.IgnoreQueryFilters()
+                .AnyAsync(x => x.Id == parentId.Value && x.TenantId == tenantId, ct);
+            if (!parentOk) return IdentityResult.Fail("上级部门不存在或不属于当前租户。");
+            dept.ParentId = parentId;
+        }
+
+        if (name is not null && !string.IsNullOrWhiteSpace(name)) dept.Name = name.Trim();
+        if (description is not null) dept.Description = description.Trim();
+        await _ctx.SaveChangesAsync(ct);
+        return IdentityResult.Ok(dept.Id);
+    }
+
+    public async Task<IdentityResult> SetDepartmentEnabledAsync(long tenantId, long id, bool enabled, CancellationToken ct = default)
+    {
+        var dept = await _ctx.Departments.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(x => x.Id == id && x.TenantId == tenantId, ct);
+        if (dept is null) return IdentityResult.Fail("部门不存在或不属于当前租户。");
+
+        dept.IsEnabled = enabled;
+        await _ctx.SaveChangesAsync(ct);
+        return IdentityResult.Ok(dept.Id);
+    }
+
+    public async Task<IdentityResult> DeleteDepartmentAsync(long tenantId, long id, CancellationToken ct = default)
+    {
+        var dept = await _ctx.Departments.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(x => x.Id == id && x.TenantId == tenantId, ct);
+        if (dept is null) return IdentityResult.Fail("部门不存在或不属于当前租户。");
+
+        var childCount = await _ctx.Departments.IgnoreQueryFilters()
+            .CountAsync(x => x.TenantId == tenantId && x.ParentId == id, ct);
+        if (childCount > 0) return IdentityResult.Fail($"该部门下仍有 {childCount} 个子部门，请先删除或改挂。");
+
+        var memberCount = await _ctx.UserDepartmentMembers.IgnoreQueryFilters()
+            .CountAsync(x => x.TenantId == tenantId && x.DepartmentId == id, ct);
+        if (memberCount > 0) return IdentityResult.Fail($"该部门仍有 {memberCount} 名成员，请先移出。");
+
+        _ctx.Departments.Remove(dept);
+        await _ctx.SaveChangesAsync(ct);
+        return IdentityResult.Ok(id);
+    }
+
     // ---------------- 用户组 ----------------
 
-    public async Task<IReadOnlyList<UserGroupView>> ListUserGroupsAsync(long tenantId, CancellationToken ct = default)
+    public async Task<DirectoryPage<UserGroupView>> ListUserGroupsAsync(long tenantId, int page = 0, int pageSize = 0, CancellationToken ct = default)
     {
-        var groups = await _ctx.UserGroups.IgnoreQueryFilters().AsNoTracking()
+        var query = _ctx.UserGroups.IgnoreQueryFilters().AsNoTracking()
             .Where(x => x.TenantId == tenantId)
-            .OrderBy(x => x.Code).ThenBy(x => x.Id)
-            .ToListAsync(ct);
+            .OrderBy(x => x.Code).ThenBy(x => x.Id);
+
+        var total = await query.CountAsync(ct);
+        var groups = pageSize > 0
+            ? await query.Skip(Math.Max(0, page - 1) * pageSize).Take(pageSize).ToListAsync(ct)
+            : await query.ToListAsync(ct);
 
         var groupIds = groups.Select(g => g.Id).ToList();
 
@@ -179,7 +313,7 @@ public sealed class IdentityDirectoryService : IIdentityDirectoryService
                 .Select(g => new { GroupId = g.Key, Count = g.Count() })
                 .ToListAsync(ct)).ToDictionary(x => x.GroupId, x => x.Count);
 
-        return groups.Select(g =>
+        var items = groups.Select(g =>
         {
             var codes = roleLinks
                 .Where(x => x.GroupId == g.Id && roleCodes.ContainsKey(x.RoleId))
@@ -190,6 +324,10 @@ public sealed class IdentityDirectoryService : IIdentityDirectoryService
                 g.Id, g.Code, g.Name, g.Description, g.IsEnabled, codes,
                 memberCounts.TryGetValue(g.Id, out var c) ? c : 0);
         }).ToList();
+
+        return pageSize > 0
+            ? new DirectoryPage<UserGroupView>(items, total, Math.Max(1, page), pageSize)
+            : DirectoryPage<UserGroupView>.OfAll(items);
     }
 
     public async Task<IdentityResult> CreateUserGroupAsync(long tenantId, string code, string? name, string? description, string[]? roleCodes, CancellationToken ct = default)
@@ -223,6 +361,49 @@ public sealed class IdentityDirectoryService : IIdentityDirectoryService
         }
 
         return IdentityResult.Ok(group.Id);
+    }
+
+    // ---------------- 用户组：M12 增量（重命名 / 启停 / 删除） ----------------
+
+    public async Task<IdentityResult> UpdateUserGroupAsync(long tenantId, long id, string? name, string? description, CancellationToken ct = default)
+    {
+        var group = await _ctx.UserGroups.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(x => x.Id == id && x.TenantId == tenantId, ct);
+        if (group is null) return IdentityResult.Fail("用户组不存在或不属于当前租户。");
+
+        if (name is not null && !string.IsNullOrWhiteSpace(name)) group.Name = name.Trim();
+        if (description is not null) group.Description = description.Trim();
+        await _ctx.SaveChangesAsync(ct);
+        return IdentityResult.Ok(group.Id);
+    }
+
+    public async Task<IdentityResult> SetUserGroupEnabledAsync(long tenantId, long id, bool enabled, CancellationToken ct = default)
+    {
+        var group = await _ctx.UserGroups.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(x => x.Id == id && x.TenantId == tenantId, ct);
+        if (group is null) return IdentityResult.Fail("用户组不存在或不属于当前租户。");
+
+        group.IsEnabled = enabled;
+        await _ctx.SaveChangesAsync(ct);
+        return IdentityResult.Ok(group.Id);
+    }
+
+    public async Task<IdentityResult> DeleteUserGroupAsync(long tenantId, long id, CancellationToken ct = default)
+    {
+        var group = await _ctx.UserGroups.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(x => x.Id == id && x.TenantId == tenantId, ct);
+        if (group is null) return IdentityResult.Fail("用户组不存在或不属于当前租户。");
+
+        var members = await _ctx.UserGroupMembers.IgnoreQueryFilters()
+            .Where(x => x.TenantId == tenantId && x.UserGroupId == id).ToListAsync(ct);
+        var roles = await _ctx.UserGroupRoles.IgnoreQueryFilters()
+            .Where(x => x.TenantId == tenantId && x.UserGroupId == id).ToListAsync(ct);
+
+        if (members.Count > 0) _ctx.UserGroupMembers.RemoveRange(members);
+        if (roles.Count > 0) _ctx.UserGroupRoles.RemoveRange(roles);
+        _ctx.UserGroups.Remove(group);
+        await _ctx.SaveChangesAsync(ct);
+        return IdentityResult.Ok(id);
     }
 
     public async Task<IdentityResult> SetUserGroupRolesAsync(long tenantId, long groupId, string[]? roleCodes, CancellationToken ct = default)

@@ -67,15 +67,17 @@ public sealed class IdentityDirectoryController : ControllerBase
 
 	// ---------------- 组织 ----------------
 
-	/// <summary>列举租户内组织（含部门计数）。</summary>
+	/// <summary>列举租户内组织（支持分页；pageSize &lt;= 0 表示不分页，返回全量）。</summary>
 	[HttpGet("organizations")]
 	public async Task<IActionResult> ListOrganizations(
 		[FromQuery] long tenantId = 0,
+		[FromQuery] int page = 0,
+		[FromQuery] int pageSize = 0,
 		CancellationToken cancellationToken = default)
 	{
 		if (RequireIdentityManage() is { } denied) return denied;
 		var tid = ScopeTo(tenantId);
-		return Ok(await _directory.ListOrganizationsAsync(tid, cancellationToken));
+		return Ok(await _directory.ListOrganizationsAsync(tid, page, pageSize, cancellationToken));
 	}
 
 	/// <summary>创建组织。</summary>
@@ -94,17 +96,68 @@ public sealed class IdentityDirectoryController : ControllerBase
 		return StatusCode(201, new { id = result.Id });
 	}
 
-	// ---------------- 部门 ----------------
-
-	/// <summary>列举租户内部门（含组织名与成员计数）。</summary>
-	[HttpGet("departments")]
-	public async Task<IActionResult> ListDepartments(
+	/// <summary>M12 增量：重命名 / 修改组织描述。</summary>
+	[HttpPut("organizations/{id:long}")]
+	public async Task<IActionResult> UpdateOrganization(
+		long id,
+		[FromBody] UpdateOrganizationRequest request,
 		[FromQuery] long tenantId = 0,
 		CancellationToken cancellationToken = default)
 	{
 		if (RequireIdentityManage() is { } denied) return denied;
+		if (request is null) return BadRequest(new ApiError { Code = ErrorCodes.BadRequest, Message = "请求体不能为空。" });
+
 		var tid = ScopeTo(tenantId);
-		return Ok(await _directory.ListDepartmentsAsync(tid, cancellationToken));
+		var result = await _directory.UpdateOrganizationAsync(tid, id, request.Name, request.Description, cancellationToken);
+		if (!result.Success) return BadRequest(new { errors = result.Errors });
+		return Ok(new { id });
+	}
+
+	/// <summary>M12 增量：启用 / 停用组织。</summary>
+	[HttpPut("organizations/{id:long}/enabled")]
+	public async Task<IActionResult> SetOrganizationEnabled(
+		long id,
+		[FromBody] SetEnabledRequest request,
+		[FromQuery] long tenantId = 0,
+		CancellationToken cancellationToken = default)
+	{
+		if (RequireIdentityManage() is { } denied) return denied;
+		if (request is null) return BadRequest(new ApiError { Code = ErrorCodes.BadRequest, Message = "请求体不能为空。" });
+
+		var tid = ScopeTo(tenantId);
+		var result = await _directory.SetOrganizationEnabledAsync(tid, id, request.Enabled, cancellationToken);
+		if (!result.Success) return BadRequest(new { errors = result.Errors });
+		return Ok(new { id, enabled = request.Enabled });
+	}
+
+	/// <summary>M12 增量：删除组织（其下仍有部门时拒绝）。</summary>
+	[HttpDelete("organizations/{id:long}")]
+	public async Task<IActionResult> DeleteOrganization(
+		long id,
+		[FromQuery] long tenantId = 0,
+		CancellationToken cancellationToken = default)
+	{
+		if (RequireIdentityManage() is { } denied) return denied;
+
+		var tid = ScopeTo(tenantId);
+		var result = await _directory.DeleteOrganizationAsync(tid, id, cancellationToken);
+		if (!result.Success) return BadRequest(new { errors = result.Errors });
+		return NoContent();
+	}
+
+	// ---------------- 部门 ----------------
+
+	/// <summary>列举租户内部门（支持分页；pageSize &lt;= 0 表示不分页）。</summary>
+	[HttpGet("departments")]
+	public async Task<IActionResult> ListDepartments(
+		[FromQuery] long tenantId = 0,
+		[FromQuery] int page = 0,
+		[FromQuery] int pageSize = 0,
+		CancellationToken cancellationToken = default)
+	{
+		if (RequireIdentityManage() is { } denied) return denied;
+		var tid = ScopeTo(tenantId);
+		return Ok(await _directory.ListDepartmentsAsync(tid, page, pageSize, cancellationToken));
 	}
 
 	/// <summary>创建部门（须隶属同租户组织）。</summary>
@@ -124,17 +177,69 @@ public sealed class IdentityDirectoryController : ControllerBase
 		return StatusCode(201, new { id = result.Id });
 	}
 
-	// ---------------- 用户组 ----------------
-
-	/// <summary>列举租户内用户组（含承载角色码与成员计数）。</summary>
-	[HttpGet("user-groups")]
-	public async Task<IActionResult> ListUserGroups(
+	/// <summary>M12 增量： renaming / 修改部门描述，并可改挂组织或上级部门。</summary>
+	[HttpPut("departments/{id:long}")]
+	public async Task<IActionResult> UpdateDepartment(
+		long id,
+		[FromBody] UpdateDepartmentRequest request,
 		[FromQuery] long tenantId = 0,
 		CancellationToken cancellationToken = default)
 	{
 		if (RequireIdentityManage() is { } denied) return denied;
+		if (request is null) return BadRequest(new ApiError { Code = ErrorCodes.BadRequest, Message = "请求体不能为空。" });
+
 		var tid = ScopeTo(tenantId);
-		return Ok(await _directory.ListUserGroupsAsync(tid, cancellationToken));
+		var result = await _directory.UpdateDepartmentAsync(
+			tid, id, request.Name, request.Description, request.OrganizationId, request.ParentId, cancellationToken);
+		if (!result.Success) return BadRequest(new { errors = result.Errors });
+		return Ok(new { id });
+	}
+
+	/// <summary>M12 增量：启用 / 停用部门。</summary>
+	[HttpPut("departments/{id:long}/enabled")]
+	public async Task<IActionResult> SetDepartmentEnabled(
+		long id,
+		[FromBody] SetEnabledRequest request,
+		[FromQuery] long tenantId = 0,
+		CancellationToken cancellationToken = default)
+	{
+		if (RequireIdentityManage() is { } denied) return denied;
+		if (request is null) return BadRequest(new ApiError { Code = ErrorCodes.BadRequest, Message = "请求体不能为空。" });
+
+		var tid = ScopeTo(tenantId);
+		var result = await _directory.SetDepartmentEnabledAsync(tid, id, request.Enabled, cancellationToken);
+		if (!result.Success) return BadRequest(new { errors = result.Errors });
+		return Ok(new { id, enabled = request.Enabled });
+	}
+
+	/// <summary>M12 增量：删除部门（仍有成员或子部门时拒绝）。</summary>
+	[HttpDelete("departments/{id:long}")]
+	public async Task<IActionResult> DeleteDepartment(
+		long id,
+		[FromQuery] long tenantId = 0,
+		CancellationToken cancellationToken = default)
+	{
+		if (RequireIdentityManage() is { } denied) return denied;
+
+		var tid = ScopeTo(tenantId);
+		var result = await _directory.DeleteDepartmentAsync(tid, id, cancellationToken);
+		if (!result.Success) return BadRequest(new { errors = result.Errors });
+		return NoContent();
+	}
+
+	// ---------------- 用户组 ----------------
+
+	/// <summary>列举租户内用户组（支持分页；pageSize &lt;= 0 表示不分页）。</summary>
+	[HttpGet("user-groups")]
+	public async Task<IActionResult> ListUserGroups(
+		[FromQuery] long tenantId = 0,
+		[FromQuery] int page = 0,
+		[FromQuery] int pageSize = 0,
+		CancellationToken cancellationToken = default)
+	{
+		if (RequireIdentityManage() is { } denied) return denied;
+		var tid = ScopeTo(tenantId);
+		return Ok(await _directory.ListUserGroupsAsync(tid, page, pageSize, cancellationToken));
 	}
 
 	/// <summary>创建用户组，可同时承载角色（角色可为全局）。</summary>
@@ -152,6 +257,55 @@ public sealed class IdentityDirectoryController : ControllerBase
 			tid, request.Code, request.Name, request.Description, request.RoleCodes, cancellationToken);
 		if (!result.Success) return BadRequest(new { errors = result.Errors });
 		return StatusCode(201, new { id = result.Id });
+	}
+
+	/// <summary>M12 增量：重命名 / 修改用户组描述。</summary>
+	[HttpPut("user-groups/{id:long}")]
+	public async Task<IActionResult> UpdateUserGroup(
+		long id,
+		[FromBody] UpdateUserGroupRequest request,
+		[FromQuery] long tenantId = 0,
+		CancellationToken cancellationToken = default)
+	{
+		if (RequireIdentityManage() is { } denied) return denied;
+		if (request is null) return BadRequest(new ApiError { Code = ErrorCodes.BadRequest, Message = "请求体不能为空。" });
+
+		var tid = ScopeTo(tenantId);
+		var result = await _directory.UpdateUserGroupAsync(tid, id, request.Name, request.Description, cancellationToken);
+		if (!result.Success) return BadRequest(new { errors = result.Errors });
+		return Ok(new { id });
+	}
+
+	/// <summary>M12 增量：启用 / 停用用户组（停用后其承载角色不再计入成员有效权限）。</summary>
+	[HttpPut("user-groups/{id:long}/enabled")]
+	public async Task<IActionResult> SetUserGroupEnabled(
+		long id,
+		[FromBody] SetEnabledRequest request,
+		[FromQuery] long tenantId = 0,
+		CancellationToken cancellationToken = default)
+	{
+		if (RequireIdentityManage() is { } denied) return denied;
+		if (request is null) return BadRequest(new ApiError { Code = ErrorCodes.BadRequest, Message = "请求体不能为空。" });
+
+		var tid = ScopeTo(tenantId);
+		var result = await _directory.SetUserGroupEnabledAsync(tid, id, request.Enabled, cancellationToken);
+		if (!result.Success) return BadRequest(new { errors = result.Errors });
+		return Ok(new { id, enabled = request.Enabled });
+	}
+
+	/// <summary>M12 增量：删除用户组（级联清理成员与角色关联）。</summary>
+	[HttpDelete("user-groups/{id:long}")]
+	public async Task<IActionResult> DeleteUserGroup(
+		long id,
+		[FromQuery] long tenantId = 0,
+		CancellationToken cancellationToken = default)
+	{
+		if (RequireIdentityManage() is { } denied) return denied;
+
+		var tid = ScopeTo(tenantId);
+		var result = await _directory.DeleteUserGroupAsync(tid, id, cancellationToken);
+		if (!result.Success) return BadRequest(new { errors = result.Errors });
+		return NoContent();
 	}
 
 	/// <summary>全量替换用户组承载的角色集（RBAC 关联）。</summary>
@@ -244,5 +398,18 @@ public sealed class IdentityDirectoryController : ControllerBase
 
 	/// <summary>设置用户部门归属请求体。</summary>
 	public sealed record SetUserDepartmentRequest(long? DepartmentId);
+
+	/// <summary>M12 增量：重命名 / 修改组织描述请求体（编码不可变）。</summary>
+	public sealed record UpdateOrganizationRequest(string? Name = null, string? Description = null);
+
+	/// <summary>M12 增量：重命名 / 修改部门描述请求体（可改挂组织与上级部门）。</summary>
+	public sealed record UpdateDepartmentRequest(
+		string? Name = null, string? Description = null, long? OrganizationId = null, long? ParentId = null);
+
+	/// <summary>M12 增量：重命名 / 修改用户组描述请求体。</summary>
+	public sealed record UpdateUserGroupRequest(string? Name = null, string? Description = null);
+
+	/// <summary>M12 增量：启用 / 停用请求体。</summary>
+	public sealed record SetEnabledRequest(bool Enabled);
 	#endregion
 }
