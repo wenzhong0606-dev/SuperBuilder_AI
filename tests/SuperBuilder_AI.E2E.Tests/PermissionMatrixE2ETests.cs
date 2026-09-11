@@ -63,9 +63,9 @@ public sealed class PermissionMatrixE2ETests
     [MemberData(nameof(AdminVisibleRoutes))]
     public async Task Admin_Sees_GuardedAction(string route, string button)
     {
-        E2EConfig.Require(_fx.BaseUrl, E2EConfig.User, E2EConfig.Password, E2EConfig.Tenant);
+        E2EConfig.Require(_fx.BaseUrl, E2EConfig.User, E2EConfig.Password);
         var page = await _fx.NewPageAsync();
-        await LoginHelper.ApiLoginAsync(page, E2EConfig.User!, E2EConfig.Password!, long.Parse(E2EConfig.Tenant!));
+        await LoginHelper.ApiLoginByCodeAsync(page, E2EConfig.User!, E2EConfig.Password!, "e2eapp");
 
         await page.GotoAsync(route);
         // 部分页面（如 /themes 的 ThemeEditor）将其受保护主操作按钮整体置于异步加载态（_loading）之后：
@@ -84,9 +84,9 @@ public sealed class PermissionMatrixE2ETests
     [MemberData(nameof(ReaderHiddenRoutes))]
     public async Task Reader_Hides_GuardedAction(string route, string button)
     {
-        E2EConfig.Require(_fx.BaseUrl, E2EConfig.ReaderUser, E2EConfig.ReaderPassword, E2EConfig.ReaderTenant);
+        E2EConfig.Require(_fx.BaseUrl, E2EConfig.ReaderUser, E2EConfig.ReaderPassword);
         var page = await _fx.NewPageAsync();
-        await LoginHelper.ApiLoginAsync(page, E2EConfig.ReaderUser!, E2EConfig.ReaderPassword!, long.Parse(E2EConfig.ReaderTenant!));
+        await LoginHelper.ApiLoginByCodeAsync(page, E2EConfig.ReaderUser!, E2EConfig.ReaderPassword!, "e2eapp");
 
         await page.GotoAsync(route);
         await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
@@ -100,9 +100,9 @@ public sealed class PermissionMatrixE2ETests
     [SkippableFact]
     public async Task Reader_Agent_RunButton_Hidden()
     {
-        E2EConfig.Require(_fx.BaseUrl, E2EConfig.ReaderUser, E2EConfig.ReaderPassword, E2EConfig.ReaderTenant);
+        E2EConfig.Require(_fx.BaseUrl, E2EConfig.ReaderUser, E2EConfig.ReaderPassword);
         var page = await _fx.NewPageAsync();
-        await LoginHelper.ApiLoginAsync(page, E2EConfig.ReaderUser!, E2EConfig.ReaderPassword!, long.Parse(E2EConfig.ReaderTenant!));
+        await LoginHelper.ApiLoginByCodeAsync(page, E2EConfig.ReaderUser!, E2EConfig.ReaderPassword!, "e2eapp");
 
         await page.GotoAsync("/agent");
         await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
@@ -117,9 +117,9 @@ public sealed class PermissionMatrixE2ETests
     [SkippableFact]
     public async Task Admin_Agent_RunButton_Visible_WhenAgentsExist()
     {
-        E2EConfig.Require(_fx.BaseUrl, E2EConfig.User, E2EConfig.Password, E2EConfig.Tenant);
+        E2EConfig.Require(_fx.BaseUrl, E2EConfig.User, E2EConfig.Password);
         var page = await _fx.NewPageAsync();
-        await LoginHelper.ApiLoginAsync(page, E2EConfig.User!, E2EConfig.Password!, long.Parse(E2EConfig.Tenant!));
+        await LoginHelper.ApiLoginByCodeAsync(page, E2EConfig.User!, E2EConfig.Password!, "e2eapp");
 
         await page.GotoAsync("/agent");
         await page.WaitForLoadStateAsync(LoadState.NetworkIdle);

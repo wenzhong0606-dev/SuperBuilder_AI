@@ -95,4 +95,27 @@ internal static class LoginHelper
         await page.EvaluateAsync("snap => localStorage.setItem('sb_auth_v1', snap)", json);
         await page.GotoAsync("/ask");
     }
+
+    /// <summary>
+    /// 经租户编码登录：先以匿名 <c>GET /api/auth/tenant-by-code?code=</c> 解析数字租户 id，
+    /// 再复用 <see cref="ApiLoginAsync"/>。避免依赖具体数字 id（e2e 种子租户 id 随库自增），
+    /// 仅锚定恒定编码 <c>e2eapp</c>（与 <c>E2ESandboxSeedService.E2ETenantCode</c> 一致）。
+    /// <para>跨域 fetch 在 Development 下被 <c>P11Cors</c> 放行（同 <see cref="ApiLoginAsync"/> 的登录 fetch）。</para>
+    /// </summary>
+    public static async Task ApiLoginByCodeAsync(IPage page, string user, string password, string tenantCode)
+    {
+        await page.GotoAsync("/");
+        var apiBase = E2EConfig.ApiUrl.TrimEnd('/');
+        var codeJson = await page.EvaluateAsync<string>(
+            "async (c) => {" +
+            "  const r = await fetch(c.apiBase + '/api/auth/tenant-by-code?code=' + encodeURIComponent(c.code));" +
+            "  const t = await r.text();" +
+            "  if (!r.ok) throw new Error('tenant-by-code ' + r.status + ' ' + t);" +
+            "  return t;" +
+            "}",
+            new { apiBase, code = tenantCode });
+        using var doc = JsonDocument.Parse(codeJson);
+        var id = doc.RootElement.GetProperty("Id").GetInt64();
+        await ApiLoginAsync(page, user, password, id);
+    }
 }

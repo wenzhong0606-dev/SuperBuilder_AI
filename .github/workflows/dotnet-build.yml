@@ -240,6 +240,8 @@ jobs:
           Qdrant__Host: 127.0.0.1
           Qdrant__Port: 6334
           ASPNETCORE_URLS: http://127.0.0.1:5050
+          # M12-P0：触发 API 启动序列中的 E2E 沙箱种子（创建 e2eapp 租户 + e2eadmin/e2ereader 账号）。
+          E2E_SEED: "true"
         run: |
           dotnet run --project SuperBuilder_AI/SuperBuilder_AI.csproj --configuration Release --no-restore --no-build --urls http://127.0.0.1:5050 > /tmp/sb-api.log 2>&1 &
           echo $! > /tmp/sb-api.pid
@@ -265,17 +267,17 @@ jobs:
         run: |
           dotnet tool install --global Microsoft.Playwright.CLI
           playwright install --with-deps chromium
-      - name: 运行 E2E 测试
+      - name: 运行 E2E 测试（M12-P0 权限矩阵）
         env:
+          # 账号由 API 的 E2E_SEED 种子创建，凭据与 E2ESandboxSeedService 硬编码一致；
+          # 租户 id 由测试经 tenant-by-code 按编码 e2eapp 解析，故无需 SB_E2E_TENANT。
           SB_E2E_BASE_URL: http://127.0.0.1:5080
           SB_E2E_API_URL: http://127.0.0.1:5050
-          SB_E2E_USER: ${{ secrets.SB_E2E_USER }}
-          SB_E2E_PASSWORD: ${{ secrets.SB_E2E_PASSWORD }}
-          SB_E2E_TENANT: ${{ secrets.SB_E2E_TENANT }}
-          SB_E2E_READER_USER: ${{ secrets.SB_E2E_READER_USER }}
-          SB_E2E_READER_PASSWORD: ${{ secrets.SB_E2E_READER_PASSWORD }}
-          SB_E2E_READER_TENANT: ${{ secrets.SB_E2E_READER_TENANT }}
-        run: dotnet test tests/SuperBuilder_AI.E2E.Tests/SuperBuilder_AI.E2E.Tests.csproj --configuration Release --no-build
+          SB_E2E_USER: e2eadmin
+          SB_E2E_PASSWORD: longping00
+          SB_E2E_READER_USER: e2ereader
+          SB_E2E_READER_PASSWORD: longping00
+        run: dotnet test tests/SuperBuilder_AI.E2E.Tests/SuperBuilder_AI.E2E.Tests.csproj --configuration Release --no-build --filter "FullyQualifiedName~PermissionMatrixE2ETests"
       - name: 上传视觉基线产物
         if: always()
         uses: actions/upload-artifact@v4

@@ -418,6 +418,8 @@ builder.Services.AddScoped<IUserLanguagePreferenceService, UserLanguagePreferenc
 // M3-01：租户界面语言关系服务（替代 localization JSON，约束在事务内强制）
 builder.Services.AddScoped<ITenantLanguageService, TenantLanguageService>();
 builder.Services.AddScoped<IPlatformLanguageService, PlatformLanguageService>();
+// M12-P0：E2E 沙箱种子服务（env-gated，仅 E2E_SEED=true 时由启动序列调用，创建 e2eapp 租户/账号供权限矩阵 E2E 验证）。
+builder.Services.AddScoped<IE2ESandboxSeedService, E2ESandboxSeedService>();
 // M0-08：限流阈值（绑定配置节 "RateLimit"，缺省使用安全默认值）
 builder.Services.Configure<RateLimitOptions>(builder.Configuration.GetSection("RateLimit"));
 // RL-1/RL-2：限流存储。
@@ -577,6 +579,26 @@ using (var startupScope = app.Services.CreateScope())
             diagnostics.State = BootstrapState.SeedIncomplete;
             diagnostics.Reason = $"平台管理员引导失败：{seedEx.Message}";
             logger.LogError(seedEx, "Platform bootstrap failed.");
+        }
+
+        // 步骤 6：E2E 沙箱种子（env-gated，仅 E2E_SEED=true）。
+        // 在全新 CI 库创建隔离租户 e2eapp + e2eadmin(tenant-admin)/e2ereader(viewer)，
+        // 使权限矩阵 E2E 能在真实账号上验证按钮级守卫。幂等；生产默认不触发。
+        if (Environment.GetEnvironmentVariable("E2E_SEED") == "true")
+        {
+            try
+            {
+                var e2eSeed = startupScope.ServiceProvider.GetRequiredService<IE2ESandboxSeedService>();
+                await e2eSeed.SeedAsync();
+                diagnostics.MarkStep("E2ESandbox");
+                logger.LogInformation("E2E sandbox tenant seeded (E2E_SEED=true).");
+            }
+            catch (Exception seedEx)
+            {
+                diagnostics.State = BootstrapState.SeedIncomplete;
+                diagnostics.Reason = $"E2E 沙箱种子失败：{seedEx.Message}";
+                logger.LogError(seedEx, "E2E sandbox seed failed.");
+            }
         }
     }
 }
