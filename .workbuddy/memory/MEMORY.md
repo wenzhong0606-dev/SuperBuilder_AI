@@ -21,7 +21,7 @@
 - **CI 实跑根因已定位（run 34566854796：17 总数 / 5 通过 / 12 失败）**：
   1. **登录 429（主因，12 例全因此）**：默认 `LoginLimit=10`/`GlobalLimit=120`（见 `RateLimitOptions.cs`）在 CI 无 `appsettings.Local.json` 时生效；所有 E2E 登录同源自 `127.0.0.1`+相同 UA → 共用一个限流桶（键 `ip:127.0.0.1:<uahash>`），矩阵 ~19 次登录瞬间触顶 → 后续用例 `SB_TOO_MANY_REQUESTS` 429。已于 `.github/workflows/dotnet-build.yml` 的「启动 Web API」步骤注入 `RateLimit__LoginLimit=500`/`RateLimit__GlobalLimit=1000`（与 Local 配置等价，仅 CI）。
   2. **`ThemeEditor` 调色板 `KeyNotFoundException 'primary'`（次因，admin `/themes` 必崩）**：`_tokens` 初值为空字典，仅 `InitTokensFromNode` 填充；而 `OnAfterRenderAsync(firstRender)` 在会话自举前触发 → `api/themes/editor/blueprint` 以 `authTenant=0` 匿名发出 → 401 → `GetJsonAsync` 抛异常被 catch → `_tokens` 仍空 → 调色板 `_tokens[key]` 抛 `KeyNotFoundException`。已修：`_tokens` 防御性初始化为 `TokenOrder.ToDictionary(k=>k,"")`；并仿 `AppPreview`/`AppRun` 在 `OnInitialized` 订阅 `State.SessionRestoredChanged`、`OnAfterRenderAsync` 仅在 `State.SessionRestored` 后取数。Components 工程 `--no-restore` 编译 0 错通过。
-  - 修复后预期：16 通过 / 1 跳过（无智能体种子，`Admin_Agent_RunButton_Visible_WhenAgentsExist` 诚实跳过）/ 0 失败。
+  - **CI 已实跑确认（run 34568568564 / commit 86a2245）：16 通过 / 1 跳过（无智能体种子，`Admin_Agent_RunButton_Visible_WhenAgentsExist` 诚实跳过）/ 0 失败，全绿 ✅**。M12-P0 验收闭合。
 - Golden 契约 `Evaluation/Golden/query-plan-golden-v1.json` 18/18，禁止删改绕过。
 
 ## 里程碑真实状态（2026-09-11，已回查源码/git）
