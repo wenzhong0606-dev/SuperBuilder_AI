@@ -108,8 +108,13 @@ public sealed class LocalizationService
     {
         if (!AvailableCultures.Contains(culture, StringComparer.OrdinalIgnoreCase)) return;
         CurrentCulture = culture;
+        // 先持久化到 localStorage：必须与 ThemeService/AuthStore 一致，作为首个 await 发起 JS 互操作。
+        // Blazor Server 中若先 await 其他任务（如 LoadRuntimeTextsAsync 的 HTTP 往返）再调 IJSRuntime，
+        // 续体在电路同步上下文上派发 JS 调用会触发 TaskCanceledException，导致语言偏好丢失（刷新即还原）。
+        try { await _js.InvokeVoidAsync("localStorage.setItem", $"sb_culture_{tenantId}_{userId}", culture); }
+        catch { /* 预渲染/JS 不可用时静默降级 */ }
+        // 再加载新文化的运行时译文（失败不影响已切换与已持久化）
         await LoadRuntimeTextsAsync();
-        try { await _js.InvokeVoidAsync("localStorage.setItem", $"sb_culture_{tenantId}_{userId}", culture); } catch { }
         // M3-G0：已登录时同步持久化到服务端，跨设备/清缓存可恢复。
         if (userId > 0) { try { await _api.SetUserLanguageAsync(culture); } catch { } }
         Changed?.Invoke();

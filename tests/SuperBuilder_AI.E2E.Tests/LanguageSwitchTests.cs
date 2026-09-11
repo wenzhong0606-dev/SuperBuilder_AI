@@ -22,8 +22,12 @@ public sealed class LanguageSwitchTests
         await LoginHelper.LoginAsync(page, _fx, E2EConfig.User!, E2EConfig.Password!, E2EConfig.Tenant!);
         await page.SelectOptionAsync("[data-testid=language-switcher]", new[] { E2EConfig.SwitchCulture });
 
-        var stored = await page.EvaluateAsync<string?>(
-            "() => { var ks = Object.keys(localStorage).filter(k => k.startsWith('sb_culture_')); return ks.length ? localStorage.getItem(ks[0]) : null; }");
+        // 等待语言偏好异步持久化到 localStorage（SetCultureAsync 经 JS 互操作写入，存在少量轮询延迟）
+        var storedHandle = await page.WaitForFunctionAsync(
+            "() => { var ks = Object.keys(localStorage).filter(k => k.startsWith('sb_culture_')); return ks.length ? localStorage.getItem(ks[0]) : null; }",
+            null,
+            new() { Timeout = 15000, PollingInterval = 100 });
+        var stored = await storedHandle.JsonValueAsync<string?>();
         Assert.Equal(E2EConfig.SwitchCulture, stored);
     }
 }
