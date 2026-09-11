@@ -30,7 +30,9 @@
 
         <RowActions>
             <button class="btn btn-sm btn-outline-secondary" @onclick="() => Open(context)">@L10n.T(Keys.Content.AgentRowDetail, "详情")</button>
-            <button class="btn btn-sm btn-outline-secondary" @onclick="() => Run(context)">@L10n.T(Keys.Content.AgentRowRun, "运行")</button>
+            <PermissionGuard Require="@(new[] { PermissionCodes.AgentManage })" Silent>
+                <button class="btn btn-sm btn-outline-secondary" @onclick="() => Run(context)">@L10n.T(Keys.Content.AgentRowRun, "运行")</button>
+            </PermissionGuard>
             <PermissionGuard Require="@(new[] { PermissionCodes.AgentDelete })" Silent>
                 <button class="btn btn-sm btn-outline-danger" @onclick="() => AskDelete(context)">@L10n.T(Keys.Content.AgentRowDelete, "删除")</button>
             </PermissionGuard>
