@@ -247,6 +247,12 @@ public static class ResourceKeys
         public const string BusinessModelDetail = "Content.BusinessModelDetail";
         public const string BusinessModelEditorNotReady = "Content.BusinessModelEditorNotReady";
 
+        // BusinessModel 关系图（M12-15）
+        public const string BusinessModelGraphTitle = "Content.BusinessModelGraphTitle";
+        public const string BusinessModelGraphEmpty = "Content.BusinessModelGraphEmpty";
+        public const string BusinessModelGraphNoRelationships = "Content.BusinessModelGraphNoRelationships";
+        public const string BusinessModelGraphClickHint = "Content.BusinessModelGraphClickHint";
+
         // BusinessModelEntityDetail（实体详情）
         public const string BusinessModelEntityLoading = "Content.BusinessModelEntityLoading";
         public const string BusinessModelEntityPanelDetail = "Content.BusinessModelEntityPanelDetail";
@@ -1817,6 +1823,11 @@ public static class ResourceKeys
         [Content.BusinessModelNoMatch] = new("Content", Page: "BusinessModel", DefaultValue: "No matching entities"),
         [Content.BusinessModelDetail] = new("Content", Page: "BusinessModel", DefaultValue: "Details"),
         [Content.BusinessModelEditorNotReady] = new("Content", Page: "BusinessModel", DefaultValue: "The entity editor will be wired in stage S2."),
+
+        [Content.BusinessModelGraphTitle] = new("Content", Page: "BusinessModel", DefaultValue: "Relationship Graph"),
+        [Content.BusinessModelGraphEmpty] = new("Content", Page: "BusinessModel", DefaultValue: "No entities yet. Create one in the Entities tab first."),
+        [Content.BusinessModelGraphNoRelationships] = new("Content", Page: "BusinessModel", DefaultValue: "No relationships are defined between entities yet; relationship editing will open in a later milestone."),
+        [Content.BusinessModelGraphClickHint] = new("Content", Page: "BusinessModel", DefaultValue: "Click any entity to view its details."),
 
         [Content.BusinessModelEntityLoading] = new("Content", Page: "BusinessModelEntityDetail", DefaultValue: "Loading entity details…"),
         [Content.BusinessModelEntityPanelDetail] = new("Content", Page: "BusinessModelEntityDetail", DefaultValue: "Details"),

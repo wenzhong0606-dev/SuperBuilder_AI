@@ -1240,3 +1240,14 @@ button.mini { padding: 4px 10px; font-size: 12px; border-radius: var(--sb-radius
 .sb-dz-source textarea{width:100%;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;line-height:1.5}
 .sb-dz-meta{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--sb-muted);margin-bottom:12px}
 @media(max-width:1100px){.sb-dz-layout{grid-template-columns:1fr}.sb-dz-panel-body{max-height:none}}
+
+/* ---- M12-15 语义模型关系图 ---- */
+.sb-graph-wrap{padding:4px}
+.sb-graph-hint{font-size:12px;color:var(--sb-muted);margin:2px 0 10px}
+.sb-graph-scroll{overflow:auto;border:1px solid var(--sb-border);border-radius:var(--sb-radius);background:var(--sb-surface-2)}
+.sb-graph-svg{display:block;max-width:100%}
+.sb-graph-node{cursor:pointer}
+.sb-graph-node-rect{fill:var(--sb-surface);stroke:var(--sb-border);stroke-width:1.2;transition:stroke .12s,fill .12s}
+.sb-graph-node:hover .sb-graph-node-rect{stroke:var(--sb-primary);fill:color-mix(in srgb,var(--sb-primary) 10%,var(--sb-surface))}
+.sb-graph-node-label{fill:var(--sb-text);font-size:12px;font-weight:600;pointer-events:none}
+.sb-graph-note{margin-top:10px;font-size:12px;color:var(--sb-muted)}

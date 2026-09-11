@@ -17,4 +17,7 @@ public interface IBusinessEntityRepository
     Task<BusinessEntityDimension?> GetDimensionAsync(long tenantId, long domainId, string name, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<BusinessEntityDimension>> ListDimensionsAsync(long tenantId, long domainId, CancellationToken cancellationToken = default);
     Task UpsertDimensionAsync(BusinessEntityDimension dimension, CancellationToken cancellationToken = default);
+
+    /// <summary>M12-15：按租户列举业务实体之间的语义关系（Source/Target 实体均须属于该租户），用于关系图。</summary>
+    Task<IReadOnlyList<BusinessEntityRelationship>> ListRelationshipsAsync(long tenantId, CancellationToken cancellationToken = default);
 }

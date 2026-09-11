@@ -28,4 +28,9 @@ public sealed class BusinessEntityRegistryService(
         long id,
         CancellationToken cancellationToken = default) =>
         await entities.GetAsync(tenantId, id, cancellationToken);
+
+    public async Task<IReadOnlyList<BusinessEntityRelationship>> ListRelationshipsAsync(
+        long tenantId,
+        CancellationToken cancellationToken = default) =>
+        await repository.ListRelationshipsAsync(tenantId, cancellationToken);
 }

@@ -301,6 +301,10 @@ public sealed class LocalizationSeedService : ILocalizationSeedService
         ["Content.BusinessModelNoMatch"] = "无匹配实体",
         ["Content.BusinessModelDetail"] = "详情",
         ["Content.BusinessModelEditorNotReady"] = "实体编辑器将在 S2 阶段接入。",
+        ["Content.BusinessModelGraphTitle"] = "关系图",
+        ["Content.BusinessModelGraphEmpty"] = "暂无实体，请先在「实体」中新建。",
+        ["Content.BusinessModelGraphNoRelationships"] = "当前实体之间尚未定义关系；关系编辑将随后续里程碑开放。",
+        ["Content.BusinessModelGraphClickHint"] = "点击任意实体查看详情。",
 
         ["Content.BusinessModelEntityLoading"] = "正在加载实体详情…",
         ["Content.BusinessModelEntityPanelDetail"] = "详情",

@@ -8,6 +8,7 @@ using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using SuperBuilder_AI.Controllers;
 using SuperBuilder_AI.Data;
+using SuperBuilder_AI.Infrastructure.Persistence;
 using SuperBuilder_AI.Interfaces.BI.Entity;
 using SuperBuilder_AI.Models.BI.Entity;
 using SuperBuilder_AI.Models.Organization;
@@ -38,6 +39,8 @@ public class BusinessModelControllerTests
 			=> Task.FromResult<IReadOnlyList<BusinessDomain>>(new List<BusinessDomain>());
 		public Task<BusinessEntity?> GetAsync(long tenantId, long id, CancellationToken ct = default)
 			=> Task.FromResult(_store.TryGetValue(id, out var e) && e.TenantId == tenantId ? e : null);
+		public Task<IReadOnlyList<BusinessEntityRelationship>> ListRelationshipsAsync(long tenantId, CancellationToken ct = default)
+			=> Task.FromResult<IReadOnlyList<BusinessEntityRelationship>>(new List<BusinessEntityRelationship>());
 	}
 
 	private sealed class FakeMapper : IBusinessSemanticMappingService
@@ -129,6 +132,70 @@ public class BusinessModelControllerTests
 		var result = await controller.GetEntity(1, 7, CancellationToken.None);
 		var objectResult = Assert.IsType<ObjectResult>(result);
 		Assert.Equal(403, objectResult.StatusCode);
+	}
+
+	#endregion
+
+	#region M12-15 关系端点契约
+
+	private static BusinessModelController BuildWithRealRegistry(SuperBIContext db, ClaimsPrincipal user)
+	{
+		var registry = new BusinessEntityRegistryService(new BusinessEntityService(db), new BusinessEntityRepository(db));
+		var controller = new BusinessModelController(registry, new FakeMapper(), new FakeEntityService());
+		controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext { User = user } };
+		return controller;
+	}
+
+	[Fact]
+	public async Task ListRelationships_Returns_403_WhenCrossTenant()
+	{
+		var registry = new FakeRegistry();
+		var controller = Build(registry, AsTenant(Tenant5));
+
+		var result = await controller.ListRelationships(7, CancellationToken.None);
+		var obj = Assert.IsType<ObjectResult>(result);
+		Assert.Equal(403, obj.StatusCode);
+	}
+
+	[Fact]
+	public async Task ListRelationships_Returns_200_AndRelationships_WhenOwned()
+	{
+		var db = CreateDb(out var connection);
+		await SeedTenant(db, Tenant5);
+		var entities = new BusinessEntityService(db);
+		var e1 = await entities.CreateAsync(new BusinessEntity { TenantId = Tenant5, BusinessKey = "bk_a", Name = "实体A" }, CancellationToken.None);
+		var e2 = await entities.CreateAsync(new BusinessEntity { TenantId = Tenant5, BusinessKey = "bk_b", Name = "实体B" }, CancellationToken.None);
+
+		db.BusinessEntityRelationships.Add(new BusinessEntityRelationship
+		{
+			SourceEntityId = e1.Id,
+			TargetEntityId = e2.Id,
+			Name = "rel_ab",
+			RelationshipType = "one-to-many",
+		});
+		await db.SaveChangesAsync();
+
+		var controller = BuildWithRealRegistry(NewContext(connection), AsTenant(Tenant5));
+		var result = await controller.ListRelationships(Tenant5, CancellationToken.None) as OkObjectResult;
+		Assert.NotNull(result);
+		var rels = Assert.IsAssignableFrom<IReadOnlyList<BusinessEntityRelationship>>(result!.Value);
+		var rel = Assert.Single(rels);
+		Assert.Equal(e1.Id, rel.SourceEntityId);
+		Assert.Equal(e2.Id, rel.TargetEntityId);
+		Assert.Equal("rel_ab", rel.Name);
+	}
+
+	[Fact]
+	public async Task ListRelationships_Returns_200_Empty_WhenNoRelationships()
+	{
+		var db = CreateDb(out _);
+		await SeedTenant(db, Tenant5);
+		var controller = BuildWithRealRegistry(db, AsTenant(Tenant5));
+
+		var result = await controller.ListRelationships(Tenant5, CancellationToken.None) as OkObjectResult;
+		Assert.NotNull(result);
+		var rels = Assert.IsAssignableFrom<IReadOnlyList<BusinessEntityRelationship>>(result!.Value);
+		Assert.Empty(rels);
 	}
 
 	#endregion

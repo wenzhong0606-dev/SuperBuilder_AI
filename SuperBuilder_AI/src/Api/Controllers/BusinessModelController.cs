@@ -42,6 +42,15 @@ public sealed class BusinessModelController : ControllerBase
 		return Ok(await _registry.ListDomainsAsync(resolution.EffectiveTenantId, cancellationToken));
 	}
 
+	/// <summary>M12-15：按租户列举业务实体之间的语义关系，供关系图渲染边。租户隔离由注册表服务保证（两端实体均须属于该租户）。</summary>
+	[HttpGet("relationships")]
+	public async Task<IActionResult> ListRelationships([FromQuery] long? tenantId, CancellationToken cancellationToken = default)
+	{
+		var resolution = TenantDataPlanePolicy.Resolve(User, tenantId);
+		if (!resolution.Authorized) return TenantMismatch();
+		return Ok(await _registry.ListRelationshipsAsync(resolution.EffectiveTenantId, cancellationToken));
+	}
+
     [HttpGet("resolve")]
     public async Task<IActionResult> Resolve(
         [FromQuery] long? tenantId,

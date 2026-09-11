@@ -128,6 +128,9 @@ public sealed class TenantDataPlanePolicyTests
 
 		public Task<BusinessEntity?> GetAsync(long tenantId, long id, CancellationToken cancellationToken = default)
 			=> Task.FromResult<BusinessEntity?>(null);
+
+		public Task<IReadOnlyList<BusinessEntityRelationship>> ListRelationshipsAsync(long tenantId, CancellationToken cancellationToken = default)
+			=> Task.FromResult<IReadOnlyList<BusinessEntityRelationship>>(Array.Empty<BusinessEntityRelationship>());
 	}
 
 	private sealed class MapperStub : IBusinessSemanticMappingService

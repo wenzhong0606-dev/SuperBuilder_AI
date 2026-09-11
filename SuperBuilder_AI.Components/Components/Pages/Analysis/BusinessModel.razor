@@ -70,6 +70,10 @@
                 </Body>
             </SbPanel>
         </SbTab>
+
+        <SbTab Title="@L10n.T(Keys.Content.BusinessModelGraphTitle, "关系图")" Badge="@_relationships.Count.ToString()">
+            <SemanticModelGraph Entities="_entities" Relationships="_relationships" />
+        </SbTab>
     </SbTabs>
 
     <SbModal Visible="@CreateVisible" VisibleChanged="v => CreateVisible = v" Title="新建实体" Size="lg">
@@ -102,6 +106,7 @@
 @code {
     private List<JsonElement> _entities = new();
     private List<JsonElement> _domains = new();
+    private List<JsonElement> _relationships = new();
     private List<string> _entityCols = new();
     private JsonElement? _entityData;
     private string _error = "";
@@ -130,11 +135,13 @@
         var tid = State.TenantId;
         var (ent, _, eErr, _) = await Api.GetJsonAsync($"api/business-model/entities?tenantId={tid}");
         var (dom, _, _, _) = await Api.GetJsonAsync($"api/business-model/domains?tenantId={tid}");
+        var (rel, _, _, _) = await Api.GetJsonAsync($"api/business-model/relationships?tenantId={tid}");
         _error = eErr ?? "";
         _entityData = ent;
         _entities = ent is { ValueKind: JsonValueKind.Array } ? ent.Value.EnumerateArray().ToList() : new();
         _entityCols = TablePresenter.InferColumns(_entityData);
         _domains = dom is { ValueKind: JsonValueKind.Array } ? dom.Value.EnumerateArray().ToList() : new();
+        _relationships = rel is { ValueKind: JsonValueKind.Array } ? rel.Value.EnumerateArray().ToList() : new();
         _loading = false;
         StateHasChanged();
     }

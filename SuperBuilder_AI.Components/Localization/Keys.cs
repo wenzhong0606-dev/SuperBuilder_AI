@@ -279,6 +279,12 @@ public static class Keys
         public const string BusinessModelDetail = "Content.BusinessModelDetail";
         public const string BusinessModelEditorNotReady = "Content.BusinessModelEditorNotReady";
 
+        // BusinessModel 关系图（M12-15）
+        public const string BusinessModelGraphTitle = "Content.BusinessModelGraphTitle";
+        public const string BusinessModelGraphEmpty = "Content.BusinessModelGraphEmpty";
+        public const string BusinessModelGraphNoRelationships = "Content.BusinessModelGraphNoRelationships";
+        public const string BusinessModelGraphClickHint = "Content.BusinessModelGraphClickHint";
+
         // BusinessModelEntityDetail（实体详情）
         public const string BusinessModelEntityLoading = "Content.BusinessModelEntityLoading";
         public const string BusinessModelEntityPanelDetail = "Content.BusinessModelEntityPanelDetail";
@@ -1835,6 +1841,11 @@ public static class Keys
         [Content.BusinessModelNoMatch] = new("无匹配实体", "No matching entities"),
         [Content.BusinessModelDetail] = new("详情", "Details"),
         [Content.BusinessModelEditorNotReady] = new("实体编辑器将在 S2 阶段接入。", "The entity editor will be wired in stage S2."),
+
+        [Content.BusinessModelGraphTitle] = new("关系图", "Relationship Graph"),
+        [Content.BusinessModelGraphEmpty] = new("暂无实体，请先在「实体」中新建。", "No entities yet. Create one in the Entities tab first."),
+        [Content.BusinessModelGraphNoRelationships] = new("当前实体之间尚未定义关系；关系编辑将随后续里程碑开放。", "No relationships are defined between entities yet; relationship editing will open in a later milestone."),
+        [Content.BusinessModelGraphClickHint] = new("点击任意实体查看详情。", "Click any entity to view its details."),
 
         [Content.BusinessModelEntityLoading] = new("正在加载实体详情…", "Loading entity details…"),
         [Content.BusinessModelEntityPanelDetail] = new("详情", "Details"),

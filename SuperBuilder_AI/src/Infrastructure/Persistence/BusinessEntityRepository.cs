@@ -93,4 +93,17 @@ public sealed class BusinessEntityRepository(SuperBIContext db) : IBusinessEntit
 
         await db.SaveChangesAsync(cancellationToken);
     }
+
+    /// <summary>M12-15：列举租户内业务实体关系。两端实体必须均属该租户，租户隔离由数据面保证。</summary>
+    public async Task<IReadOnlyList<BusinessEntityRelationship>> ListRelationshipsAsync(
+        long tenantId,
+        CancellationToken cancellationToken = default) =>
+        await db.BusinessEntityRelationships
+            .AsNoTracking()
+            .Include(x => x.SourceEntity)
+            .Include(x => x.TargetEntity)
+            .Where(x => x.SourceEntity != null && x.SourceEntity.TenantId == tenantId
+                        && x.TargetEntity != null && x.TargetEntity.TenantId == tenantId)
+            .OrderBy(x => x.Id)
+            .ToListAsync(cancellationToken);
 }

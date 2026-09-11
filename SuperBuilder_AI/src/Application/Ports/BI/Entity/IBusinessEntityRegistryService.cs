@@ -12,4 +12,5 @@ public interface IBusinessEntityRegistryService
     Task<IReadOnlyList<BusinessEntity>> ListEntitiesAsync(long tenantId, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<BusinessDomain>> ListDomainsAsync(long tenantId, CancellationToken cancellationToken = default);
     Task<BusinessEntity?> GetAsync(long tenantId, long id, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<BusinessEntityRelationship>> ListRelationshipsAsync(long tenantId, CancellationToken cancellationToken = default);
 }
