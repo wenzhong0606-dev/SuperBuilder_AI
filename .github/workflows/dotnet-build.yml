@@ -30,7 +30,7 @@ jobs:
       - name: 输出 .NET 版本
         run: dotnet --info
       - name: 恢复 NuGet 依赖
-        run: dotnet restore SuperBuilder_AI.CI.slnf
+        run: dotnet restore SuperBuilder_AI.CI.slnf -p:TargetFrameworks=net10.0
       - name: Release 编译
         run: dotnet build SuperBuilder_AI.CI.slnf --configuration Release --no-restore -p:TargetFrameworks=net10.0
       - name: 输出编译完成信息
@@ -49,7 +49,7 @@ jobs:
         with:
           dotnet-version: '10.0.x'
       - name: 恢复 Runtime NuGet 依赖
-        run: dotnet restore SuperBuilder_AI.CI.slnf
+        run: dotnet restore SuperBuilder_AI.CI.slnf -p:TargetFrameworks=net10.0
       - name: 启动 SQL Server CI 容器
         run: |
           docker run -d --name superbuilder-c13-3-sqlserver \
@@ -189,7 +189,7 @@ jobs:
         with:
           dotnet-version: '10.0.x'
       - name: 恢复 NuGet 依赖
-        run: dotnet restore SuperBuilder_AI.CI.slnf
+        run: dotnet restore SuperBuilder_AI.CI.slnf -p:TargetFrameworks=net10.0
       - name: Release 编译（含 E2E 工程）
         run: dotnet build SuperBuilder_AI.CI.slnf --configuration Release --no-restore -p:TargetFrameworks=net10.0
       - name: 加全局工具到 PATH
@@ -277,12 +277,15 @@ jobs:
           SB_E2E_PASSWORD: longping00
           SB_E2E_READER_USER: e2ereader
           SB_E2E_READER_PASSWORD: longping00
-        # 注意：不能用 --no-build。slnf 编译携带的全局 -p:TargetFrameworks=net10.0
-        # 会抑制 xunit 测试适配器（xunit.runner.visualstudio）部署目标，导致 bin 下
-        # 缺适配器 DLL、dotnet test --no-build 报“No test is available”（假绿）。
-        # 改为由 dotnet test 自行以标准方式重建测试工程（适配器正常部署、可被发现）。
-        # 测试工程无 ProjectReference，不会触发 Components 的 android/ios workload。
-        run: dotnet test tests/SuperBuilder_AI.E2E.Tests/SuperBuilder_AI.E2E.Tests.csproj --configuration Release --no-restore --filter "FullyQualifiedName~PermissionMatrixE2ETests" --logger "console;verbosity=normal"
+        # 关键：测试工程必须“自带完整 restore+build”而非复用 slnf 的 --no-restore。
+        # slnf 的 restore/build 携带全局 -p:TargetFrameworks=net10.0（规避 Components 的
+        # android/ios workload），会使该全局属性传入测试工程的 NuGet 资产关联，导致
+        # xunit.runner.visualstudio 适配器 build/*.targets 与 net10.0 错配、适配器 DLL
+        # 不进输出，dotnet test 报“No test is available”（0 用例→退出码 0→假绿）。
+        # 此处对测试工程单独 dotnet test（自带 restore+build、不加该属性）：测试工程
+        # 仅引用 NuGet 包、无 ProjectReference，不会触发 android/ios，且 xunit 适配器
+        # 正常部署、可被 VSTest 发现。
+        run: dotnet test tests/SuperBuilder_AI.E2E.Tests/SuperBuilder_AI.E2E.Tests.csproj --configuration Release --filter "FullyQualifiedName~PermissionMatrixE2ETests" --logger "console;verbosity=normal"
       - name: 上传视觉基线产物
         if: always()
         uses: actions/upload-artifact@v4
