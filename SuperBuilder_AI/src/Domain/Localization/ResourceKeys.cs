@@ -300,7 +300,6 @@ public static class ResourceKeys
         public const string DataSourcesSaveAndConnect = "Content.DataSourcesSaveAndConnect";
         public const string DataSourcesLoadFailed = "Content.DataSourcesLoadFailed";
         public const string DataSourcesConnectorSelected = "Content.DataSourcesConnectorSelected";
-        public const string DataSourcesTestSubmitted = "Content.DataSourcesTestSubmitted";
         public const string DataSourcesRequiredError = "Content.DataSourcesRequiredError";
         public const string DataSourcesSaveFailed = "Content.DataSourcesSaveFailed";
         public const string DataSourcesSavedToast = "Content.DataSourcesSavedToast";
@@ -1739,7 +1738,6 @@ public static class ResourceKeys
         [Content.DataSourcesSaveAndConnect] = new("Content", Page: "DataSources", DefaultValue: "Save & connect"),
         [Content.DataSourcesLoadFailed] = new("Content", Page: "DataSources", DefaultValue: "Failed to load data sources."),
         [Content.DataSourcesConnectorSelected] = new("Content", Page: "DataSources", DefaultValue: "Connector selected: {0}"),
-        [Content.DataSourcesTestSubmitted] = new("Content", Page: "DataSources", DefaultValue: "Connectivity test submitted (Multi-DB Connector backend planned for P12)."),
         [Content.DataSourcesRequiredError] = new("Content", Page: "DataSources", DefaultValue: "Data source name and connection string are required."),
         [Content.DataSourcesColConnStatus] = new("Content", Page: "DataSources", DefaultValue: "Connection status"),
         [Content.DataSourcesColLastScan] = new("Content", Page: "DataSources", DefaultValue: "Last scan"),

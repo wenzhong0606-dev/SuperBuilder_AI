@@ -35,7 +35,7 @@ public class DataSourcesControllerTests
 			new Claim(ClaimTypes.NameIdentifier, uid.ToString()),
 		}));
 
-	private sealed class PermissiveIdentity : IIdentityService
+	private sealed class PermissiveIdentity(bool allowed = true) : IIdentityService
 	{
 		public Task SeedAsync(CancellationToken ct = default) => Task.CompletedTask;
 		public Task<IdentityResult> CreateUserAsync(long tenantId, string username, string? displayName, string? email, string[]? roleCodes, CancellationToken ct = default) => Task.FromResult(IdentityResult.Ok(0));
@@ -44,7 +44,7 @@ public class DataSourcesControllerTests
 		public Task<IdentityResult> SetPasswordAsync(long tenantId, long userId, string password, CancellationToken ct = default) => Task.FromResult(IdentityResult.Ok(0));
 		public Task<IdentityResult> SetUserStatusAsync(long tenantId, long userId, UserStatus newStatus, CancellationToken ct = default) => Task.FromResult(IdentityResult.Ok(0));
 		public Task<IReadOnlyList<string>> GetPermissionsAsync(long tenantId, long userId, CancellationToken ct = default) => Task.FromResult<IReadOnlyList<string>>(Array.Empty<string>());
-		public Task<bool> HasPermissionAsync(long tenantId, long userId, string permissionCode, CancellationToken ct = default) => Task.FromResult(true);
+		public Task<bool> HasPermissionAsync(long tenantId, long userId, string permissionCode, CancellationToken ct = default) => Task.FromResult(allowed);
 	}
 
 	private static SuperBIContext CreateContext(out SqliteConnection connection)
@@ -258,6 +258,56 @@ public class DataSourcesControllerTests
 		// 连接失败也会被记录到数据源测试状态字段。
 		var saved = await ctx.DataSources.FirstAsync(x => x.Id == id);
 		Assert.Equal("Failed", saved.LastTestStatus);
+	}
+
+	[Theory]
+	[InlineData("MYSQL", "")]
+	[InlineData("ORACLE", "Server=localhost;")]
+	[InlineData("", "Server=localhost;")]
+	public async Task Preview_RejectsInvalidInput_WithoutPersisting(string type, string value)
+	{
+		await using var ctx = CreateContext(out var connection);
+		await using var lease = connection;
+		Assert.IsType<BadRequestObjectResult>(await Build(ctx, TenantA).TestConnectionString(new(type, value), CancellationToken.None));
+		Assert.Empty(await ctx.DataSources.ToListAsync());
+		Assert.Empty(await ctx.DataSourceAccessGrants.ToListAsync());
+	}
+
+	[Fact]
+	public async Task Preview_RejectsOversizedConnectionString()
+	{
+		await using var ctx = CreateContext(out var connection);
+		await using var lease = connection;
+		Assert.IsType<BadRequestObjectResult>(await Build(ctx, TenantA).TestConnectionString(new("MYSQL", new string('x', 2049)), CancellationToken.None));
+	}
+
+	[Theory]
+	[InlineData("MYSQL")]
+	[InlineData("SQLSERVER")]
+	[InlineData("POSTGRESQL")]
+	public async Task Preview_FailureIsSanitized_AndDoesNotPersist(string type)
+	{
+		await using var ctx = CreateContext(out var connection);
+		await using var lease = connection;
+		var result = await Build(ctx, TenantA).TestConnectionString(new(type, "UnsupportedSecretKey=never-echo-this-secret;"), CancellationToken.None);
+		Assert.Equal("Failed", ReadStatus(result));
+		var body = System.Text.Json.JsonSerializer.Serialize(Assert.IsType<OkObjectResult>(result).Value);
+		Assert.DoesNotContain("never-echo", body);
+		Assert.DoesNotContain("UnsupportedSecretKey", body);
+		Assert.Empty(await ctx.DataSources.ToListAsync());
+		Assert.Empty(await ctx.DataSourceAccessGrants.ToListAsync());
+	}
+
+	[Fact]
+	public async Task Preview_RequiresIdentityAndMetadataEdit()
+	{
+		await using var ctx = CreateContext(out var connection);
+		await using var lease = connection;
+		Assert.IsType<UnauthorizedObjectResult>(await Build(ctx, 0).TestConnectionString(new("MYSQL", "x"), CancellationToken.None));
+		var ctrl = new DataSourcesController(ctx, new PermissiveIdentity(false));
+		ctrl.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext { User = AsTenant(TenantA) } };
+		var denied = Assert.IsType<ObjectResult>(await ctrl.TestConnectionString(new("MYSQL", "x"), CancellationToken.None));
+		Assert.Equal(403, denied.StatusCode);
 	}
 
 	private static string? ReadStatus(IActionResult result)

@@ -53,6 +53,7 @@ public sealed class AuthStoreTests
 
 	private sealed class StatusApiClient(int status) : IApiClient
 	{
+		public Task<(JsonElement? Data, int Status, string? Error, string? Code)> PostJsonAsync(string relativeUrl, object? body = null, CancellationToken ct = default) => throw new NotSupportedException();
 		public Task<(JsonElement? Data, int Status, string? Error, string? Code)> GetJsonAsync(string relativeUrl, CancellationToken ct = default)
 			=> Task.FromResult<(JsonElement?, int, string?, string?)>((null, status, status == 200 ? null : "temporary", null));
 

@@ -363,6 +363,43 @@ public sealed class DataSourcesController : ControllerBase
 		}
 	}
 
+	/// <summary>保存前测试连接；不创建数据源或授权，不返回连接串或驱动异常消息。</summary>
+	[HttpPost("test-connection")]
+	public async Task<IActionResult> TestConnectionString([FromBody] TestDataSourceConnectionRequest request, CancellationToken cancellationToken)
+	{
+		var tenantId = ResolveTenantId();
+		var userId = ResolveUserId();
+		if (tenantId <= 0 || userId <= 0)
+			return Unauthorized(new ApiError { Code = ErrorCodes.Unauthorized, Message = "未授权：令牌声明缺失。" });
+		if (!await _identity.HasPermissionAsync(tenantId, userId, IdentityPermissions.MetadataEdit, cancellationToken))
+			return StatusCode(403, new ApiError { Code = ErrorCodes.Forbidden, Message = "禁止：缺少 metadata:edit 权限。" });
+
+		var dbType = (request.DbType ?? string.Empty).Trim().ToUpperInvariant();
+		var connectionString = (request.ConnectionString ?? string.Empty).Trim();
+		if (!DataSource.IsSupportedDbType(dbType) || connectionString.Length == 0 || connectionString.Length > 2048)
+			return BadRequest(new ApiError { Code = ErrorCodes.BadRequest, Message = "请提供支持的数据库类型及 1–2048 字符的连接字符串。" });
+
+		var sw = Stopwatch.StartNew();
+		try
+		{
+			using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+			timeout.CancelAfter(TimeSpan.FromSeconds(15));
+			await using var connection = CreateConnection(new DataSource { DbType = dbType, ConnectionString = connectionString });
+			await connection.OpenAsync(timeout.Token);
+			await using var command = connection.CreateCommand();
+			command.CommandText = "SELECT 1";
+			command.CommandTimeout = 15;
+			await command.ExecuteScalarAsync(timeout.Token);
+			return Ok(new { status = "Ok", elapsedMs = sw.ElapsedMilliseconds, errorCode = (string?)null });
+		}
+		catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
+		catch (Exception ex)
+		{
+			var errorCode = ex is OperationCanceledException or TimeoutException ? "Timeout" : ex.GetType().Name;
+			return Ok(new { status = "Failed", elapsedMs = sw.ElapsedMilliseconds, errorCode });
+		}
+	}
+
 	private static DbConnection CreateConnection(DataSource source)
 	{
 		return source.DbType?.ToUpperInvariant() switch
@@ -409,6 +446,7 @@ public sealed class DataSourcesController : ControllerBase
 	}
 }
 
+public sealed record TestDataSourceConnectionRequest(string? DbType, string? ConnectionString);
 public sealed record CreateDataSourceRequest(string? Name, string? DbType, string? ConnectionString);
 
 public sealed record UpdateDataSourceRequest(string? Name, string? DbType, string? ConnectionString);

@@ -332,7 +332,6 @@ public static class Keys
         public const string DataSourcesSaveAndConnect = "Content.DataSourcesSaveAndConnect";
         public const string DataSourcesLoadFailed = "Content.DataSourcesLoadFailed";
         public const string DataSourcesConnectorSelected = "Content.DataSourcesConnectorSelected";
-        public const string DataSourcesTestSubmitted = "Content.DataSourcesTestSubmitted";
         public const string DataSourcesRequiredError = "Content.DataSourcesRequiredError";
         public const string DataSourcesSaveFailed = "Content.DataSourcesSaveFailed";
         public const string DataSourcesSavedToast = "Content.DataSourcesSavedToast";
@@ -1757,7 +1756,6 @@ public static class Keys
         [Content.DataSourcesSaveAndConnect] = new("保存并接入", "Save & connect"),
         [Content.DataSourcesLoadFailed] = new("加载数据源失败。", "Failed to load data sources."),
         [Content.DataSourcesConnectorSelected] = new("已选择连接器：{0}", "Connector selected: {0}"),
-        [Content.DataSourcesTestSubmitted] = new("连通性测试已提交（Multi-DB Connector 后端计划于 P12 实现）。", "Connectivity test submitted (Multi-DB Connector backend planned for P12)."),
         [Content.DataSourcesRequiredError] = new("数据源名称和连接串必填。", "Data source name and connection string are required."),
         [Content.DataSourcesColConnStatus] = new("连接状态", "Connection status"),
         [Content.DataSourcesColLastScan] = new("最后扫描", "Last scan"),

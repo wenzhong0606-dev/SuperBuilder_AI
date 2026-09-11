@@ -335,7 +335,6 @@ public sealed class LocalizationSeedService : ILocalizationSeedService
         ["Content.DataSourcesTestConn"] = "测试连接", ["Content.DataSourcesSaveAndConnect"] = "保存并接入",
         ["Content.DataSourcesLoadFailed"] = "加载数据源失败。",
         ["Content.DataSourcesConnectorSelected"] = "已选择连接器：{0}",
-        ["Content.DataSourcesTestSubmitted"] = "连通性测试已提交（Multi-DB Connector 后端计划于 P12 实现）。",
         ["Content.DataSourcesRequiredError"] = "数据源名称和连接串必填。",
         ["Content.DataSourcesColConnStatus"] = "连接状态", ["Content.DataSourcesColLastScan"] = "最后扫描",
         ["Content.DataSourcesConnOk"] = "已连通", ["Content.DataSourcesConnFailed"] = "连接失败",

@@ -83,7 +83,7 @@
             <div class="connector-picker">
                 @foreach (var c in _connectors)
                 {
-                    <button type="button" class="connector-option @(Type == c.Name ? "is-selected" : "") @(c.Ready ? "" : "is-disabled")" disabled="@(!c.Ready)" @onclick="() => Select(c.Name)">
+                    <button type="button" class="connector-option @(Type == c.Name ? "is-selected" : "") @(c.Ready ? "" : "is-disabled")" disabled="@(!c.Ready || TestingNew || Saving)" @onclick="() => Select(c.Name)">
                         <span class="connector-logo">@c.Name.Substring(0, 1)</span><strong>@c.Name</strong><small>@ConnectorDesc(c.Name)</small>
                     </button>
                 }
@@ -93,17 +93,17 @@
                 <SbField Label="@L10n.T(Keys.Content.DataSourcesFieldType, "连接器类型")"><input value="@Type" disabled /></SbField>
             </div>
             <SbField Label="@L10n.T(Keys.Content.DataSourcesFieldConnStr, "连接串")" Full="true">
-                <input @bind="ConnStr" placeholder="@L10n.T(Keys.Content.DataSourcesFieldConnStrPlaceholder, "Server=host;Database=db;User=...;")" />
+                <input type="password" disabled="@(TestingNew || Saving)" @bind="ConnStr" placeholder="@L10n.T(Keys.Content.DataSourcesFieldConnStrPlaceholder, "Server=host;Database=db;User=...;")" />
             </SbField>
             @if (!string.IsNullOrWhiteSpace(Error)) { <div class="alert alert-danger tiny" style="margin-top:12px">@Error</div> }
         </Body>
         <Footer>
             <button class="btn btn-outline-secondary" @onclick="() => CreateVisible = false">@L10n.T(Keys.Action.Cancel, "取消")</button>
             <PermissionGuard Require="@(new[] { PermissionCodes.MetadataEdit })" Silent>
-                <button class="btn btn-outline-secondary" @onclick="TestConn">@L10n.T(Keys.Content.DataSourcesTestConn, "测试连接")</button>
+                <button class="btn btn-outline-secondary" @onclick="TestConn" disabled="@(TestingNew || Saving)">@(TestingNew ? L10n.T(Keys.Content.DataSourcesTesting, "测试中…") : L10n.T(Keys.Content.DataSourcesTestConn, "测试连接"))</button>
             </PermissionGuard>
             <PermissionGuard Require="@(new[] { PermissionCodes.MetadataEdit })" Silent>
-                <button class="btn btn-primary" @onclick="Save" disabled="@Saving">@(Saving ? L10n.T(Keys.Content.DataSourcesSaving, "正在保存…") : L10n.T(Keys.Content.DataSourcesSaveAndConnect, "保存并接入"))</button>
+                <button class="btn btn-primary" @onclick="Save" disabled="@(Saving || TestingNew)">@(Saving ? L10n.T(Keys.Content.DataSourcesSaving, "正在保存…") : L10n.T(Keys.Content.DataSourcesSaveAndConnect, "保存并接入"))</button>
             </PermissionGuard>
         </Footer>
     </SbModal>
@@ -147,6 +147,8 @@
     }
     private string Name = "", Type = "MySQL", ConnStr = "";
     private bool Saving;
+    private bool TestingNew;
+    private string DbTypeCode => Type == "SQL Server" ? "SQLSERVER" : Type.ToUpperInvariant();
     private bool CreateVisible;
     private string Error = "";
     private string Search = "";
@@ -196,7 +198,26 @@
     private void Open(JsonElement row) { if (long.TryParse(Cell(row, "id"), out var id)) Nav.NavigateTo($"data-sources/{id}"); }
 
     private void Select(string n) { Type = n; Toast.Info(string.Format(L10n.T(Keys.Content.DataSourcesConnectorSelected, "已选择连接器：{0}"), n)); }
-    private void TestConn() => Toast.Info(L10n.T(Keys.Content.DataSourcesTestSubmitted, "连通性测试已提交（Multi-DB Connector 后端计划于 P12 实现）。"));
+    private async Task TestConn()
+    {
+        if (TestingNew || Saving) return;
+        Error = "";
+        TestingNew = true;
+        try
+        {
+            var (data, _, _, _) = await Api.PostJsonAsync("api/data-sources/test-connection", new { dbType = DbTypeCode, connectionString = ConnStr });
+            if (data is { ValueKind: JsonValueKind.Object } && Cell(data.Value, "status") == "Ok")
+                Toast.Success(L10n.T(Keys.Content.DataSourcesConnOk, "已连通"));
+            else
+            {
+                Error = L10n.T(Keys.Content.DataSourcesConnFailed, "连接失败");
+                if (data is { ValueKind: JsonValueKind.Object })
+                    Error += " (" + Cell(data.Value, "errorCode") + ")";
+            }
+        }
+        catch { Error = L10n.T(Keys.Content.DataSourcesConnFailed, "连接失败"); }
+        finally { TestingNew = false; }
+    }
 
     private async Task Test(JsonElement row)
     {
@@ -253,6 +274,7 @@
     }
     private async Task Save()
     {
+        if (Saving || TestingNew) return;
         Error = "";
         if (string.IsNullOrWhiteSpace(Name) || string.IsNullOrWhiteSpace(ConnStr))
         {
@@ -263,7 +285,7 @@
         var (ok, _, err, _) = await Api.PostAsync("api/data-sources", new
         {
             name = Name,
-            dbType = Type,
+            dbType = DbTypeCode,
             connectionString = ConnStr,
         });
         Saving = false;
