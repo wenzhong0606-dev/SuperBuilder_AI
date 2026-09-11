@@ -13,4 +13,10 @@ public interface IBusinessEntityService
     Task<BusinessEntity> CreateAsync(BusinessEntity entity, CancellationToken cancellationToken = default);
     Task<BusinessEntity> UpdateAsync(BusinessEntity entity, CancellationToken cancellationToken = default);
     Task DeleteAsync(long tenantId, long id, CancellationToken cancellationToken = default);
+
+    /// <summary>M12 增量：按业务实体全量合并其指标集合（按指标 Name 匹配更新/新增/删除，保留匹配项的物理绑定）。租户隔离经实体 TenantId 保证。</summary>
+    Task UpsertMetricsAsync(long tenantId, long entityId, IReadOnlyList<BusinessEntityMetric> metrics, CancellationToken cancellationToken = default);
+
+    /// <summary>M12 增量：按业务域全量合并其维度集合（按维度 Name 匹配更新/新增/删除）。租户隔离经维度 TenantId 保证。</summary>
+    Task UpsertDimensionsAsync(long tenantId, long domainId, IReadOnlyList<BusinessEntityDimension> dimensions, CancellationToken cancellationToken = default);
 }

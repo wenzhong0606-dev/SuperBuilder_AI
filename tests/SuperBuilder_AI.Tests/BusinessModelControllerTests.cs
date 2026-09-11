@@ -67,6 +67,10 @@ public class BusinessModelControllerTests
 			=> Task.FromResult(entity);
 		public Task DeleteAsync(long tenantId, long id, CancellationToken ct = default)
 			=> Task.CompletedTask;
+		public Task UpsertMetricsAsync(long tenantId, long entityId, IReadOnlyList<BusinessEntityMetric> metrics, CancellationToken ct = default)
+			=> Task.CompletedTask;
+		public Task UpsertDimensionsAsync(long tenantId, long domainId, IReadOnlyList<BusinessEntityDimension> dimensions, CancellationToken ct = default)
+			=> Task.CompletedTask;
 	}
 
 	private static BusinessModelController Build(FakeRegistry registry, ClaimsPrincipal user)
@@ -98,7 +102,7 @@ public class BusinessModelControllerTests
 
 	private static async Task SeedTenant(SuperBIContext db, long tid)
 	{
-		db.Tenants.Add(new Tenant { Id = tid });
+		db.Tenants.Add(new Tenant { Id = tid, TenantCode = "t" + tid, TenantName = "Tenant " + tid });
 		await db.SaveChangesAsync();
 	}
 
@@ -444,6 +448,90 @@ public class BusinessModelControllerTests
 		var result = await controller.UpdateEntity(1, new BusinessEntityUpsertRequest { BusinessKey = "bk", Name = "x" }, 7, CancellationToken.None);
 		var obj = Assert.IsType<ObjectResult>(result);
 		Assert.Equal(403, obj.StatusCode);
+	}
+
+	#endregion
+
+	#region M12 增量：指标 / 维度编辑端点（真实持久化）
+
+	[Fact]
+	public async Task UpsertMetrics_Returns_204_AndPersists()
+	{
+		using var db = CreateDb(out _);
+		await SeedTenant(db, Tenant5);
+		var entity = new BusinessEntity { TenantId = Tenant5, BusinessKey = "bk_m", Name = "指标实体" };
+		db.BusinessEntities.Add(entity);
+		await db.SaveChangesAsync();
+
+		var controller = BuildWithDb(db, AsTenant(Tenant5));
+		var dto = new List<BusinessEntityMetricUpsertRequest>
+		{
+			new() { Name = "销售额", Aggregation = "sum" },
+			new() { Name = "订单数", Aggregation = "count" },
+		};
+		var result = await controller.UpsertMetrics(entity.Id, dto, Tenant5, CancellationToken.None);
+		Assert.IsType<NoContentResult>(result);
+		Assert.Equal(2, await db.BusinessEntityMetrics.CountAsync(m => m.BusinessEntityId == entity.Id));
+	}
+
+	[Fact]
+	public async Task UpsertMetrics_Returns_404_WhenEntityOtherTenant()
+	{
+		using var db = CreateDb(out _);
+		await SeedTenant(db, Tenant5);
+		await SeedTenant(db, 7);
+		var entity = new BusinessEntity { TenantId = Tenant5, BusinessKey = "bk_m2", Name = "指标实体2" };
+		db.BusinessEntities.Add(entity);
+		await db.SaveChangesAsync();
+
+		var controller = BuildWithDb(db, AsTenant(7));
+		var result = await controller.UpsertMetrics(entity.Id, new List<BusinessEntityMetricUpsertRequest> { new() { Name = "x" } }, 7, CancellationToken.None);
+		Assert.IsType<NotFoundObjectResult>(result);
+	}
+
+	[Fact]
+	public async Task UpsertMetrics_Returns_400_WhenEmpty()
+	{
+		using var db = CreateDb(out _);
+		await SeedTenant(db, Tenant5);
+		var controller = BuildWithDb(db, AsTenant(Tenant5));
+		var result = await controller.UpsertMetrics(1, new List<BusinessEntityMetricUpsertRequest>(), Tenant5, CancellationToken.None);
+		Assert.IsType<BadRequestObjectResult>(result);
+	}
+
+	[Fact]
+	public async Task UpsertDimensions_Returns_204_AndPersists()
+	{
+		using var db = CreateDb(out _);
+		await SeedTenant(db, Tenant5);
+		var domain = new BusinessDomain { Id = 50, TenantId = Tenant5, Name = "指标域" };
+		db.BusinessDomains.Add(domain);
+		await db.SaveChangesAsync();
+
+		var controller = BuildWithDb(db, AsTenant(Tenant5));
+		var dto = new List<BusinessEntityDimensionUpsertRequest>
+		{
+			new() { Name = "仓库" },
+			new() { Name = "入库日期", Expression = "date_trunc('month', created_at)" },
+		};
+		var result = await controller.UpsertDimensions(50, dto, Tenant5, CancellationToken.None);
+		Assert.IsType<NoContentResult>(result);
+		Assert.Equal(2, await db.BusinessEntityDimensions.CountAsync(d => d.BusinessDomainId == 50));
+	}
+
+	[Fact]
+	public async Task UpsertDimensions_Returns_404_WhenDomainOtherTenant()
+	{
+		using var db = CreateDb(out _);
+		await SeedTenant(db, Tenant5);
+		await SeedTenant(db, 7);
+		var domain = new BusinessDomain { Id = 51, TenantId = Tenant5, Name = "指标域2" };
+		db.BusinessDomains.Add(domain);
+		await db.SaveChangesAsync();
+
+		var controller = BuildWithDb(db, AsTenant(7));
+		var result = await controller.UpsertDimensions(51, new List<BusinessEntityDimensionUpsertRequest> { new() { Name = "x" } }, 7, CancellationToken.None);
+		Assert.IsType<NotFoundObjectResult>(result);
 	}
 
 	#endregion

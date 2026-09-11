@@ -62,6 +62,115 @@ public sealed class BusinessEntityService(SuperBIContext db) : IBusinessEntitySe
     }
 
     /// <summary>
+    /// M12 增量：按业务实体全量合并其指标集合。
+    /// 按指标 Name 匹配：命中则仅更新标量字段（保留 Id 与 PhysicalBindings），未命中则新增，传入列表外的存量项删除（cascade 清其物理绑定）。
+    /// 租户隔离：先校验实体存在且属该租户，杜绝跨租户写入。
+    /// </summary>
+    public async Task UpsertMetricsAsync(long tenantId, long entityId, IReadOnlyList<BusinessEntityMetric> metrics, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(metrics);
+        await EnsureTenantAsync(tenantId, cancellationToken);
+        var entity = await db.BusinessEntities.AsNoTracking()
+            .SingleOrDefaultAsync(x => x.Id == entityId && x.TenantId == tenantId, cancellationToken);
+        if (entity is null) throw new KeyNotFoundException($"BusinessEntity {entityId} was not found for tenant {tenantId}.");
+
+        var names = metrics.Select(m => m.Name).ToList();
+        if (names.Count != names.Distinct(StringComparer.OrdinalIgnoreCase).Count())
+            throw new InvalidOperationException("指标 Name 在集合中必须唯一（不区分大小写）。");
+
+        var existing = await db.BusinessEntityMetrics.Where(m => m.BusinessEntityId == entityId).ToListAsync(cancellationToken);
+        var byName = existing.ToDictionary(m => m.Name, m => m, StringComparer.OrdinalIgnoreCase);
+        var incoming = new HashSet<string>(names, StringComparer.OrdinalIgnoreCase);
+
+        foreach (var e in existing.Where(e => !incoming.Contains(e.Name)))
+            db.BusinessEntityMetrics.Remove(e);
+
+        foreach (var src in metrics)
+        {
+            if (byName.TryGetValue(src.Name, out var e))
+            {
+                e.DisplayName = src.DisplayName;
+                e.Description = src.Description;
+                e.SemanticType = src.SemanticType;
+                e.Aggregation = src.Aggregation;
+                e.IsCalculated = src.IsCalculated;
+                e.Expression = src.Expression;
+                e.DataType = src.DataType;
+                db.BusinessEntityMetrics.Update(e);
+            }
+            else
+            {
+                db.BusinessEntityMetrics.Add(new BusinessEntityMetric
+                {
+                    BusinessEntityId = entityId,
+                    Name = src.Name,
+                    DisplayName = src.DisplayName,
+                    Description = src.Description,
+                    SemanticType = src.SemanticType,
+                    Aggregation = src.Aggregation,
+                    IsCalculated = src.IsCalculated,
+                    Expression = src.Expression,
+                    DataType = src.DataType,
+                });
+            }
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// M12 增量：按业务域全量合并其维度集合。
+    /// 按维度 Name 匹配：命中则更新标量字段，未命中则新增，传入列表外的存量项删除。
+    /// 租户隔离：先校验业务域存在且属该租户。
+    /// </summary>
+    public async Task UpsertDimensionsAsync(long tenantId, long domainId, IReadOnlyList<BusinessEntityDimension> dimensions, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(dimensions);
+        await EnsureTenantAsync(tenantId, cancellationToken);
+        var domain = await db.BusinessDomains.AsNoTracking()
+            .SingleOrDefaultAsync(x => x.Id == domainId && x.TenantId == tenantId, cancellationToken);
+        if (domain is null) throw new KeyNotFoundException($"BusinessDomain {domainId} was not found for tenant {tenantId}.");
+
+        var names = dimensions.Select(d => d.Name).ToList();
+        if (names.Count != names.Distinct(StringComparer.OrdinalIgnoreCase).Count())
+            throw new InvalidOperationException("维度 Name 在集合中必须唯一（不区分大小写）。");
+
+        var existing = await db.BusinessEntityDimensions
+            .Where(d => d.TenantId == tenantId && d.BusinessDomainId == domainId)
+            .ToListAsync(cancellationToken);
+        var byName = existing.ToDictionary(d => d.Name, d => d, StringComparer.OrdinalIgnoreCase);
+        var incoming = new HashSet<string>(names, StringComparer.OrdinalIgnoreCase);
+
+        foreach (var e in existing.Where(e => !incoming.Contains(e.Name)))
+            db.BusinessEntityDimensions.Remove(e);
+
+        foreach (var src in dimensions)
+        {
+            if (byName.TryGetValue(src.Name, out var e))
+            {
+                e.Description = src.Description;
+                e.Expression = src.Expression;
+                e.DataType = src.DataType;
+                db.BusinessEntityDimensions.Update(e);
+            }
+            else
+            {
+                db.BusinessEntityDimensions.Add(new BusinessEntityDimension
+                {
+                    TenantId = tenantId,
+                    BusinessDomainId = domainId,
+                    Name = src.Name,
+                    Description = src.Description,
+                    Expression = src.Expression,
+                    DataType = src.DataType,
+                });
+            }
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    /// <summary>
     /// M0-06：校验 BusinessEntity 聚合内所有 PhysicalBinding 的 Tenant → DataSource → Table → Column 完整链，
     /// 确保每条物理绑定都归属于该实体的租户，杜绝跨租户字段越权。
     /// </summary>

@@ -139,6 +139,50 @@ public sealed class BusinessModelController : ControllerBase
 		return NoContent();
 	}
 
+	/// <summary>M12 增量：按业务实体全量合并其指标（含计算口径 Expression/DataType）。租户隔离由数据面策略 + 服务层双重保证。</summary>
+	[HttpPut("entities/{id:long}/metrics")]
+	public async Task<IActionResult> UpsertMetrics(long id, [FromBody] List<BusinessEntityMetricUpsertRequest> dto, [FromQuery] long? tenantId, CancellationToken cancellationToken = default)
+	{
+		var resolution = TenantDataPlanePolicy.Resolve(User, tenantId);
+		if (!resolution.Authorized) return TenantMismatch();
+		if (dto is null || dto.Count == 0)
+			return BadRequest(new ApiError { Code = ErrorCodes.BadRequest, Message = "指标列表不能为空。" });
+		if (dto.Any(m => string.IsNullOrWhiteSpace(m.Name)))
+			return BadRequest(new ApiError { Code = ErrorCodes.BadRequest, Message = "每个指标 Name 为必填。" });
+		var metrics = dto.Select(ToMetric).ToList();
+		try
+		{
+			await _entities.UpsertMetricsAsync(resolution.EffectiveTenantId, id, metrics, cancellationToken);
+		}
+		catch (KeyNotFoundException)
+		{
+			return NotFound(new ApiError { Code = ErrorCodes.NotFound, Message = "业务实体不存在或不属于当前租户。" });
+		}
+		return NoContent();
+	}
+
+	/// <summary>M12 增量：按业务域全量合并其维度（含维度表达式 Expression/DataType）。租户隔离由数据面策略 + 服务层双重保证。</summary>
+	[HttpPut("domains/{domainId:long}/dimensions")]
+	public async Task<IActionResult> UpsertDimensions(long domainId, [FromBody] List<BusinessEntityDimensionUpsertRequest> dto, [FromQuery] long? tenantId, CancellationToken cancellationToken = default)
+	{
+		var resolution = TenantDataPlanePolicy.Resolve(User, tenantId);
+		if (!resolution.Authorized) return TenantMismatch();
+		if (dto is null || dto.Count == 0)
+			return BadRequest(new ApiError { Code = ErrorCodes.BadRequest, Message = "维度列表不能为空。" });
+		if (dto.Any(d => string.IsNullOrWhiteSpace(d.Name)))
+			return BadRequest(new ApiError { Code = ErrorCodes.BadRequest, Message = "每个维度 Name 为必填。" });
+		var dimensions = dto.Select(ToDimension).ToList();
+		try
+		{
+			await _entities.UpsertDimensionsAsync(resolution.EffectiveTenantId, domainId, dimensions, cancellationToken);
+		}
+		catch (KeyNotFoundException)
+		{
+			return NotFound(new ApiError { Code = ErrorCodes.NotFound, Message = "业务域不存在或不属于当前租户。" });
+		}
+		return NoContent();
+	}
+
 	private static BusinessEntity ToEntity(long tenantId, BusinessEntityUpsertRequest dto)
 		=> new BusinessEntity
 		{
@@ -162,6 +206,26 @@ public sealed class BusinessModelController : ControllerBase
 		entity.SemanticText = string.IsNullOrWhiteSpace(dto.SemanticText) ? null : dto.SemanticText.Trim();
 		entity.Status = string.IsNullOrWhiteSpace(dto.Status) ? "Active" : dto.Status.Trim();
 	}
+
+	private static BusinessEntityMetric ToMetric(BusinessEntityMetricUpsertRequest dto) => new()
+	{
+		Name = dto.Name.Trim(),
+		DisplayName = string.IsNullOrWhiteSpace(dto.DisplayName) ? null : dto.DisplayName.Trim(),
+		Description = string.IsNullOrWhiteSpace(dto.Description) ? null : dto.Description.Trim(),
+		SemanticType = string.IsNullOrWhiteSpace(dto.SemanticType) ? null : dto.SemanticType.Trim(),
+		Aggregation = string.IsNullOrWhiteSpace(dto.Aggregation) ? null : dto.Aggregation.Trim(),
+		IsCalculated = dto.IsCalculated,
+		Expression = string.IsNullOrWhiteSpace(dto.Expression) ? null : dto.Expression.Trim(),
+		DataType = string.IsNullOrWhiteSpace(dto.DataType) ? null : dto.DataType.Trim(),
+	};
+
+	private static BusinessEntityDimension ToDimension(BusinessEntityDimensionUpsertRequest dto) => new()
+	{
+		Name = dto.Name.Trim(),
+		Description = string.IsNullOrWhiteSpace(dto.Description) ? null : dto.Description.Trim(),
+		Expression = string.IsNullOrWhiteSpace(dto.Expression) ? null : dto.Expression.Trim(),
+		DataType = string.IsNullOrWhiteSpace(dto.DataType) ? null : dto.DataType.Trim(),
+	};
 
 	private ObjectResult TenantMismatch() => StatusCode(403,
 		new ApiError { Code = ErrorCodes.TenantIsolated, Message = "禁止：数据面请求租户必须与认证租户一致。" });

@@ -48,6 +48,7 @@ public class MetricCenterUiTests : BunitContext
         Services.AddSingleton(api);
         Services.AddSingleton(state);
         Services.AddSingleton(new LocalizationService(null!, null!));
+        Services.AddSingleton(new ToastService());
         return Render<MetricCenter>();
     }
 

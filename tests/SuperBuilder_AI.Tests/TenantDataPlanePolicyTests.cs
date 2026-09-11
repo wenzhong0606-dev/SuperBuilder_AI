@@ -157,5 +157,9 @@ public sealed class TenantDataPlanePolicyTests
 			=> Task.FromResult(entity);
 		public Task DeleteAsync(long tenantId, long id, CancellationToken cancellationToken = default)
 			=> Task.CompletedTask;
+		public Task UpsertMetricsAsync(long tenantId, long entityId, IReadOnlyList<BusinessEntityMetric> metrics, CancellationToken cancellationToken = default)
+			=> Task.CompletedTask;
+		public Task UpsertDimensionsAsync(long tenantId, long domainId, IReadOnlyList<BusinessEntityDimension> dimensions, CancellationToken cancellationToken = default)
+			=> Task.CompletedTask;
 	}
 }

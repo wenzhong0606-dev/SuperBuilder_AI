@@ -19,7 +19,11 @@ public sealed record BusinessMetricView(
     string? SemanticType,
     string? Aggregation,
     bool IsCalculated,
-    int PhysicalBindingCount);
+    int PhysicalBindingCount,
+    /// <summary>M12 增量：计算口径表达式（仅 <see cref="IsCalculated"/> 为 true 时有意义）。</summary>
+    string? Expression,
+    /// <summary>M12 增量：结果数据类型（decimal/int/string/date）。</summary>
+    string? DataType);
 
 /// <summary>M12-16 指标中心：维度治理视图行（只读投影）。</summary>
 public sealed record BusinessDimensionView(
@@ -27,4 +31,8 @@ public sealed record BusinessDimensionView(
     long BusinessDomainId,
     string? DomainName,
     string Name,
-    string? Description);
+    string? Description,
+    /// <summary>M12 增量：维度表达式（可分组字段或时间粒度，如 date_trunc('month', created_at)）。</summary>
+    string? Expression,
+    /// <summary>M12 增量：维度数据类型 / 时间粒度（string/date/month）。</summary>
+    string? DataType);

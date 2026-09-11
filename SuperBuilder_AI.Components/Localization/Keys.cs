@@ -318,6 +318,11 @@ public static class Keys
         public const string MetricCenterColDimension = "Content.MetricCenterColDimension";
         public const string MetricCenterColDescription = "Content.MetricCenterColDescription";
         public const string MetricCenterEditHint = "Content.MetricCenterEditHint";
+        public const string MetricCenterColExpression = "Content.MetricCenterColExpression";
+        public const string MetricCenterColDataType = "Content.MetricCenterColDataType";
+        public const string MetricCenterNameRequired = "Content.MetricCenterNameRequired";
+        public const string MetricCenterDimNameRequired = "Content.MetricCenterDimNameRequired";
+        public const string MetricCenterSaveFailed = "Content.MetricCenterSaveFailed";
         public const string IdentityDirectoryDesc = "Content.IdentityDirectoryDesc";
         public const string IdentityDirectoryNewOrg = "Content.IdentityDirectoryNewOrg";
         public const string IdentityDirectoryNewDepartment = "Content.IdentityDirectoryNewDepartment";
@@ -2037,7 +2042,12 @@ public static class Keys
         [Content.MetricCenterColDomain] = new("业务域", "Domain"),
         [Content.MetricCenterColDimension] = new("维度", "Dimension"),
         [Content.MetricCenterColDescription] = new("描述", "Description"),
-        [Content.MetricCenterEditHint] = new("本页为只读治理视图；指标与维度的编辑（含计算口径）将随后续里程碑开放。", "This page is a read-only governance view; editing metrics and dimensions is planned for a later milestone."),
+        [Content.MetricCenterEditHint] = new("点击指标或维度行内「编辑」维护口径。", "Use the row Edit action to maintain metric and dimension definitions."),
+        [Content.MetricCenterColExpression] = new("计算口径", "Expression"),
+        [Content.MetricCenterColDataType] = new("数据类型", "Data Type"),
+        [Content.MetricCenterNameRequired] = new("指标名必填。", "Metric name is required."),
+        [Content.MetricCenterDimNameRequired] = new("维度名必填。", "Dimension name is required."),
+        [Content.MetricCenterSaveFailed] = new("保存失败（HTTP {0}）。", "Save failed (HTTP {0})."),
         [Content.IdentityDirectoryDesc] = new("管理租户内的组织、部门与用户组；用户组承载角色，成员经组获得对应权限（与 RBAC 联动）。", "Manage organizations, departments and user groups in this tenant; groups carry roles so members gain matching permissions (RBAC-linked)."),
         [Content.IdentityDirectoryNewOrg] = new("新建组织", "New organization"),
         [Content.IdentityDirectoryNewDepartment] = new("新建部门", "New department"),

@@ -110,6 +110,7 @@ public sealed class BusinessEntityRepository(SuperBIContext db) : IBusinessEntit
     /// <summary>
     /// M12-16：列举租户内全部指标。BusinessEntityMetric 本身无 TenantId，
     /// 租户隔离经所属 BusinessEntity 过滤（EF 翻译为 INNER JOIN）；投影同时带出实体名与物理绑定计数。
+    /// M12 增量：投影补充 Expression / DataType 供前端编辑预填。
     /// </summary>
     public async Task<IReadOnlyList<BusinessMetricView>> ListMetricsAsync(
         long tenantId,
@@ -132,10 +133,12 @@ public sealed class BusinessEntityRepository(SuperBIContext db) : IBusinessEntit
                 m.SemanticType,
                 m.Aggregation,
                 m.IsCalculated,
-                m.PhysicalBindings.Count))
+                m.PhysicalBindings.Count,
+                m.Expression,
+                m.DataType))
             .ToListAsync(cancellationToken);
 
-    /// <summary>M12-16：列举租户内全部维度（附所属业务域名）。维度自带 TenantId，直接过滤。</summary>
+    /// <summary>M12-16：列举租户内全部维度（附所属业务域名）。维度自带 TenantId，直接过滤。M12 增量：投影补充 Expression / DataType。</summary>
     public async Task<IReadOnlyList<BusinessDimensionView>> ListDimensionsByTenantAsync(
         long tenantId,
         CancellationToken cancellationToken = default) =>
@@ -149,6 +152,8 @@ public sealed class BusinessEntityRepository(SuperBIContext db) : IBusinessEntit
                 x.BusinessDomainId,
                 x.Domain != null ? x.Domain.Name : null,
                 x.Name,
-                x.Description))
+                x.Description,
+                x.Expression,
+                x.DataType))
             .ToListAsync(cancellationToken);
 }

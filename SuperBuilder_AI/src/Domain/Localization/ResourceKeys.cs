@@ -283,6 +283,11 @@ public static class ResourceKeys
         public const string MetricCenterColDimension = "Content.MetricCenterColDimension";
         public const string MetricCenterColDescription = "Content.MetricCenterColDescription";
         public const string MetricCenterEditHint = "Content.MetricCenterEditHint";
+        public const string MetricCenterColExpression = "Content.MetricCenterColExpression";
+        public const string MetricCenterColDataType = "Content.MetricCenterColDataType";
+        public const string MetricCenterNameRequired = "Content.MetricCenterNameRequired";
+        public const string MetricCenterDimNameRequired = "Content.MetricCenterDimNameRequired";
+        public const string MetricCenterSaveFailed = "Content.MetricCenterSaveFailed";
         public const string IdentityDirectoryDesc = "Content.IdentityDirectoryDesc";
         public const string IdentityDirectoryNewOrg = "Content.IdentityDirectoryNewOrg";
         public const string IdentityDirectoryNewDepartment = "Content.IdentityDirectoryNewDepartment";
@@ -2016,7 +2021,12 @@ public static class ResourceKeys
         [Content.MetricCenterColDomain] = new("Content", Page: "MetricCenter", DefaultValue: "Domain"),
         [Content.MetricCenterColDimension] = new("Content", Page: "MetricCenter", DefaultValue: "Dimension"),
         [Content.MetricCenterColDescription] = new("Content", Page: "MetricCenter", DefaultValue: "Description"),
-        [Content.MetricCenterEditHint] = new("Content", Page: "MetricCenter", DefaultValue: "This page is a read-only governance view; editing metrics and dimensions is planned for a later milestone."),
+        [Content.MetricCenterEditHint] = new("Content", Page: "MetricCenter", DefaultValue: "Use the row Edit action to maintain metric and dimension definitions."),
+        [Content.MetricCenterColExpression] = new("Content", Page: "MetricCenter", DefaultValue: "Expression"),
+        [Content.MetricCenterColDataType] = new("Content", Page: "MetricCenter", DefaultValue: "Data Type"),
+        [Content.MetricCenterNameRequired] = new("Content", Page: "MetricCenter", DefaultValue: "Metric name is required."),
+        [Content.MetricCenterDimNameRequired] = new("Content", Page: "MetricCenter", DefaultValue: "Dimension name is required."),
+        [Content.MetricCenterSaveFailed] = new("Content", Page: "MetricCenter", DefaultValue: "Save failed (HTTP {0})."),
         [Content.IdentityDirectoryDesc] = new("Content", Page: "IdentityDirectory", DefaultValue: "Manage organizations, departments and user groups in this tenant; groups carry roles so members gain matching permissions (RBAC-linked)."),
         [Content.IdentityDirectoryNewOrg] = new("Content", Page: "IdentityDirectory", DefaultValue: "New organization"),
         [Content.IdentityDirectoryNewDepartment] = new("Content", Page: "IdentityDirectory", DefaultValue: "New department"),

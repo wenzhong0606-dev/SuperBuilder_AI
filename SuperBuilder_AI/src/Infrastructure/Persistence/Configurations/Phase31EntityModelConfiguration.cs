@@ -61,6 +61,9 @@ public sealed class BusinessEntityMetricConfiguration : IEntityTypeConfiguration
         builder.HasIndex(x => new { x.BusinessEntityId, x.Name }).IsUnique();
         builder.Property(x => x.Name).HasMaxLength(200).IsRequired();
         builder.Property(x => x.Aggregation).HasMaxLength(50);
+        // M12 增量：计算口径与结果类型
+        builder.Property(x => x.Expression).HasMaxLength(1000);
+        builder.Property(x => x.DataType).HasMaxLength(50);
         builder.HasOne(x => x.BusinessEntity).WithMany(x => x.Metrics).HasForeignKey(x => x.BusinessEntityId).OnDelete(DeleteBehavior.Cascade);
     }
 }
@@ -132,6 +135,9 @@ public sealed class BusinessEntityDimensionConfiguration : IEntityTypeConfigurat
         builder.ToTable("BusinessEntityDimensions", tb => tb.HasComment("业务实体维度"));
         builder.HasIndex(x => new { x.TenantId, x.BusinessDomainId, x.Name }).IsUnique();
         builder.Property(x => x.Name).HasMaxLength(200).IsRequired();
+        // M12 增量：维度表达式与数据类型 / 时间粒度
+        builder.Property(x => x.Expression).HasMaxLength(1000);
+        builder.Property(x => x.DataType).HasMaxLength(50);
         builder.HasOne(x => x.Domain).WithMany(x => x.Dimensions).HasForeignKey(x => x.BusinessDomainId).OnDelete(DeleteBehavior.Cascade);
     }
 }

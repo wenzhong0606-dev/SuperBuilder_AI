@@ -1,6 +1,7 @@
 @page "/metrics"
 @inject IApiClient Api
 @inject AppState State
+@inject ToastService Toast
 @inject NavigationManager Nav
 @using System.Text.Json
 @using SuperBuilder_AI.Components.Shared
@@ -64,7 +65,7 @@
                     else
                     {
                         <SbDataTable Items="@DimensionsFiltered" Columns="@DimensionColumns" PageSize="20" Loading="_loading"
-                                     EmptyTitle="@L10n.T(Keys.Content.MetricCenterNoMatch, "无匹配项")" />
+                                     EmptyTitle="@L10n.T(Keys.Content.MetricCenterNoMatch, "无匹配项")" RowActions="DimensionActions" />
                     }
                 </Body>
             </SbPanel>
@@ -88,8 +89,64 @@
         </SbTab>
     </SbTabs>
 
-    <p class="sb-graph-note">@L10n.T(Keys.Content.MetricCenterEditHint, "本页为只读治理视图；指标与维度的编辑（含计算口径）将随后续里程碑开放。")</p>
+    <p class="sb-graph-note">@L10n.T(Keys.Content.MetricCenterEditHint, "点击指标或维度行内「编辑」维护口径。")</p>
 </AuthGuard>
+
+<SbModal Visible="@_metricModal" VisibleChanged="v => _metricModal = v" Title="@(L10n.T(Keys.Content.CommonEdit, "编辑") + " · " + L10n.T(Keys.Content.MetricCenterTabMetrics, "指标"))" Size="lg">
+    <Body>
+        <div class="form-stack">
+            <SbField Label="@L10n.T(Keys.Content.CommonName, "名称")" Required="true" Error="@_metricErr">
+                <input class="form-control" @bind="_editMetricName" />
+            </SbField>
+            <SbField Label="@L10n.T(Keys.Content.CommonDescription, "展示名")">
+                <input class="form-control" @bind="_editMetricDisplayName" placeholder="@L10n.T(Keys.Content.CommonOptional, "可选")" />
+            </SbField>
+            <SbField Label="@L10n.T(Keys.Content.MetricCenterColSemanticType, "语义类型")">
+                <input class="form-control" @bind="_editMetricSemanticType" placeholder="@L10n.T(Keys.Content.CommonOptional, "可选")" />
+            </SbField>
+            <SbField Label="@L10n.T(Keys.Content.MetricCenterColAggregation, "聚合方式")">
+                <input class="form-control" @bind="_editMetricAggregation" placeholder="@L10n.T(Keys.Content.CommonOptional, "可选")" />
+            </SbField>
+            <div class="form-check form-switch mb-2">
+                <input type="checkbox" class="form-check-input" @bind="_editMetricIsCalculated" id="mc-calc" />
+                <label class="form-check-label" for="mc-calc">@L10n.T(Keys.Content.MetricCenterColCalculated, "计算字段")</label>
+            </div>
+            <SbField Label="@L10n.T(Keys.Content.MetricCenterColExpression, "计算口径")">
+                <textarea class="form-control" rows="2" @bind="_editMetricExpression" placeholder="@L10n.T(Keys.Content.CommonOptional, "可选")"></textarea>
+            </SbField>
+            <SbField Label="@L10n.T(Keys.Content.MetricCenterColDataType, "数据类型")">
+                <input class="form-control" @bind="_editMetricDataType" placeholder="@L10n.T(Keys.Content.CommonOptional, "可选")" />
+            </SbField>
+        </div>
+    </Body>
+    <Footer>
+        <button class="btn btn-outline-secondary btn-sm" @onclick="() => _metricModal = false">@L10n.T(Keys.Content.CommonCancel, "取消")</button>
+        <button class="btn btn-primary btn-sm" @onclick="SaveMetric">@L10n.T(Keys.Content.CommonSave, "保存")</button>
+    </Footer>
+</SbModal>
+
+<SbModal Visible="@_dimModal" VisibleChanged="v => _dimModal = v" Title="@(L10n.T(Keys.Content.CommonEdit, "编辑") + " · " + L10n.T(Keys.Content.MetricCenterTabDimensions, "维度"))" Size="lg">
+    <Body>
+        <div class="form-stack">
+            <SbField Label="@L10n.T(Keys.Content.CommonName, "名称")" Required="true" Error="@_dimErr">
+                <input class="form-control" @bind="_editDimName" />
+            </SbField>
+            <SbField Label="@L10n.T(Keys.Content.CommonDescription, "描述")">
+                <input class="form-control" @bind="_editDimDescription" placeholder="@L10n.T(Keys.Content.CommonOptional, "可选")" />
+            </SbField>
+            <SbField Label="@L10n.T(Keys.Content.MetricCenterColExpression, "计算口径")">
+                <textarea class="form-control" rows="2" @bind="_editDimExpression" placeholder="@L10n.T(Keys.Content.CommonOptional, "可选")"></textarea>
+            </SbField>
+            <SbField Label="@L10n.T(Keys.Content.MetricCenterColDataType, "数据类型")">
+                <input class="form-control" @bind="_editDimDataType" placeholder="@L10n.T(Keys.Content.CommonOptional, "可选")" />
+            </SbField>
+        </div>
+    </Body>
+    <Footer>
+        <button class="btn btn-outline-secondary btn-sm" @onclick="() => _dimModal = false">@L10n.T(Keys.Content.CommonCancel, "取消")</button>
+        <button class="btn btn-primary btn-sm" @onclick="SaveDimension">@L10n.T(Keys.Content.CommonSave, "保存")</button>
+    </Footer>
+</SbModal>
 
 @code {
     private List<JsonElement> _metrics = new();
@@ -146,6 +203,7 @@
             if (!string.IsNullOrWhiteSpace(eid))
             {
                 <button class="btn btn-sm btn-outline-secondary" @onclick='() => Nav.NavigateTo($"business-model/entities/{eid}")'>@L10n.T(Keys.Content.BusinessModelDetail, "详情")</button>
+                <button class="btn btn-sm btn-outline-secondary" @onclick='() => OpenEditMetric(row)'>@L10n.T(Keys.Content.CommonEdit, "编辑")</button>
             }
         };
 
@@ -168,6 +226,167 @@
     }
 
     private void OnQueryChanged(string value) => _query = value;
+
+    // ---- M12 增量：指标 / 维度编辑 ----
+    private bool _metricModal;
+    private long _editMetricEntityId;
+    private string _editMetricName = "";
+    private string _editMetricDisplayName = "";
+    private string _editMetricDescription = "";
+    private string _editMetricSemanticType = "";
+    private string _editMetricAggregation = "";
+    private bool _editMetricIsCalculated;
+    private string _editMetricExpression = "";
+    private string _editMetricDataType = "";
+    private string _metricErr = "";
+
+    private bool _dimModal;
+    private long _editDimDomainId;
+    private string _editDimName = "";
+    private string _editDimDescription = "";
+    private string _editDimExpression = "";
+    private string _editDimDataType = "";
+    private string _dimErr = "";
+
+    private RenderFragment<JsonElement> DimensionActions =>
+        row => __builder =>
+        {
+            <button class="btn btn-sm btn-outline-secondary" @onclick='() => OpenEditDimension(row)'>@L10n.T(Keys.Content.CommonEdit, "编辑")</button>
+        };
+
+    private static string? NullIfEmpty(string? s) => string.IsNullOrWhiteSpace(s) ? null : s;
+
+    private void OpenEditMetric(JsonElement row)
+    {
+        _editMetricEntityId = long.TryParse(TablePresenter.Cell(row, "businessEntityId"), out var eid) ? eid : 0;
+        _editMetricName = TablePresenter.Cell(row, "name");
+        _editMetricDisplayName = TablePresenter.Cell(row, "displayName");
+        _editMetricDescription = TablePresenter.Cell(row, "description");
+        _editMetricSemanticType = TablePresenter.Cell(row, "semanticType");
+        _editMetricAggregation = TablePresenter.Cell(row, "aggregation");
+        _editMetricIsCalculated = IsTrue(row, "isCalculated");
+        _editMetricExpression = TablePresenter.Cell(row, "expression");
+        _editMetricDataType = TablePresenter.Cell(row, "dataType");
+        _metricErr = "";
+        _metricModal = true;
+    }
+
+    private async Task SaveMetric()
+    {
+        if (string.IsNullOrWhiteSpace(_editMetricName))
+        {
+            _metricErr = L10n.T(Keys.Content.MetricCenterNameRequired, "指标名必填。");
+            return;
+        }
+        if (_editMetricEntityId <= 0) return;
+
+        var group = _metrics.Where(m => long.TryParse(TablePresenter.Cell(m, "businessEntityId"), out var g) && g == _editMetricEntityId).ToList();
+        var payload = new List<object>();
+        foreach (var m in group)
+        {
+            var name = TablePresenter.Cell(m, "name");
+            if (name == _editMetricName)
+            {
+                payload.Add(new
+                {
+                    name = _editMetricName,
+                    displayName = NullIfEmpty(_editMetricDisplayName),
+                    description = NullIfEmpty(_editMetricDescription),
+                    semanticType = NullIfEmpty(_editMetricSemanticType),
+                    aggregation = NullIfEmpty(_editMetricAggregation),
+                    isCalculated = _editMetricIsCalculated,
+                    expression = NullIfEmpty(_editMetricExpression),
+                    dataType = NullIfEmpty(_editMetricDataType),
+                });
+            }
+            else
+            {
+                payload.Add(new
+                {
+                    name,
+                    displayName = NullIfEmpty(TablePresenter.Cell(m, "displayName")),
+                    description = NullIfEmpty(TablePresenter.Cell(m, "description")),
+                    semanticType = NullIfEmpty(TablePresenter.Cell(m, "semanticType")),
+                    aggregation = NullIfEmpty(TablePresenter.Cell(m, "aggregation")),
+                    isCalculated = IsTrue(m, "isCalculated"),
+                    expression = NullIfEmpty(TablePresenter.Cell(m, "expression")),
+                    dataType = NullIfEmpty(TablePresenter.Cell(m, "dataType")),
+                });
+            }
+        }
+
+        var (_, status, err, _) = await Api.PutAsync($"api/business-model/entities/{_editMetricEntityId}/metrics?tenantId={State.TenantId}", payload);
+        if (status is >= 200 and < 300)
+        {
+            Toast.Success(L10n.T(Keys.Content.CommonSaveSuccess, "已保存。"));
+            _metricModal = false;
+            await Reload();
+        }
+        else
+        {
+            _metricErr = err ?? string.Format(L10n.T(Keys.Content.MetricCenterSaveFailed, "保存失败（HTTP {0}）。"), status);
+        }
+    }
+
+    private void OpenEditDimension(JsonElement row)
+    {
+        _editDimDomainId = long.TryParse(TablePresenter.Cell(row, "businessDomainId"), out var did) ? did : 0;
+        _editDimName = TablePresenter.Cell(row, "name");
+        _editDimDescription = TablePresenter.Cell(row, "description");
+        _editDimExpression = TablePresenter.Cell(row, "expression");
+        _editDimDataType = TablePresenter.Cell(row, "dataType");
+        _dimErr = "";
+        _dimModal = true;
+    }
+
+    private async Task SaveDimension()
+    {
+        if (string.IsNullOrWhiteSpace(_editDimName))
+        {
+            _dimErr = L10n.T(Keys.Content.MetricCenterDimNameRequired, "维度名必填。");
+            return;
+        }
+        if (_editDimDomainId <= 0) return;
+
+        var group = _dimensions.Where(d => long.TryParse(TablePresenter.Cell(d, "businessDomainId"), out var g) && g == _editDimDomainId).ToList();
+        var payload = new List<object>();
+        foreach (var d in group)
+        {
+            var name = TablePresenter.Cell(d, "name");
+            if (name == _editDimName)
+            {
+                payload.Add(new
+                {
+                    name = _editDimName,
+                    description = NullIfEmpty(_editDimDescription),
+                    expression = NullIfEmpty(_editDimExpression),
+                    dataType = NullIfEmpty(_editDimDataType),
+                });
+            }
+            else
+            {
+                payload.Add(new
+                {
+                    name,
+                    description = NullIfEmpty(TablePresenter.Cell(d, "description")),
+                    expression = NullIfEmpty(TablePresenter.Cell(d, "expression")),
+                    dataType = NullIfEmpty(TablePresenter.Cell(d, "dataType")),
+                });
+            }
+        }
+
+        var (_, status, err, _) = await Api.PutAsync($"api/business-model/domains/{_editDimDomainId}/dimensions?tenantId={State.TenantId}", payload);
+        if (status is >= 200 and < 300)
+        {
+            Toast.Success(L10n.T(Keys.Content.CommonSaveSuccess, "已保存。"));
+            _dimModal = false;
+            await Reload();
+        }
+        else
+        {
+            _dimErr = err ?? string.Format(L10n.T(Keys.Content.MetricCenterSaveFailed, "保存失败（HTTP {0}）。"), status);
+        }
+    }
 
     private bool CellsContain(JsonElement row, params string[] keys)
         => keys.Any(k => TablePresenter.Cell(row, k).Contains(_query, StringComparison.OrdinalIgnoreCase));
