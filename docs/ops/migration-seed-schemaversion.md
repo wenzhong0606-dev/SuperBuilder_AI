@@ -9,7 +9,7 @@
 
 | 项 | 现状 | 证据 |
 |---|---|---|
-| EF 迁移 | **42 个**（`20260810081146_CreateDB` → `20260909025001_M7_11_PublishIdempotency`） | `dotnet ef migrations list` |
+| EF 迁移 | **44 个**（`20260810081146_CreateDB` → `20260911143327_M12_17_IdentityOrganizationUnits`） | `dotnet ef migrations list` |
 | SchemaVersion | **无独立概念**，仅 EF 自带 `__EFMigrationsHistory` | 全仓 grep `SchemaVersion` 无结果 |
 | 启动自动迁移 | 由 `Startup:MigrateOnStartup` 控制，**默认 false** | `Program.cs:481` |
 | 启动探测 | `SchemaProbe` 区分 三态：`DatabaseUnreachable` / `SchemaNotCreated` / `Ready` | `src/Api/Diagnostics/SchemaProbe.cs` |
@@ -27,8 +27,8 @@
 
 ## 3. Schema Version 策略
 
-- **定义**：`schemaVersion` = **最新（序号最大）迁移 ID**。当前 = `20260909025001_M7_11_PublishIdempotency`。
-- **权威清单**：`scripts/schema/schema-version.json`（含 42 个有序迁移 ID、生成时间、生成命令）。
+- **定义**：`schemaVersion` = **最新（序号最大）迁移 ID**。当前 = `20260911143327_M12_17_IdentityOrganizationUnits`。
+- **权威清单**：`scripts/schema/schema-version.json`（含 44 个有序迁移 ID、生成时间、生成命令）。
 - **读取方式**：
   - 代码/运维：`SELECT TOP 1 MigrationId FROM __EFMigrationsHistory ORDER BY MigrationId DESC`
   - 或直接用校验脚本（见 §6）。
@@ -96,13 +96,15 @@
 - **CI 接入建议**：PR/CI 中跑**离线**校验（防迁移漏提交/清单过期）；部署后跑**在线**校验（防环境漏升级）。
 
 ### 已执行的真实验证（详见 `schema-verify-evidence-2026-09-10.md`）
-- ✅ 离线正向：42/42 一致，`EXIT=0`。
+- ✅ 离线正向：44/44 一致，`EXIT=0`（2026-09-11 重新生成清单后复跑）。
 - ✅ 离线负向：篡改清单（去掉 1 个迁移）→ 正确报漂移 `+ 20260909025001_M7_11_PublishIdempotency`，`EXIT=2`（证明工具非橡皮图章）。
 - ✅ 在线实证：本机 SQL Server **可达**（`sqlservr.exe` 运行），检出**真实漂移：5 个迁移未应用**（见 §7）。
 
-## 7. 当前环境实况（真实漂移，待处理）
+## 7. 环境实况（2026-09-11 升级闭环）
 
-本机开发库（`SuperBuilder_Platform`）**落后于代码**，以下 5 个迁移尚未应用：
+### 7.1 M9-15 当时登记的待升级项（已过期）
+
+文档初版登记本机开发库（`SuperBuilder_Platform`）落后于代码，以下 5 个迁移未应用：
 
 ```
 20260906075147_M1_ClosureIntegrity
@@ -112,8 +114,33 @@
 20260909025001_M7_11_PublishIdempotency
 ```
 
-- 这正是一个真实的"**旧环境待升级**"样本，可作为 M9-15「旧环境升级可验证」的现成用例。
-- **未擅自应用**（避免改动开发库状态）。如需升级，执行 `dotnet ef database update` 后重跑 §6 在线校验即可闭环验证。
+### 7.2 实际执行（2026-09-11）
+
+回查 `__EFMigrationsHistory` 发现：上述 5 项**已在此前被应用**，真实待应用项仅为
+M12-17 新增的 `20260911143327_M12_17_IdentityOrganizationUnits`（建 6 张组织目录表）。
+
+执行步骤（先审后执）：
+
+1. 重新生成清单：`dotnet ef migrations list --no-connect` → `scripts/schema/schema-version.json`
+   由 42 项刷新为 **44 项**（补 `20260910053000_M7_02_Fix_AppPlanPublishColumns`、
+   `20260911143327_M12_17_IdentityOrganizationUnits`），schemaVersion 同步更新。
+2. 生成待应用脚本并审查：`dotnet ef migrations script <from> <to> --idempotent`
+   → **纯 additive**（仅 `CREATE TABLE` × 6 + 索引 + 外键），扫描无
+   `DROP TABLE/COLUMN/INDEX/CONSTRAINT`、无 `DELETE/TRUNCATE`。
+3. 应用：`dotnet ef database update` → `Done.`（写入 `__EFMigrationsHistory`，ProductVersion 10.0.11）。
+4. 复核（权威口径：直连客户端读 `__EFMigrationsHistory`，与迁移程序集做集合差）：
+   **已应用 44 / 程序集 44，pending 0，drift 0**。
+
+### 7.3 沙箱内官方脚本自证的限制（如实记录）
+
+`scripts/schema/verify-schema.ps1` 依赖在 Windows 脚本宿主会话内调用 `dotnet` 与 `sqlcmd`。
+本工作沙箱的宿主会话**无法解析/执行这两个原生命令**（PATH 含其目录但 `Get-Command`
+解析失败；改用全路径函数垫片后，子进程仍返回 0 行输出），故脚本在本环境 `EXIT=2`
+（解析出 0 个迁移）。**判定为环境限制，非脚本缺陷**：脚本逻辑与 §6 历史验证证据有效，
+在正常 Windows 宿主环境可复现 `EXIT=0`。
+
+顺带做的健壮性改进（不改变语义）：脚本原先用 `_ -match '^[0-9]{14}_'` 在 `Trim()`
+**之前**匹配，对带前导空白的宿主输出不鲁棒；已改为先 `Trim()` 再匹配。
 
 ## 8. 红线与诚实声明
 

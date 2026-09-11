@@ -54,6 +54,9 @@
 - 权威验证法：`migrations script --idempotent` → **空库**重放 → 与 `SuperBIContextModelSnapshot.cs` 双向差集。⚠️ `has-pending-model-changes` 检不出「快照有、迁移无」；**对已打补丁的开发库 diff 会假绿**。
 - 🟢 **沙箱内可直接用真实 EF 工具（2026-09-11 突破）**：`dotnet-ef 10.0.10` **已全局安装**于 `~/.dotnet/tools/dotnet-ef.exe`；沙箱 `APPDATA` 为空 → `dotnet ef` / `dotnet nuget` 报 `Value cannot be null. (Parameter 'path1')`。**先 `export APPDATA="C:\Users\ThinkPad  X1\AppData\Roaming"`，再直接调 exe**：`"$HOME/.dotnet/tools/dotnet-ef.exe" migrations add <Name> --project SuperBuilder_AI/SuperBuilder_AI.csproj --startup-project SuperBuilder_AI/SuperBuilder_AI.csproj --framework net10.0 --no-build`（`--no-build` 前须先 `dotnet build ... -f net10.0 --no-restore`）。**新表一律走此路径，勿手工写迁移**（手工迁移是本项目历史缺陷来源）。
 - 历史缺陷：`M7_02_AppVersion` 曾含 39 个重复 CreateTable（已重写，仅建 `AppVersions`）；`AppPlans` 4 个发布列曾缺失（补丁 `20260910053000_M7_02_Fix_AppPlanPublishColumns`）。当前 **44 迁移、45→51 张表**（M12-17 新增 6 张）、差集 0。
+- **开发库 `SuperBuilder_Platform` 已于 2026-09-11 同步到 44/44（pending 0 / drift 0）**；清单 `scripts/schema/schema-version.json` 同步刷新为 44（schemaVersion=`20260911143327_M12_17_IdentityOrganizationUnits`）。⚠️ 每次新增迁移必须重生成清单，否则校验报漂移。
+- ⚠️ **统计迁移文件禁用 `grep -v Snapshot`**：会把 `20260908051650_M7_11_AskQuerySnapshot` 误过滤（文件名含 Snapshot）→ 假漂移。正确：`grep -vE '\.Designer\.cs$|SuperBIContextModelSnapshot\.cs$'`。
+- ⚠️ **沙箱内 `verify-schema.ps1` 无法自证**：宿主脚本会话解析不到 `dotnet`/`sqlcmd`（PATH 有目录但 `Get-Command` 失败，全路径函数垫片后子进程仍 0 行输出）→ EXIT=2 假漂移；且需 `Set-ExecutionPolicy -Scope Process Bypass` 才能调用脚本。复核改用 bash 直连 sqlcmd + `comm` 集合差。
 - ⚠️ **元数据扫描是「追加」非「重建」**：重扫后须按 `tableId` 范围删旧向量，否则 ID 空间错位 → 回查落空 → 伪装成 `SB_AUTHZ_001 403`。
 - M9-15 产物：`scripts/schema/schema-version.json`、`verify-schema.ps1`（离线/在线双模，EXIT 0/2）、`rollback-one-step.sql`、`docs/ops/migration-seed-schemaversion.md`。
 

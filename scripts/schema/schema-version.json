@@ -1,8 +1,8 @@
 {
   "artifact": "SuperBuilder_AI.SchemaVersionManifest",
-  "schemaVersion": "20260909025001_M7_11_PublishIdempotency",
-  "migrationCount": 42,
-  "generatedUtc": "2026-09-10T00:33:40Z",
+  "schemaVersion": "20260911143327_M12_17_IdentityOrganizationUnits",
+  "migrationCount": 44,
+  "generatedUtc": "2026-09-11T16:08:24Z",
   "generator": "dotnet ef migrations list --no-connect",
   "note": "schemaVersion = 最新（序号最大）迁移 ID；环境已应用迁移集合须与本清单前缀一致。",
   "migrations": [
@@ -47,6 +47,8 @@
     "20260907035855_P7_3_ModelAccounts",
     "20260907053931_M7_09_CustomComponents",
     "20260908051650_M7_11_AskQuerySnapshot",
-    "20260909025001_M7_11_PublishIdempotency"
+    "20260909025001_M7_11_PublishIdempotency",
+    "20260910053000_M7_02_Fix_AppPlanPublishColumns",
+    "20260911143327_M12_17_IdentityOrganizationUnits"
   ]
 }
