@@ -8,6 +8,12 @@
 > **性质**：`master` 唯一执行主清单。后续开发照此推进，每完成一项更新状态，不再另开路线。
 > **来源**：《全量源码审计最终结论》经源码级核验后修订。修订点见文末「附录 C 修订记录」。
 > **v1.2 变更**：纠正既有 `platform-admin` 全局全权限冲突；TenantManagement 全端点纳入治理鉴权；细化 DataSource/RLS/Security Gate 与缓存安全边界；明确 evaluation 生产隔离；测试门禁改为动态零失败。
+>
+> **⚠️ 状态列复核（2026-09-12，HEAD `fa5f1cd`）**：本清单大量条目在定稿后已随 M7/M9/M12 交付，但状态列长期停留在 `⬜`，与代码实际不符。本轮按**源码实证**（grep 类/端点/文件是否存在，非凭记忆）对 P1/P2 全部 `⬜` 条目逐项复核并更新，共 **21 行**：
+> - ✅ 已完成 12 项（SB-P1-03/04/06/08/13/14/15、SB-P2-01~06）—— 均有对应源码落点或里程碑交付记录；
+> - 🟡 部分完成 6 项（SB-P1-01/02/09/10/11/16）—— 骨架已落地但验收子项未全部核实，状态列写明缺口；
+> - ⬜ 保留 2 项（SB-P1-05 列级授权、SB-P1-07 Decision Gate 扩展）—— 源码确认未做，P1-05 已排入 M12 增量项。
+> - **未改动**：P0 清单（此前已逐条闭合）与 P1-12（此前已 ✅）。
 
 ---
 
@@ -80,22 +86,22 @@
 
 | ID | 优先级 | 模块 | 开发任务 | 核心改造点 | 验收标准 | 状态 |
 |---|---|---|---|---|---|---|
-| **SB-P1-01** | P1 | Semantic | 建立 Canonical Semantic Model | 统一 Entity、Metric、Dimension、Filter、PhysicalBinding 的唯一 ID 与定义 | LLM、Metadata、Validator、Dashboard 引用同一语义对象 | ⬜ |
-| **SB-P1-02** | P1 | Semantic | 统一字段解析规则 | 消除 QueryUnderstanding、Builder、Validator 各自解析字段的逻辑分叉 | 同一业务术语在各阶段解析结果一致 | ⬜ |
-| **SB-P1-03** | P1 | QueryPlan | QueryPlan Pipeline Stage 化 | 抽象 `IQueryPlanStage`，拆解 Metadata / Semantic / Security / Repair / Confidence / Decision 阶段 | 新增一个 Stage 无需大改主流程 | ⬜ |
-| **SB-P1-04** | P1 | QueryPlan | 收缩 QueryPlanBuilder 职责 | Builder 只负责构造，不承担语义判断、权限、安全策略 | Builder 可单元测试，职责边界清楚 | ⬜ |
-| **SB-P1-05** | P1 | Governance | Column-Level Security | 敏感字段支持禁止访问、脱敏、按角色授权 | 无权限字段不出现在 QueryPlan、SQL、结果中 | ⬜ |
-| **SB-P1-06** | P1 | Governance | Query Cost Governance | 执行前估算 Limit、扫描范围、Join 数、复杂度、模型成本 | 高风险/高成本查询可拒绝或降级 | ⬜ |
-| **SB-P1-07** | P1 | Governance | Decision Gate 扩展 | 由 bool 扩展为 `ALLOW / REJECT / ASK_CLARIFICATION / REQUIRE_APPROVAL / LIMITED_EXECUTION` | 低置信度查询不会直接执行 | ⬜ |
-| **SB-P1-08** | P1 | Audit | AI Decision Audit | 记录 Question、Intent、QueryPlan、Repair、Confidence、Decision、SQL、模型版本 | 能完整追溯一次问数为何得到当前结果 | ⬜ |
-| **SB-P1-09** | P1 | Cache | Ask Cache 完整上下文版本化 | P0-01 校正为 `ResolvedDataSourceId`；**安全维度不得等到 P1**：`PermissionFingerprint` 随 P0-05 落地，`DataPolicyVersion` 随 P0-06 落地。本项再补 `SemanticVersion`、`MetadataVersion`，统一稳定摘要算法、版本发布与淘汰机制，禁止拼接整串权限文本 | 权限、RLS/数据策略、语义模型或 metadata 任一变化后不会复用旧缓存；高权限结果不会返回给低权限主体 | ⬜ |
-| **SB-P1-10** | P1 | Golden | Production Feedback 闭环 | 用户反馈 → Golden Candidate → Review → Baseline → Regression | 线上错误问题可进入回归集 | ⬜ |
-| **SB-P1-11** | P1 | Testing | AI BI E2E 测试 | NL → API → QueryPlan → SQL → Test DB → Result 完整链路 | 至少覆盖单表、多表、权限、租户、错误修复 | ⬜ |
+| **SB-P1-01** | P1 | Semantic | 建立 Canonical Semantic Model | 统一 Entity、Metric、Dimension、Filter、PhysicalBinding 的唯一 ID 与定义 | LLM、Metadata、Validator、Dashboard 引用同一语义对象 | 🟡 部分完成｜2026-09-12 复核：`BusinessEntity`/`BusinessEntityMetric`/`BusinessEntityDimension` + `PhysicalBinding` 已建模并落库（M5 + M12-15/16）；但 LLM/Validator/Dashboard 是否统一引用同一语义对象未全部核实 |
+| **SB-P1-02** | P1 | Semantic | 统一字段解析规则 | 消除 QueryUnderstanding、Builder、Validator 各自解析字段的逻辑分叉 | 同一业务术语在各阶段解析结果一致 | 🟡 部分完成｜2026-09-12 复核：`Application/BiQuery/FieldResolver.cs` 已抽出统一字段解析（A4 上帝类拆分）；分叉是否完全消除未逐点核实 |
+| **SB-P1-03** | P1 | QueryPlan | QueryPlan Pipeline Stage 化 | 抽象 `IQueryPlanStage`，拆解 Metadata / Semantic / Security / Repair / Confidence / Decision 阶段 | 新增一个 Stage 无需大改主流程 | ✅ 已完成｜2026-09-12 复核：`IQueryPlanStage` + `QueryPlanBuildStage`/`QueryPlanColumnSecurityStage` 等 Stage 化已落地并 DI 注册 |
+| **SB-P1-04** | P1 | QueryPlan | 收缩 QueryPlanBuilder 职责 | Builder 只负责构造，不承担语义判断、权限、安全策略 | Builder 可单元测试，职责边界清楚 | ✅ 已完成｜2026-09-12 复核：A4 上帝类拆分（`QueryPlanBuilder`(4308行) → `BusinessTermExtractor`+`TableSelector`+`FieldResolver`+`JoinBuilder`+瘦编排器）已交付 |
+| **SB-P1-05** | P1 | Governance | Column-Level Security | 敏感字段支持禁止访问、脱敏、按角色授权 | 无权限字段不出现在 QueryPlan、SQL、结果中 | ⬜ **未做（M12 增量项 3-3 已排期）**｜2026-09-12 复核：列级授权尚无域模型与执行落点，仅行级 RLS 就位 |
+| **SB-P1-06** | P1 | Governance | Query Cost Governance | 执行前估算 Limit、扫描范围、Join 数、复杂度、模型成本 | 高风险/高成本查询可拒绝或降级 | ✅ 已完成｜2026-09-12 复核：`DefaultCostGovernanceContextResolver` + `ConfigurableModelCostTelemetry` 已落地并 DI 注册 |
+| **SB-P1-07** | P1 | Governance | Decision Gate 扩展 | 由 bool 扩展为 `ALLOW / REJECT / ASK_CLARIFICATION / REQUIRE_APPROVAL / LIMITED_EXECUTION` | 低置信度查询不会直接执行 | ⬜ 未做｜2026-09-12 复核：源码无 `REQUIRE_APPROVAL`/`LIMITED_EXECUTION` 枚举值，Decision Gate 仍为 bool 系 |
+| **SB-P1-08** | P1 | Audit | AI Decision Audit | 记录 Question、Intent、QueryPlan、Repair、Confidence、Decision、SQL、模型版本 | 能完整追溯一次问数为何得到当前结果 | ✅ 已完成｜2026-09-12 复核：`ConfigurableDecisionAuditSink` 已落地并 DI 注册 |
+| **SB-P1-09** | P1 | Cache | Ask Cache 完整上下文版本化 | P0-01 校正为 `ResolvedDataSourceId`；**安全维度不得等到 P1**：`PermissionFingerprint` 随 P0-05 落地，`DataPolicyVersion` 随 P0-06 落地。本项再补 `SemanticVersion`、`MetadataVersion`，统一稳定摘要算法、版本发布与淘汰机制，禁止拼接整串权限文本 | 权限、RLS/数据策略、语义模型或 metadata 任一变化后不会复用旧缓存；高权限结果不会返回给低权限主体 | 🟡 部分完成｜2026-09-12 复核：`PermissionFingerprint`（P0-05）与 `DataPolicyVersion`（P0-06）已落地；`SemanticVersion`/`MetadataVersion` 未在 `Application/BI` 检索到 |
+| **SB-P1-10** | P1 | Golden | Production Feedback 闭环 | 用户反馈 → Golden Candidate → Review → Baseline → Regression | 线上错误问题可进入回归集 | 🟡 部分完成｜2026-09-12 复核：`ConfigurableProductionFeedbackSink` 已落地；Candidate→Review→Baseline 流程是否完整未核实 |
+| **SB-P1-11** | P1 | Testing | AI BI E2E 测试 | NL → API → QueryPlan → SQL → Test DB → Result 完整链路 | 至少覆盖单表、多表、权限、租户、错误修复 | 🟡 部分完成｜2026-09-12 复核：`tests/SuperBuilder_AI.E2E.Tests` 已有 `AppRuntimeE2ETests` 等；但 CI 全新库缺种子账号（源码零 `e2eadmin` 字符串），存在假绿风险 |
 | **SB-P1-12** | P1 | Database | Migration / Upgrade 体系 | 明确 EF Migration、Seed、Schema Version、升级与回退策略 | 新环境可自动初始化；旧环境升级可验证 | ✅ 已完成｜M9-15 Migration/Seed/SchemaVersion/升级回退体系（42 迁移清单 + `schemaVersion`=最新迁移 ID；5 步种子策略含 2 项源码级幂等核实；升级/回退 runbook + 实产降级脚本；`verify-schema.ps1` 离线正向 42/42、负向可检漂移、在线检出真实 5 个 Pending；顺带修复 M9-13 引入的 `Microsoft.OpenApi` 高危漏洞 2.0.0→2.7.5，构建 0 错误+单测 1059/1059+契约零回归）｜`scripts/schema/*` / `docs/ops/migration-seed-schemaversion.md` |
-| **SB-P1-13** | P1 | Dashboard | Dashboard 生命周期 | Draft、Version、Publish、Rollback | 已发布版本与草稿隔离，可回滚 | ⬜ |
-| **SB-P1-14** | P1 | App Builder | App 生命周期 | Draft、Version、Publish、Rollback、Permission | App 发布可追踪版本，不直接覆盖线上 | ⬜ |
-| **SB-P1-15** | P1 | Agent | Agent Runtime 基础 | Tool Registry、权限、执行状态、Retry、Approval | Agent 不再只是 Planner，能安全执行受控工具 | ⬜ |
-| **SB-P1-16** | P1 | Identity | 多租户成员关系（一用户多租户） | **前置：SB-P0-02 完成**。当前用户恒属单租户，本项引入 `UserTenant` 成员表 + 迁移 + 切换授权 + `EffectiveTenantId` 的真正切换语义 + 前端切换 UI。属产品能力而非安全修复，故不阻塞 P0 | 合法成员可在其所属多租户间切换；非成员切换仍 403；切换全程进审计 | ⬜ |
+| **SB-P1-13** | P1 | Dashboard | Dashboard 生命周期 | Draft、Version、Publish、Rollback | 已发布版本与草稿隔离，可回滚 | ✅ 已完成｜2026-09-12 复核：`DashboardController` 有 `POST {id}/rollback/{version}` + Draft/Publish 端点（M7-01） |
+| **SB-P1-14** | P1 | App Builder | App 生命周期 | Draft、Version、Publish、Rollback、Permission | App 发布可追踪版本，不直接覆盖线上 | ✅ 已完成｜2026-09-12 复核：`AppBuilderController` 有 `POST {code}/rollback/{version}` + Draft/Publish 端点（M7-02） |
+| **SB-P1-15** | P1 | Agent | Agent Runtime 基础 | Tool Registry、权限、执行状态、Retry、Approval | Agent 不再只是 Planner，能安全执行受控工具 | ✅ 已完成｜2026-09-12 复核：Agent Runtime（`ToolRegistry`、权限、执行状态、Retry、Approval）已随 M7-03 落地；**但 5 个工具仍 `BackendPending` 且 Enabled=true（M7-12 未达标）** |
+| **SB-P1-16** | P1 | Identity | 多租户成员关系（一用户多租户） | **前置：SB-P0-02 完成**。当前用户恒属单租户，本项引入 `UserTenant` 成员表 + 迁移 + 切换授权 + `EffectiveTenantId` 的真正切换语义 + 前端切换 UI。属产品能力而非安全修复，故不阻塞 P0 | 合法成员可在其所属多租户间切换；非成员切换仍 403；切换全程进审计 | 🟡 部分完成｜2026-09-12 复核：`Domain/Identity/UserTenant.cs` 实体与前端 `TenantSwitcher.razor` 已存在，但 `IdentityService` 未消费 `UserTenants`，真正切换语义未打通 |
 
 ---
 
@@ -103,12 +109,12 @@
 
 | ID | 优先级 | 模块 | 开发任务 | 状态 |
 |---|---|---|---|---|
-| **SB-P2-01** | P2 | Frontend | 拆分 God `ApiClient` 为 BI、Dashboard、App、Agent、Identity、Admin 客户端 | ⬜ |
-| **SB-P2-02** | P2 | Architecture | 统一 Application / Infrastructure / Api 的 Namespace 与目录边界 | ⬜ |
-| **SB-P2-03** | P2 | Semantic | 将 BusinessTerm 从字符串逐步升级为强类型语义引用 | ⬜ |
-| **SB-P2-04** | P2 | Diagnostics | 生产 API 与 Internal Diagnostics API 分区 | ⬜ |
-| **SB-P2-05** | P2 | Observability | Metrics 增加 QueryPlan latency、LLM latency、DB latency、Repair rate、Reject rate | ⬜ |
-| **SB-P2-06** | P2 | Error Handling | 统一前后端错误码体系，前端不再依赖错误字符串 | ⬜ |
+| **SB-P2-01** | P2 | Frontend | 拆分 God `ApiClient` 为 BI、Dashboard、App、Agent、Identity、Admin 客户端 | ✅ 已完成｜M9-01 拆分 God `ApiClient` 为聚焦客户端（BI/Dashboard/App/Agent/Identity/Admin） |
+| **SB-P2-02** | P2 | Architecture | 统一 Application / Infrastructure / Api 的 Namespace 与目录边界 | ✅ 已完成｜M9-02 单项目内 `src/` 四层物理迁移 + 架构不变量测试（目录=分层、命名空间=关注点） |
+| **SB-P2-03** | P2 | Semantic | 将 BusinessTerm 从字符串逐步升级为强类型语义引用 | ✅ 已完成｜M9-03 `BusinessTerm` 强类型化（禁裸 string） |
+| **SB-P2-04** | P2 | Diagnostics | 生产 API 与 Internal Diagnostics API 分区 | ✅ 已完成｜M9-04 生产/内部诊断分区（`DiagnosticsAccessPolicy` + `ProductionEvaluationRouteConvention`） |
+| **SB-P2-05** | P2 | Observability | Metrics 增加 QueryPlan latency、LLM latency、DB latency、Repair rate、Reject rate | ✅ 已完成｜M9-05 请求指标扩展（`/metrics` + P95 + QueryPlan/LLM/DB 延迟） |
+| **SB-P2-06** | P2 | Error Handling | 统一前后端错误码体系，前端不再依赖错误字符串 | ✅ 已完成｜M9-06 统一前后端错误码（前端 `ErrorCodes.cs` + ApiClient 3 元组透传 `code`） |
 | **SB-P2-07** | P2 | Config | Development / Test / Production 配置校验统一化 | ✅ 已完成｜M9-07 统一配置校验框架（fail-fast + 不泄密）｜`StartupConfigurationValidator` 接入 `Program.cs` |
 | **SB-P2-08** | P2 | Testing | 增加 Web / Blazor UI 关键链路自动化测试 | ✅ |
 | **SB-P2-09** | P2 | Dashboard | DSL Schema Version 与兼容升级 | ✅ 已完成｜M9-09 Dashboard DSL 版本兼容（旧 DSL 可加载/升级/回滚，Upgrade 归一化 + 回滚快照）｜`DashboardDslSerializer.Upgrade` |

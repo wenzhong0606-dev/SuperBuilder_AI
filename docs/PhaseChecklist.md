@@ -24,7 +24,7 @@
 
 - [x] **A1** 目标结构文档/骨架/冗余清理（删 40 文件、归档 13 计划）
 - [x] **A2** 单项目内 `src/` 四层物理迁移（234 .cs，命名空间保留，build 0 error，Golden 18/18）
-- [ ] **A3** 抽取独立项目 Domain/Application/Infrastructure/Api
+- [x] **A3** 抽取独立项目 Domain/Application/Infrastructure/Api —— **按用户决策跳过（2026-09-11）**；M9-02/03 已用「单项目内 `src/` 四层物理迁移 + 架构不变量测试」等价替代（目录=分层、命名空间=关注点），不再拆 `.csproj`
   - [ ] 新建 4 个 `.csproj` + slnx 引用
   - [ ] 迁移包引用与 `Migrations`（随 Infrastructure.Persistence）
   - [ ] 每拆一个项目：`dotnet build` 绿 + Golden 18/18
@@ -38,8 +38,8 @@
   - [x] **GQ-008 幽灵维度加固（与上条对称）**：`ApplyDimensionResolutions` 在 `bindings.Count==0` 时不再直接 return，改为 `RemoveAll(IsUnboundDimension)` 清除 LLM 空维度；数量漂移不再硬抛 `InvalidOperationException`，改为 SemanticText 对齐 + 丢弃幻影 + 用未消费 Resolution 绑定补全
   - [x] **Metric 漂移同构加固（收口第三处）**：`ApplyMetricResolutions` 原 `plan.Metrics.Count != bindings.Count` 硬抛 `InvalidOperationException`（曾可触发 GQ-002/GQ-005 的 500 回归）改为与 Filter/Dimension 一致——SemanticText 对齐 + 丢弃无绑定幻影指标 + 用未消费 Resolution 绑定补全（保留 GQ-002 EntityCount→COUNT 强制覆盖）；1:1 时等价于原索引重写，行为不变。`ApplyOrderResolutions` 因 `BuildResolvedPlanSkeleton` 的 orders 直接由 `resolution.Orders` 生成（结构恒等）无需改
   - [x] **Golden 闸门 LLM 超时加固**：`QwenService` 注入的 `HttpClient` 从未设 `Timeout`（落默认 100s），高延迟时段 `qwen3.7-plus` 单次推理超时被取消 → GQ-005 判 ERROR（属基础设施抖动而非逻辑失败，却污染 18/18 结论）。新增可配置 `Qwen:TimeoutSeconds`（默认 180s，与 Embedding 侧 120s 对齐）覆盖默认超时
-- [ ] **A5** 限界上下文解耦（**A3 前置**）
-  - [ ] 消除 `Metadata↔Organization` 循环依赖
+- [~] **A5** 限界上下文解耦（**A3 前置**）—— **部分完成（M9-11，2026-09-09）**：循环依赖已消除；SharedKernel 抽取与重复 DTO/枚举合并未做
+  - [x] 消除 `Metadata↔Organization` 循环依赖 —— **M9-11 已交付**：移除 `Tenant.DataSources` 集合导航（环的唯一边），应用层零 `tenant.DataSources` 读取，改由 Fluent `HasOne(...).WithMany(x => x.DataSources)` 保持关系语义；build 0 error + Golden 18/18
   - [ ] 抽 `SharedKernel`
   - [ ] 合并 `GoldenBaseline`↔`GoldenBaselinePersistenceRecord`
   - [ ] 合并 `QueryPlanSemanticResolution`↔`SemanticApplicabilityResult/*Resolution`
@@ -253,9 +253,9 @@
 
 **§12 用户自定义能力（接入 P11.3，已规划）**
 
-- [ ] ① 用户自定义组件库（需新建 Component 领域模型 + 持久化 + `api/components`，受 P8 `AppComponentTypes` 白名单约束）
-- [ ] ② 用户自定义风格/样式（P7 主题引擎已支撑 `AppDsl.ThemeKey` 引用）
-- [ ] ③ Ask 多轮调整 + 发布为应用页面（接 P8 应用工厂）
+- [x] ① 用户自定义组件库 —— **已于 M7-09 交付（2026-09-07）**：`Domain/Components/CustomComponentDefinition.cs` + `CustomComponentVersion` + `Application/Components/CustomComponentDslSerializer.cs` + `Api/Controllers/ComponentsController.cs` @ `api/components` + 迁移 `20260907053931_M7_09_CustomComponents` + `tests/CustomComponentsTests.cs`；前端 `ComponentGallery.razor` 已接真实编辑器。**剩余缺口**：App DSL 的 `AppComponentTypes` 为 6 类硬编码白名单，尚无 `CustomComponentRef` 机制（归 App DSL 演进，见 M12 增量项）
+- [x] ② 用户自定义风格/样式 —— **已于 M7-10 交付（2026-09-07）**：自定义主题在 App / Dashboard / 主题资产间完成可授权复用，`AppDsl.ThemeKey` 引用链路打通；前端 `Themes.razor` 管理页就位
+- [x] ③ Ask 多轮调整 + 发布为应用页面 —— **已于 M7-11 C3/C4 交付（2026-09-08）**：发布改「创建草稿 `POST api/apps` → `POST api/apps/{code}/publish`」两段式，修复假成功；`AskTurn` 增 `PublishStage`/`PublishCode` 支持重试复用
 
 **§13 平台扩展（已规划）**
 
