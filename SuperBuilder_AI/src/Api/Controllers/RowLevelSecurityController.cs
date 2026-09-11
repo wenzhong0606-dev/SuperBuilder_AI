@@ -31,6 +31,97 @@ public sealed class RowLevelSecurityController : ControllerBase
 			.OrderBy(x => x.MetadataTableId).ThenBy(x => x.Id).ToListAsync(ct));
 	}
 
+	/// <summary>
+	/// M12-18：跨数据源的行级策略管理视图。在原始实体之上补齐数据源名 / 表名 / 列名 / 数据类型
+	/// 与主体显示名，供可视化管理页直接渲染（纯增量，不影响既有 List 契约）。
+	/// </summary>
+	[HttpGet("manage")]
+	public async Task<IActionResult> Manage([FromQuery] long? dataSourceId, CancellationToken ct)
+	{
+		var scope = await ScopeAsync(ct);
+		if (scope.Error is not null) return scope.Error;
+
+		var query = _db.RowLevelSecurityPolicies.AsNoTracking().Where(x => x.TenantId == scope.TenantId);
+		if (dataSourceId.HasValue && dataSourceId.Value > 0)
+			query = query.Where(x => x.DataSourceId == dataSourceId.Value);
+
+		var rows = await query
+			.OrderBy(x => x.DataSourceId).ThenBy(x => x.MetadataTableId).ThenBy(x => x.Id)
+			.Select(x => new
+			{
+				x.Id,
+				x.DataSourceId,
+				x.MetadataTableId,
+				x.MetadataColumnId,
+				DataSourceName = _db.DataSources.IgnoreQueryFilters().AsNoTracking()
+					.Where(d => d.Id == x.DataSourceId).Select(d => d.Name).FirstOrDefault(),
+				TableName = _db.MetadataTables.IgnoreQueryFilters().AsNoTracking()
+					.Where(t => t.Id == x.MetadataTableId).Select(t => t.TableName).FirstOrDefault(),
+				ColumnName = _db.MetadataColumns.IgnoreQueryFilters().AsNoTracking()
+					.Where(c => c.Id == x.MetadataColumnId).Select(c => c.ColumnName).FirstOrDefault(),
+				DataType = _db.MetadataColumns.IgnoreQueryFilters().AsNoTracking()
+					.Where(c => c.Id == x.MetadataColumnId).Select(c => c.DataType).FirstOrDefault(),
+				x.SubjectType,
+				x.SubjectId,
+				x.SubjectKey,
+				x.SubjectValue,
+				x.Effect,
+				x.Operator,
+				x.Value,
+				x.Enabled,
+				x.Version,
+				x.UpdatedTime,
+			})
+			.ToListAsync(ct);
+
+		var userIds = rows.Where(r => r.SubjectType == RowPolicySubjectType.User && r.SubjectId.HasValue)
+			.Select(r => r.SubjectId!.Value).Distinct().ToList();
+		var roleIds = rows.Where(r => r.SubjectType == RowPolicySubjectType.Role && r.SubjectId.HasValue)
+			.Select(r => r.SubjectId!.Value).Distinct().ToList();
+
+		var userNames = userIds.Count == 0
+			? new Dictionary<long, string>()
+			: (await _db.Users.IgnoreQueryFilters().AsNoTracking().Where(u => userIds.Contains(u.Id))
+				.Select(u => new { u.Id, u.Username, u.DisplayName }).ToListAsync(ct))
+				.ToDictionary(u => u.Id, u => string.IsNullOrWhiteSpace(u.DisplayName) ? u.Username : u.DisplayName);
+		var roleNames = roleIds.Count == 0
+			? new Dictionary<long, string>()
+			: (await _db.Roles.IgnoreQueryFilters().AsNoTracking().Where(r => roleIds.Contains(r.Id))
+				.Select(r => new { r.Id, r.Name, r.Code }).ToListAsync(ct))
+				.ToDictionary(r => r.Id, r => string.IsNullOrWhiteSpace(r.Name) ? r.Code : r.Name);
+
+		var items = rows.Select(r => new
+		{
+			r.Id,
+			r.DataSourceId,
+			r.MetadataTableId,
+			r.MetadataColumnId,
+			DataSourceName = r.DataSourceName ?? string.Empty,
+			TableName = r.TableName ?? string.Empty,
+			ColumnName = r.ColumnName ?? string.Empty,
+			DataType = r.DataType ?? string.Empty,
+			r.SubjectType,
+			r.SubjectId,
+			r.SubjectKey,
+			r.SubjectValue,
+			SubjectDisplayName = r.SubjectType switch
+			{
+				RowPolicySubjectType.User => r.SubjectId.HasValue && userNames.TryGetValue(r.SubjectId.Value, out var un) ? un : string.Empty,
+				RowPolicySubjectType.Role => r.SubjectId.HasValue && roleNames.TryGetValue(r.SubjectId.Value, out var rn) ? rn : string.Empty,
+				RowPolicySubjectType.Attribute => $"{r.SubjectKey}={r.SubjectValue}",
+				_ => string.Empty,
+			},
+			r.Effect,
+			r.Operator,
+			r.Value,
+			r.Enabled,
+			r.Version,
+			r.UpdatedTime,
+		}).ToList();
+
+		return Ok(items);
+	}
+
 	[HttpPost]
 	public async Task<IActionResult> Save([FromBody] RowLevelSecurityPolicyRequest request, CancellationToken ct)
 	{
@@ -87,6 +178,25 @@ public sealed class RowLevelSecurityController : ControllerBase
 		return NoContent();
 	}
 
+	/// <summary>M12-18：启用 / 停用一条行级策略。body 省略时按当前状态取反。</summary>
+	[HttpPost("{id:long}/toggle")]
+	public async Task<IActionResult> Toggle(long id, [FromBody] ToggleRowPolicyRequest? request, CancellationToken ct)
+	{
+		var scope = await ScopeAsync(ct);
+		if (scope.Error is not null) return scope.Error;
+
+		var entity = await _db.RowLevelSecurityPolicies
+			.FirstOrDefaultAsync(x => x.Id == id && x.TenantId == scope.TenantId, ct);
+		if (entity is null)
+			return NotFound(new ApiError { Code = ErrorCodes.BadRequest, Message = "行级策略不存在。" });
+
+		entity.Enabled = request?.Enabled ?? !entity.Enabled;
+		entity.Version++;
+		entity.UpdatedTime = DateTime.UtcNow;
+		await _db.SaveChangesAsync(ct);
+		return Ok(new { entity.Id, entity.Enabled, entity.Version });
+	}
+
 	private async Task<bool> SubjectExistsAsync(long tenantId, RowLevelSecurityPolicyRequest request, CancellationToken ct) => request.SubjectType switch
 	{
 		RowPolicySubjectType.Everyone => true,
@@ -107,6 +217,11 @@ public sealed class RowLevelSecurityController : ControllerBase
 		_db.ApplyTenantScope(tenantId);
 		return (tenantId, null);
 	}
+}
+
+public sealed class ToggleRowPolicyRequest
+{
+	public bool Enabled { get; set; }
 }
 
 public sealed class RowLevelSecurityPolicyRequest

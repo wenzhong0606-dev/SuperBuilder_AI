@@ -1,3 +1,5 @@
+using System.Linq;
+using System.Text.Json;
 using System.Collections.Generic;
 using System.Net;
 using System.Security.Claims;
@@ -34,8 +36,11 @@ public class RowLevelSecurityControllerTests
 	}
 
 	private static RowLevelSecurityController Build(SuperBIContext db, long authTenantId)
+		=> Build(db, authTenantId, new FakeIdentityService());
+
+	private static RowLevelSecurityController Build(SuperBIContext db, long authTenantId, FakeIdentityService identity)
 	{
-		var controller = new RowLevelSecurityController(db, new FakeIdentityService());
+		var controller = new RowLevelSecurityController(db, identity);
 		controller.ControllerContext = new ControllerContext
 		{
 			HttpContext = new DefaultHttpContext
@@ -116,8 +121,179 @@ public class RowLevelSecurityControllerTests
 		Assert.Equal((int)HttpStatusCode.Forbidden, obj.StatusCode);
 	}
 
+	#region M12-18 可视化管理端点（富化列表 + 启用切换）
+
+	private static async Task<(SuperBIContext Ctx, long TableId, long ColumnId)> SeedPolicyGraphAsync(SuperBIContext ctx)
+	{
+		ctx.Tenants.Add(new Tenant { Id = 5, TenantCode = "t5", TenantName = "Tenant 5" });
+		ctx.Tenants.Add(new Tenant { Id = 7, TenantCode = "t7", TenantName = "Tenant 7" });
+		ctx.DataSources.Add(new DataSource { Id = 50, TenantId = 5, Name = "ds5", NormalizedName = "ds5", DbType = "SQLSERVER", ConnectionString = "x" });
+		ctx.MetadataTables.Add(new MetadataTable { Id = 51, TenantId = 5, DataSourceId = 50, TableName = "orders" });
+		ctx.MetadataColumns.Add(new MetadataColumn { Id = 52, MetadataTableId = 51, ColumnName = "region", DataType = "nvarchar" });
+		ctx.Users.Add(new User { Id = 55, TenantId = 5, Username = "alice", DisplayName = "Alice", Email = "a@x" });
+		ctx.Roles.Add(new Role { Id = 56, TenantId = 5, Code = "viewer", Name = "查看者" });
+		await ctx.SaveChangesAsync();
+		return (ctx, 51, 52);
+	}
+
+	private static async Task<RowLevelSecurityPolicy> AddPolicyAsync(SuperBIContext ctx, long tenantId, long dataSourceId,
+		long tableId, long columnId, RowPolicySubjectType subjectType, long? subjectId, bool enabled = true)
+	{
+		var policy = new RowLevelSecurityPolicy
+		{
+			TenantId = tenantId,
+			DataSourceId = dataSourceId,
+			MetadataTableId = tableId,
+			MetadataColumnId = columnId,
+			SubjectType = subjectType,
+			SubjectId = subjectId,
+			Effect = RowPolicyEffect.Allow,
+			Operator = "=",
+			Value = "east",
+			Enabled = enabled,
+		};
+		ctx.RowLevelSecurityPolicies.Add(policy);
+		await ctx.SaveChangesAsync();
+		return policy;
+	}
+
+	// 匿名投影经 ASP.NET Core 输出时同样走 camelCase，测试侧保持一致。
+	private static readonly JsonSerializerOptions WebJson = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
+
+	private static JsonDocument Json(object? value) =>
+		JsonDocument.Parse(JsonSerializer.Serialize(value, WebJson));
+
+	[Fact]
+	public async Task Manage_Returns_Enriched_Rows_With_Table_Column_And_Subject_Names()
+	{
+		var ctx = CreateContext(out var connection);
+		await using var _ = connection;
+		await using var __ = ctx;
+		var (_, tableId, columnId) = await SeedPolicyGraphAsync(ctx);
+		await AddPolicyAsync(ctx, 5, 50, tableId, columnId, RowPolicySubjectType.User, 55);
+		await AddPolicyAsync(ctx, 5, 50, tableId, columnId, RowPolicySubjectType.Role, 56);
+
+		var controller = Build(ctx, 5);
+		var result = await controller.Manage(null, CancellationToken.None);
+
+		var ok = Assert.IsType<OkObjectResult>(result);
+		using var doc = Json(ok.Value);
+		var rows = doc.RootElement.EnumerateArray().ToList();
+		Assert.Equal(2, rows.Count);
+
+		var userRow = rows.Single(r => r.GetProperty("subjectType").GetInt32() == (int)RowPolicySubjectType.User);
+		Assert.Equal("ds5", userRow.GetProperty("dataSourceName").GetString());
+		Assert.Equal("orders", userRow.GetProperty("tableName").GetString());
+		Assert.Equal("region", userRow.GetProperty("columnName").GetString());
+		Assert.Equal("Alice", userRow.GetProperty("subjectDisplayName").GetString());
+
+		var roleRow = rows.Single(r => r.GetProperty("subjectType").GetInt32() == (int)RowPolicySubjectType.Role);
+		Assert.Equal("查看者", roleRow.GetProperty("subjectDisplayName").GetString());
+	}
+
+	[Fact]
+	public async Task Manage_Excludes_CrossTenant_Policies()
+	{
+		var ctx = CreateContext(out var connection);
+		await using var _ = connection;
+		await using var __ = ctx;
+		var (_, tableId, columnId) = await SeedPolicyGraphAsync(ctx);
+		await AddPolicyAsync(ctx, 5, 50, tableId, columnId, RowPolicySubjectType.Everyone, null);
+		await AddPolicyAsync(ctx, 7, 50, tableId, columnId, RowPolicySubjectType.Everyone, null);
+
+		var controller = Build(ctx, 5);
+		var ok = Assert.IsType<OkObjectResult>(await controller.Manage(null, CancellationToken.None));
+		using var doc = Json(ok.Value);
+		Assert.Single(doc.RootElement.EnumerateArray());
+	}
+
+	[Fact]
+	public async Task Manage_Filters_By_DataSourceId()
+	{
+		var ctx = CreateContext(out var connection);
+		await using var _ = connection;
+		await using var __ = ctx;
+		var (_, tableId, columnId) = await SeedPolicyGraphAsync(ctx);
+		ctx.DataSources.Add(new DataSource { Id = 60, TenantId = 5, Name = "ds6", NormalizedName = "ds6", DbType = "MYSQL", ConnectionString = "y" });
+		await ctx.SaveChangesAsync();
+		await AddPolicyAsync(ctx, 5, 50, tableId, columnId, RowPolicySubjectType.Everyone, null);
+		await AddPolicyAsync(ctx, 5, 60, tableId, columnId, RowPolicySubjectType.Everyone, null);
+
+		var controller = Build(ctx, 5);
+		var ok = Assert.IsType<OkObjectResult>(await controller.Manage(60, CancellationToken.None));
+		using var doc = Json(ok.Value);
+		var rows = doc.RootElement.EnumerateArray().ToList();
+		Assert.Single(rows);
+		Assert.Equal(60, rows[0].GetProperty("dataSourceId").GetInt64());
+	}
+
+	[Theory]
+	[InlineData(IdentityPermissions.IdentityManage)]
+	[InlineData(IdentityPermissions.MetadataEdit)]
+	public async Task Manage_Requires_Both_Permissions(string missing)
+	{
+		var ctx = CreateContext(out var connection);
+		await using var _ = connection;
+		await using var __ = ctx;
+		await SeedPolicyGraphAsync(ctx);
+
+		var identity = new FakeIdentityService();
+		identity.Granted.Remove(missing);
+
+		var controller = Build(ctx, 5, identity);
+		var result = await controller.Manage(null, CancellationToken.None);
+		var obj = Assert.IsType<ObjectResult>(result);
+		Assert.Equal((int)HttpStatusCode.Forbidden, obj.StatusCode);
+	}
+
+	[Fact]
+	public async Task Toggle_Flips_Enabled_And_Bumps_Version()
+	{
+		var ctx = CreateContext(out var connection);
+		await using var _ = connection;
+		await using var __ = ctx;
+		var (_, tableId, columnId) = await SeedPolicyGraphAsync(ctx);
+		var policy = await AddPolicyAsync(ctx, 5, 50, tableId, columnId, RowPolicySubjectType.Everyone, null, enabled: true);
+		var versionBefore = policy.Version;
+
+		var controller = Build(ctx, 5);
+		var ok = Assert.IsType<OkObjectResult>(
+			await controller.Toggle(policy.Id, new ToggleRowPolicyRequest { Enabled = false }, CancellationToken.None));
+		using var doc = Json(ok.Value);
+		Assert.False(doc.RootElement.GetProperty("enabled").GetBoolean());
+		Assert.Equal(versionBefore + 1, doc.RootElement.GetProperty("version").GetInt64());
+
+		// 省略 body 时按当前状态取反
+		var ok2 = Assert.IsType<OkObjectResult>(await controller.Toggle(policy.Id, null, CancellationToken.None));
+		using var doc2 = Json(ok2.Value);
+		Assert.True(doc2.RootElement.GetProperty("enabled").GetBoolean());
+	}
+
+	[Fact]
+	public async Task Toggle_CrossTenant_Returns_NotFound()
+	{
+		var ctx = CreateContext(out var connection);
+		await using var _ = connection;
+		await using var __ = ctx;
+		var (_, tableId, columnId) = await SeedPolicyGraphAsync(ctx);
+		var policy = await AddPolicyAsync(ctx, 7, 50, tableId, columnId, RowPolicySubjectType.Everyone, null);
+
+		var controller = Build(ctx, 5);
+		var result = await controller.Toggle(policy.Id, new ToggleRowPolicyRequest { Enabled = false }, CancellationToken.None);
+		Assert.IsType<NotFoundObjectResult>(result);
+	}
+
+	#endregion
+
 	private sealed class FakeIdentityService : IIdentityService
 	{
+		/// <summary>M12-18：按权限码控制授权结果，用于验证管理端点要求 identity:manage + metadata:edit。</summary>
+		public HashSet<string> Granted { get; } = new()
+		{
+			IdentityPermissions.IdentityManage,
+			IdentityPermissions.MetadataEdit,
+		};
+
 		public Task SeedAsync(CancellationToken ct = default) => throw new System.NotImplementedException();
 		public Task<IdentityResult> CreateUserAsync(long tenantId, string username, string displayName, string email, string[]? roleCodes, CancellationToken ct = default) => throw new System.NotImplementedException();
 		public Task<IdentityResult> AssignRoleAsync(long tenantId, long userId, string roleCode, CancellationToken ct = default) => throw new System.NotImplementedException();
@@ -125,6 +301,7 @@ public class RowLevelSecurityControllerTests
 		public Task<IdentityResult> SetPasswordAsync(long tenantId, long userId, string password, CancellationToken ct = default) => throw new System.NotImplementedException();
 		public Task<IdentityResult> SetUserStatusAsync(long tenantId, long userId, UserStatus newStatus, CancellationToken ct = default) => throw new System.NotImplementedException();
 		public Task<IReadOnlyList<string>> GetPermissionsAsync(long tenantId, long userId, CancellationToken ct = default) => throw new System.NotImplementedException();
-		public Task<bool> HasPermissionAsync(long tenantId, long userId, string permissionCode, CancellationToken ct = default) => Task.FromResult(true);
+		public Task<bool> HasPermissionAsync(long tenantId, long userId, string permissionCode, CancellationToken ct = default)
+			=> Task.FromResult(Granted.Contains(permissionCode));
 	}
 }

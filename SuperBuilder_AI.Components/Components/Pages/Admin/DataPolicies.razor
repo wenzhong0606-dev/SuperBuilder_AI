@@ -1,0 +1,471 @@
+@page "/admin/data-policies"
+@inject IApiClient Api
+@inject AppState State
+@inject ToastService Toast
+@using System.Text.Json
+@using SuperBuilder_AI.Components.Shared
+
+<AuthGuard>
+    <PermissionGuard Require="@(new[]{ PermissionCodes.IdentityManage, PermissionCodes.MetadataEdit })">
+    <PageHead Icon="sb-ico-shield" Key="DataPolicies" Title="数据权限" Desc="@L10n.T(Keys.Content.DataPoliciesDesc, "集中管理行级安全策略（RLS）：按数据源 / 表 / 列限定用户或角色可见的数据行，防范越权取数。")">
+        <button class="btn btn-primary btn-sm" @onclick="OpenCreate">@L10n.T(Keys.Content.DataPoliciesNew, "新建策略")</button>
+        <button class="btn btn-outline-secondary btn-sm" @onclick="Reload">@L10n.T(Keys.Content.CommonRefresh, "刷新")</button>
+    </PageHead>
+
+    @if (_loading)
+    {
+        <LoadingState Text="@L10n.T(Keys.Content.DataPoliciesLoading, "正在加载数据权限策略…")" />
+    }
+    else if (!string.IsNullOrWhiteSpace(_error))
+    {
+        <ErrorState Message="@_error" OnRetry="Reload" />
+    }
+    else
+    {
+        <div class="stat-grid">
+            <SbStatTile Label="@L10n.T(Keys.Content.DataPoliciesStatTotal, "策略总数")" Value="@_policies.Count" Sub="@L10n.T(Keys.Content.DataPoliciesStatTotalSub, "租户内全部行级策略")" />
+            <SbStatTile Label="@L10n.T(Keys.Content.DataPoliciesStatEnabled, "已启用")" Value="@_policies.Count(IsEnabled)" Sub="@L10n.T(Keys.Content.DataPoliciesStatEnabledSub, "参与查询期强制过滤")" Accent="success" />
+            <SbStatTile Label="@L10n.T(Keys.Content.DataPoliciesStatDisabled, "已停用")" Value="@_policies.Count(p => !IsEnabled(p))" Sub="@L10n.T(Keys.Content.DataPoliciesStatDisabledSub, "保留但不生效")" Accent="warning" />
+            <SbStatTile Label="@L10n.T(Keys.Content.DataPoliciesStatDataSources, "覆盖数据源")" Value="@_policies.Select(p => TablePresenter.Cell(p, "dataSourceId")).Where(x => x.Length > 0).Distinct().Count()" Sub="@L10n.T(Keys.Content.DataPoliciesStatDataSourcesSub, "至少一个策略")" Accent="info" />
+        </div>
+
+        <SbPanel Icon="sb-ico-shield" Title="@L10n.T(Keys.Content.DataPoliciesPanelPolicies, "行级安全策略")" Flush="true">
+            <Body>
+                <div class="filter-bar">
+                    <select class="form-select form-select-sm" @bind="_filterDataSourceId">
+                        <option value="0">@L10n.T(Keys.Content.DataPoliciesAllDataSources, "全部数据源")</option>
+                        @foreach (var ds in _dataSources)
+                        {
+                            <option value="@String(ds, "id")">@String(ds, "name")</option>
+                        }
+                    </select>
+                    <select class="form-select form-select-sm" @bind="_filterEnabled">
+                        <option value="">@L10n.T(Keys.Content.DataPoliciesAllStates, "全部状态")</option>
+                        <option value="true">@L10n.T(Keys.Content.DataPoliciesStateEnabled, "已启用")</option>
+                        <option value="false">@L10n.T(Keys.Content.DataPoliciesStateDisabled, "已停用")</option>
+                    </select>
+                    <input class="form-control form-control-sm" @bind="_filterText" placeholder="@L10n.T(Keys.Content.DataPoliciesSearchPh, "搜索表 / 列 / 主体 / 值…")" />
+                </div>
+
+                @if (Filtered.Count == 0)
+                {
+                    <SbEmptyState Icon="sb-ico-shield" Title="@L10n.T(Keys.Content.DataPoliciesEmptyTitle, "暂无行级安全策略")"
+                                  Text="@L10n.T(Keys.Content.DataPoliciesEmptyText, "新建策略后，命中条件的查询会被自动追加强制过滤条件；停用策略不会删除，仅停止生效。")" />
+                }
+                else
+                {
+                    <SbDataTable Items="@Filtered" Columns="@PolicyColumns" PageSize="20" EmptyTitle="@L10n.T(Keys.Content.DataPoliciesEmptyTitle, "暂无行级安全策略")">
+                        <RowActions>
+                            <button class="btn btn-sm btn-outline-secondary" @onclick="async () => await Toggle(context)">@(IsEnabled(context) ? L10n.T(Keys.Content.DataPoliciesDisable, "停用") : L10n.T(Keys.Content.DataPoliciesEnable, "启用"))</button>
+                            <button class="btn btn-sm btn-outline-secondary" @onclick="async () => await OpenEdit(context)">@L10n.T(Keys.Action.Edit, "编辑")</button>
+                            <button class="btn btn-sm btn-outline-danger" @onclick="async () => await Remove(context)">@L10n.T(Keys.Action.Delete, "删除")</button>
+                        </RowActions>
+                    </SbDataTable>
+                }
+            </Body>
+        </SbPanel>
+
+        <p class="muted">@L10n.T(Keys.Content.DataPoliciesNote, "说明：策略在查询期生效，不修改物理数据；运算符取自受控词表，值以参数化方式拼接。本页仅管理行级策略，列级（字段）授权尚未提供。")" /></p>
+    }
+    </PermissionGuard>
+</AuthGuard>
+
+<SbModal Visible="@_editModal" VisibleChanged="v => _editModal = v" Title="@(_editId > 0 ? L10n.T(Keys.Content.DataPoliciesEdit, "编辑策略") : L10n.T(Keys.Content.DataPoliciesNew, "新建策略"))" Size="lg">
+    <Body>
+        <div class="form-stack">
+            <SbField Label="@L10n.T(Keys.Content.DataPoliciesColDataSource, "数据源")" Required="true" Error="@_editErr">
+                <select class="form-select" @bind="_editDataSourceId" @bind:after="OnEditDataSourceChanged">
+                    <option value="0">@L10n.T(Keys.Content.DataPoliciesSelectDataSource, "— 选择数据源 —")</option>
+                    @foreach (var ds in _dataSources)
+                    {
+                        <option value="@String(ds, "id")">@String(ds, "name")</option>
+                    }
+                </select>
+            </SbField>
+            <SbField Label="@L10n.T(Keys.Content.DataPoliciesColTable, "表")" Required="true">
+                <select class="form-select" @bind="_editTableId" @bind:after="OnEditTableChanged">
+                    <option value="0">@L10n.T(Keys.Content.DataPoliciesSelectTable, "— 选择表 —")</option>
+                    @foreach (var t in _editTables)
+                    {
+                        <option value="@String(t, "id")">@String(t, "tableName")</option>
+                    }
+                </select>
+                @if (_editDataSourceId > 0 && _editTables.Count == 0)
+                {
+                    <span class="muted">@L10n.T(Keys.Content.DataPoliciesNoTables, "该数据源尚无元数据，请先执行元数据扫描。")</span>
+                }
+            </SbField>
+            <SbField Label="@L10n.T(Keys.Content.DataPoliciesColColumn, "列")" Required="true">
+                <select class="form-select" @bind="_editColumnId">
+                    <option value="0">@L10n.T(Keys.Content.DataPoliciesSelectColumn, "— 选择列 —")</option>
+                    @foreach (var c in _editColumns)
+                    {
+                        <option value="@String(c, "id")">@String(c, "columnName")</option>
+                    }
+                </select>
+            </SbField>
+            <SbField Label="@L10n.T(Keys.Content.DataPoliciesColSubjectType, "主体类型")" Required="true">
+                <select class="form-select" @bind="_editSubjectType">
+                    <option value="@((int)SubjectKind.Everyone)">@L10n.T(Keys.Content.DataPoliciesSubjectEveryone, "所有人")</option>
+                    <option value="@((int)SubjectKind.User)">@L10n.T(Keys.Content.DataPoliciesSubjectUser, "用户")</option>
+                    <option value="@((int)SubjectKind.Role)">@L10n.T(Keys.Content.DataPoliciesSubjectRole, "角色")</option>
+                    <option value="@((int)SubjectKind.Attribute)">@L10n.T(Keys.Content.DataPoliciesSubjectAttribute, "属性")</option>
+                </select>
+            </SbField>
+            @if (_editSubjectType == (int)SubjectKind.User)
+            {
+                <SbField Label="@L10n.T(Keys.Content.DataPoliciesColSubject, "主体")" Required="true">
+                    <select class="form-select" @bind="_editSubjectId">
+                        <option value="0">@L10n.T(Keys.Content.DataPoliciesSelectUser, "— 选择用户 —")</option>
+                        @foreach (var u in _users)
+                        {
+                            <option value="@String(u, "id")">@UserLabel(u)</option>
+                        }
+                    </select>
+                </SbField>
+            }
+            else if (_editSubjectType == (int)SubjectKind.Role)
+            {
+                <SbField Label="@L10n.T(Keys.Content.DataPoliciesColSubject, "主体")" Required="true">
+                    <select class="form-select" @bind="_editSubjectId">
+                        <option value="0">@L10n.T(Keys.Content.DataPoliciesSelectRole, "— 选择角色 —")</option>
+                        @foreach (var r in _roles)
+                        {
+                            <option value="@String(r, "id")">@RoleLabel(r)</option>
+                        }
+                    </select>
+                </SbField>
+            }
+            else if (_editSubjectType == (int)SubjectKind.Attribute)
+            {
+                <SbField Label="@L10n.T(Keys.Content.DataPoliciesAttrKey, "属性名")" Required="true">
+                    <input class="form-control" @bind="_editSubjectKey" placeholder="@L10n.T(Keys.Content.DataPoliciesAttrKeyPh, "如 department")" />
+                </SbField>
+                <SbField Label="@L10n.T(Keys.Content.DataPoliciesAttrValue, "属性值")">
+                    <input class="form-control" @bind="_editSubjectValue" placeholder="@L10n.T(Keys.Content.DataPoliciesAttrValuePh, "如 sales")" />
+                </SbField>
+            }
+            <SbField Label="@L10n.T(Keys.Content.DataPoliciesColEffect, "效果")" Required="true">
+                <select class="form-select" @bind="_editEffect">
+                    <option value="1">@L10n.T(Keys.Content.DataPoliciesEffectAllow, "允许（仅可见命中行）")</option>
+                    <option value="2">@L10n.T(Keys.Content.DataPoliciesEffectDeny, "拒绝（排除命中行）")</option>
+                </select>
+            </SbField>
+            <SbField Label="@L10n.T(Keys.Content.DataPoliciesColOperator, "运算符")" Required="true">
+                <select class="form-select" @bind="_editOperator">
+                    @foreach (var op in Operators)
+                    {
+                        <option value="@op">@op</option>
+                    }
+                </select>
+            </SbField>
+            <SbField Label="@L10n.T(Keys.Content.DataPoliciesColValue, "值")" Required="@(!IsNullOperator)" Error="@_valueErr">
+                <input class="form-control" @bind="_editValue" placeholder="@L10n.T(Keys.Content.DataPoliciesValuePh, "如 east")" disabled="@IsNullOperator" />
+                @if (IsNullOperator)
+                {
+                    <span class="muted">@L10n.T(Keys.Content.DataPoliciesNullValueHint, "该运算符不需要值。")</span>
+                }
+            </SbField>
+            <label class="chk"><input type="checkbox" @bind="_editEnabled" /> @L10n.T(Keys.Content.DataPoliciesEnabled, "启用该策略")</label>
+        </div>
+    </Body>
+    <Footer>
+        <button class="btn btn-outline-secondary btn-sm" @onclick="() => _editModal = false">@L10n.T(Keys.Content.CommonCancel, "取消")</button>
+        <button class="btn btn-primary btn-sm" @onclick="Save">@L10n.T(Keys.Content.CommonSave, "保存")</button>
+    </Footer>
+</SbModal>
+
+@code {
+    private enum SubjectKind { Everyone = 0, User = 1, Role = 2, Attribute = 3 }
+
+    /// <summary>后端 <c>RlsVocabularyValidator</c> 受控词表的前端镜像（新增/修改须与后端保持同步）。</summary>
+    private static readonly string[] Operators =
+    {
+        "=", "!=", ">", ">=", "<", "<=", "LIKE", "IN", "IS NULL", "IS NOT NULL",
+    };
+
+    private List<JsonElement> _policies = new();
+    private List<JsonElement> _dataSources = new();
+    private List<JsonElement> _users = new();
+    private List<JsonElement> _roles = new();
+    private string _error = string.Empty;
+    private bool _loading = true;
+
+    private long _filterDataSourceId;
+    private string _filterEnabled = string.Empty;
+    private string _filterText = string.Empty;
+
+    private bool _editModal;
+    private long _editId;
+    private long _editDataSourceId;
+    private long _editTableId;
+    private long _editColumnId;
+    private int _editSubjectType;
+    private long _editSubjectId;
+    private string _editSubjectKey = string.Empty;
+    private string _editSubjectValue = string.Empty;
+    private int _editEffect = 1;
+    private string _editOperator = "=";
+    private string _editValue = string.Empty;
+    private bool _editEnabled = true;
+    private string _editErr = string.Empty;
+    private string _valueErr = string.Empty;
+    private List<JsonElement> _editTables = new();
+    private List<JsonElement> _editColumns = new();
+
+    private bool IsNullOperator => _editOperator is "IS NULL" or "IS NOT NULL";
+
+    private List<JsonElement> Filtered => _policies.Where(Match).ToList();
+
+    private List<SbColumn<JsonElement>> PolicyColumns => new()
+    {
+        SbCol.Of<JsonElement>(L10n.T(Keys.Content.DataPoliciesColDataSource, "数据源"), r => TablePresenter.Cell(r, "dataSourceName")),
+        SbCol.Of<JsonElement>(L10n.T(Keys.Content.DataPoliciesColTable, "表"), r => TablePresenter.Cell(r, "tableName")),
+        SbCol.Of<JsonElement>(L10n.T(Keys.Content.DataPoliciesColColumn, "列"), r => TablePresenter.Cell(r, "columnName")),
+        SbCol.Of<JsonElement>(L10n.T(Keys.Content.DataPoliciesColSubjectType, "主体类型"), r => SubjectTypeLabel(TablePresenter.Cell(r, "subjectType"))),
+        SbCol.Of<JsonElement>(L10n.T(Keys.Content.DataPoliciesColSubject, "主体"), r => TablePresenter.Cell(r, "subjectDisplayName")),
+        SbCol.Of<JsonElement>(L10n.T(Keys.Content.DataPoliciesColEffect, "效果"), r => EffectLabel(TablePresenter.Cell(r, "effect"))),
+        SbCol.Of<JsonElement>(L10n.T(Keys.Content.DataPoliciesColCondition, "条件"), r => ConditionLabel(r)),
+        SbCol.Of<JsonElement>(L10n.T(Keys.Content.DataPoliciesColState, "状态"), r => IsEnabled(r) ? L10n.T(Keys.Content.DataPoliciesStateEnabled, "已启用") : L10n.T(Keys.Content.DataPoliciesStateDisabled, "已停用")),
+    };
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender) await Reload();
+    }
+
+    private async Task Reload()
+    {
+        _loading = true;
+        var tid = State.TenantId;
+        var (p, _, pErr, _) = await Api.GetJsonAsync($"api/data-policies/row/manage?tenantId={tid}");
+        _error = pErr ?? string.Empty;
+        _policies = Array(p);
+        var (d, _, _, _) = await Api.GetJsonAsync("api/data-sources/manage");
+        _dataSources = Array(d);
+        var (u, _, _, _) = await Api.GetJsonAsync($"api/identity/users?tenantId={tid}");
+        _users = Array(u);
+        var (r, _, _, _) = await Api.GetJsonAsync($"api/identity/roles?tenantId={tid}");
+        _roles = Array(r);
+        _loading = false;
+        StateHasChanged();
+    }
+
+    private bool Match(JsonElement p)
+    {
+        if (_filterDataSourceId > 0 && TablePresenter.Cell(p, "dataSourceId") != _filterDataSourceId.ToString()) return false;
+        if (_filterEnabled.Length > 0 && IsEnabled(p) != (_filterEnabled == "true")) return false;
+        if (_filterText.Trim().Length == 0) return true;
+        var needle = _filterText.Trim();
+        return needle.Split(' ', StringSplitOptions.RemoveEmptyEntries).All(term =>
+            Contains(p, "tableName", term) || Contains(p, "columnName", term) ||
+            Contains(p, "subjectDisplayName", term) || Contains(p, "value", term) ||
+            Contains(p, "dataSourceName", term));
+    }
+
+    private static bool Contains(JsonElement e, string prop, string term) =>
+        TablePresenter.Cell(e, prop).Contains(term, StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsEnabled(JsonElement p)
+    {
+        var raw = TablePresenter.Cell(p, "enabled");
+        return raw.Length > 0 && !raw.Equals("false", StringComparison.OrdinalIgnoreCase) && raw != "0";
+    }
+
+    private string SubjectTypeLabel(string raw) => raw switch
+    {
+        "0" or "Everyone" => L10n.T(Keys.Content.DataPoliciesSubjectEveryone, "所有人"),
+        "1" or "User" => L10n.T(Keys.Content.DataPoliciesSubjectUser, "用户"),
+        "2" or "Role" => L10n.T(Keys.Content.DataPoliciesSubjectRole, "角色"),
+        "3" or "Attribute" => L10n.T(Keys.Content.DataPoliciesSubjectAttribute, "属性"),
+        _ => raw,
+    };
+
+    private string EffectLabel(string raw) => raw is "2" or "Deny"
+        ? L10n.T(Keys.Content.DataPoliciesEffectDenyShort, "拒绝")
+        : L10n.T(Keys.Content.DataPoliciesEffectAllowShort, "允许");
+
+    private string ConditionLabel(JsonElement p)
+    {
+        var op = TablePresenter.Cell(p, "operator");
+        var val = TablePresenter.Cell(p, "value");
+        return op is "IS NULL" or "IS NOT NULL" ? op : $"{op} {val}";
+    }
+
+    private static string UserLabel(JsonElement u)
+    {
+        var name = TablePresenter.Cell(u, "displayName");
+        var uname = TablePresenter.Cell(u, "username");
+        return name.Length > 0 ? $"{name}（{uname}）" : uname;
+    }
+
+    private static string RoleLabel(JsonElement r)
+    {
+        var name = TablePresenter.Cell(r, "name");
+        var code = TablePresenter.Cell(r, "code");
+        return name.Length > 0 ? $"{name}（{code}）" : code;
+    }
+
+    private void OpenCreate()
+    {
+        _editId = 0;
+        _editDataSourceId = 0;
+        _editTableId = 0;
+        _editColumnId = 0;
+        _editSubjectType = (int)SubjectKind.Everyone;
+        _editSubjectId = 0;
+        _editSubjectKey = string.Empty;
+        _editSubjectValue = string.Empty;
+        _editEffect = 1;
+        _editOperator = "=";
+        _editValue = string.Empty;
+        _editEnabled = true;
+        _editErr = string.Empty;
+        _valueErr = string.Empty;
+        _editTables = new();
+        _editColumns = new();
+        _editModal = true;
+    }
+
+    private async Task OpenEdit(JsonElement row)
+    {
+        OpenCreate();
+        _editId = Num(row, "id");
+        _editDataSourceId = Num(row, "dataSourceId");
+        _editTableId = Num(row, "metadataTableId");
+        _editColumnId = Num(row, "metadataColumnId");
+        _editSubjectType = (int)Num(row, "subjectType");
+        _editSubjectId = Num(row, "subjectId");
+        _editSubjectKey = TablePresenter.Cell(row, "subjectKey");
+        _editSubjectValue = TablePresenter.Cell(row, "subjectValue");
+        _editEffect = Num(row, "effect") == 2 ? 2 : 1;
+        _editOperator = TablePresenter.Cell(row, "operator");
+        if (_editOperator.Length == 0) _editOperator = "=";
+        _editValue = TablePresenter.Cell(row, "value");
+        _editEnabled = IsEnabled(row);
+        await LoadTables();
+        _editColumnId = Num(row, "metadataColumnId");
+        LoadColumns();
+        _editModal = true;
+    }
+
+    private async Task OnEditDataSourceChanged()
+    {
+        _editTableId = 0;
+        _editColumnId = 0;
+        await LoadTables();
+    }
+
+    private async Task LoadTables()
+    {
+        _editTables = new();
+        _editColumns = new();
+        if (_editDataSourceId <= 0) return;
+        var (data, _, err, _) = await Api.GetJsonAsync($"api/data-sources/{_editDataSourceId}/metadata");
+        if (!string.IsNullOrWhiteSpace(err)) return;
+        _editTables = Array(data);
+    }
+
+    private void OnEditTableChanged() => LoadColumns();
+
+    private void LoadColumns()
+    {
+        _editColumns = new();
+        if (_editTableId <= 0) return;
+        foreach (var t in _editTables)
+        {
+            if (Num(t, "id") != _editTableId) continue;
+            if (t.TryGetProperty("columns", out var cols) && cols.ValueKind == JsonValueKind.Array)
+                _editColumns = cols.EnumerateArray().ToList();
+            break;
+        }
+    }
+
+    private async Task Save()
+    {
+        _editErr = string.Empty;
+        _valueErr = string.Empty;
+        if (_editDataSourceId <= 0 || _editTableId <= 0 || _editColumnId <= 0)
+        {
+            _editErr = L10n.T(Keys.Content.DataPoliciesSelectBinding, "请选择数据源、表与列。");
+            return;
+        }
+        if (_editSubjectType is (int)SubjectKind.User or (int)SubjectKind.Role && _editSubjectId <= 0)
+        {
+            _editErr = L10n.T(Keys.Content.DataPoliciesSelectSubject, "请选择主体。");
+            return;
+        }
+        if (_editSubjectType == (int)SubjectKind.Attribute && _editSubjectKey.Trim().Length == 0)
+        {
+            _editErr = L10n.T(Keys.Content.DataPoliciesAttrKeyRequired, "请填写属性名。");
+            return;
+        }
+        if (!IsNullOperator && _editValue.Trim().Length == 0)
+        {
+            _valueErr = L10n.T(Keys.Content.DataPoliciesValueRequired, "请填写值。");
+            return;
+        }
+
+        var payload = new
+        {
+            id = _editId,
+            dataSourceId = _editDataSourceId,
+            metadataTableId = _editTableId,
+            metadataColumnId = _editColumnId,
+            subjectType = _editSubjectType,
+            subjectId = _editSubjectType is (int)SubjectKind.User or (int)SubjectKind.Role ? _editSubjectId : (long?)null,
+            subjectKey = _editSubjectType == (int)SubjectKind.Attribute ? _editSubjectKey.Trim() : null,
+            subjectValue = _editSubjectType == (int)SubjectKind.Attribute ? _editSubjectValue.Trim() : null,
+            effect = _editEffect,
+            @operator = _editOperator,
+            value = _editValue.Trim(),
+            enabled = _editEnabled,
+        };
+
+        var (ok, _, err, _) = await Api.PostAsync("api/data-policies/row", payload);
+        if (!ok)
+        {
+            Toast.Error(err ?? L10n.T(Keys.Content.DataPoliciesSaveFailed, "保存失败。"));
+            return;
+        }
+        Toast.Success(_editId > 0 ? L10n.T(Keys.Content.DataPoliciesUpdated, "策略已更新。") : L10n.T(Keys.Content.DataPoliciesCreated, "策略已创建。"));
+        _editModal = false;
+        await Reload();
+    }
+
+    private async Task Toggle(JsonElement row)
+    {
+        var id = Num(row, "id");
+        var (ok, _, err, _) = await Api.PostAsync($"api/data-policies/row/{id}/toggle", new { enabled = !IsEnabled(row) });
+        if (!ok)
+        {
+            Toast.Error(err ?? L10n.T(Keys.Content.DataPoliciesToggleFailed, "状态切换失败。"));
+            return;
+        }
+        await Reload();
+    }
+
+    private async Task Remove(JsonElement row)
+    {
+        var id = Num(row, "id");
+        var (ok, _, err, _) = await Api.DeleteAsync($"api/data-policies/row/{id}");
+        if (!ok)
+        {
+            Toast.Error(err ?? L10n.T(Keys.Content.DataPoliciesDeleteFailed, "删除失败。"));
+            return;
+        }
+        Toast.Success(L10n.T(Keys.Content.DataPoliciesDeleted, "策略已删除。"));
+        await Reload();
+    }
+
+    private static long Num(JsonElement e, string prop)
+    {
+        var raw = TablePresenter.Cell(e, prop);
+        return long.TryParse(raw, out var v) ? v : 0;
+    }
+
+    private static List<JsonElement> Array(JsonElement? e) =>
+        e is { ValueKind: JsonValueKind.Array } ? e.Value.EnumerateArray().ToList() : new();
+
+    private static string String(JsonElement e, string prop) => TablePresenter.Cell(e, prop);
+}
