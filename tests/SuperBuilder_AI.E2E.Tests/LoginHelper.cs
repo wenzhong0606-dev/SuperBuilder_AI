@@ -115,7 +115,9 @@ internal static class LoginHelper
             "}",
             new { apiBase, code = tenantCode });
         using var doc = JsonDocument.Parse(codeJson);
-        var id = doc.RootElement.GetProperty("Id").GetInt64();
+        // API 采用 camelCase 序列化策略（对照 ApiLoginAsync 中 token/tenantId/userId 等小写键），
+        // tenant-by-code 返回 { id, tenantCode, name }，故取小写 "id"。
+        var id = doc.RootElement.GetProperty("id").GetInt64();
         await ApiLoginAsync(page, user, password, id);
     }
 }
