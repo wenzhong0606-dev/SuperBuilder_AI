@@ -24,7 +24,7 @@
 - 删除死键须四地同步删；同文件两处**不可并行 Edit**（后者覆盖前者）。校验脚本样例 `C:/tmp/verify_designer_i18n2.py`。
 
 ## 测试基线
-- 单测 `SuperBuilder_AI.Tests` **1073/1073 绿**（2026-09-11，基线随 M12-11/12/13 递增：1061→1071→1073）。⚠️ `RateLimitMiddlewareTests.Expired_Windows_Are_Evicted...` 时间敏感 flaky（全量偶发失败、单跑 7/7 绿）。
+- 单测 `SuperBuilder_AI.Tests` **1091/1091 绿**（2026-09-11，基线随 M12-11~16 递增：1061→1071→1073→1075→1082→1091）。⚠️ `RateLimitMiddlewareTests.Expired_Windows_Are_Evicted...` 时间敏感 flaky（全量偶发失败、单跑 7/7 绿）。
 - E2E `tests/SuperBuilder_AI.E2E.Tests`：**上次记录 10 通过 / 1 跳过（axe 按设计）/ 0 失败**（需 `SB_E2E_BASE_URL`+`SB_E2E_API_URL`+Chromium）。限流依赖 gitignored `appsettings.Local.json`（LoginLimit=500/GlobalLimit=1000）。⚠️ 09-11 新增 `PermissionMatrixE2ETests.cs`（M12-P0 权限矩阵，17 用例：7 管理可见+8 读者隐藏双向+Agent Run 专项×2），编译通过、env 缺失时全跳过；**已本地拉起整套栈经 `dotnet vstest` 实跑 = 15 通过 / 1 失败(`/themes` 测试时序耦合) / 1 跳过（无智能体种子），时序修复已落源码，并已接 CI（51b0d16：E2ESandboxSeedService 建 e2eapp 租户+e2eadmin/e2ereader，E2E_SEED=true + 过滤 PermissionMatrixE2ETests 类），待 CI 实跑确认全绿**。
 - **CI 实跑根因已定位（run 34566854796：17 总数 / 5 通过 / 12 失败）**：
   1. **登录 429（主因，12 例全因此）**：默认 `LoginLimit=10`/`GlobalLimit=120`（见 `RateLimitOptions.cs`）在 CI 无 `appsettings.Local.json` 时生效；所有 E2E 登录同源自 `127.0.0.1`+相同 UA → 共用一个限流桶（键 `ip:127.0.0.1:<uahash>`），矩阵 ~19 次登录瞬间触顶 → 后续用例 `SB_TOO_MANY_REQUESTS` 429。已于 `.github/workflows/dotnet-build.yml` 的「启动 Web API」步骤注入 `RateLimit__LoginLimit=500`/`RateLimit__GlobalLimit=1000`（与 Local 配置等价，仅 CI）。
@@ -36,7 +36,7 @@
 - ✅ M0 / M1 / M2 / M3 / M4 / M5 / M6 / M7(01~11) / M8。
 - 🟡 **M9 主体交付，范围须限定**：01~11、13~15 均有交付块，但 **M9-06 = 务实子集**（UI 仅按 `code` 分支，未全量改造字符串展示）、**M9-11 未含完整 DTO/枚举合并审计**、**M9-14 仍记完整恢复演练待办**——**不得统称"全部验收完成"**。仅 **M9-12（A3 拆四项目）明确跳过**（用户决策）。
 - 🟡 **M12-P0 前端 RBAC 已实施 + 权限矩阵 E2E 已编写（env-gated 待执行，非"完成"）**：`PermissionCodes.cs` 已补 dashboard/agent/theme:edit|publish/metadata:*；`SystemStatus.razor:6` 已补 `Require=PlatformDiagnosticsView`；逐页核实 SystemStatus/Dashboards/Apps/DataSources/ThemeEditor/BusinessModel/SemanticLabels 均正确包裹；**`Agent.razor:33` Run 按钮已补 `agent:manage` 包裹**（原唯一遗漏）。权限矩阵 E2E `tests/SuperBuilder_AI.E2E.Tests/PermissionMatrixE2ETests.cs`（18 用例：8 路由双向矩阵 + Agent Run 专项）已于 09-11 编写，`dotnet build` 通过、无 env 时全跳过（跳过安全网正常）；**尚未在运行实例+凭据+Chromium 集成环境实跑**，故不标记 ✅。`MDP/M12.md` 已同步刷新，文档不再滞后。
-- ⬜ M12-P1（M12-09~18 功能闭环）、M10（多库连接器/BYO 模型/外部 IdP）、M11（暂缓）。
+- 🟡 **M12-P1 推进中**：M12-09~16 已实施（09=Agent 新建/Run 接真实 API、10=Agent Runs 详情页、11=DataSource 测试连接方案 B、12=P0 收口、13=Dashboard 可视化设计器、14=App 可视化设计器、15=Semantic Model 关系图、16=指标中心只读治理视图）；**M12-17（Identity 组织/部门/用户组）、M12-18（数据权限/RLS 可视化）待排期**。⬜ M10（多库连接器/BYO 模型/外部 IdP）、M11（暂缓）。
 - ⚠️ 本地 `HEAD == origin/master == 87b109e`（0/0 差异）；远端实时态因 Git HTTPS helper 故障未独立确认，故服务器最新状态未知。提交均随用户自行推送。
 
 ## 已知缺口（2026-09-11 经用户逐条源码勘误修正）
@@ -61,6 +61,8 @@
 - **登录/权限**：`platform` 租户被登录 UI 排除，但 `POST /api/auth/login` 仅按 TenantId 校验 → `platform-admin` 须走 `/admin/login`。登出缺陷已中心化修复：`ApiClientBase.OnUnauthorized(bool requestCarriedToken)` 仅在「请求确带令牌且已登录」时清会话。
 - **端点易混**：租户管理 `POST /api/tenant-management`（非 `/api/platform/tenants`）；元数据扫描 `POST /api/data-sources/{id}/metadata/scan`（在 **MetadataController**）。
 - **PowerShell 5.1**：原生命令 stderr 在 `$ErrorActionPreference='Stop'` 下误判终止；`Write-Host` 无法捕获（用 `Write-Output`）；BOM 重复叠加会破坏 `<#` 帮助块；Windows curl `-o` 须相对路径。
+- **业务语义层模型**：`BusinessEntityMetric` 继承 `BaseEntity`（**BaseEntity 无 TenantId**，仅 Id/审计/RowVersion）→ 指标无自身 TenantId，租户隔离须经所属 `BusinessEntity.TenantId`（EF INNER JOIN）；`BusinessEntityDimension` 自带 TenantId；`BusinessEntityRelationship` 亦无 TenantId，靠两端实体。返回带反向导航的 EF 实体会循环引用 → 一律用只读投影 record。
+- **EF/SQLite 测试**：SQLite 内存库 `Tenants.TenantCode` 有唯一约束 → 同测试种多租户须显式给 TenantCode（默认空串冲突，报 `UNIQUE constraint failed: Tenants.TenantCode`）。`dotnet test` **不带 `--no-restore`** 报 `Value cannot be null (Parameter 'path1')`（本沙箱还原不可用）→ 统一 `build --no-restore` + `test --no-build`。
 - **P11 前端**：`ServerPrerendered` 阶段无 JS → 主题/JS 互操作移 `OnAfterRenderAsync(firstRender)`；RCL 不可引 `Components.WebView.Maui`；`TokenService` 缺 `Auth:SigningKey` **拒绝启动**（`AuthSigningKeyPolicy.cs`），非 dev 还校验强度——生产密钥管理由配置校验强制保障，无硬编码回退。
 
 ## 架构治理（M9-02/03 固化）
