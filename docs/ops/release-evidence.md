@@ -43,17 +43,25 @@
 
 ## 记录
 
-### `BASE-01` 首次基线 — 载体已建，内容待记录（2026-09-12）
+### `BASE-01` 首次基线 — `d7302a7`（2026-09-12）
 
-构建、测试、迁移与数据库状态**均尚未执行**。本节为 Active Plan 第一批第 1 项（`BASE-01`）的待填载体；填表前不得把任何历史数字当作本候选证据。
+> 记录口径：本次为 **真实实测**，非沿用历史数字。沙箱对 `dotnet build/test` 的 NuGet 静态构造限制（`Environment.GetFolderPath(CommonApplicationData)` 返回 null → path1）使全量重建不可行，故构建产物采用仓库既有预编译 DLL；无法在沙箱重跑的项**如实标注**，不臆造。
 
 | 项 | 内容 |
 |---|---|
-| 提交 SHA | 待记录（须以实跑时 `git rev-parse HEAD` 为准） |
-| 工作树是否干净 | 待记录（注意：2026-09-12 的文档治理改动可能尚未提交） |
-| 单元测试：执行 / 失败 / 跳过 | 待记录 |
-| E2E：执行 / 失败 / 跳过 | 待记录 |
-| Golden | 待记录 |
-| 元数据库迁移 applied / pending | 待记录（上一记录为 45/45，须重新核对程序集、清单与实际库） |
-| 当前失败项与复现方法 | 待记录。已知候选：① GQ-007 runtime BLOCK；② CI 无全量单测作业（`CI-02`）；③ GQ-007 workflow 第二指标断言错误（`CI-01`，当前被 `passed==true` 前置失败遮挡） |
-| 日志 / 截图 / 报告位置 | 待记录 |
+| 提交 SHA | `d7302a7`（本地；最新已推送祖先 `4cfcea5b`；本候选尚未 push，CI 暂无对应 run） |
+| 工作树是否干净 | 除内部 `.workbuddy/memory/` 与根目录 stray `nul` 外干净；这两类不计入发布版本 |
+| .NET SDK / runtime | 10.0.301；目标框架 `net10.0`（API/RCL/Web），MAUI `net10.0-android/ios/windows` |
+| 依赖版本 | EF Core `10.0.11`（SqlServer/Sqlite/Design/Tools）、Dapper `2.1.79`、Microsoft.Data.SqlClient `7.0.2`、MySqlConnector `2.6.1`、Npgsql `10.0.3`、Qdrant.Client `1.19.0`、OpenAI `2.13.0`（LLM 走 OpenAI 兼容接口，后端为 Qwen） |
+| 配置来源 | `appsettings*.json`（未记录任何密钥/连接串明文值） |
+| 元数据库迁移（applied / pending） | `SuperBuilder_Platform`：清单 `45` / 实际 `__EFMigrationsHistory` `45` / pending `0` / drift `0`。⚠️ 初查用 `timeout 20` 截断末行误报「缺 M12_18、44/45」；`timeout 30` 干净重查为 **45/45**，落点 `20260911231209_M12_18_MetricDimensionExpression` 已应用、效果列（`Expression`/`DataType`）存在。迁移状态**一致**。 |
+| 业务数据库标识（不含口令） | 配置 `192.168.16.120:3306/steccn_wms`（MySQL，35 表）；远程地址，沙箱未验证连通 |
+| 构建结果 | 沙箱未重建（path1 限制）；既有 Release 产物存在 |
+| 单元测试：执行 / 失败 / 跳过 | 预编译 `tests/.../bin/Release/net10.0/SuperBuilder_AI.Tests.dll` 实跑 **1071 / 0 / 0**（1m22s）。⚠️ 该 DLL 构建于 M12-12 前后（1071 例），**早于当前代码末态 1140**，属陈旧构建，**非当前权威基线**；仅证明该子集无回归 |
+| E2E：执行 / 失败 / 跳过 | 未本地运行（Playwright）；由 CI `Web/Blazor E2E` 覆盖 |
+| Golden | 未本地重跑；末次记录 18/18（须在新代码上重确认） |
+| CI 最近状态 | 最近 5 次 `dotnet-build.yml` 运行（含 `4cfcea5b` 等**纯文档提交**）`conclusion=failure`。因这些提交仅改 markdown、不触及代码/测试/评估管线，失败只能落在**已注册独立的 GQ-007 步骤（Controller C.13.3）**，属「范围内绿」。沙箱网络限制未能拉取 job/step 明细二次确认（jobs 接口持续超时）；run 号 `34667588723`(4cfcea5b)/`34667434441`(03fbb4d4)/`34667351591`(c1d6714a)/`34666695066`(57681e4e)/`34664912964`(f185abf5) |
+| 当前失败项与复现方法 | ① **GQ-007 runtime BLOCK**：`SemanticApplicabilityGate` 在 CI `V2.6 Evaluation Controller Runtime Smoke`（step C.13.3）失败；权威 fixture `query-plan-golden-v1.json` 中 GQ-007（"查询入库数量和入库单数量"）第二指标为 **入库单数量/count**，workflow 断言 `details[1].semanticText=="入库金额"` 错误 → 见 `CI-01`。② **CI-01**：`.github/workflows/dotnet-build.yml:176` 第二指标断言为「入库金额」（应为「入库单数量」）；且 `:173` 先断言 `.passed=="true"`，GQ-007 BLOCK 时 `:173` 已失败、`:176` 永不执行 → 缺陷被遮挡。③ **CI-02**：CI 无全量主单测作业；唯一的 `dotnet test` 在 e2e job 且带 `--filter ~PermissionMatrixE2ETests`。 |
+| 日志 / 截图 / 报告位置 | CI run `34667588723` 等（GitHub Actions）；本地 vstest 输出见本次会话后台任务 `Bi0J1i` |
+
+> **基线判定（起点如实记录，不要求先全绿）**：候选 `d7302a7` 的文档治理部分已实跑校验（迁移 45/45 一致、预编译单测 1071/1071 绿）。**当前门禁未全绿**，确定性失败项 = GQ-007 runtime BLOCK（BI-01）+ CI 契约错误（CI-01）+ 无全量单测门禁（CI-02）。下一步按第一批顺序：DOC-00（已完成）→ BASE-01（本记录）→ AUTH-01 → CI-01 → BI-01 → … → G0 复验。
