@@ -14,7 +14,7 @@
 | DOC-00 | 文档治理 | docs 结构、状态规则、Backlog↔里程碑任务映射对账 | BACKLOG | —（BASE-01 前置） | 形成唯一主线与归档规则；任务 ID 无孤立项、无失效章节引用 |
 | BASE-01 | M13-01 | 固定候选版本与发布证据基线（代码/环境/测试/迁移/运行证据） | BACKLOG | M13-01 | 同一候选 SHA 对应完整证据清单并落 `docs/ops/release-evidence.md`；旧的 431/1015 等门槛不再作为当前基线 |
 | AUTH-01 | 审计/M13-02 | Identity 管理 API 强制 `identity:manage` | BACKLOG | M13-02 | viewer/member 直接 HTTP 403 且无副作用 |
-| BI-01 | CI/M13-06 | GQ-007 多指标 SemanticApplicabilityGate | BACKLOG | M13-06 | runtime smoke + Golden 全绿 |
+| BI-01 | CI/M13-06 | GQ-007 多指标 SemanticApplicabilityGate | BACKLOG | M13-06 | **经 2026-08-29 golden run 实证 `applicabilityState=Resolved`、`queryPlanEvaluationPassed=true`、`decision=PASS`（两指标 入库数量/Sum、入库单数量/Count 均通过）→ 无 runtime BLOCK，gate 实际通过。** 近期 CI 在 GQ-007 step 的红系 CI-01 断言错误（已修 `41e9624`），**BI-01 无代码缺陷**。关闭条件：CI 复跑 GQ-007 step（C.13.3）绿。 |
 | CI-01 | CI | 修正 GQ-007 YAML 将第二指标错写为"入库金额"（契约应为"入库单数量"） | BACKLOG | M13-05 | CI 断言已与 Golden 契约对齐（第二指标改 `入库单数量`）；**本项关闭不等于整体门禁转绿**，`:173` 先断言 `.passed=="true"`，BI-01 未闭前 `:173` 即失败、`:176` 永不执行，CI 保持失败（属预期） |
 | CI-02 | M13-05 | CI 执行全部 Unit Tests | BACKLOG | M13-05 | 非零测试数、0 failure、TRX 可追溯 |
 | SEC-01 | M13-03 | DataSource ConnectionString AEAD 加密 | BACKLOG | M13-03 | 新旧数据均不明文持久化 |

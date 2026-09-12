@@ -65,3 +65,10 @@
 | 日志 / 截图 / 报告位置 | CI run `34667588723` 等（GitHub Actions）；本地 vstest 输出见本次会话后台任务 `Bi0J1i` |
 
 > **基线判定（起点如实记录，不要求先全绿）**：候选 `d7302a7` 的文档治理部分已实跑校验（迁移 45/45 一致、预编译单测 1071/1071 绿）。**当前门禁未全绿**，确定性失败项 = GQ-007 runtime BLOCK（BI-01）+ CI 契约错误（CI-01）+ 无全量单测门禁（CI-02）。下一步按第一批顺序：DOC-00（已完成）→ BASE-01（本记录）→ AUTH-01 → CI-01 → BI-01 → … → G0 复验。
+
+## 更正记录（2026-09-12 CI-01 / BI-01 复核，不覆盖上方基线快照）
+
+- **BI-01「GQ-007 runtime BLOCK」为误判，已纠正**：实证 `SuperBuilder_AI/Evaluation/artifacts/golden_run_20260829_fix3.json`（18/18）中 GQ-007 记录 = `applicabilityState=Resolved`、`queryPlanEvaluationPassed=true`、`decision=PASS`、`expectedOutcomeSatisfied=true`；两指标 `入库数量/quantity/Sum`、`入库单数量/id/Count` 的 `bindingMatched=true`、均 `passed`。即 `SemanticApplicabilityEvaluator` → `QueryPlanEvaluationGate` 对 GQ-007 **实际通过**，无代码缺陷。
+- **近期 CI 在 GQ-007 step（C.13.3）的红，唯一根因是 CI-01 断言错误**（`dotnet-build.yml:176` 原断言 `details[1].semanticText=="入库金额"`，权威 fixture 应为 `入库单数量`），已于 `41e9624` 修正为 `入库单数量`。修正前 `:176` 直接失败；修正后该 step 的依赖（`:173` `.passed==true` 由 gate 通过而绿、`:174/:175/:177` 均满足）应转绿。
+- 上方「当前失败项 ①」与「基线判定」中 "GQ-007 runtime BLOCK（BI-01）" 为 BASE-01 时点的推断（当时未实跑 GQ-007 全链路、且 jobs 明细接口超时无法二次确认），**以此更正为准**。
+- **待 CI 复跑确认**：CI-01 修正后首跑若 GQ-007 step 仍红，则回查 CI `controller-runtime` job 是否加载了 wms 元数据/Qdrant 索引（golden run 与 CI 元数据状态须一致）；若一致则 BI-01 确为无缺陷。CI-02（无全量主单测 job）仍为真缺口，独立于本次更正。
