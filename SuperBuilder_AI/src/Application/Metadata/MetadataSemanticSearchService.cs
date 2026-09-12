@@ -300,6 +300,51 @@ public class MetadataSemanticSearchService
 			.Any(k => Normalize(k) == normalized);
 	}
 
+	/// <summary>
+	/// 基于语义层关键词/Synonyms/BusinessMeaning 的<strong>子串</strong>确定性匹配检索，用于实体计数等场景。
+	/// 与 <see cref="SearchByKeywordAsync"/> 的精确匹配不同，本方法按“归一化子串包含”匹配，
+	/// 以覆盖“入库单ID/入库单号”等将实体词作为前缀的关键词形态，不依赖向量召回深度。
+	/// </summary>
+	public async Task<List<MetadataSemanticSearchResult>> SearchByKeywordSubstringAsync(string keyword, int limit = 30)
+	{
+		if (string.IsNullOrWhiteSpace(keyword)) return new List<MetadataSemanticSearchResult>();
+		var normalized = Normalize(keyword);
+		if (normalized.Length == 0) return new List<MetadataSemanticSearchResult>();
+
+		var semantics = await _context.MetadataSemantics
+			.Include(x => x.MetadataColumn)
+			.ThenInclude(x => x!.MetadataTable)
+			.AsNoTracking()
+			.ToListAsync();
+
+		var hits = new List<MetadataSemanticSearchResult>();
+		foreach (var s in semantics)
+		 {
+			if (s.MetadataColumn is null || s.MetadataColumn.MetadataTable is null) continue;
+			if (SubstringKeywordMatches(s.Keywords, normalized)
+				|| SubstringKeywordMatches(s.Synonyms, normalized)
+				|| (s.BusinessMeaning is not null && Normalize(s.BusinessMeaning).Contains(normalized, StringComparison.OrdinalIgnoreCase)))
+			{
+				hits.Add(new MetadataSemanticSearchResult
+				{
+					VectorType = "semantic",
+					Table = s.MetadataColumn.MetadataTable,
+					Column = s.MetadataColumn,
+					Semantic = s,
+					Score = 0.99
+				});
+			}
+		}
+		return hits.OrderByDescending(x => x.Score).Take(limit).ToList();
+	}
+
+	private static bool SubstringKeywordMatches(string? keywords, string normalized)
+	{
+		if (string.IsNullOrWhiteSpace(keywords)) return false;
+		return keywords.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+			.Any(k => Normalize(k).Contains(normalized, StringComparison.OrdinalIgnoreCase));
+	}
+
 	private static string Normalize(string? value) =>
 		(value ?? string.Empty).Trim().Replace(" ", string.Empty, StringComparison.Ordinal).ToLowerInvariant();
 

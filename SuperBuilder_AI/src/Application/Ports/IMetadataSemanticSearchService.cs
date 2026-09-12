@@ -76,5 +76,16 @@ public interface IMetadataSemanticSearchService
 			string keyword,
 			int limit = 30);
 
+	/// <summary>
+	/// 基于语义层关键词/Synonyms/BusinessMeaning 的子串确定性匹配检索（用于实体计数等场景）。
+	/// 与 <see cref="SearchByKeywordAsync"/> 的精确匹配不同，本方法按“归一化子串包含”匹配，
+	/// 以覆盖“入库单ID/入库单号”等将实体词作为前缀的关键词形态，不依赖向量召回深度。
+	/// 仅用于评估器等需要确定性语义锚定的场景。
+	/// </summary>
+	Task<List<MetadataSemanticSearchResult>>
+		SearchByKeywordSubstringAsync(
+			string keyword,
+			int limit = 30);
+
 
 }

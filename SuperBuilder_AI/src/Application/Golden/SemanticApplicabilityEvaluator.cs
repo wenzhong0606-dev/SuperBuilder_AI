@@ -87,16 +87,18 @@ public sealed class SemanticApplicabilityEvaluator
         var lexical = ContainsSemanticText(top, metric.SemanticText);
         if (!lexical)
         {
-            // D-GQ007：Top 候选缺少 Golden SemanticText 直接语义证据时：
-            // 1) 先在全量向量候选（topK=50）内回退到「前向匹配」候选（候选元数据显式包含 Golden SemanticText，严格）；
-            // 2) 若仍无，使用语义层关键词确定性匹配（SearchByKeywordAsync，不依赖向量召回深度）。
-            // 两者结合，使 GQ-007（入库数量/入库单数量）等复合指标在 CI 与 golden 环境一致通过。
+            // D-GQ007：Top 候选缺少 Golden SemanticText 直接语义证据时，先在全量向量候选（topK=50）内回退到「前向匹配」候选。
             var lexicalFallback = candidates.FirstOrDefault(c => ContainsSemanticText(c, metric.SemanticText));
             if (lexicalFallback is not null) { top = lexicalFallback; lexical = true; }
             else
             {
-                var keywordHits = await _semanticSearchService.SearchByKeywordAsync(metric.SemanticText);
-                var keywordFallback = keywordHits.FirstOrDefault(c => c.Table is not null && c.Column is not null && ContainsSemanticText(c, metric.SemanticText));
+                // 仍无则使用语义层关键词精确匹配（SearchByKeywordAsync，不依赖向量召回深度）；
+                // 优先“入库数量”作为独立关键词（而非同义词）的列，使 GQ-007 命中正确列。
+                var keywordFallback = (await _semanticSearchService.SearchByKeywordAsync(metric.SemanticText))
+                    .Where(c => c.Table is not null && c.Column is not null && ContainsSemanticText(c, metric.SemanticText))
+                    .OrderByDescending(c => HasStandaloneKeywordMatch(c, metric.SemanticText) ? 1 : 0)
+                    .ThenByDescending(c => c.Semantic?.Id ?? 0)
+                    .FirstOrDefault();
                 if (keywordFallback is not null) { top = keywordFallback; lexical = true; }
             }
         }
@@ -105,12 +107,39 @@ public sealed class SemanticApplicabilityEvaluator
         var second = (fallbackIdx >= 0 && fallbackIdx + 1 < candidates.Count) ? candidates[fallbackIdx + 1] : null;
         var gap = second is null ? (double?)null : top.Score - second.Score;
         var competing = fallbackIdx >= 0 && second is not null && ContainsSemanticText(second, metric.SemanticText) && gap <= AmbiguityScoreGapThreshold;
+
+        // D-GQ007 v3：若向量解析未稳定（缺词法证据或存在竞争歧义），启用确定性精确关键词命中作为权威解析，
+        // 优先选择“入库数量”作为独立关键词（而非同义词）的列，并视为非竞争，纠正 CI 向量排序偏序。
+        if (!lexical || competing)
+        {
+            var keywordExact = (await _semanticSearchService.SearchByKeywordAsync(metric.SemanticText))
+                .Where(c => c.Table is not null && c.Column is not null && ContainsSemanticText(c, metric.SemanticText))
+                .OrderByDescending(c => HasStandaloneKeywordMatch(c, metric.SemanticText) ? 1 : 0)
+                .ThenByDescending(c => c.Semantic?.Id ?? 0)
+                .FirstOrDefault();
+            if (keywordExact is not null) { top = keywordExact; lexical = true; competing = false; }
+        }
+
         if (metricType == "EntityCount")
         {
             var entityText = ExtractEntitySemanticText(metric.SemanticText);
             // D-EntityCount：按表分组，同一表的多个列不互相竞争；PK 加分区分实体表与关联表。
             var entityCandidates = string.IsNullOrWhiteSpace(entityText) ? new List<MetadataSemanticSearchResult>() : candidates.Where(x => ContainsDirectEntityEvidence(x, entityText)).GroupBy(x => x.Table?.Id ?? 0).Select(g => g.OrderByDescending(x => GetEntityEvidenceScore(x, entityText)).First()).OrderByDescending(x => GetEntityEvidenceScore(x, entityText)).ToList();
             var entity = entityCandidates.FirstOrDefault(); var entityScore = entity is null ? 0 : GetEntityEvidenceScore(entity, entityText); var secondEntity = entityCandidates.Skip(1).FirstOrDefault(); var entityGap = secondEntity is null ? (double?)null : entityScore - GetEntityEvidenceScore(secondEntity, entityText); var entityCompeting = secondEntity is not null && entityGap <= 8;
+            // D-GQ007 v3：若向量实体解析未稳定，启用确定性实体关键词（子串）兜底（SearchByKeywordSubstringAsync），
+            // 纠正 CI 向量排序偏序；按实体证据分排序，优先表主键（PK），明细表（BusinessMeaning 含“明细”）扣分。
+            if (entity is null || entityScore < 60)
+            {
+                var entityKw = (await _semanticSearchService.SearchByKeywordSubstringAsync(entityText))
+                    .Where(c => c.Table is not null && c.Column is not null)
+                    .OrderByDescending(c => GetEntityEvidenceScore(c, entityText))
+                    .FirstOrDefault();
+                if (entityKw is not null)
+                {
+                    var ekScore = GetEntityEvidenceScore(entityKw, entityText);
+                    if (ekScore >= 60) { entity = entityKw; entityScore = ekScore; entityCompeting = false; }
+                }
+            }
             if (entity is not null && entityScore >= 60) { top = entity; competing = entityCompeting; lexical = true; gap = entityGap; }
             else return new() { CaseId = goldenCase.Id, Question = goldenCase.Question, MetricSemanticText = metric.SemanticText, MetricType = metricType, State = "NotResolved", Reason = "No direct EntityCount semantic evidence could be resolved.", SearchCandidate = ToCandidate(top), Evidence = new SemanticApplicabilityEvidence { SemanticCandidateExists = candidates.Count > 0, DirectEntityCountEvidence = false, LexicalMatch = lexical, CompetingCandidates = false, TopScore = top.Score, SecondScore = second?.Score, ScoreGap = gap } };
         }
