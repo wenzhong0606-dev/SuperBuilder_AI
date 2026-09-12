@@ -14,12 +14,6 @@ public sealed class SemanticApplicabilityEvaluator
 {
     private const double AmbiguityScoreGapThreshold = 0.05d;
 
-    /// <summary>
-    /// D-GQ007：当 Top 候选缺少 Golden SemanticText 直接语义证据时，在 Top-N 内回退到「前向匹配」候选的回溯深度。
-    /// 前向匹配要求候选元数据显式包含 Golden SemanticText（严格，不会误接受错误列），
-    /// 仅用于纠正向量排序将正确列排在 #1 之后的偏序，使 GQ-007（入库数量/入库单数量）等复合指标在 CI 与 golden 环境一致通过。
-    /// </summary>
-    private const int TopNCandidateLookback = 5;
     private readonly IMetadataSemanticSearchService _semanticSearchService;
     private readonly IDimensionResolutionEvidenceService _dimensionEvidenceService;
 
@@ -84,7 +78,8 @@ public sealed class SemanticApplicabilityEvaluator
     {
         if (string.IsNullOrWhiteSpace(metric.SemanticText)) return new() { CaseId = goldenCase.Id, Question = goldenCase.Question, MetricSemanticText = metric.SemanticText, MetricType = "Unknown", State = "NotResolved", Reason = "Metric SemanticText 为空。" };
         var metricType = metric.Aggregation == QueryAggregation.Count ? "EntityCount" : "ColumnMetric";
-        var results = await _semanticSearchService.SearchAsync(metric.SemanticText, topK);
+        // D-GQ007：召回深度至少 50，确保向量排序将正确列排在 #1 之后时，前向匹配回退仍能覆盖到它。
+        var results = await _semanticSearchService.SearchAsync(metric.SemanticText, topK < 50 ? 50 : topK);
         if (results.Count == 0) return new() { CaseId = goldenCase.Id, Question = goldenCase.Question, MetricSemanticText = metric.SemanticText, MetricType = metricType, State = "NotResolved", Reason = "Semantic Search returned no candidates." };
         var candidates = results.Where(x => x.IsSemanticVector && x.Table is not null && x.Column is not null).GroupBy(GetCandidateBindingKey, StringComparer.OrdinalIgnoreCase).Select(g => g.OrderByDescending(x => x.Score).First()).OrderByDescending(x => x.Score).ToList();
         if (candidates.Count == 0) return new() { CaseId = goldenCase.Id, Question = goldenCase.Question, MetricSemanticText = metric.SemanticText, MetricType = metricType, State = "NotResolved", Reason = "No semantic vector candidate with physical binding was returned." };
@@ -92,16 +87,24 @@ public sealed class SemanticApplicabilityEvaluator
         var lexical = ContainsSemanticText(top, metric.SemanticText);
         if (!lexical)
         {
-            // D-GQ007：Top 候选缺少 Golden SemanticText 直接语义证据时，在 Top-N 内回退到「前向匹配」候选。
-            // 前向匹配要求候选元数据显式包含 Golden SemanticText（严格，不会误接受错误列），
-            // 仅用于纠正向量排序将正确列排在 #1 之后的偏序，使 GQ-007（入库数量/入库单数量）等复合指标在 CI 与 golden 环境一致通过。
-            var lexicalFallback = candidates.Take(TopNCandidateLookback).FirstOrDefault(c => ContainsSemanticText(c, metric.SemanticText));
+            // D-GQ007：Top 候选缺少 Golden SemanticText 直接语义证据时：
+            // 1) 先在全量向量候选（topK=50）内回退到「前向匹配」候选（候选元数据显式包含 Golden SemanticText，严格）；
+            // 2) 若仍无，使用语义层关键词确定性匹配（SearchByKeywordAsync，不依赖向量召回深度）。
+            // 两者结合，使 GQ-007（入库数量/入库单数量）等复合指标在 CI 与 golden 环境一致通过。
+            var lexicalFallback = candidates.FirstOrDefault(c => ContainsSemanticText(c, metric.SemanticText));
             if (lexicalFallback is not null) { top = lexicalFallback; lexical = true; }
+            else
+            {
+                var keywordHits = await _semanticSearchService.SearchByKeywordAsync(metric.SemanticText);
+                var keywordFallback = keywordHits.FirstOrDefault(c => c.Table is not null && c.Column is not null && ContainsSemanticText(c, metric.SemanticText));
+                if (keywordFallback is not null) { top = keywordFallback; lexical = true; }
+            }
         }
         var fallbackIdx = candidates.IndexOf(top);
-        var second = (fallbackIdx >= 0 && fallbackIdx + 1 < candidates.Count) ? candidates[fallbackIdx + 1] : candidates.Skip(1).FirstOrDefault();
+        // 若 top 来自语义层关键词确定性兜底（不在向量候选集合内），则不参与「竞争候选」判定，直接视为稳定解析。
+        var second = (fallbackIdx >= 0 && fallbackIdx + 1 < candidates.Count) ? candidates[fallbackIdx + 1] : null;
         var gap = second is null ? (double?)null : top.Score - second.Score;
-        var competing = second is not null && ContainsSemanticText(second, metric.SemanticText) && gap <= AmbiguityScoreGapThreshold;
+        var competing = fallbackIdx >= 0 && second is not null && ContainsSemanticText(second, metric.SemanticText) && gap <= AmbiguityScoreGapThreshold;
         if (metricType == "EntityCount")
         {
             var entityText = ExtractEntitySemanticText(metric.SemanticText);

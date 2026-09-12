@@ -65,5 +65,16 @@ public interface IMetadataSemanticSearchService
 			int topK = 10,
 			LocaleContext? locale = null);
 
+	/// <summary>
+	/// 基于语义层关键词/Synonyms 的确定性精确匹配检索，不依赖向量召回深度。
+	/// 当向量召回候选缺少词法证据时，按 Keywords/Synonyms 独立关键词精确匹配 query，
+	/// 直接返回携带物理绑定的候选（确定性证据，不受向量排序偏序影响）。
+	/// 仅用于评估器等需要确定性语义锚定的场景。
+	/// </summary>
+	Task<List<MetadataSemanticSearchResult>>
+		SearchByKeywordAsync(
+			string keyword,
+			int limit = 30);
+
 
 }

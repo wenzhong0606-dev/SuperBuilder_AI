@@ -84,7 +84,6 @@ public class MetadataSemanticSearchService
 
 
 
-
 	/// <summary>
 	/// Metadata语义搜索
 	/// </summary>
@@ -96,6 +95,7 @@ public class MetadataSemanticSearchService
 	{
 
 
+
 		/*
 		 * 1.
 		 * 用户问题Embedding
@@ -105,7 +105,6 @@ public class MetadataSemanticSearchService
 			await _embedding.GenerateAsync(
 				question,
 				"query");
-
 
 
 
@@ -124,10 +123,8 @@ public class MetadataSemanticSearchService
 
 
 
-
 		var results =
 			new List<MetadataSemanticSearchResult>();
-
 
 
 
@@ -183,6 +180,7 @@ public class MetadataSemanticSearchService
 						results);
 
 					break;
+
 
 
 
@@ -258,6 +256,55 @@ public class MetadataSemanticSearchService
 
 
 
+
+	/// <summary>
+	/// 基于语义层关键词/Synonyms 的确定性精确匹配检索，不依赖向量召回深度。
+	/// 用于评估器等场景：当向量召回候选缺少词法证据时，作为确定性兜底，
+	/// 直接按 Keywords/Synonyms 独立关键词精确匹配 query 返回携带物理绑定的候选。
+	/// </summary>
+	public async Task<List<MetadataSemanticSearchResult>> SearchByKeywordAsync(string keyword, int limit = 30)
+	{
+		if (string.IsNullOrWhiteSpace(keyword)) return new List<MetadataSemanticSearchResult>();
+		var normalized = Normalize(keyword);
+		if (normalized.Length == 0) return new List<MetadataSemanticSearchResult>();
+
+		var semantics = await _context.MetadataSemantics
+			.Include(x => x.MetadataColumn)
+			.ThenInclude(x => x!.MetadataTable)
+			.AsNoTracking()
+			.ToListAsync();
+
+		var hits = new List<MetadataSemanticSearchResult>();
+		foreach (var s in semantics)
+		{
+			if (s.MetadataColumn is null || s.MetadataColumn.MetadataTable is null) continue;
+			if (KeywordMatches(s.Keywords, normalized) || KeywordMatches(s.Synonyms, normalized))
+			{
+				hits.Add(new MetadataSemanticSearchResult
+				{
+					VectorType = "semantic",
+					Table = s.MetadataColumn.MetadataTable,
+					Column = s.MetadataColumn,
+					Semantic = s,
+					Score = 0.99
+				});
+			}
+		}
+		return hits.OrderByDescending(x => x.Score).Take(limit).ToList();
+	}
+
+	private static bool KeywordMatches(string? keywords, string normalized)
+	{
+		if (string.IsNullOrWhiteSpace(keywords)) return false;
+		return keywords.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+			.Any(k => Normalize(k) == normalized);
+	}
+
+	private static string Normalize(string? value) =>
+		(value ?? string.Empty).Trim().Replace(" ", string.Empty, StringComparison.Ordinal).ToLowerInvariant();
+
+
+
 	/// <summary>
 	/// P5：按多语言标签命中提升候选排序。
 	/// 提升量 = <see cref="LabelRecallBoostFactor"/> × 匹配强度，并封顶于 1.0
@@ -306,8 +353,6 @@ public class MetadataSemanticSearchService
 
 
 
-
-
 	/// <summary>
 	/// 加载表向量
 	/// </summary>
@@ -328,7 +373,6 @@ public class MetadataSemanticSearchService
 
 
 
-
 		var table =
 			await _context.MetadataTables
 
@@ -341,12 +385,10 @@ public class MetadataSemanticSearchService
 
 
 
-
 		if (table == null)
 		{
 			return;
 		}
-
 
 
 
@@ -377,8 +419,6 @@ public class MetadataSemanticSearchService
 
 
 
-
-
 	/// <summary>
 	/// 加载字段向量
 	/// </summary>
@@ -399,7 +439,6 @@ public class MetadataSemanticSearchService
 
 
 
-
 		var column =
 			await _context.MetadataColumns
 
@@ -415,12 +454,10 @@ public class MetadataSemanticSearchService
 
 
 
-
 		if (column == null)
 		{
 			return;
 		}
-
 
 
 
@@ -459,8 +496,6 @@ public class MetadataSemanticSearchService
 
 
 
-
-
 	/// <summary>
 	/// 加载语义向量
 	/// </summary>
@@ -481,7 +516,6 @@ public class MetadataSemanticSearchService
 
 
 
-
 		var semantic =
 			await _context.MetadataSemantics
 
@@ -497,14 +531,12 @@ public class MetadataSemanticSearchService
 
 
 
-
 		if (semantic == null
 			||
 			semantic.MetadataColumn == null)
 		{
 			return;
 		}
-
 
 
 
@@ -540,8 +572,6 @@ public class MetadataSemanticSearchService
 			});
 
 	}
-
-
 
 
 
