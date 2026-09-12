@@ -27,8 +27,8 @@
 
 ## 3. Schema Version 策略
 
-- **定义**：`schemaVersion` = **最新（序号最大）迁移 ID**。当前 = `20260911143327_M12_17_IdentityOrganizationUnits`。
-- **权威清单**：`scripts/schema/schema-version.json`（含 44 个有序迁移 ID、生成时间、生成命令）。
+- **定义**：`schemaVersion` = **最新（序号最大）迁移 ID**。当前 = `20260911231209_M12_18_MetricDimensionExpression`。
+- **权威清单**：`scripts/schema/schema-version.json`（含 45 个有序迁移 ID、生成时间、生成命令）。
 - **读取方式**：
   - 代码/运维：`SELECT TOP 1 MigrationId FROM __EFMigrationsHistory ORDER BY MigrationId DESC`
   - 或直接用校验脚本（见 §6）。
@@ -96,7 +96,8 @@
 - **CI 接入建议**：PR/CI 中跑**离线**校验（防迁移漏提交/清单过期）；部署后跑**在线**校验（防环境漏升级）。
 
 ### 已执行的真实验证（详见 `schema-verify-evidence-2026-09-10.md`）
-- ✅ 离线正向：44/44 一致，`EXIT=0`（2026-09-11 重新生成清单后复跑）。
+- ✅ 离线正向：**45/45** 一致，`EXIT=0`（2026-09-12 增量 `M12_18` 后重新生成清单复跑；此前 44/44）。
+- ✅ 在线实证（2026-09-12）：开发库 `SuperBuilder_Platform` 已应用 **45/45**，`(Pending)` 计数 0。
 - ✅ 离线负向：篡改清单（去掉 1 个迁移）→ 正确报漂移 `+ 20260909025001_M7_11_PublishIdempotency`，`EXIT=2`（证明工具非橡皮图章）。
 - ✅ 在线实证：本机 SQL Server **可达**（`sqlservr.exe` 运行），检出**真实漂移：5 个迁移未应用**（见 §7）。
 
@@ -141,6 +142,25 @@ M12-17 新增的 `20260911143327_M12_17_IdentityOrganizationUnits`（建 6 张�
 
 顺带做的健壮性改进（不改变语义）：脚本原先用 `_ -match '^[0-9]{14}_'` 在 `Trim()`
 **之前**匹配，对带前导空白的宿主输出不鲁棒；已改为先 `Trim()` 再匹配。
+
+### 7.4 增量迁移 `M12_18`（2026-09-12，44 → 45）
+
+M12 增量 3-2（指标/维度编辑）为 `BusinessEntityMetrics` / `BusinessEntityDimensions` 各新增
+`Expression nvarchar(1000)` + `DataType nvarchar(50)`（均可空），生成迁移：
+
+```
+20260911231209_M12_18_MetricDimensionExpression
+```
+
+执行步骤：
+
+1. 用真实 EF 工具生成（沙箱内 `dotnet ef` 不在 PATH，需全路径 `~/.dotnet/tools/dotnet-ef.exe`
+   + `--no-build`；`dotnet build` 一律 `--no-restore` 规避 `path1`）：
+   `dotnet-ef migrations add M12_18_MetricDimensionExpression --project/--startup-project SuperBuilder_AI/SuperBuilder_AI.csproj`。
+2. 审查生成的 `Up()`：**仅 4 个 `AddColumn`**（无 DROP/ALTER），快照 diff 精确 16 行 —— 纯 additive。
+3. `dotnet-ef database update` → `Applying migration '20260911231209_M12_18_MetricDimensionExpression'. Done.`
+4. 清单同步：`scripts/schema/schema-version.json` 44 → **45**（`schemaVersion`/`migrationCount`/`generatedUtc`/`migrations[]` 四项）。
+5. 复核：`migrations list --no-connect` 与清单做集合差 → **45/45，missing 0 / extra 0**；连库 `migrations list` → `(Pending)` 计数 **0**。
 
 ## 8. 红线与诚实声明
 
