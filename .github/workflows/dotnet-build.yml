@@ -173,7 +173,7 @@ jobs:
           test "$(jq -r '.passed' /tmp/gq007.json)" = "true"
           test "$(jq '.evaluation.metrics.details | length' /tmp/gq007.json)" -eq 2
           test "$(jq -r '.evaluation.metrics.details[0].semanticText' /tmp/gq007.json)" = "入库数量"
-          test "$(jq -r '.evaluation.metrics.details[1].semanticText' /tmp/gq007.json)" = "入库金额"
+          test "$(jq -r '.evaluation.metrics.details[1].semanticText' /tmp/gq007.json)" = "入库单数量"
           test "$(jq '.runtimePlan.Metrics | length' /tmp/gq007.json)" -eq 2
       - name: Controller Golden Coverage
         run: |
