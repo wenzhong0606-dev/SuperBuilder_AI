@@ -5,11 +5,13 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 using SuperBuilder_AI.Data;
 using SuperBuilder_AI.Api.Security;
 using SuperBuilder_AI.Interfaces.Identity;
 using SuperBuilder_AI.Models.Identity;
 using SuperBuilder_AI.Services.Identity;
+using SuperBuilder_AI.Api.Errors;
 
 namespace SuperBuilder_AI.Controllers;
 
@@ -54,7 +56,6 @@ public sealed class IdentityController : ControllerBase
 		_identity = identity;
 	}
 
-	/// <summary>在当前请求作用域内开启租户隔离，返回解析出的租户 Id。</summary>
 	/// <summary>在当前请求作用域内开启租户隔离：有效租户恒为认证租户，跨租户显式请求直接拒绝。</summary>
 	private long ScopeTo(long requestedTenantId)
 	{
@@ -70,6 +71,18 @@ public sealed class IdentityController : ControllerBase
 		return resolution.EffectiveTenantId;
 	}
 
+	/// <summary>身份治理权限门禁：缺少 <c>identity:manage</c> 直接 403（服务端强制，非仅前端隐藏）。</summary>
+	private IActionResult? RequireIdentityManage()
+	{
+		if (!User.HasClaim("perm", IdentityPermissions.IdentityManage))
+			return StatusCode(403, new ApiError { Code = ErrorCodes.Forbidden, Message = $"禁止：缺少 {IdentityPermissions.IdentityManage} 权限。" });
+		return null;
+	}
+
+	/// <summary>当前认证用户的 Id（用于自查豁免：本人可读自己的用户/权限，他人需 identity:manage）。</summary>
+	private long? CurrentUserId() =>
+		long.TryParse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value, out var uid) ? uid : (long?)null;
+
 	/// <summary>创建租户用户（默认路径，确定性、不调 LLM），可选同时指派角色。</summary>
 	[HttpPost("users")]
 	public async Task<IActionResult> CreateUser(
@@ -79,6 +92,7 @@ public sealed class IdentityController : ControllerBase
 		if (request is null) return BadRequest("请求体不能为空。");
 		if (request.TenantId <= 0) return BadRequest("不能通过 API 创建全局/内置用户（TenantId 必须 > 0）。");
 		if (string.IsNullOrWhiteSpace(request.Username)) return BadRequest("username 必填。");
+		if (RequireIdentityManage() is { } denied) return denied;
 
 		var tenantId = ScopeTo(request.TenantId);
 		var result = await _identity.CreateUserAsync(tenantId, request.Username, request.DisplayName, request.Email, request.RoleCodes, cancellationToken);
@@ -108,6 +122,7 @@ public sealed class IdentityController : ControllerBase
 		[FromQuery] long tenantId = 0,
 		CancellationToken cancellationToken = default)
 	{
+		if (CurrentUserId() != id && RequireIdentityManage() is { } denied) return denied;
 		ScopeTo(tenantId);
 		var user = await _db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == id, cancellationToken);
 		if (user is null) return NotFound();
@@ -124,6 +139,7 @@ public sealed class IdentityController : ControllerBase
 	{
 		if (request is null) return BadRequest("请求体不能为空。");
 		if (string.IsNullOrWhiteSpace(request.RoleCode)) return BadRequest("roleCode 必填。");
+		if (RequireIdentityManage() is { } denied) return denied;
 
 		tenantId = ScopeTo(tenantId);
 		var result = await _identity.AssignRoleAsync(tenantId, id, request.RoleCode, cancellationToken);
@@ -140,6 +156,7 @@ public sealed class IdentityController : ControllerBase
 		CancellationToken cancellationToken = default)
 	{
 		if (string.IsNullOrWhiteSpace(roleCode)) return BadRequest("roleCode 必填。");
+		if (RequireIdentityManage() is { } denied) return denied;
 
 		tenantId = ScopeTo(tenantId);
 		var result = await _identity.RevokeRoleAsync(tenantId, id, roleCode, cancellationToken);
@@ -157,6 +174,7 @@ public sealed class IdentityController : ControllerBase
 	{
 		if (request is null) return BadRequest("请求体不能为空。");
 		if (!Enum.IsDefined(typeof(UserStatus), request.Status)) return BadRequest("非法状态值。");
+		if (RequireIdentityManage() is { } denied) return denied;
 
 		tenantId = ScopeTo(tenantId);
 		var result = await _identity.SetUserStatusAsync(tenantId, id, request.Status, cancellationToken);
@@ -174,6 +192,7 @@ public sealed class IdentityController : ControllerBase
 		[FromQuery] long tenantId = 0,
 		CancellationToken cancellationToken = default)
 	{
+		if (CurrentUserId() != id && RequireIdentityManage() is { } denied) return denied;
 		tenantId = ScopeTo(tenantId);
 
 		var user = await _db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == id, cancellationToken);
@@ -223,6 +242,7 @@ public sealed class IdentityController : ControllerBase
 		if (request is null) return BadRequest("请求体不能为空。");
 		if (request.TenantId <= 0) return BadRequest("不能创建全局/内置角色（TenantId 必须 > 0）。");
 		if (string.IsNullOrWhiteSpace(request.Code)) return BadRequest("角色编码不能为空。");
+		if (RequireIdentityManage() is { } denied) return denied;
 
 		var tenantId = ScopeTo(request.TenantId);
 		var conflict = await _db.Roles.IgnoreQueryFilters()
@@ -262,6 +282,7 @@ public sealed class IdentityController : ControllerBase
 	{
 		if (request is null) return BadRequest("请求体不能为空。");
 		if (string.IsNullOrWhiteSpace(code)) return BadRequest("角色编码不能为空。");
+		if (RequireIdentityManage() is { } denied) return denied;
 
 		var tid = ScopeTo(tenantId);
 		var role = await _db.Roles.FirstOrDefaultAsync(r => r.Code == code, cancellationToken);
