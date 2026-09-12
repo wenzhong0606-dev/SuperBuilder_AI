@@ -1,4 +1,4 @@
-# SuperBuilder AI Native BI — 逐文件逐行代码审计报告
+> **HISTORICAL SNAPSHOT / 历史快照**：本文仅记录当时的工作状态、判断或证据，不是当前缺陷清单、当前测试基线、当前 HEAD 或当前执行计划。任何“当前/唯一/已完成/未完成/风险”等表述均按本文记录日期理解；现状必须按 `docs/README.md` 的治理顺序重新核验：当前源码/测试 → Master → Milestone → Active Plan → Backlog。\n\n# SuperBuilder AI Native BI — 逐文件逐行代码审计报告
 
 **审计日期**: 2026-08-26  
 **审计范围**: 206 个源文件, 30,102 行 C# 代码  

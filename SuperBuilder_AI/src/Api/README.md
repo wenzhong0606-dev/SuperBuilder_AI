@@ -8,4 +8,4 @@
 - `Program.cs` — 组合根（DI 注册），从 `SuperBuilder_AI/Program.cs` 迁移而来。
 - `Views/`、`wwwroot/` — 现有 MVC 视图与静态资源。
 
-> 完整目录树与文件映射见 `docs/ARCHITECTURE.md`。
+> 完整目录树与文件映射见 `docs/architecture/ARCHITECTURE.md`。

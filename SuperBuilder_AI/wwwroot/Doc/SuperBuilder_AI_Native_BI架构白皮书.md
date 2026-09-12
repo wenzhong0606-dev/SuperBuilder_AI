@@ -1,4 +1,4 @@
-# SuperBuilder AI Native BI 架构白皮书
+> **REFERENCE SNAPSHOT / 参考快照**：本文保留为历史架构说明，不负责维护当前任务状态或发布基线。当前架构治理以 `docs/architecture/ARCHITECTURE.md` 为准，当前进度以 Master/Backlog/Active Plan 为准。\n\n# SuperBuilder AI Native BI 架构白皮书
 
 
 版本：

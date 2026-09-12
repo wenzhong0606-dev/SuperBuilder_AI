@@ -1,4 +1,4 @@
-> **治理声明**：本文档是 `Master_Development_Plan.md` 的**输入 / 审计基线**，**不是**独立执行计划。所有里程碑状态、优先级与验收以 `Master_Development_Plan.md`（唯一事实来源）及其 `milestones/` 拆分文档为准；本文与 MDP 冲突时以 MDP 为准。映射见 MDP §17。
+> **治理声明**：本文档属于长期参考资料，不负责维护当前任务状态。当前状态与优先级按 `docs/README.md` 的治理顺序判定：源码/测试 → Master → Milestone → Active Plan → Backlog。与当前实现冲突时必须以当前证据更新 Master/Backlog，而不是按本文历史描述重复开发。
 >
 > **文档角色**：迁移参考（非计划）
 

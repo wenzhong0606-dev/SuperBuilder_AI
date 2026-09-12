@@ -1,4 +1,4 @@
-# SuperBuilder AI Native BI Phase 开发测试管理总则
+> **HISTORICAL SNAPSHOT / 历史快照**：本文是归档资料，只描述记录当时的计划、状态或审计判断。文中的“当前、唯一、已完成、未完成、风险、测试基线、HEAD”等均不得解释为现在的项目状态。当前事实请按 `docs/README.md` 的治理顺序核验。\n\n# SuperBuilder AI Native BI Phase 开发测试管理总则
 
 > 文档性质：项目长期正式管理基线
 > 适用范围：Phase 2.1 及后续全部阶段

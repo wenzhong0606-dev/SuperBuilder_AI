@@ -12,4 +12,4 @@
 
 领域服务（纯业务规则，无 IO）：`QueryPlanDecisionGate`、`QuerySemanticValidator`、`QueryPlanMetadataValidator`、`QueryJoinInferenceService`（启发式）、`QueryIntentNormalizer`、各 `*ScoringService`、各 `*Evaluator`(纯)、`GoldenDatasetQualityGate` 等。
 
-> 完整目录树与文件映射见 `docs/ARCHITECTURE.md`。
+> 完整目录树与文件映射见 `docs/architecture/ARCHITECTURE.md`。
