@@ -126,9 +126,11 @@ public sealed class SemanticApplicabilityEvaluator
             // D-EntityCount：按表分组，同一表的多个列不互相竞争；PK 加分区分实体表与关联表。
             var entityCandidates = string.IsNullOrWhiteSpace(entityText) ? new List<MetadataSemanticSearchResult>() : candidates.Where(x => ContainsDirectEntityEvidence(x, entityText)).GroupBy(x => x.Table?.Id ?? 0).Select(g => g.OrderByDescending(x => GetEntityEvidenceScore(x, entityText)).First()).OrderByDescending(x => GetEntityEvidenceScore(x, entityText)).ToList();
             var entity = entityCandidates.FirstOrDefault(); var entityScore = entity is null ? 0 : GetEntityEvidenceScore(entity, entityText); var secondEntity = entityCandidates.Skip(1).FirstOrDefault(); var entityGap = secondEntity is null ? (double?)null : entityScore - GetEntityEvidenceScore(secondEntity, entityText); var entityCompeting = secondEntity is not null && entityGap <= 8;
-            // D-GQ007 v3：若向量实体解析未稳定，启用确定性实体关键词（子串）兜底（SearchByKeywordSubstringAsync），
-            // 纠正 CI 向量排序偏序；按实体证据分排序，优先表主键（PK），明细表（BusinessMeaning 含“明细”）扣分。
-            if (entity is null || entityScore < 60)
+            // D-GQ007 v4：向量实体解析未稳定（未解析 / 证据不足 / **存在分差不足的竞争**）时，
+            // 启用确定性实体关键词（子串）兜底（SearchByKeywordSubstringAsync），纠正 CI 向量排序偏序；
+            // 按实体证据分排序，优先表主键（PK），明细表（BusinessMeaning 含“明细”）扣分。
+            var entityDeterministic = false;
+            if (entity is null || entityScore < 60 || entityCompeting)
             {
                 var entityKw = (await _semanticSearchService.SearchByKeywordSubstringAsync(entityText))
                     .Where(c => c.Table is not null && c.Column is not null)
@@ -137,10 +139,15 @@ public sealed class SemanticApplicabilityEvaluator
                 if (entityKw is not null)
                 {
                     var ekScore = GetEntityEvidenceScore(entityKw, entityText);
-                    if (ekScore >= 60) { entity = entityKw; entityScore = ekScore; entityCompeting = false; }
+                    // 竞争歧义（分差不足）场景下，确定性子串命中作为权威解析打破平局（即使证据分低于 60）；
+                    // 未解析 / 证据不足场景仍要求 >= 60，避免弱证据被误判为稳定解析。
+                    if (ekScore >= 60 || entityCompeting)
+                    {
+                        entity = entityKw; entityScore = ekScore; entityCompeting = false; entityGap = null; entityDeterministic = true;
+                    }
                 }
             }
-            if (entity is not null && entityScore >= 60) { top = entity; competing = entityCompeting; lexical = true; gap = entityGap; }
+            if (entity is not null && (entityScore >= 60 || entityDeterministic)) { top = entity; competing = entityCompeting; lexical = true; gap = entityGap; }
             else return new() { CaseId = goldenCase.Id, Question = goldenCase.Question, MetricSemanticText = metric.SemanticText, MetricType = metricType, State = "NotResolved", Reason = "No direct EntityCount semantic evidence could be resolved.", SearchCandidate = ToCandidate(top), Evidence = new SemanticApplicabilityEvidence { SemanticCandidateExists = candidates.Count > 0, DirectEntityCountEvidence = false, LexicalMatch = lexical, CompetingCandidates = false, TopScore = top.Score, SecondScore = second?.Score, ScoreGap = gap } };
         }
         var state = lexical ? competing ? "Ambiguous" : "Resolved" : "NotResolved";
