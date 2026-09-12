@@ -56,7 +56,7 @@ public sealed class DataSourceSecretMigrationHostedService : BackgroundService
 		var db = scope.ServiceProvider.GetRequiredService<SuperBIContext>();
 
 		var pending = await db.DataSources
-			.Where(d => d.ConnectionString != null && !d.ConnectionString.StartsWith("v1:", StringComparison.Ordinal))
+			.Where(d => d.ConnectionString != null && !d.ConnectionString.StartsWith("v1:"))
 			.ToListAsync(ct);
 		if (pending.Count == 0)
 			return;
