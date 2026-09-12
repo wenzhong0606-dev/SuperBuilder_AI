@@ -66,24 +66,25 @@ SuperBuilder AI 的目标是形成一个可部署、可治理、可扩展、可�
 
 [2026-09 Production Readiness Plan](plans/active/2026-09-production-readiness.md)
 
-执行顺序：
+执行顺序（任务 ID 与状态见 [Backlog](Development_Backlog.md)；详表与门禁映射见 Active Plan）：
 
-1. 文档治理与发布基线；
-2. Identity 管理 API 权限；
-3. GQ-007 Semantic Applicability 回归；
-4. CI 契约与全量 Unit Test Gate；
-5. DataSource 凭据加密；
-6. Schema pending migration readiness；
-7. Agent Pending Tool 诚实禁用；
-8. EF Global Query Filter correctness；
-9. Quota 原子并发；
-10. 核心 Playwright E2E；
-11. Agent 真实 Backend；
-12. Observability / DR / Performance；
-13. M13 产品化尾项；
-14. G0/G1；
-15. M10；
-16. M14/G2。
+1. `DOC-00` 文档对账（状态规则、ID 映射、失效章节引用）；
+2. `BASE-01` 发布基线与证据（落 `docs/ops/release-evidence.md`）；
+3. `AUTH-01` Identity 管理 API 权限；
+4. `CI-01` 修正 CI 契约断言（**修断言不等于门禁转绿**，期间 CI 保持失败属预期）；
+5. `BI-01` GQ-007 Semantic Applicability 回归（CI 转绿）；
+6. `CI-02` 全量 Unit Test Gate；
+7. `SEC-01` DataSource 凭据加密；
+8. `DB-01` Schema pending migration readiness；
+9. `AGENT-01` Agent Pending Tool 诚实禁用；
+10. `DB-02` EF Global Query Filter correctness；
+11. `QUOTA-01` Quota 原子并发（边界：全业务路径归 M14-03）；
+12. `E2E-01` 核心 Playwright E2E；
+13. `OBS-01` / `DR-01` / `PERF-01` 观测、恢复、容量；
+14. `ONBOARD-01` / `CACHE-01` / `M14-01` / `M14-07` / `M14-08a` 试点前置；
+15. G0 → G1 验收；
+16. `AGENT-02~04` / `SEC-02` / `APP-01` 按签约范围纳入（条件门禁）；
+17. M10、`M14-08b` 与 M14 商业化主体（G2）。
 
 P0 未清零前，不启动 M10、M11 或 M14 大规模功能开发。
 
@@ -142,6 +143,7 @@ G1 基础上增加：
 
 - 当前未完成任务：见 [Development_Backlog.md](Development_Backlog.md)。
 - 当前执行计划：见 [plans/active/](plans/active/)。
+- 发布证据记录：见 [ops/release-evidence.md](ops/release-evidence.md)（`BASE-01` 载体，同一候选 SHA 一份清单）。
 - 历史计划：见 [plans/archive/](plans/archive/)。
 - 历史审计：见 [audits/archive/](audits/archive/)。
 

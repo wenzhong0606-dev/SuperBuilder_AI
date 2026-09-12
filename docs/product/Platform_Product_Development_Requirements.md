@@ -1,6 +1,6 @@
 > **治理声明**：本文档属于长期参考资料，不负责维护当前任务状态。当前状态与优先级按 `docs/README.md` 的治理顺序判定：源码/测试 → Master → Milestone → Active Plan → Backlog。与当前实现冲突时必须以当前证据更新 Master/Backlog，而不是按本文历史描述重复开发。
 >
-> **文档角色**：平台产品需求（映射到 M0/M2/M3/M4/M6/M8，见 MDP §17.3）
+> **文档角色**：平台产品需求（映射到 M0/M2/M3/M4/M6/M8，见 MDP 里程碑总览 §3.1）
 
 # SuperBuilder AI 平台产品与开发要求
 
