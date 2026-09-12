@@ -50,6 +50,20 @@ public static class SchemaProbe
             return (BootstrapState.SchemaNotCreated, $"无法读取迁移历史，架构可能未创建：{Format(ex)}");
         }
 
+        // 4) 代码程序集中的迁移是否已全部应用到数据库（DB-01：缺迁移时 readiness=false）
+        try
+        {
+            var pending = await db.Database.GetPendingMigrationsAsync(ct);
+            if (pending is { Count: > 0 })
+                return (BootstrapState.MigrationsPending,
+                    $"存在 {pending.Count} 个尚未应用到数据库的迁移，部署前请先执行迁移：" +
+                    string.Join(", ", pending));
+        }
+        catch (Exception ex)
+        {
+            return (BootstrapState.MigrationsPending, $"无法读取待应用迁移列表：{Format(ex)}");
+        }
+
         return (BootstrapState.Ready, null);
     }
 

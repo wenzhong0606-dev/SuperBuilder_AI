@@ -15,6 +15,9 @@ public enum BootstrapState
     /// <summary>数据库可达，但迁移历史为空或不存在（Schema 未创建/未应用）。</summary>
     SchemaNotCreated,
 
+    /// <summary>数据库可达且已有迁移历史，但代码中存在尚未应用到数据库的迁移（Schema 版本落后于程序集）。</summary>
+    MigrationsPending,
+
     /// <summary>Schema 已就绪，但平台目录/本地化/配额/引导等种子不完整。</summary>
     SeedIncomplete,
 

@@ -18,7 +18,7 @@
 | CI-01 | CI | 修正 GQ-007 YAML 将第二指标错写为"入库金额"（契约应为"入库单数量"） | BACKLOG | M13-05 | CI 断言已与 Golden 契约对齐（第二指标改 `入库单数量`）；**本项关闭不等于整体门禁转绿**，`:173` 先断言 `.passed=="true"`，BI-01 未闭前 `:173` 即失败、`:176` 永不执行，CI 保持失败（属预期） |
 | CI-02 | M13-05 | CI 执行全部 Unit Tests | BACKLOG | M13-05 | 非零测试数、0 failure、TRX 可追溯 |
 | SEC-01 | M13-03 | DataSource ConnectionString AEAD 加密 | BACKLOG | M13-03 | **已实现，待 CI 验证**：复用 `ISecretStore`(AES-256-GCM) 信封加密。写路径 `DataSourcesController`(Create/Update)+ 种子 `DemoDataInstaller`/`MetadataCsvFixtureService` 加密落库；读路径 `DataSourceConnectionFactory`/`MetadataScanHostedService`/`LocalRuntimeDiagnosticsController` 经 `ResolvePlaintext` 解密（兼容遗留明文）。列宽 nvarchar(2048)→nvarchar(max)（迁移 `20260912103000_M13_03`）；新增启动期一次性存量再加密托管服务（幂等）。CI 已注入测试主密钥（`SecretStore__MasterKey`）。旧数据与新数据均不明文持久化。 |
-| DB-01 | M13-04 | SchemaProbe 检查 pending migrations | BACKLOG | M13-04 | 缺迁移时 readiness=false |
+| DB-01 | M13-04 | SchemaProbe 检查 pending migrations | BACKLOG | M13-04 | **已实现，待 CI 验证**：`BootstrapState` 新增 `MigrationsPending`；`SchemaProbe.ProbeAsync` 在「已应用迁移非空」后再查 `GetPendingMigrationsAsync`，存在未应用迁移即返回 `MigrationsPending`（readiness=false，/health=degraded）。CI 启动 API 前已 `dotnet ef database update`（工作流 :100）应用全部迁移，pending=0，不误伤。 |
 | AGENT-01 | M7-12/M13-07 | Pending Agent Tool 在 planner/runtime 同时禁用 | BACKLOG | M13-07 | 构造 DSL 也无法执行 pending tool |
 
 ## P1 — 企业试点稳定性
