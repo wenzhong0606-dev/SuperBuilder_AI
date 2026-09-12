@@ -14,6 +14,7 @@ using SuperBuilder_AI.Api.Errors;
 using SuperBuilder_AI.Data;
 using SuperBuilder_AI.Interfaces.Identity;
 using SuperBuilder_AI.Models.Identity;
+using SuperBuilder_AI.Infrastructure.Security;
 using SuperBuilder_AI.Models.Metadata;
 
 namespace SuperBuilder_AI.Controllers;
@@ -38,11 +39,13 @@ public sealed class DataSourcesController : ControllerBase
 {
 	private readonly SuperBIContext _db;
 	private readonly IIdentityService _identity;
+	private readonly ISecretStore _secrets;
 
-	public DataSourcesController(SuperBIContext db, IIdentityService identity)
+	public DataSourcesController(SuperBIContext db, IIdentityService identity, ISecretStore secrets)
 	{
 		_db = db;
 		_identity = identity;
+		_secrets = secrets;
 	}
 
 	/// <summary>列出当前用户已授权且启用的数据源（摘要）。</summary>
@@ -234,7 +237,7 @@ public sealed class DataSourcesController : ControllerBase
 			Name = rawName,
 			NormalizedName = normalizedName,
 			DbType = dbType,
-			ConnectionString = connectionString,
+			ConnectionString = _secrets.Protect(connectionString),
 			Enabled = true,
 		};
 		_db.DataSources.Add(source);
@@ -287,7 +290,7 @@ public sealed class DataSourcesController : ControllerBase
 			var connectionString = request.ConnectionString.Trim();
 			if (connectionString.Length > 2048)
 				return BadRequest(new ApiError { Code = ErrorCodes.BadRequest, Message = "连接字符串长度不能超过 2048 个字符。" });
-			source.ConnectionString = connectionString;
+			source.ConnectionString = _secrets.Protect(connectionString);
 		}
 
 		await _db.SaveChangesAsync(cancellationToken);
@@ -346,7 +349,8 @@ public sealed class DataSourcesController : ControllerBase
 		{
 			using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
 			using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
-			await using var connection = CreateConnection(source);
+			var plainConnectionString = _secrets.ResolvePlaintext(source.ConnectionString);
+			await using var connection = CreateConnection(new DataSource { DbType = source.DbType, ConnectionString = plainConnectionString });
 			await connection.OpenAsync(linked.Token);
 			await using var command = connection.CreateCommand();
 			command.CommandText = "SELECT 1";

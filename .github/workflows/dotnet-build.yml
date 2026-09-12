@@ -111,6 +111,8 @@ jobs:
           # 供本 job 登录后持令牌调用该管理端点。仅 CI 测试环境使用。
           PlatformBootstrap__Username: "ci-platform-admin"
           PlatformBootstrap__Password: "C13_3_CI_Admin_Pass_2026"
+          # SEC-01：CI 测试密钥（AES-256）。生产环境须由 KeyVault/环境变量注入真实主密钥，缺失即 fail-fast。
+          SecretStore__MasterKey: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
         run: |
           dotnet run --project SuperBuilder_AI/SuperBuilder_AI.csproj --configuration Release --no-restore --no-build --urls http://127.0.0.1:5050 > /tmp/superbuilder-api.log 2>&1 &
           echo $! > /tmp/superbuilder-api.pid

@@ -261,7 +261,7 @@ public class SuperBIContext : DbContext
         builder.Entity<DataSource>().HasIndex(x => new { x.TenantId, x.NormalizedName }).IsUnique()
             .HasDatabaseName("IX_DataSources_TenantId_NormalizedName");
         builder.Entity<DataSource>().Property(x => x.DbType).IsRequired().HasMaxLength(32).HasComment("数据库类型(MYSQL/SQLSERVER/POSTGRESQL)");
-        builder.Entity<DataSource>().Property(x => x.ConnectionString).IsRequired().HasMaxLength(2048).HasComment("连接字符串（敏感，禁止日志记录）");
+        builder.Entity<DataSource>().Property(x => x.ConnectionString).IsRequired().HasColumnType("nvarchar(max)").HasComment("连接字符串（AES-256-GCM 信封加密，v1: 前缀；明文绝不持久化）");
         // M1-04：Enabled 非空（默认启用），兼容既有种子与查询计划测试。
         builder.Entity<DataSource>().Property(x => x.Enabled).IsRequired().HasDefaultValue(true).HasComment("是否启用");
         // M1-04：连接测试记录（脱敏）。

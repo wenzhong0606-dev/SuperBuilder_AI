@@ -7,6 +7,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using SuperBuilder_AI.Services;
 using SuperBuilder_AI.Data;
+using SuperBuilder_AI.Infrastructure.Security;
 using SuperBuilder_AI.Models.Metadata;
 
 namespace SuperBuilder_AI.Api.Background;
@@ -62,6 +63,7 @@ public sealed class MetadataScanHostedService : BackgroundService
         using var scope = _scopeFactory.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<SuperBIContext>();
         var scanner = scope.ServiceProvider.GetRequiredService<MetadataScannerService>();
+        var secrets = scope.ServiceProvider.GetRequiredService<ISecretStore>();
 
         var job = await context.MetadataScanJobs.FirstOrDefaultAsync(j => j.Id == jobId, stoppingToken);
         if (job is null)
@@ -106,7 +108,7 @@ public sealed class MetadataScanHostedService : BackgroundService
             await scanner.ScanAsync(
                 job.TenantId,
                 job.DataSourceId,
-                dataSource.ConnectionString ?? string.Empty,
+                secrets.ResolvePlaintext(dataSource.ConnectionString) ?? string.Empty,
                 progress,
                 telemetry,
                 cleanupOrphans: true,

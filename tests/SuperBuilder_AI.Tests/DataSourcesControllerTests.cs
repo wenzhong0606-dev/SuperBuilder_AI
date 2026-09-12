@@ -64,7 +64,7 @@ public class DataSourcesControllerTests
 
 	private static DataSourcesController Build(SuperBIContext db, long tid, long uid = 1)
 	{
-		var controller = new DataSourcesController(db, new PermissiveIdentity());
+		var controller = new DataSourcesController(db, new PermissiveIdentity(), new AesGcmSecretStore(new byte[32]));
 		controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext { User = AsTenant(tid, uid) } };
 		return controller;
 	}
@@ -304,7 +304,7 @@ public class DataSourcesControllerTests
 		await using var ctx = CreateContext(out var connection);
 		await using var lease = connection;
 		Assert.IsType<UnauthorizedObjectResult>(await Build(ctx, 0).TestConnectionString(new("MYSQL", "x"), CancellationToken.None));
-		var ctrl = new DataSourcesController(ctx, new PermissiveIdentity(false));
+		var ctrl = new DataSourcesController(ctx, new PermissiveIdentity(false), new AesGcmSecretStore(new byte[32]));
 		ctrl.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext { User = AsTenant(TenantA) } };
 		var denied = Assert.IsType<ObjectResult>(await ctrl.TestConnectionString(new("MYSQL", "x"), CancellationToken.None));
 		Assert.Equal(403, denied.StatusCode);

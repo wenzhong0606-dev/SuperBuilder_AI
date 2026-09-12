@@ -12,6 +12,7 @@ using SuperBuilder_AI.Models.Identity;
 using SuperBuilder_AI.Models.Metadata;
 using SuperBuilder_AI.Models.BI.Entity;
 using SuperBuilder_AI.Models.Organization;
+using SuperBuilder_AI.Infrastructure.Security;
 using SuperBuilder_AI.Models.Theme;
 
 namespace SuperBuilder_AI.Services.Seed;
@@ -33,25 +34,28 @@ public sealed class DemoDataInstaller : IDemoDataInstaller
     private const string DemoAdminEmail = "demo@demo.local";
     private const string DemoAdminPassword = "Demo@123456";
 
-    private readonly SuperBIContext _db;
-    private readonly IIdentityService _identity;
-    private readonly IAuditLogService _audit;
-    private readonly IDashboardDslSerializer _dashboardSerializer;
-    private readonly ITenantLanguageService _tenantLanguage;
+	private readonly SuperBIContext _db;
+	private readonly IIdentityService _identity;
+	private readonly IAuditLogService _audit;
+	private readonly IDashboardDslSerializer _dashboardSerializer;
+	private readonly ITenantLanguageService _tenantLanguage;
+	private readonly ISecretStore _secrets;
 
-    public DemoDataInstaller(
-        SuperBIContext db,
-        IIdentityService identity,
-        IAuditLogService audit,
-        IDashboardDslSerializer dashboardSerializer,
-        ITenantLanguageService tenantLanguage)
-    {
-        _db = db;
-        _identity = identity;
-        _audit = audit;
-        _dashboardSerializer = dashboardSerializer;
-        _tenantLanguage = tenantLanguage;
-    }
+	public DemoDataInstaller(
+		SuperBIContext db,
+		IIdentityService identity,
+		IAuditLogService audit,
+		IDashboardDslSerializer dashboardSerializer,
+		ITenantLanguageService tenantLanguage,
+		ISecretStore secrets)
+	{
+		_db = db;
+		_identity = identity;
+		_audit = audit;
+		_dashboardSerializer = dashboardSerializer;
+		_tenantLanguage = tenantLanguage;
+		_secrets = secrets;
+	}
 
     public async Task<DemoInstallPlan> PreviewAsync(CancellationToken ct = default)
     {
@@ -120,7 +124,7 @@ public sealed class DemoDataInstaller : IDemoDataInstaller
                 Name = "演示销售数据库",
                 NormalizedName = DataSource.NormalizeName("演示销售数据库"),
                 DbType = "MYSQL",
-                ConnectionString = "Server=localhost;Port=3306;Database=demo_sales;Uid=demo_ro;Pwd=demo_ro;",
+                ConnectionString = _secrets.Protect("Server=localhost;Port=3306;Database=demo_sales;Uid=demo_ro;Pwd=demo_ro;"),
                 Enabled = true,
             };
             _db.DataSources.Add(dataSource);

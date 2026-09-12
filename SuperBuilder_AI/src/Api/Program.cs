@@ -105,6 +105,8 @@ builder.Services.AddScoped<MetadataScannerService>();
 // M4-05：扫描任务队列与后台处理器（Channel + BackgroundService）。
 builder.Services.AddSingleton<IMetadataScanQueue, MetadataScanQueue>();
 builder.Services.AddHostedService<MetadataScanHostedService>();
+// M13-03：启动期一次性存量数据源连接串再加密（AES-256-GCM），确保新旧数据均不明文持久化。
+builder.Services.AddHostedService<DataSourceSecretMigrationHostedService>();
 builder.Services.AddScoped<MetadataSearchTextBuilder>();
 builder.Services.AddScoped<IMetadataSearchTextBuilder>(sp => sp.GetRequiredService<MetadataSearchTextBuilder>());
 builder.Services.AddScoped<MetadataPromptBuilder>();

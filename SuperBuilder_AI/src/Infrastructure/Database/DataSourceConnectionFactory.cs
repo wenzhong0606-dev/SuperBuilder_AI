@@ -5,6 +5,7 @@ using Npgsql;
 using Microsoft.EntityFrameworkCore;
 using SuperBuilder_AI.Data;
 using SuperBuilder_AI.Interfaces.Database;
+using SuperBuilder_AI.Infrastructure.Security;
 using SuperBuilder_AI.Interfaces.Identity;
 
 
@@ -33,6 +34,7 @@ public class DataSourceConnectionFactory
 	private readonly SuperBIContext _context;
 	private readonly IDataSourceAuthorizationService? _authorization;
 	private readonly IDataSourceExecutionIdentityAccessor? _executionIdentity;
+	private readonly ISecretStore _secrets;
 
 
 
@@ -41,11 +43,13 @@ public class DataSourceConnectionFactory
 	/// </summary>
 	public DataSourceConnectionFactory(
 		SuperBIContext context,
+		ISecretStore secrets,
 		IDataSourceAuthorizationService? authorization = null,
 		IDataSourceExecutionIdentityAccessor? executionIdentity = null)
 	{
 
 		_context = context;
+		_secrets = secrets;
 		_authorization = authorization;
 		_executionIdentity = executionIdentity;
 
@@ -92,8 +96,8 @@ public class DataSourceConnectionFactory
 
 
 
-		if (string.IsNullOrWhiteSpace(
-			dataSource.ConnectionString))
+		var plainConnectionString = _secrets.ResolvePlaintext(dataSource.ConnectionString);
+		if (string.IsNullOrWhiteSpace(plainConnectionString))
 		{
 			throw new InvalidOperationException(
 				$"数据源连接字符串为空:{dataSourceId}");
@@ -117,19 +121,19 @@ public class DataSourceConnectionFactory
 
 			"SQLSERVER" =>
 				new SqlConnection(
-					dataSource.ConnectionString),
+					plainConnectionString),
 
 
 
 			"MYSQL" =>
 				new MySqlConnection(
-					dataSource.ConnectionString),
+					plainConnectionString),
 
 
 
 			"POSTGRESQL" =>
 				new NpgsqlConnection(
-					dataSource.ConnectionString),
+					plainConnectionString),
 
 
 

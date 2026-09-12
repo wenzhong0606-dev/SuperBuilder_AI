@@ -7,6 +7,7 @@ using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
 using System.Text.RegularExpressions;
+using SuperBuilder_AI.Infrastructure.Security;
 using System.Threading;
 
 namespace SuperBuilder_AI.Controllers;
@@ -15,16 +16,19 @@ namespace SuperBuilder_AI.Controllers;
 [Route("evaluation/local-runtime")]
 public sealed class LocalRuntimeDiagnosticsController : ControllerBase
 {
-    private readonly SuperBIContext _context;
-    private readonly IDataSourceConnectionFactory _dataSourceConnectionFactory;
+	private readonly SuperBIContext _context;
+	private readonly IDataSourceConnectionFactory _dataSourceConnectionFactory;
+	private readonly ISecretStore _secrets;
 
-    public LocalRuntimeDiagnosticsController(
-        SuperBIContext context,
-        IDataSourceConnectionFactory dataSourceConnectionFactory)
-    {
-        _context = context;
-        _dataSourceConnectionFactory = dataSourceConnectionFactory;
-    }
+	public LocalRuntimeDiagnosticsController(
+		SuperBIContext context,
+		IDataSourceConnectionFactory dataSourceConnectionFactory,
+		ISecretStore secrets)
+	{
+		_context = context;
+		_dataSourceConnectionFactory = dataSourceConnectionFactory;
+		_secrets = secrets;
+	}
 
     /// <summary>
     /// 本次根因诊断唯一测试入口：
@@ -96,7 +100,7 @@ public sealed class LocalRuntimeDiagnosticsController : ControllerBase
         if (source == null)
             return NotFound(new { passed = false, table, column, dataSourceId, reason = "DataSource 不存在。" });
 
-        var safe = BuildSafeConnectionInfo(source.ConnectionString, source.DbType);
+        var safe = BuildSafeConnectionInfo(_secrets.ResolvePlaintext(source.ConnectionString), source.DbType);
         var tcp = await CheckTcpAsync(safe.Host, safe.Port, cancellationToken);
         var db = await CheckDbConnectionAsync(dataSourceId, cancellationToken);
 

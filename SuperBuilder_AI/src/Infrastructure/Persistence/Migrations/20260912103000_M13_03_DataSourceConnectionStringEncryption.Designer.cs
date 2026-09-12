@@ -10,10 +10,11 @@ using SuperBuilder_AI.Data;
 
 namespace SuperBuilder_AI.Infrastructure.Persistence.Migrations
 {
-    [DbContext(typeof(SuperBIContext))]
-    partial class SuperBIContextModelSnapshot : ModelSnapshot
+[DbContext(typeof(SuperBIContext))]
+[Migration("20260912103000_M13_03_DataSourceConnectionStringEncryption")]
+partial class M13_03_DataSourceConnectionStringEncryption : ModelSnapshot
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

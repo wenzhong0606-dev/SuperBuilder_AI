@@ -17,6 +17,7 @@ using SuperBuilder_AI.Services.Auth;
 using SuperBuilder_AI.Services.Localization;
 using SuperBuilder_AI.Services.BI.Dashboard;
 using SuperBuilder_AI.Services.Identity;
+using SuperBuilder_AI.Infrastructure.Security;
 using Xunit;
 
 namespace SuperBuilder_AI.Tests;
@@ -47,7 +48,7 @@ public sealed class DemoDataInstallerTests
     {
         var identity = new IdentityService(ctx, new PasswordHasher());
         identity.SeedAsync().GetAwaiter().GetResult();
-        return new DemoDataInstaller(ctx, identity, audit ?? new NoopAuditService(), new DashboardDslSerializer(), new TenantLanguageService(ctx, new NoopAuditService()));
+        return new DemoDataInstaller(ctx, identity, audit ?? new NoopAuditService(), new DashboardDslSerializer(), new TenantLanguageService(ctx, new NoopAuditService()), new AesGcmSecretStore(new byte[32]));
     }
 
     [Fact]

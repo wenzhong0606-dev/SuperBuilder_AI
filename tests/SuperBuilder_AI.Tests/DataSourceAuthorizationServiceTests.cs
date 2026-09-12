@@ -10,6 +10,7 @@ using SuperBuilder_AI.Models.Identity;
 using SuperBuilder_AI.Models.Metadata;
 using SuperBuilder_AI.Models.Organization;
 using SuperBuilder_AI.Infrastructure.Database;
+using SuperBuilder_AI.Infrastructure.Security;
 using SuperBuilder_AI.Services.Identity;
 using Xunit;
 
@@ -80,7 +81,7 @@ public sealed class DataSourceAuthorizationServiceTests
 		await using var _ = connection;
 		await SeedAsync(db);
 		var identity = new DataSourceExecutionIdentityAccessor { Current = new DataSourceExecutionIdentity(1, 10) };
-		var factory = new DataSourceConnectionFactory(db, new DenyAuthorization(), identity);
+		var factory = new DataSourceConnectionFactory(db, new AesGcmSecretStore(new byte[32]), new DenyAuthorization(), identity);
 
 		await Assert.ThrowsAsync<UnauthorizedAccessException>(() => factory.CreateAsync(100));
 		await Assert.ThrowsAsync<UnauthorizedAccessException>(() => factory.CreateAsync(200));

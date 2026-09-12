@@ -5,6 +5,7 @@ using SuperBuilder_AI.Data;
 using SuperBuilder_AI.Interfaces;
 using SuperBuilder_AI.Models.Metadata;
 using SuperBuilder_AI.Models.Organization;
+using SuperBuilder_AI.Infrastructure.Security;
 
 namespace SuperBuilder_AI.Services;
 
@@ -18,11 +19,13 @@ public sealed class MetadataCsvFixtureService : IMetadataCsvFixtureService
 {
     private readonly SuperBIContext _context;
     private readonly IWebHostEnvironment _environment;
+    private readonly ISecretStore _secrets;
 
-    public MetadataCsvFixtureService(SuperBIContext context, IWebHostEnvironment environment)
+    public MetadataCsvFixtureService(SuperBIContext context, IWebHostEnvironment environment, ISecretStore secrets)
     {
         _context = context;
         _environment = environment;
+        _secrets = secrets;
     }
 
     public async Task<MetadataCsvFixtureResult> ImportAsync()
@@ -130,7 +133,7 @@ public sealed class MetadataCsvFixtureService : IMetadataCsvFixtureService
             TenantId = tenant.Id,
             Name = "C.13.3 CSV Metadata Fixture",
             DbType = "SQLSERVER",
-            ConnectionString = "Server=fixture;Database=fixture;Trusted_Connection=True;",
+            ConnectionString = _secrets.Protect("Server=fixture;Database=fixture;Trusted_Connection=True;"),
             Enabled = true
         };
         _context.DataSources.Add(dataSource);
