@@ -10,4 +10,4 @@
   - `Golden/`：`GoldenDatasetRunner`、`GoldenDatasetRuntimeService`、`GoldenBaseline*Service`、`GoldenConfidenceCalibration*`、`GoldenScenarioGapGenerator`、`GoldenCaseDraftGenerator`、`GoldenQueryDatasetSerializer`。
 - `Common/` — 映射器、管道、共享编排助手。
 
-> 完整目录树与文件映射见 `docs/ARCHITECTURE.md`。
+> 完整目录树与文件映射见 `docs/architecture/ARCHITECTURE.md`。

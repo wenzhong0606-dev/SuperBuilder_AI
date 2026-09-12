@@ -10,4 +10,4 @@
 
 注意：当前 `MySqlMetadataReader`、`DataSourceConnectionFactory`、`QueryExecutionService`、`QdrantService`、`QwenService`、`QwenEmbeddingService` 都错误地处位于 `Services/` 下，应迁移到本层对应子目录。
 
-> 完整目录树与文件映射见 `docs/ARCHITECTURE.md`。
+> 完整目录树与文件映射见 `docs/architecture/ARCHITECTURE.md`。

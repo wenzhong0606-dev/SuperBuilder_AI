@@ -1,4 +1,4 @@
-# SuperBuilder AI Native BI
+> **HISTORICAL SNAPSHOT / 历史快照**：本文是 2026-08-27 时点的 Phase 开发计划，不是当前执行计划；其中“当前阶段、当前状态、冻结基线”等表述仅表示当时记录。当前开发状态请以 `docs/Master_Development_Plan.md`、`docs/Development_Backlog.md` 与 `docs/plans/active/` 为准。\n\n# SuperBuilder AI Native BI
 # Phase开发计划（正式版）
 
 版本：v3.1  
