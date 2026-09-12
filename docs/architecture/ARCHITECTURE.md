@@ -1,11 +1,11 @@
-> **治理声明**：本文档是 `Master_Development_Plan.md` 的**输入 / 审计基线**，**不是**独立执行计划。所有里程碑状态、优先级与验收以 `Master_Development_Plan.md`（唯一事实来源）及其 `milestones/` 拆分文档为准；本文与 MDP 冲突时以 MDP 为准。映射见 MDP §17。
+> **治理声明**：本文档属于长期参考资料，不负责维护当前任务状态。当前状态与优先级按 `docs/README.md` 的治理顺序判定：源码/测试 → Master → Milestone → Active Plan → Backlog。与当前实现冲突时必须以当前证据更新 Master/Backlog，而不是按本文历史描述重复开发。
 >
 > **文档角色**：架构参考（非计划，供 MDP 参考）
 
 # SuperBuilder AI Native BI — 目标架构（Clean Architecture + DDD）
 
 > 本文定义 SuperBuilder_AI 项目按 **Clean Architecture + 领域驱动设计（DDD）** 重构后的目标文件结构与依赖规则。
-> 配套主文档：`docs/DevelopmentPlan.md`（阶段计划与完成情况）。
+> 配套主文档：`docs/Master_Development_Plan.md`（战略总账）与 `docs/Development_Backlog.md`（未完成任务总账）。
 > 历史计划文档已归档于 `docs/plans/archive/`。
 
 ---
@@ -56,7 +56,7 @@ SuperBuilder_AI.slnx
 │  └─ SuperBuilder_AI.IntegrationTests/       # Golden 运行时回归(对应 18-case 契约)
 │
 ├─ docs/
-│  ├─ DevelopmentPlan.md
+│  ├─ Master_Development_Plan.md
 │  ├─ ARCHITECTURE.md
 │  └─ plans/archive/                          # 历史计划文档
 └─ SuperBuilder_AI/                           # 旧单体项目(重构期保留, 逐步废弃)
@@ -141,7 +141,7 @@ SuperBuilder_AI.slnx
 
 ---
 
-## 6. 冗余与重复（待合并/删除，详见 DevelopmentPlan §5）
+## 6. 冗余与重复（待合并/删除，当前任务见 `docs/Development_Backlog.md`）
 
 - `Models/BI/Evaluation/GoldenBaselinePersistenceRecord.cs` 与 `GoldenBaseline.cs` 字段重复 → 保留 `GoldenBaseline` + 持久化 DTO（`GoldenBaselinePersistenceRecord` 仅作存储投影，精简字段）。
 - `Models/BI/QueryPlanSemanticResolution.cs` 与 `Models/BI/Evaluation/SemanticApplicabilityResult(+*Resolution)` 形状近重复 → 抽取共享 Kernel 的解析契约。
