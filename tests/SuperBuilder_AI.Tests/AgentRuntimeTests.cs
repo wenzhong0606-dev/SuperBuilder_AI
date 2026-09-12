@@ -66,13 +66,6 @@ public class AgentRuntimeTests
 	private static IAgentRuntime BuildRuntime(SuperBIContext db, IToolCatalog catalog, int maxAttempts = 3)
 		=> new AgentRuntime(db, new AgentDslSerializer(), catalog, new ToolPermissionPolicy(), new RetryPolicy(maxAttempts));
 
-	private static IToolCatalog RealCatalog()
-		=> new ControlledToolCatalog(new ITool[]
-		{
-			new MetadataTool(), new SemanticTool(), new QueryTool(), new DashboardTool(),
-			new ForecastTool(), new ReportTool(), new AlertTool(), new WorkflowTool(),
-		});
-
 	#region 权限 deny-by-default
 
 	[Fact]
@@ -83,7 +76,7 @@ public class AgentRuntimeTests
 		await using var __ = ctx;
 
 		await InsertPlan(ctx, Tenant5, "p-query", AgentTools.Query); // Query=Read，默认授权集仅含 Safe
-		var runtime = BuildRuntime(ctx, RealCatalog());
+		var runtime = BuildRuntime(ctx, LiveCatalog(ctx));
 
 		var run = await runtime.StartRunAsync(Tenant5, "p-query", null, null, CancellationToken.None);
 
@@ -98,8 +91,9 @@ public class AgentRuntimeTests
 		await using var _ = conn;
 		await using var __ = ctx;
 
+		// 用 live 假工具隔离"权限闸门放行后执行"语义（与 pending 后端闸门无关）。
 		await InsertPlan(ctx, Tenant5, "p-query", AgentTools.Query);
-		var runtime = BuildRuntime(ctx, RealCatalog());
+		var runtime = BuildRuntime(ctx, new FakeCatalog(new FakeTool(AgentTools.Query, ToolRisk.Read, requiresApproval: false)));
 		var granted = new HashSet<string> { AgentTools.Query };
 
 		var run = await runtime.StartRunAsync(Tenant5, "p-query", null, granted, CancellationToken.None);
@@ -121,7 +115,7 @@ public class AgentRuntimeTests
 		await using var __ = ctx;
 
 		await InsertPlan(ctx, Tenant5, "p-wf", AgentTools.Workflow); // Workflow=Write
-		var runtime = BuildRuntime(ctx, RealCatalog());
+		var runtime = BuildRuntime(ctx, LiveCatalog(ctx));
 		var granted = new HashSet<string> { AgentTools.Workflow };
 
 		var run = await runtime.StartRunAsync(Tenant5, "p-wf", null, granted, CancellationToken.None);
@@ -138,8 +132,9 @@ public class AgentRuntimeTests
 		await using var _ = conn;
 		await using var __ = ctx;
 
+		// 用 live 假工具（需审批）隔离"审批恢复后执行"语义；pending 真实工具已由后端闸门拦截，不在此验证。
 		await InsertPlan(ctx, Tenant5, "p-wf", AgentTools.Workflow);
-		var runtime = BuildRuntime(ctx, RealCatalog());
+		var runtime = BuildRuntime(ctx, new FakeCatalog(new FakeTool(AgentTools.Workflow, ToolRisk.Write, requiresApproval: true)));
 		var granted = new HashSet<string> { AgentTools.Workflow };
 
 		var run = await runtime.StartRunAsync(Tenant5, "p-wf", null, granted, CancellationToken.None);
@@ -163,7 +158,7 @@ public class AgentRuntimeTests
 		await using var __ = ctx;
 
 		await InsertPlan(ctx, Tenant5, "p-wf", AgentTools.Workflow);
-		var runtime = BuildRuntime(ctx, RealCatalog());
+		var runtime = BuildRuntime(ctx, LiveCatalog(ctx));
 		var granted = new HashSet<string> { AgentTools.Workflow };
 
 		var run = await runtime.StartRunAsync(Tenant5, "p-wf", null, granted, CancellationToken.None);
@@ -227,7 +222,7 @@ public class AgentRuntimeTests
 		await using var __ = ctx;
 
 		await InsertPlan(ctx, Tenant5, "p-safe", AgentTools.Metadata, AgentTools.Semantic); // 均为 Safe，默认授权
-		var runtime = BuildRuntime(ctx, RealCatalog());
+		var runtime = BuildRuntime(ctx, LiveCatalog(ctx));
 
 		var run = await runtime.StartRunAsync(Tenant5, "p-safe", null, null, CancellationToken.None);
 
@@ -260,7 +255,7 @@ public class AgentRuntimeTests
 		await using var __ = ctx;
 
 		await InsertPlan(ctx, Tenant5, "p-wf", AgentTools.Workflow);
-		var runtime = BuildRuntime(ctx, RealCatalog());
+		var runtime = BuildRuntime(ctx, LiveCatalog(ctx));
 		var granted = new HashSet<string> { AgentTools.Workflow };
 
 		var run = await runtime.StartRunAsync(Tenant5, "p-wf", null, granted, CancellationToken.None);
@@ -269,24 +264,24 @@ public class AgentRuntimeTests
 	}
 
 	[Fact]
-	public async Task StartRun_ControlledTool_HonestEnvelope_NoFakeSuccess()
+	public async Task StartRun_PendingToolGranted_BlockedByBackendGate()
 	{
 		var ctx = CreateContext(out var conn);
 		await using var _ = conn;
 		await using var __ = ctx;
 
-		await InsertPlan(ctx, Tenant5, "p-meta", AgentTools.Metadata); // Safe，默认授权
-		var runtime = BuildRuntime(ctx, RealCatalog());
+		// AGENT-01：pending 工具即使显式授权也不得执行（诚实：不伪造成功、不产生假结果）。
+		await InsertPlan(ctx, Tenant5, "p-query", AgentTools.Query); // Query=pending，未接真实后端
+		var runtime = BuildRuntime(ctx, LiveCatalog(ctx));
+		var granted = new HashSet<string> { AgentTools.Query };
 
-		var run = await runtime.StartRunAsync(Tenant5, "p-meta", null, null, CancellationToken.None);
+		var run = await runtime.StartRunAsync(Tenant5, "p-query", null, granted, CancellationToken.None);
 
-		Assert.Equal(AgentRunStatuses.Succeeded, run.Status);
+		Assert.Equal(AgentRunStatuses.Failed, run.Status);
+		Assert.Contains("后端未就绪", run.ResultSummary ?? "");
 		var step = run.GetStepLog().Single();
+		Assert.False(step.Succeeded);
 		Assert.Equal("controlled", step.Mode);
-		Assert.NotNull(step.Output);
-		// 受控（pending）信封须诚实声明未接真实后端、不伪造成功：
-		// 信封显式携带 "connected":false（ASCII，规避中文 \uXXXX 转义差异），作为稳健断言锚点。
-		Assert.Contains("\"connected\":false", step.Output);
 	}
 
 	[Fact]
@@ -297,7 +292,7 @@ public class AgentRuntimeTests
 		await using var __ = ctx;
 
 		await InsertPlan(ctx, Tenant5, "p-safe", AgentTools.Metadata, AgentTools.Semantic);
-		var runtime = BuildRuntime(ctx, RealCatalog());
+		var runtime = BuildRuntime(ctx, LiveCatalog(ctx));
 
 		var run = await runtime.StartRunAsync(Tenant5, "p-safe", null, null, CancellationToken.None);
 		Assert.Equal(AgentRunStatuses.Succeeded, run.Status);

@@ -19,7 +19,7 @@
 | CI-02 | M13-05 | CI 执行全部 Unit Tests | BACKLOG | M13-05 | 非零测试数、0 failure、TRX 可追溯 |
 | SEC-01 | M13-03 | DataSource ConnectionString AEAD 加密 | BACKLOG | M13-03 | **已实现，待 CI 验证**：复用 `ISecretStore`(AES-256-GCM) 信封加密。写路径 `DataSourcesController`(Create/Update)+ 种子 `DemoDataInstaller`/`MetadataCsvFixtureService` 加密落库；读路径 `DataSourceConnectionFactory`/`MetadataScanHostedService`/`LocalRuntimeDiagnosticsController` 经 `ResolvePlaintext` 解密（兼容遗留明文）。列宽 nvarchar(2048)→nvarchar(max)（迁移 `20260912103000_M13_03`）；新增启动期一次性存量再加密托管服务（幂等）。CI 已注入测试主密钥（`SecretStore__MasterKey`）。旧数据与新数据均不明文持久化。 |
 | DB-01 | M13-04 | SchemaProbe 检查 pending migrations | BACKLOG | M13-04 | **已实现，待 CI 验证**：`BootstrapState` 新增 `MigrationsPending`；`SchemaProbe.ProbeAsync` 在「已应用迁移非空」后再查 `GetPendingMigrationsAsync`，存在未应用迁移即返回 `MigrationsPending`（readiness=false，/health=degraded）。CI 启动 API 前已 `dotnet ef database update`（工作流 :100）应用全部迁移，pending=0，不误伤。 |
-| AGENT-01 | M7-12/M13-07 | Pending Agent Tool 在 planner/runtime 同时禁用 | BACKLOG | M13-07 | 构造 DSL 也无法执行 pending tool |
+| AGENT-01 | M7-12/M13-07 | Pending Agent Tool 禁用（runtime 后端闸门） | ACTIVE | M13-07 | **runtime 闸门已实现**（待 CI 验证）：`ITool.BackendStatus`（默认 live，ControlledToolBase 重写为 pending）；`AgentRuntime.ExecuteRunAsync` 在权限/审批闸门后、执行前新增后端状态闸门，pending 工具即使显式授权也拒绝执行，满足"构造 DSL 也无法执行 pending tool"。planner 侧（`ToolRegistry.ResolveFromIntent`）**未**过滤 pending 工具——若过滤将移除全部 analytics 意图编排能力（Query/Dashboard/Forecast/Report/Alert/Workflow 均 pending）并破坏 AgentController/Planner 测试套件；当前由 runtime 闸门兜底，pending 工具仅诚实占位（connected:false）且不可执行。是否严格在 planner 抑制 pending 工具为待定决策（需同步改造 ~15 个用例）。 |
 
 ## P1 — 企业试点稳定性
 

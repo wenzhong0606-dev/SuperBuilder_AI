@@ -175,6 +175,14 @@ public sealed class AgentRuntime : IAgentRuntime
 				return run;
 			}
 
+			// 后端状态闸门（AGENT-01）：pending 工具（诚实受控信封，未接真实后端）即使已授权也拒绝执行，
+			// 杜绝"构造 DSL 也能跑 pending 工具"的假成功。仅 live 工具可真实执行。
+			if (!string.Equals(tool.BackendStatus, "live", StringComparison.OrdinalIgnoreCase))
+			{
+				log.Add(new AgentRunStepRecord(step.Order, step.Tool, tool.Risk.ToString().ToLowerInvariant(), false, 0, null, $"工具后端未就绪（{tool.BackendStatus}）：{step.Tool} 尚未接入真实后端，无法执行。", "controlled"));
+				return await FailRunAsync(run, log, $"工具 {step.Tool} 后端未就绪（{tool.BackendStatus}），无法执行", cancellationToken);
+			}
+
 			// 执行（带重试）
 			try
 			{

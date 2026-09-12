@@ -32,6 +32,9 @@ public sealed class LiveMetadataTool : ITool
 	/// <inheritdoc />
 	public bool RequiresApproval => false;
 
+	/// <summary>后端连接状态：已接真实后端（live）。</summary>
+	public string BackendStatus => "live";
+
 	/// <summary>展示名。</summary>
 	public string DisplayName => "元数据探查";
 

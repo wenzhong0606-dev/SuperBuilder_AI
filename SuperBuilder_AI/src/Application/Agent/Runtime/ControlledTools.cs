@@ -25,6 +25,9 @@ public abstract class ControlledToolBase : ITool
 	/// <inheritdoc />
 	public virtual bool RequiresApproval => Risk == ToolRisk.Write;
 
+	/// <summary>后端连接状态：诚实受控信封，尚未接入真实后端（pending），运行时拒绝执行。</summary>
+	public string BackendStatus => "pending";
+
 	/// <summary>展示名（用于执行信封可读说明）。</summary>
 	public abstract string DisplayName { get; }
 

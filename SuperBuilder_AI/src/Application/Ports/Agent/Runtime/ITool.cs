@@ -18,6 +18,9 @@ public interface ITool
 	/// <summary>是否需人工审批（<see cref="ToolRisk.Write"/> 为 true）。</summary>
 	bool RequiresApproval { get; }
 
+	/// <summary>后端连接状态：<c>live</c>=已接真实后端（可真实执行）；<c>pending</c>=诚实受控信封（未接真实后端，运行时拒绝执行，杜绝假成功）。默认 <c>live</c>。</summary>
+	string BackendStatus => "live";
+
 	/// <summary>执行工具（受控信封）。瞬态失败抛 <see cref="TransientToolException"/> 以触发重试。</summary>
 	Task<ToolResult> ExecuteAsync(ToolContext context, CancellationToken cancellationToken = default);
 }
