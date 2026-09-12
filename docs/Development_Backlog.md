@@ -21,6 +21,9 @@
 | DB-01 | M13-04 | SchemaProbe 检查 pending migrations | ACTIVE | M13-04 | **已实现，待 CI 验证**（30153f7）：`BootstrapState` 新增 `MigrationsPending`；`SchemaProbe.ProbeAsync` 在「已应用迁移非空」后再查 `GetPendingMigrationsAsync`，存在未应用迁移即返回 `MigrationsPending`（readiness=false，/health=degraded）。CI 启动 API 前已 `dotnet ef database update`（工作流 :100）应用全部迁移，pending=0，不误伤。 |
 | AGENT-01 | M7-12/M13-07 | Pending Agent Tool 禁用（runtime 后端闸门） | ACTIVE | M13-07 | **runtime 闸门已实现**（待 CI 验证）：`ITool.BackendStatus`（默认 live，ControlledToolBase 重写为 pending）；`AgentRuntime.ExecuteRunAsync` 在权限/审批闸门后、执行前新增后端状态闸门，pending 工具即使显式授权也拒绝执行，满足"构造 DSL 也无法执行 pending tool"。planner 侧（`ToolRegistry.ResolveFromIntent`）**未**过滤 pending 工具——若过滤将移除全部 analytics 意图编排能力（Query/Dashboard/Forecast/Report/Alert/Workflow 均 pending）并破坏 AgentController/Planner 测试套件；当前由 runtime 闸门兜底，pending 工具仅诚实占位（connected:false）且不可执行。是否严格在 planner 抑制 pending 工具为待定决策（需同步改造 ~15 个用例）。 |
 
+> **G0 编译/构建复核（2026-09-12，run `f85d2af` / `34690533915`）**：8 项 G0 代码已全部实现并合入 `master`；`编译检查` 与 `Web/Blazor E2E` 两个 job **转绿**。`V2.6 Evaluation` job 仍红，但本次失败在 `启动 Qdrant CI 容器`（Docker 基础设施，与代码无关）；前次 run（cc8358c）曾暴露 `GQ-007` 在 `SemanticApplicabilityGate` 阶段 BLOCK（reason：Top Candidate 缺少 Golden SemanticText 直接语义证据）——该评估 gate 不属 G0 代码范围（SEC-01/DB-01/AGENT-01 均未触碰），CI-01 仅修正了断言文案、未消除该 BLOCK，BI-01 关闭需另行排查评估 gate 的语义证据链（非 G0 阻塞项）。
+> 复核期间修复了 3 个会致编译/E2E 失败的缺陷（均已合入 master）：SEC-01 迁移 Designer 基类 `ModelSnapshot`→`Migration`（CS0262/CS0246，`c612c6b`）、DB-01 `SchemaProbe` 改用 `Any()/Count()`（CS0117/CS1503，`cc8358c`）、SEC-01 托管服务 `StartsWith` 去掉 `StringComparison` 以可翻译为 SQL（运行时 `InvalidOperationException`，`f85d2af`）。
+
 ## P1 — 企业试点稳定性
 
 | ID | 来源 | 工作项 | 状态 | Milestone |
