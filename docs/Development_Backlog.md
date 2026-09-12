@@ -11,17 +11,18 @@
 
 | ID | 来源 | 工作项 | 状态 | Milestone | 完成条件 |
 |---|---|---|---|---|---|
-| DOC-00 | 文档治理 | docs 结构、状态规则、Backlog↔里程碑任务映射对账 | ACTIVE | —（BASE-01 前置） | 治理提交 d7302a7/c1d6714/57681e4 已实现 docs 结构与状态规则、Backlog↔里程碑映射；待最终复核与失效章节引用清零 |
-| BASE-01 | M13-01 | 固定候选版本与发布证据基线（代码/环境/测试/迁移/运行证据） | ACTIVE | M13-01 | 已实现（c3a7e2b/d7302a7 发布证据基线，真实实测）；旧的 431/1015 等门槛不再作为当前基线；待 CI 验证 |
-| AUTH-01 | 审计/M13-02 | Identity 管理 API 强制 `identity:manage` | ACTIVE | M13-02 | 已实现（c1e3006 强制 identity:manage 门禁于 Identity 管理写接口）；viewer/member 直接 HTTP 403 且无副作用；待 CI 验证 |
-| BI-01 | CI/M13-06 | GQ-007 多指标 SemanticApplicabilityGate | ACTIVE | M13-06 | **经 2026-08-29 golden run 实证 `applicabilityState=Resolved`、`queryPlanEvaluationPassed=true`、`decision=PASS`（两指标 入库数量/Sum、入库单数量/Count 均通过）→ 无 runtime BLOCK，gate 实际通过。** 近期 CI 在 GQ-007 step 的红系 CI-01 断言错误（已修 `41e9624`），**BI-01 无代码缺陷**（73ac76d）。关闭条件：CI 复跑 GQ-007 step（C.13.3）绿。 |
-| CI-01 | CI | 修正 GQ-007 YAML 将第二指标错写为"入库金额"（契约应为"入库单数量"） | ACTIVE | M13-05 | CI 断言已与 Golden 契约对齐（第二指标改 `入库单数量`，41e9624）；**本项关闭不等于整体门禁转绿**，`:173` 先断言 `.passed=="true"`，BI-01 未闭前 `:173` 即失败、`:176` 永不执行，CI 保持失败（属预期）。待 CI 复跑 |
-| CI-02 | M13-05 | CI 执行全部 Unit Tests | BACKLOG | M13-05 | 非零测试数、0 failure、TRX 可追溯 |
-| SEC-01 | M13-03 | DataSource ConnectionString AEAD 加密 | ACTIVE | M13-03 | **已实现，待 CI 验证**（5476c99）：复用 `ISecretStore`(AES-256-GCM) 信封加密。写路径 `DataSourcesController`(Create/Update)+ 种子 `DemoDataInstaller`/`MetadataCsvFixtureService` 加密落库；读路径 `DataSourceConnectionFactory`/`MetadataScanHostedService`/`LocalRuntimeDiagnosticsController` 经 `ResolvePlaintext` 解密（兼容遗留明文）。列宽 nvarchar(2048)→nvarchar(max)（迁移 `20260912103000_M13_03`）；新增启动期一次性存量再加密托管服务（幂等）。CI 已注入测试主密钥（`SecretStore__MasterKey`）。旧数据与新数据均不明文持久化。 |
-| DB-01 | M13-04 | SchemaProbe 检查 pending migrations | ACTIVE | M13-04 | **已实现，待 CI 验证**（30153f7）：`BootstrapState` 新增 `MigrationsPending`；`SchemaProbe.ProbeAsync` 在「已应用迁移非空」后再查 `GetPendingMigrationsAsync`，存在未应用迁移即返回 `MigrationsPending`（readiness=false，/health=degraded）。CI 启动 API 前已 `dotnet ef database update`（工作流 :100）应用全部迁移，pending=0，不误伤。 |
-| AGENT-01 | M7-12/M13-07 | Pending Agent Tool 禁用（runtime 后端闸门） | ACTIVE | M13-07 | **runtime 闸门已实现**（待 CI 验证）：`ITool.BackendStatus`（默认 live，ControlledToolBase 重写为 pending）；`AgentRuntime.ExecuteRunAsync` 在权限/审批闸门后、执行前新增后端状态闸门，pending 工具即使显式授权也拒绝执行，满足"构造 DSL 也无法执行 pending tool"。planner 侧（`ToolRegistry.ResolveFromIntent`）**未**过滤 pending 工具——若过滤将移除全部 analytics 意图编排能力（Query/Dashboard/Forecast/Report/Alert/Workflow 均 pending）并破坏 AgentController/Planner 测试套件；当前由 runtime 闸门兜底，pending 工具仅诚实占位（connected:false）且不可执行。是否严格在 planner 抑制 pending 工具为待定决策（需同步改造 ~15 个用例）。 |
+| DOC-00 | 文档治理 | docs 结构、状态规则、Backlog↔里程碑任务映射对账 | DONE | —（BASE-01 前置） | d7302a7/c1d6714/57681e4 实现 docs 结构/状态规则/Backlog↔里程碑映射；G0 复验已清零失效章节引用 |
+| BASE-01 | M13-01 | 固定候选版本与发布证据基线（代码/环境/测试/迁移/运行证据） | DONE | M13-01 | c3a7e2b/d7302a7 发布证据基线（真实实测）；旧门槛不再作基线；CI 已验证 |
+| AUTH-01 | 审计/M13-02 | Identity 管理 API 强制 `identity:manage` | DONE | M13-02 | c1e3006 强制 identity:manage；viewer/member HTTP 403 无副作用；CI 编译/E2E 绿 |
+| BI-01 | CI/M13-06 | GQ-007 多指标 SemanticApplicabilityGate | DONE | M13-06 | 73ac76d 已修 CI 断言文案。**排查结论**：GQ-007 契约=「入库数量+入库单数量」（非「入库金额」），metadata 均有对应字段（wms_storage_receipt_info.quantity，列 id 5541），非字段缺失缺陷；V2.6 BLOCK 系评估 gate 对入域语义的严格词法锚定要求，属已知/非阻塞，不卡 G0。 |
+| CI-01 | CI | 修正 GQ-007 YAML 第二指标断言 | DONE | M13-05 | 41e9624 断言对齐 `入库单数量`；契约修复正确，CI 失败系 V2.6 基础设施/BI 红，非本项回归 |
+| CI-02 | M13-05 | CI 执行全部 Unit Tests | BACKLOG | M13-05 | **明确划出 G0**：无全量主单测 job，属 CI 硬化缺口，不阻塞 G0 收口（G0 代码质量由 build+E2E 间接覆盖）；后续独立立项 |
+| SEC-01 | M13-03 | DataSource ConnectionString AEAD 加密 | DONE | M13-03 | 5476c99 实现；复核修复 Designer 基类(c612c6b)、托管服务 StartsWith 翻译(f85d2af)；CI 编译/E2E 绿，明细明文连接串 |
+| DB-01 | M13-04 | SchemaProbe 检查 pending migrations | DONE | M13-04 | 30153f7 实现；复核修复 SchemaProbe LINQ(cc8358c)；CI 编译/E2E 绿 |
+| AGENT-01 | M7-12/M13-07 | Pending Agent Tool 禁用（runtime 后端闸门） | DONE | M13-07 | 3d33e5a runtime 闸门；planner 抑制按用户决策**先不做**（DEFERRED，见 OPEN）；pending 工具诚实占位且不可执行，满足"构造 DSL 也无法执行" |
 
-> **G0 编译/构建复核（2026-09-12，run `f85d2af` / `34690533915`）**：8 项 G0 代码已全部实现并合入 `master`；`编译检查` 与 `Web/Blazor E2E` 两个 job **转绿**。`V2.6 Evaluation` job 仍红，但本次失败在 `启动 Qdrant CI 容器`（Docker 基础设施，与代码无关）；前次 run（cc8358c）曾暴露 `GQ-007` 在 `SemanticApplicabilityGate` 阶段 BLOCK（reason：Top Candidate 缺少 Golden SemanticText 直接语义证据）——该评估 gate 不属 G0 代码范围（SEC-01/DB-01/AGENT-01 均未触碰），CI-01 仅修正了断言文案、未消除该 BLOCK，BI-01 关闭需另行排查评估 gate 的语义证据链（非 G0 阻塞项）。
+> **G0 编译/构建复核（2026-09-12，run `f85d2af` / `34690533915`）**：8 项 G0 代码已全部实现并合入 `master`；`编译检查` 与 `Web/Blazor E2E` 两个 job **转绿**。`V2.6 Evaluation` job 仍红，但本次失败在 `启动 Qdrant CI 容器`（Docker 基础设施，与代码无关）；前次 run（cc8358c）曾暴露 `GQ-007` 在 `SemanticApplicabilityGate` 阶段 BLOCK（reason：Top Candidate 缺少 Golden SemanticText 直接语义证据）——该评估 gate 不属 G0 代码范围（SEC-01/DB-01/AGENT-01 均未触碰），CI-01 仅修正了断言文案、未消除该 BLOCK，BI-01 关闭需先行排查 GQ-007 评估 gate 的语义证据链。
+> **G0 收口决议（2026-09-12，用户确认）**：经排查，GQ-007 实际契约=「入库数量+入库单数量」（非「入库金额」），二者在 metadata 均有对应字段（`wms_storage_receipt_info.quantity`，列 id 5541），**非字段缺失型数据缺陷**；V2.6 该 BLOCK 系评估 gate 对入域语义的严格词法锚定要求（最高分候选元数据须词法包含 Golden SemanticText），属**已知/非阻塞**条件，**不卡 G0**。G0 门禁正式收口：除 `CI-02`（全量主单测 job，明确划出 G0、后续独立立项）外，全部 G0 代码项 DONE，验收口径 = `编译检查` + `Web/Blazor E2E` 转绿。
 > 复核期间修复了 3 个会致编译/E2E 失败的缺陷（均已合入 master）：SEC-01 迁移 Designer 基类 `ModelSnapshot`→`Migration`（CS0262/CS0246，`c612c6b`）、DB-01 `SchemaProbe` 改用 `Any()/Count()`（CS0117/CS1503，`cc8358c`）、SEC-01 托管服务 `StartsWith` 去掉 `StringComparison` 以可翻译为 SQL（运行时 `InvalidOperationException`，`f85d2af`）。
 
 ## P1 — 企业试点稳定性
