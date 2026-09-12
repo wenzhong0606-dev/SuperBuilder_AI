@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using SuperBuilder_AI.Data;
 
@@ -12,7 +13,7 @@ namespace SuperBuilder_AI.Infrastructure.Persistence.Migrations
 {
 [DbContext(typeof(SuperBIContext))]
 [Migration("20260912103000_M13_03_DataSourceConnectionStringEncryption")]
-partial class M13_03_DataSourceConnectionStringEncryption : ModelSnapshot
+partial class M13_03_DataSourceConnectionStringEncryption : Migration
     {
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
