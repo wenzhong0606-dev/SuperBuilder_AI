@@ -54,9 +54,9 @@ public static class SchemaProbe
         try
         {
             var pending = await db.Database.GetPendingMigrationsAsync(ct);
-            if (pending is { Count: > 0 })
+            if (pending.Any())
                 return (BootstrapState.MigrationsPending,
-                    $"存在 {pending.Count} 个尚未应用到数据库的迁移，部署前请先执行迁移：" +
+                    $"存在 {pending.Count()} 个尚未应用到数据库的迁移，部署前请先执行迁移：" +
                     string.Join(", ", pending));
         }
         catch (Exception ex)
