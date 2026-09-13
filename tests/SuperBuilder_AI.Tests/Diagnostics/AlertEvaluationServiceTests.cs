@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Threading.Tasks;
 using SuperBuilder_AI.Api.Diagnostics;
 using SuperBuilder_AI.Interfaces.BI;

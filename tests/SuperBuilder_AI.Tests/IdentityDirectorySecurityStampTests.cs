@@ -5,6 +5,7 @@ using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using SuperBuilder_AI.Data;
 using SuperBuilder_AI.Models.Identity;
+using SuperBuilder_AI.Models.Organization;
 using SuperBuilder_AI.Services.Auth;
 using SuperBuilder_AI.Services.Identity;
 using Xunit;
