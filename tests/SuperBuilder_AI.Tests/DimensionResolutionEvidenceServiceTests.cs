@@ -84,6 +84,12 @@ public class DimensionResolutionEvidenceServiceTests : IDisposable
         public FakeSearch(Dictionary<string, List<MetadataSemanticSearchResult>> map) => _map = map;
         public Task<List<MetadataSemanticSearchResult>> SearchAsync(string question, int topK = 10, LocaleContext? locale = null)
             => Task.FromResult(_map.TryGetValue(question, out var list) ? list : new List<MetadataSemanticSearchResult>());
+
+        public Task<List<MetadataSemanticSearchResult>> SearchByKeywordAsync(string keyword, int limit = 30)
+            => Task.FromResult(new List<MetadataSemanticSearchResult>());
+
+        public Task<List<MetadataSemanticSearchResult>> SearchByKeywordSubstringAsync(string keyword, int limit = 30)
+            => Task.FromResult(new List<MetadataSemanticSearchResult>());
     }
 
     private static MetadataSemanticSearchResult Semantic(MetadataTable table, MetadataColumn column, double score, string businessMeaning)

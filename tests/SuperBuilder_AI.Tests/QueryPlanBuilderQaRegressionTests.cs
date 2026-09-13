@@ -46,6 +46,12 @@ public class QueryPlanBuilderQaRegressionTests
 		public List<MetadataSemanticSearchResult> Results { get; set; } = new();
 		public Task<List<MetadataSemanticSearchResult>> SearchAsync(string question, int topK = 10, LocaleContext? locale = null)
 			=> Task.FromResult(Results);
+
+		public Task<List<MetadataSemanticSearchResult>> SearchByKeywordAsync(string keyword, int limit = 30)
+			=> Task.FromResult(new List<MetadataSemanticSearchResult>());
+
+		public Task<List<MetadataSemanticSearchResult>> SearchByKeywordSubstringAsync(string keyword, int limit = 30)
+			=> Task.FromResult(new List<MetadataSemanticSearchResult>());
 	}
 
 	private sealed class FakeJoin : IQueryJoinInferenceService

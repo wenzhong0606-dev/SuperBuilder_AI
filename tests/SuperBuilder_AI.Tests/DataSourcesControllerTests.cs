@@ -10,6 +10,7 @@ using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using SuperBuilder_AI.Controllers;
 using SuperBuilder_AI.Data;
+using SuperBuilder_AI.Infrastructure.Security;
 using SuperBuilder_AI.Interfaces.Identity;
 using SuperBuilder_AI.Models.Identity;
 using SuperBuilder_AI.Models.Metadata;

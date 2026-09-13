@@ -261,7 +261,13 @@ public class SuperBIContext : DbContext
         builder.Entity<DataSource>().HasIndex(x => new { x.TenantId, x.NormalizedName }).IsUnique()
             .HasDatabaseName("IX_DataSources_TenantId_NormalizedName");
         builder.Entity<DataSource>().Property(x => x.DbType).IsRequired().HasMaxLength(32).HasComment("数据库类型(MYSQL/SQLSERVER/POSTGRESQL)");
-        builder.Entity<DataSource>().Property(x => x.ConnectionString).IsRequired().HasColumnType("nvarchar(max)").HasComment("连接字符串（AES-256-GCM 信封加密，v1: 前缀；明文绝不持久化）");
+        // 连接串为不限长字符串：SQL Server 使用 nvarchar(max)；SQLite 测试库使用 TEXT。
+        // 二者在各自提供程序下均为「不限长文本」语义，SQL Server 端的迁移/快照保持不变（无需新增迁移）。
+        // 此 provider 分支仅解决 SQLite EnsureCreated 因 nvarchar(max) 不被解析而失败的既有测试基础设施缺陷。
+        var connectionStringType = Database.ProviderName == "Microsoft.EntityFrameworkCore.Sqlite"
+            ? "TEXT"
+            : "nvarchar(max)";
+        builder.Entity<DataSource>().Property(x => x.ConnectionString).IsRequired().HasColumnType(connectionStringType).HasComment("连接字符串（AES-256-GCM 信封加密，v1: 前缀；明文绝不持久化）");
         // M1-04：Enabled 非空（默认启用），兼容既有种子与查询计划测试。
         builder.Entity<DataSource>().Property(x => x.Enabled).IsRequired().HasDefaultValue(true).HasComment("是否启用");
         // M1-04：连接测试记录（脱敏）。
@@ -844,6 +850,20 @@ public class SuperBIContext : DbContext
         builder.Entity<MetadataTable>().HasQueryFilter(e => !_tenantFilterEnabled || e.TenantId == _scopedTenantId);
         builder.Entity<Models.BI.Entity.BusinessEntity>().HasQueryFilter(e => !_tenantFilterEnabled || e.TenantId == _scopedTenantId);
         builder.Entity<TenantSetting>().HasQueryFilter(e => !_tenantFilterEnabled || e.TenantId == _scopedTenantId);
+
+        // ---- DB-02 / M13-17：依赖实体租户过滤（消除 EF 10622 + 跨租户直查泄漏）----
+        // 以下实体无自身 TenantId（或经父导航隔离更可靠），须经「父实体导航的 TenantId」间接隔离；
+        // MetadataScanJob 自身持有 TenantId，直接过滤。
+        // 全部沿用 !_tenantFilterEnabled || … 守卫：未开启租户作用域（Golden/系统/种子路径）时恒为 no-op，
+        // 与既有根实体过滤语义完全一致，不改变现有行为。
+        // 所有父导航均为 required（FK 非空 long），EF 不会生成空引用判定，规避 "Nullable object must have a value"。
+        builder.Entity<MetadataColumn>().HasQueryFilter(c => !_tenantFilterEnabled || c.MetadataTable!.TenantId == _scopedTenantId);
+        builder.Entity<MetadataScanJob>().HasQueryFilter(j => !_tenantFilterEnabled || j.TenantId == _scopedTenantId);
+        builder.Entity<BusinessEntityAttribute>().HasQueryFilter(a => !_tenantFilterEnabled || a.BusinessEntity!.TenantId == _scopedTenantId);
+        builder.Entity<BusinessEntityKey>().HasQueryFilter(k => !_tenantFilterEnabled || k.BusinessEntity!.TenantId == _scopedTenantId);
+        builder.Entity<BusinessEntityMetric>().HasQueryFilter(m => !_tenantFilterEnabled || m.BusinessEntity!.TenantId == _scopedTenantId);
+        builder.Entity<BusinessEntityRelationship>().HasQueryFilter(r => !_tenantFilterEnabled || r.SourceEntity!.TenantId == _scopedTenantId);
+        builder.Entity<PhysicalBinding>().HasQueryFilter(b => !_tenantFilterEnabled || b.DataSource!.TenantId == _scopedTenantId);
 
         // SemanticLabel：租户私有标签 + 全局共享标签（TenantId=0）均对本租户可见。
         // 与其余实体不同，此处显式放行 TenantId == 0，否则全局译文在租户作用域内会被误过滤。
