@@ -60,6 +60,7 @@ public sealed class EvaluationDiagnosticsController : ControllerBase
         _goldenDatasetQualityGate = goldenDatasetQualityGate;
         _goldenBaselineReleaseService = goldenBaselineReleaseService;
         _goldenBaselineComparisonService = goldenBaselineComparisonService;
+        _configuration = configuration;
     }
 
     [HttpGet("golden-dataset")]
