@@ -273,6 +273,11 @@ jobs:
           # 导致权限矩阵大部分用例登录即被限流失败。此处用环境变量注入等价的高阈值（仅 CI 测试环境）。
           RateLimit__LoginLimit: "500"
           RateLimit__GlobalLimit: "1000"
+          # SEC-01：与 build job 一致的 CI 测试主密钥（AES-256）。此前 e2e job 的 API 未注入此键，
+          # 导致 ISecretStore 单例构造失败——E2E 种子创建数据源（需 Protect）降级、涉及加解密的端点
+          # 在请求期抛 "缺少 SecretStore:MasterKey"。注入后与 build job 行为一致，DataSourceScan/RlsIsolation
+          # 等数据源头相关用例才能真正落到有数据的状态（而非空库 0=0 假通过）。
+          SecretStore__MasterKey: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
         run: |
           dotnet run --project SuperBuilder_AI/SuperBuilder_AI.csproj --configuration Release --no-restore --no-build --urls http://127.0.0.1:5050 > /tmp/sb-api.log 2>&1 &
           echo $! > /tmp/sb-api.pid

@@ -30,7 +30,12 @@ internal static class E2EApiHelper
     {
         var (token, _, _, _) = await GetAuthAsync(page);
         var apiBase = E2EConfig.ApiUrl.TrimEnd('/');
-        var result = await page.EvaluateAsync<JsonElement>(
+        // 注意：脚本返回 JSON.stringify(...) 的结果是"字符串"，Playwright 的
+        // EvaluateAsync<JsonElement> 会把它反序列化为 String 类型而非 Object，
+        // 导致后续 result.GetProperty("status") 抛
+        // "requires an element of type 'Object', but the target element has type 'String'"。
+        // 故此处与 LoginHelper 保持一致：返回字符串，由 C# 侧 JsonDocument 解析。
+        var json = await page.EvaluateAsync<string>(
             "async (c) => {" +
             "  const headers = { 'Content-Type': 'application/json' };" +
             "  if (c.token) headers['Authorization'] = 'Bearer ' + c.token;" +
@@ -41,9 +46,11 @@ internal static class E2EApiHelper
             "  return JSON.stringify({ status: r.status, ok: r.ok, body: t });" +
             "}",
             new { apiBase, method, path, token, body });
-        var status = result.GetProperty("status").GetInt32();
-        var ok = result.GetProperty("ok").GetBoolean();
-        var bodyStr = result.GetProperty("body").GetString() ?? "";
+        using var doc = JsonDocument.Parse(json);
+        var root = doc.RootElement;
+        var status = root.GetProperty("status").GetInt32();
+        var ok = root.GetProperty("ok").GetBoolean();
+        var bodyStr = root.GetProperty("body").GetString() ?? "";
         return (ok, status, bodyStr);
     }
 }
