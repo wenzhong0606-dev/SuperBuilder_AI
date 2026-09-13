@@ -421,8 +421,13 @@ builder.Services.AddSingleton<SuperBuilder_AI.Api.Diagnostics.ScanBacklogGauge>(
 builder.Services.AddSingleton(new SuperBuilder_AI.Api.Diagnostics.AlertThresholds());
 // OBS-01：告警接收端（默认仅记录日志；测试用 TestAlertSink 验证触发+恢复）
 builder.Services.AddSingleton<SuperBuilder_AI.Api.Diagnostics.IAlertSink, SuperBuilder_AI.Api.Diagnostics.LoggingAlertSink>();
-// OBS-01：告警评估主机服务（周期评估指标并分发告警，含恢复判定）
-builder.Services.AddHostedService<SuperBuilder_AI.Api.Diagnostics.AlertEvaluationService>();
+// OBS-01：告警评估主机服务（周期评估指标并分发告警，含恢复判定）。
+// 关键：AddHostedService<T> 仅把 T 注册为 IHostedService，不注册其具体类型；
+// /metrics 端点按具体类型 AlertEvaluationService 注入取 LastAlerts，若仅 AddHostedService
+// 会在启动期 RequestDelegateFactory 校验依赖时抛 “Unable to resolve service for type”
+// 导致 API 进程启动即崩溃。故先注册为单例，再让 HostedService 复用同一实例（保证 LastAlerts 一致）。
+builder.Services.AddSingleton<SuperBuilder_AI.Api.Diagnostics.AlertEvaluationService>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<SuperBuilder_AI.Api.Diagnostics.AlertEvaluationService>());
 // M0-05：本地化目录种子服务，使 UiLanguage/Text 在启动序列中固定顺序执行
 builder.Services.AddScoped<ILocalizationSeedService, LocalizationSeedService>();
 builder.Services.AddScoped<IThemeSeedService, ThemeSeedService>();

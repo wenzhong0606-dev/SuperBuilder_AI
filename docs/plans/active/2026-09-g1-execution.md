@@ -150,6 +150,7 @@ G1 有若干项被 Active Plan 的「待决事项（OPEN）」阻塞。下表明
   - **Ask 失败细分近似**：`LlmError` 兜底覆盖理解/结果解析阶段的其它异常（非 DB/超时），实际包含 LLM/AI 后端与其它未知故障；精确的 DB vs LLM 区分依赖 LLM 客户端的专用异常类型，后续可在 `IsDbException` 旁补 `IsLlmException`。
   - **告警阈值出厂基线**：`AlertThresholds` 默认值（错误率 20%/50%、登录失败 30%、Ask 失败 20%、积压 ≥5）为合理出厂值，**生产级 P95/错误率目标仍受 OPEN「性能和恢复目标」约束**，待回填后在 `docs/ops` 定稿。
 - **验证**：`RequestMetricsCollectorTests`（401/403/429 拆分 + 登录成功率）、`ScanBacklogGauge`/`AlertEvaluator`/`AlertEvaluationService` 测试（触发+恢复闭环）已补；CI 编译检查 + Web/Blazor E2E 守护（沙箱 NuGet 坑下 E2E 工程无法本地编译，改完靠 CI 实跑）。
+  - **CI 收尾（2026-09-13 第二次提交）**：首提 `1a80cc4` 后 CI 两个 runtime job（V2.6 Evaluation Controller Runtime Smoke / Web·Blazor E2E）在「等待 Controller 启动」失败——API 进程启动即崩溃。根因：`AddHostedService<T>()` 仅把 `AlertEvaluationService` 注册为 `IHostedService`，而 `/metrics` 端点按**具体类型**注入它取 `LastAlerts`；`RequestDelegateFactory` 在启动期校验 handler 依赖时抛 `Unable to resolve service for type 'AlertEvaluationService'`。修复：先 `AddSingleton<AlertEvaluationService>()` 再 `AddHostedService(sp => sp.GetRequiredService<AlertEvaluationService>())`，保证端点与后台服务复用同一实例（LastAlerts 一致）。改后待 CI 重跑确认三 job 全绿方算闭环。
 
 ---
 
@@ -167,7 +168,7 @@ G1 有若干项被 Active Plan 的「待决事项（OPEN）」阻塞。下表明
 
 ## 6. 建议推进方式
 
-1. **已完成（无 OPEN 阻塞）**：DB-02（`e772684`）、QUOTA-01（`bcbc71d`）、ONBOARD-01（引导清单）、**OBS-01（指标细分+扫描积压+告警，CI 绿）** 均已 DONE。**下一步可立即开工**：受 OPEN「支持环境/性能恢复目标」约束的 **DR-01 / PERF-01**，以及无阻塞的 **OBS 后续打磨**（阈值按 OPEN 定稿）；关键路径收口后进入 **M14-07（可用交接包）**。
+1. **已完成（无 OPEN 阻塞）**：DB-02（`e772684`）、QUOTA-01（`bcbc71d`）、ONBOARD-01（引导清单）、**OBS-01（指标细分+扫描积压+告警，代码 DONE；首提 CI 暴露启动期 DI 崩溃，已二次提交修复待重跑确认）** 均已 DONE。**下一步可立即开工**：受 OPEN「支持环境/性能恢复目标」约束的 **DR-01 / PERF-01**，以及无阻塞的 **OBS 后续打磨**（阈值按 OPEN 定稿）；关键路径收口后进入 **M14-07（可用交接包）**。
 2. **骨架先行（范围待 OPEN 回填）**：E2E-01 用既有测试配置补齐业务链骨架。
 3. **OPEN 回填后再定稿**：PERF-01 / DR-01 / M14-01 / M14-08a / M14-07 必须在对应 OPEN 决策落地后锁定验收。
 4. **节奏**：每项独立提交并触发 CI；优先让「编译检查 / Web-Blazor-E2E」保持绿，V2.6 维持绿。
