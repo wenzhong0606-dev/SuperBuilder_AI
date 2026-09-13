@@ -197,6 +197,20 @@ G1 有若干项被 Active Plan 的「待决事项（OPEN）」阻塞。下表明
 - **同步产出**：`docs/plans/active/2026-09-open-decisions-form.md`（O1 支持环境 / O2 性能和恢复目标 / O3 试点业务口径，含定稿去向与回填后动作）；Backlog M14-07：BACKLOG → **ACTIVE**；`docs/README.md` 新增 `handover/` 目录与两个入口链接。
 - **定稿（残余工作）**：① 回填 O1/O2/O3；② 以 PERF-01/DR-01 实测替换占位符；③ 完成 `07` 的四条判据演练（非开发人员安装+升级、关联 ID 定位、退出导出+授权记录、承诺≤实测）。
 
+### 4.9 CI-02 (M13-05) — 全量单测纳入 CI 门禁 ✅ 已完成（2026-09-13）
+
+- **起因（比"少个 job"严重）**：`tests/SuperBuilder_AI.Tests`（136 文件 / 1061 个 `[Fact]/[Theory]`）**不在 `SuperBuilder_AI.CI.slnf`** 中 → 该工程从未在 CI 编译或执行。此前所有"CI 三 job 全绿"的结论**都不覆盖单测工程**。
+- **交付**：
+  - `SuperBuilder_AI.Components.csproj`：`TargetFrameworks` 条件化——`CI=true`（workflow 全局 env）时只产 `net10.0`，否则保持 `net10.0;net10.0-android;net10.0-ios`。两个目的：① 规避 runner 无 android/ios workload；② 使测试工程可「自带完整 restore+build」而**不必**携带全局 `-p:TargetFrameworks`（该全局属性会污染测试工程 NuGet 资产关联 → `xunit.runner.visualstudio` 适配器不进输出 → `No test is available` → 0 用例退出码 0 假绿，e2e job 长注释即此教训）。
+  - `.github/workflows/dotnet-build.yml`：新增 `unit-tests` job（`needs: build`、`timeout-minutes: 20`，纯内存 SQLite 无需容器）；执行数取自 trx `<Counters total>`（机器生成、唯一）而非 console 文本，`total=0` 即 `::error::` + `exit 1`；上传 `unit-tests.log` + `TestResults/` artifact。
+- **首次执行即暴露 7 个真实缺陷（全部已修，按域分 3 个提交）**：
+  1. `abb7613` **编译错误 4 处**：`Diagnostics/AlertEvaluationServiceTests` 缺 `using System.Linq`（测试工程 `ImplicitUsings=disable`，`.Count(predicate)` 被解析为 `IReadOnlyCollection<T>.Count` 属性）；`IdentityDirectorySecurityStampTests` 缺 `using SuperBuilder_AI.Models.Organization`（`Tenant` 定义于 `src/Domain/Organization/Tenant.cs`）。
+  2. `29c49a3` **OBS-01 真实实现缺陷**：`AlertEvaluationService.CycleOnce` 触发分支无条件 `Raise` 本轮全部评估结果，`_firedRules` 仅被恢复分支使用 → 越界规则**每周期重复发告警**（生产上即告警风暴）。改为仅发「本周期新进入触发态」的规则；`/metrics` 的 `activeAlerts`（`LastAlerts`）语义不变。
+  3. `249510b` **SEC-01 不同步**：`DataSourcesControllerTests.Update_ChangesName_And_ResetsConnectionString` 仍断言连接串明文，而 SEC-01（M13_03）已改为 AEAD 密文（`v1:` 前缀）落库 → 改为断言前缀 + 以同密钥 `AesGcmSecretStore` 解密比对明文。
+  4. `7f62ff4` **AUTH-01 不同步**：`IdentityControllerTests.GetUser_WithoutIdentityManage_Returns_403` 使用裸 `Build(ctx)`（未设 `ControllerContext.HttpContext`）→ `GetUser` 首行自查豁免 `CurrentUserId()` 读 `User` 抛 `NullReferenceException`，403 断言从未执行 → 改用 `BuildMember(ctx, Tenant5)`（含 `tid`、无 `perm`），与用例语义一致。
+- **CI 闭环**：run `34746710044`（head `7f62ff4c`）**四 job 全绿**——编译检查 ✅ / **单元测试 ✅（1168/1168）** / V2.6 Evaluation Controller Runtime Smoke ✅ / Web·Blazor E2E (Playwright) ✅。
+- **结论**：「CI 绿」自本项起第一次真正包含单测工程；单测从"本地偶发手动跑"变为**发布门禁**。
+
 ---
 
 ## 5. 提交与 CI 纪律（沿用 G0 约束）
@@ -213,8 +227,8 @@ G1 有若干项被 Active Plan 的「待决事项（OPEN）」阻塞。下表明
 
 ## 6. 建议推进方式
 
-1. **已完成（无 OPEN 阻塞）**：E2E-01、DB-02（`e772684`）、QUOTA-01（`bcbc71d`）、ONBOARD-01（引导清单）、**OBS-01（指标细分+扫描积压+告警；首提 CI 暴露启动期 DI 崩溃，二次提交 `7b43566` 修复后 CI 全绿）**、**CACHE-01（组授权变更轮换安全戳；CI `34742720340` 全绿）**、**DR-01（备份/恢复真实演练闭环：SQL+Qdrant+空库重放；新增原生脚本；残留仅 RPO/RTO 目标待 OPEN）**、**迁移漂移归并（45→46，`0771f52`，CI `34744475335` 全绿）** 均已 DONE；**M14-07 交接包草稿已交付（`docs/handover/` 7 册，Backlog → ACTIVE，待 PERF-01/OPEN 回填后定稿）**。**下一步可立即开工**：等待 `docs/plans/active/2026-09-open-decisions-form.md` 的 O1/O2/O3 回填（定性为「需用户/平台 owner 决策」）；**PERF-01 / M14-01 / M14-08a / M14-07 定稿仍受 OPEN 阻塞**。
+1. **已完成（无 OPEN 阻塞）**：E2E-01、DB-02（`e772684`）、QUOTA-01（`bcbc71d`）、ONBOARD-01（引导清单）、**OBS-01（指标细分+扫描积压+告警；首提 CI 暴露启动期 DI 崩溃，二次提交 `7b43566` 修复后 CI 全绿）**、**CACHE-01（组授权变更轮换安全戳；CI `34742720340` 全绿）**、**DR-01（备份/恢复真实演练闭环：SQL+Qdrant+空库重放；新增原生脚本；残留仅 RPO/RTO 目标待 OPEN）**、**迁移漂移归并（45→46，`0771f52`）**、**CI-02 全量单测纳入 CI 门禁（新增 `unit-tests` job；首次执行即暴露 4 个编译错误 + 3 个测试失败并全部修复——含 OBS-01 告警每周期重复发的真实实现缺陷；CI `34746710044` 四 job 全绿，单测 **1168/1168**）** 均已 DONE；**M14-07 交接包草稿已交付（`docs/handover/` 7 册，Backlog → ACTIVE，待 PERF-01/OPEN 回填后定稿）**。**P0 段已无可立即开工项**（`AGENT-01` 为 DEFERRED）。**唯一待办**：回填 `docs/plans/active/2026-09-open-decisions-form.md` 的 O1/O2/O3 → 解锁 **PERF-01 / M14-01 / M14-08a / M14-07 定稿**。
 2. **骨架先行（范围待 OPEN 回填）**：E2E-01 用既有测试配置补齐业务链骨架。
 3. **OPEN 回填后再定稿**：PERF-01 / DR-01 / M14-01 / M14-08a / M14-07 必须在对应 OPEN 决策落地后锁定验收。
-4. **节奏**：每项独立提交并触发 CI；优先让「编译检查 / Web-Blazor-E2E」保持绿，V2.6 维持绿。
-5. **本计划下一步动作**：与用户确认「首批开工项」——按 M13 §4 顺序从 **M13-09 (E2E-01)** 起步（关键路径第一项），或先啃无阻塞的 **DB-02 / QUOTA-01** 建立正确性底座，再回头做 E2E。
+4. **节奏**：每项独立提交并触发 CI；四个 job（编译检查 / 单元测试 / V2.6 Evaluation Controller Runtime Smoke / Web·Blazor E2E）须保持全绿。
+5. **本计划下一步动作**：G1 门禁中不依赖 OPEN 的项**已全部 DONE**（关键路径 `BASE-01→G0→M13-09→M13-14→M14-07` 主体完成，M14-07 待实测定稿）；剩余 `PERF-01 / M14-01 / M14-08a` 与 `M14-07` **定稿**均等待 `2026-09-open-decisions-form.md`（O1/O2/O3）回填。
