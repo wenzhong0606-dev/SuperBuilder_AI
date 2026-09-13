@@ -179,7 +179,9 @@ public class IdentityControllerTests
 
 		var id = await CreateUserAsync(ctx, Tenant5, "dave");
 		// 未携带 identity:manage 的主体（即便同租户）读取他人 → 403。
-		var ctrl = Build(ctx);
+		// 注意：必须装配带租户的主体。GetUser 首行的自查豁免判定 CurrentUserId() 会读取 User，
+		// 而裸 Build(ctx) 未设置 ControllerContext.HttpContext → User 为 null → NullReferenceException。
+		var ctrl = BuildMember(ctx, Tenant5);
 		var result = await ctrl.GetUser(id, Tenant5, CancellationToken.None) as Microsoft.AspNetCore.Mvc.ObjectResult;
 
 		Assert.NotNull(result);
