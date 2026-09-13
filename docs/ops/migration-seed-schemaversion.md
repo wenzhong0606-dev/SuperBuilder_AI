@@ -27,8 +27,8 @@
 
 ## 3. Schema Version 策略
 
-- **定义**：`schemaVersion` = **最新（序号最大）迁移 ID**。当前 = `20260911231209_M12_18_MetricDimensionExpression`。
-- **权威清单**：`scripts/schema/schema-version.json`（含 45 个有序迁移 ID、生成时间、生成命令）。
+- **定义**：`schemaVersion` = **最新（序号最大）迁移 ID**。当前 = `20260912103000_M13_03_DataSourceConnectionStringEncryption`。
+- **权威清单**：`scripts/schema/schema-version.json`（含 46 个有序迁移 ID、生成时间、生成命令）。
 - **读取方式**：
   - 代码/运维：`SELECT TOP 1 MigrationId FROM __EFMigrationsHistory ORDER BY MigrationId DESC`
   - 或直接用校验脚本（见 §6）。
@@ -161,6 +161,18 @@ M12 增量 3-2（指标/维度编辑）为 `BusinessEntityMetrics` / `BusinessEn
 3. `dotnet-ef database update` → `Applying migration '20260911231209_M12_18_MetricDimensionExpression'. Done.`
 4. 清单同步：`scripts/schema/schema-version.json` 44 → **45**（`schemaVersion`/`migrationCount`/`generatedUtc`/`migrations[]` 四项）。
 5. 复核：`migrations list --no-connect` 与清单做集合差 → **45/45，missing 0 / extra 0**；连库 `migrations list` → `(Pending)` 计数 **0**。
+
+### 7.5 漂移归并（2026-09-13，45 → 46）
+
+DR-01 演练（`docs/ops/drill-evidence-20260913.md §7.1`）发现**开发库与清单双双落后代码 1 个迁移**，本次归并：
+
+1. 取证：代码/快照 **46** 迁移（末位 `20260912103000_M13_03_DataSourceConnectionStringEncryption`）；开发库 `__EFMigrationsHistory` = **45**，且 `DataSources.ConnectionString` 实测仍为 `nvarchar(2048)`（`sys.columns.max_length=4096`）→ 漂移在 schema 层真实存在，非仅历史表差异；清单 `migrationCount=45`。
+2. 升级前备份：`BACKUP DATABASE ... WITH INIT, COMPRESSION, CHECKSUM` + `RESTORE VERIFYONLY` → 5.79 MB / 0.14 s，备份集有效。
+3. 应用：`dotnet-ef database update --no-build` → `Applying migration '20260912103000_M13_03_DataSourceConnectionStringEncryption'. Done.`（`ProductVersion 10.0.11`）；复核 `DataSources.ConnectionString = nvarchar(max)`（`max_length=-1`）。
+4. 清单同步：`schema-version.json` 45 → **46**（`schemaVersion` / `migrationCount` / `generatedUtc` / `migrations[]` 四项）。
+5. 复核：迁移程序集 **46** / 清单 **46** / 开发库已应用 **46**，三方差集 `missing=0 / extra=0`；`migrations list` 的 `(Pending)` 计数 **0** → `SchemaProbe` 不再判 `MigrationsPending`，readiness 恢复正常。
+
+> 沙箱限制复现：本环境 PowerShell 脚本宿主内 `sqlcmd` 返回 0 行（见 §7.3），故 `verify-schema.ps1` 的 **-Online** 模式仍无法在本沙箱自证；本次用同一口径的等价校验（直连客户端读 `__EFMigrationsHistory` + 程序集文件清单 + 清单 JSON 三方集合差）完成，结论一致。
 
 ## 8. 红线与诚实声明
 

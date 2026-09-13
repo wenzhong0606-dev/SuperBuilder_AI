@@ -175,7 +175,7 @@ G1 有若干项被 Active Plan 的「待决事项（OPEN）」阻塞。下表明
 - **修复的缺陷**：① 运行手册 6 处脚本路径错误（`scripts\backup\` → 实际 `scripts\dr-backup\`，照抄必失败）；② `restore-schema-from-migrations.sql` 陈旧（42 迁移 → 重新生成 **46**，否则空库恢复漏 3~4 个迁移）；③ 手册陈旧计数（迁移 42→46、Qdrant `vectors_count`→`points_count`）与 §8 自相矛盾表述。
 - **失败可定位性**：故意以不存在目录还原，SQL Server 给出精确到"缺哪个文件/OS 错误 2/WITH MOVE 补救"的错误链。✅
 - **交付**：`scripts/dr-backup/backup-db-native.sql`、`restore-db-native.sql`（新增并实测）、重生成的 `restore-schema-from-migrations.sql`；`docs/ops/drill-evidence-20260913.md`（真实演练证据）；`docs/ops/backup-restore-dr.md`（修正）；Backlog DR-01 → DONE。
-- **残留（须告知验收）**：**RPO/RTO 目标值**仍待平台 owner 按 OPEN「性能与恢复目标」定稿（本项只给实测基线）。演练另发现两处相邻漂移（**开发库落后 1 个迁移 45 vs 46**；`schema-version.json` 清单 45）——已记入 `drill-evidence-20260913.md §7.1`，**不在 DR-01 范围**，建议另行 `dotnet ef database update` 归并。
+- **残留（须告知验收）**：**RPO/RTO 目标值**仍待平台 owner 按 OPEN「性能与恢复目标」定稿（本项只给实测基线）。演练另发现的**两处相邻漂移已于 2026-09-13 归并**（开发库 `dotnet ef database update` 应用 M13_03 → 已应用 46；`schema-version.json` 重生成 → 46）：程序集/清单/开发库三方一致，`(Pending)`=0，`SchemaProbe` 不再判 `MigrationsPending`（见 `docs/ops/migration-seed-schemaversion.md §7.5`）。
 
 ---
 

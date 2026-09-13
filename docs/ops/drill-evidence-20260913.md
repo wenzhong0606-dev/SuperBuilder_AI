@@ -129,15 +129,20 @@
 
 ### 7.1 演练中发现的相邻问题（不在 DR-01 范围内，需另行处置）
 
+> **处置状态（2026-09-13 已归并）**：下列 1、2 两项均已修复并复核通过 —— 详见 `docs/ops/migration-seed-schemaversion.md §7.5`。
+> 开发库已应用 **46** / 代码程序集 **46** / 清单 **46**，三方差集 0；`(Pending)`=0，`SchemaProbe` 不再判 `MigrationsPending`。以下为发现时的原始记录，保留备查。
+
 1. **开发库落后代码 1 个迁移**：代码 / 模型快照为 **46** 迁移（末位 `20260912103000_M13_03_DataSourceConnectionStringEncryption`，
    SEC-01/M13-03，把 `DataSources.ConnectionString` 由 `nvarchar(2048)` 拓宽为 `nvarchar(max)`），
    而开发库 `SuperBuilder_Platform` 的 `__EFMigrationsHistory` = **45**（该迁移未应用，列仍为 `nvarchar(2048)`）。
    - 系统**有检测**：`SchemaProbe.ProbeAsync` 用 `GetPendingMigrationsAsync` 判定 `BootstrapState.MigrationsPending` → readiness=false（DB-01）；
      CI 在测试前执行 `dotnet ef database update`，故 CI 不受影响。
    - **建议**：对开发/部署库执行一次 `dotnet ef database update`（或用 §2.5 的幂等脚本升级），使库与代码一致。
+   - **✅ 已执行**：`dotnet ef database update --no-build` 应用该迁移；列已为 `nvarchar(max)`。
 2. **`scripts/schema/schema-version.json` 清单落后**：manifest `migrationCount=45`、`schemaVersion=20260911231209_M12_18_MetricDimensionExpression`
    （生成于 2026-09-11），早于 2026-09-12 的 M13_03 迁移 → 与代码的 46 不一致。
    - **建议**：按其 `generator`（`dotnet ef migrations list`）重新生成并回到 46。
+   - **✅ 已执行**：清单重生成，`migrationCount=46`、`schemaVersion=20260912103000_M13_03_DataSourceConnectionStringEncryption`。
 
 ## 8. 清理（演练后环境复原）
 
