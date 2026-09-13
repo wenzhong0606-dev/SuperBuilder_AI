@@ -1,8 +1,9 @@
-# SuperBuilder_AI 备份恢复与灾备演练（M9-14）
+# SuperBuilder_AI 备份恢复与灾备演练（M9-14 → M13-10 / DR-01）
 
-> 交付 M9-14｜验收口径：RPO/RTO 目标明确、步骤明确、演练证据明确。
+> 交付 M9-14｜G1 收口 M13-10（DR-01）｜验收口径：RPO/RTO 目标明确、步骤明确、演练证据明确。
 > 本文档为运维级契约：定义**要备份什么、RPO/RTO 是多少、怎么备份、怎么恢复、怎么演练**。
-> 配套脚本：`scripts/dr-backup/*.ps1`（6 个，已在 Windows PowerShell 5.1 解析校验通过）。
+> 配套脚本：`scripts/dr-backup/` —— 6 个 `*.ps1`（PS 5.1 解析校验通过）+ 2 个**原生 T-SQL**
+> （`backup-db-native.sql` / `restore-db-native.sql`，2026-09-13 实测通过，见 `drill-evidence-20260913.md`）。
 
 ---
 
@@ -34,23 +35,29 @@
 | 种子/语义 CSV | **24 h** | **15 min** | 版本化于 Git，随发布回滚 |
 
 > 上述为**推荐目标**，最终数值需平台负责人确认后写入本表（当前为交付基线，非 SLA 承诺）。
+> **2026-09-13 实测基线**：本环境（元库 72 MB / 1061 向量点）关系库全量备份 **2.3 s**、还原 **0.124 s**，
+> Qdrant 592 MB 快照还原 **109 s**——**远优于上表 RTO**；但数据规模小、非生产口径，仅作参考（见 `drill-evidence-20260913.md`）。
 
 ## 4. 备份策略（步骤明确）
 
 ### 4.1 关系库（按引擎）
-- SQL Server：`sqlpackage /Action:Export`（BACPAC，自含架构+数据）
+- **SQL Server（已验证主路径，2026-09-13 实测，见 `drill-evidence-20260913.md`）**：原生 `BACKUP DATABASE ... WITH INIT, COMPRESSION, CHECKSUM` + `RESTORE VERIFYONLY`（经 `sqlcmd`），**无需额外工具**、备份即校验。
   ```powershell
-  dotnet tool install --global dotnet-sqlpackage
-  .\scripts\backup\backup-db.ps1 -ConnectionString $env:SB_DB_CS -OutputDir ./backups
+  # 须用 stdin 重定向（-i 在 MSYS 等 shell 下被改写）；路径类变量请改脚本内 :setvar（sqlcmd -v 不接受含 ":" 的 Windows 路径）
+  sqlcmd -S localhost -U <user> -P <pwd> -I -W < scripts\dr-backup\backup-db-native.sql
+  ```
+- SQL Server（可选，BACPAC 自含架构+数据）：`sqlpackage /Action:Export`；**前提：已安装 sqlpackage**（本仓库当前环境未安装，故主路径用上面的原生方式）。
+  ```powershell
+  .\scripts\dr-backup\backup-db.ps1 -ConnectionString $env:SB_DB_CS -OutputDir ./backups
   ```
 - MySQL：`mysqldump --single-transaction --routines --events --triggers`
 - PostgreSQL：`pg_dump -Fc`
-- 脚本自动识别引擎、产出 `<name>.bacpac|.sql|.dump` + `manifest.json`（SHA256 + 大小 + 时间）。
+- PowerShell 脚本按连接串自动识别引擎、产出 `<name>.bacpac|.sql|.dump` + `manifest.json`（SHA256 + 大小 + 时间）。
 
 ### 4.2 Qdrant 向量
 - `POST /collections/{collection}/snapshots` 触发 → `GET` 下载 `.snapshot`：
   ```powershell
-  .\scripts\backup\backup-qdrant.ps1 -Host localhost -Port 6333 -Collection superbi_metadata -OutputDir ./backups
+  .\scripts\dr-backup\backup-qdrant.ps1 -Host localhost -Port 6333 -Collection superbi_metadata -OutputDir ./backups
   ```
 
 ### 4.3 配置/种子/迁移
@@ -60,9 +67,9 @@
 ### 4.4 全量编排与校验
 ```powershell
 # 一次性产出"恢复点"：关系库 + Qdrant + 配置归档
-.\scripts\backup\backup-all.ps1 -DbConnectionString $env:SB_DB_CS -OutputDir ./backups
+.\scripts\dr-backup\backup-all.ps1 -DbConnectionString $env:SB_DB_CS -OutputDir ./backups
 # 完整性校验（SHA256 + 大小比对 manifest）
-.\scripts\backup\verify-backup.ps1 -BackupDir ./backups/sb_rp_*
+.\scripts\dr-backup\verify-backup.ps1 -BackupDir ./backups/sb_rp_*
 ```
 
 ### 4.5 保留与加密
@@ -75,15 +82,17 @@
 > 原则：先架构（迁移）→ 再数据（还原）→ 再校验（一致性）。避免"有数据无表"或"有表无种子"。
 
 1. **准备**：确认目标实例可达、凭据就位、备份点（`sb_rp_*`）完整（`verify-backup.ps1` 通过）。
-2. **架构重建（空库场景）**：在新库执行 EF 迁移（等同 `M7-11_apply_migrations.ps1` 的 `dotnet ef database update`）；或应用仓库自带幂等脚本 `scripts/dr-backup/restore-schema-from-migrations.sql`（42 个迁移全量建表，已生成，可在全新库重建整个关系架构）。
+2. **架构重建（空库场景）**：在新库执行 EF 迁移（等同 `M7-11_apply_migrations.ps1` 的 `dotnet ef database update`）；或应用仓库自带幂等脚本 `scripts/dr-backup/restore-schema-from-migrations.sql`（**随迁移集自动生成、当前 46 个迁移**；2026-09-13 空库重放实测：46 迁移 / 52 表 / 5.9 s）。
 3. **数据还原**：
-   - 关系库：`.\scripts\backup\restore-db.ps1 -ConnectionString $env:SB_DB_CS -BackupFile <point>.bacpac`
-   - Qdrant：`.\scripts\backup\restore-qdrant.ps1 -SnapshotFile <point>.snapshot`
+   - 关系库（原生，主路径，2026-09-13 已验证）：`sqlcmd -S localhost -U <user> -P <pwd> -I -W < scripts\dr-backup\restore-db-native.sql`（还原到独立目标库，不动源库）
+   - 关系库（BACPAC 可选）：`.\scripts\dr-backup\restore-db.ps1 -ConnectionString $env:SB_DB_CS -BackupFile <point>.bacpac`
+   - Qdrant：`.\scripts\dr-backup\restore-qdrant.ps1 -SnapshotFile <point>.snapshot`；或用服务端非破坏式还原到新集合：
+     `PUT /collections/<target>/snapshots/recover` body `{"location":"http://<host>:6333/collections/<src>/snapshots/<file>"}`（2026-09-13 实测：592 MB 快照 109 s，points 1061 一致）
 4. **配置下发**：从配置仓库 + 密钥管理器恢复 `appsettings*.json` 与密钥（**绝不**从历史备份恢复明文密钥）。
 5. **种子/语义**：随发布从 Git 拉取 `Document/Semantic.csv`。
 6. **一致性校验**：
-   - 关系库：`SELECT COUNT(*) FROM __EFMigrationsHistory` 应等于 42；核心表行数与备份前一致；i18n 新键经启动自动播种。
-   - Qdrant：`GET /collections/{collection}` 的 `vectors_count` 与备份前一致。
+   - 关系库：`SELECT COUNT(*) FROM [dbo].[__EFMigrationsHistory]` 应等于**当前迁移总数（截至 2026-09-13 为 45）**；核心表行数与备份前一致；i18n 新键经启动自动播种。建议追加 `DBCC CHECKDB(<db>) WITH NO_INFOMSGS`。
+   - Qdrant：`GET /collections/{collection}` 的 **`points_count`** 与备份前一致（Qdrant 1.19：`indexed_vectors_count` 为 0 属正常，应比对 `points_count`）。
 7. **切换流量**：校验通过后，将流量切至恢复实例；旧实例隔离观察。
 
 ## 6. DR 拓扑
@@ -110,34 +119,30 @@
 恢复点：sb_rp_____  大小：____  SHA256：____
 架构重建耗时：____  数据还原耗时：____
 RPO 实测：____  RTO 实测：____  （对比 §3 目标）
-一致性校验：关系库迁移数=42? __  核心表行数一致? __  Qdrant vectors 一致? __
+一致性校验：关系库迁移数=当前总数(2026-09-13=45)? __  核心表行数一致? __  Qdrant points_count 一致? __
 结论：通过 / 不通过（附偏差与整改）
 ```
 
-## 8. 沙箱内已完成的演练证据（本交付）
+## 8. 演练证据
 
-> **⚠️ 勘误（2026-09-10，M9-15 期间发现）**：本节原结论「沙箱无可达关系库」**不成立**。
-> 当时仅扫描 1433/5432/3306 标准端口未见监听即判定不可达，但本机 SQL Server 以**命名实例/共享内存**
-> 方式提供（`sqlservr.exe` 在运行），`Server=localhost` 可正常连接——M9-15 期间已实证（实例成功读取
-> `__EFMigrationsHistory`、5 步种子全部成功）。
-> 修正：**关系库可达**（关系库侧演练可执行）。
-> **再勘误（Qdrant）**：原文「Qdrant 不可达（6333/6334 无监听）」**同样不成立**——经实测
-> `curl http://localhost:6333/` 返回 **HTTP 200**（`qdrant - vector search engine` v1.19.0），
-> 集合 `superbi_metadata` 含 **961 个点**。根因同上：`ss`/`netstat` 在本沙箱看不到宿主监听。
-> **结论：关系库与 Qdrant 均可达**，M9-14 的「环境门禁」结论整体作废；真实阻塞仅剩 592MB 级
-> 快照下载在沙箱资源下未完整执行（见 `schema-verify-evidence-2026-09-10.md` E7）。
-> 当初未执行演练属**排查方法缺陷**（端口扫描不可用），非环境硬性阻塞。
+> **⚠️ 勘误历史（2026-09-10，M9-15 期间发现）**：本节原结论「沙箱无可达关系库 / Qdrant」**均不成立**。
+> 当时仅扫描标准端口（1433/5432/3306/6333/6334）未见监听即判定不可达，但本机 SQL Server 以
+> **命名实例/共享内存**方式提供、Qdrant 亦在监听——`ss`/`netstat` 在本沙箱看不到宿主监听，
+> **端口扫描法整体不可用**。勘误后：**关系库与 Qdrant 均可达**，M9-14 曾下的「环境门禁」结论作废。
+> 当初未执行数据级演练属**排查方法缺陷**，非环境硬性阻塞。
 
-本环境为开发沙箱：**关系库可达**（SQL Server，`Server=localhost`，命名实例/共享内存），**Qdrant 不可达**（6333/6334 无监听）；mysql/pg 客户端缺失（仅 `sqlcmd` 在）。因此**关系库侧数据级演练可执行**，**Qdrant 侧演练仍为环境门禁**。
+### 8.1 历史证据（2026-09-09，架构级 / 脚本级）
+1. **架构级演练（schema-as-truth）**：`dotnet ef migrations script --idempotent` 生成 `scripts/dr-backup/restore-schema-from-migrations.sql`（**当时 42 迁移 / 367 KB**），证明任意空库可由该脚本重建关系架构（"迁移即恢复"路径的真实证据）。**该脚本已于 2026-09-13 重新生成至 46 迁移 / 268 KB 并通过空库重放验证，见 §8.2。**
+2. **脚本可用性（解析级）**：6 个 `scripts/dr-backup/*.ps1` 经 PowerShell 5.1 `Language.Parser` 解析 **PARSE_OK**（初版因 UTF-8 无 BOM + 中文误报失败，已统一 UTF-8 BOM 修复）。
+3. 详见 `docs/ops/drill-evidence-20260909.md`。
 
-在沙箱内**已真实执行并产出**的可验证证据：
-1. **架构级演练（schema-as-truth）**：`dotnet ef migrations script --idempotent` 成功生成 `scripts/dr-backup/restore-schema-from-migrations.sql`（**367KB / 42 个迁移全量建表 + 迁移历史**），证明任意空库可通过该脚本重建完整关系架构。→ 这是"迁移即恢复"路径的真实证据。
-2. **脚本可用性（解析级）**：6 个 `scripts/dr-backup/*.ps1` 经 Windows PowerShell 5.1 `System.Management.Automation.Language.Parser` 解析，**全部 PARSE_OK**（修复了初版在 PS5.1 下因 UTF-8 无 BOM + 中文导致的误报解析失败，已统一改为 UTF-8 BOM 编码）。
-3. **幂等迁移 SQL 实测**：`dotnet ef` 工具链 10.0.10 可用，迁移总数 42，脚本生成零错误。
-
-**待环境就绪后的真实演练**（环境门禁，非本交付缺陷）：
-- 在具备可达 SQL Server / Qdrant 的环境，按 §5 + §7.3 执行全量演练并填证据模板。
-- 建议与 M7-11 P0-D1/D2 验收共用一套环境准备。
+### 8.2 真实数据级演练（2026-09-13，已完成 ✅）
+**关系库与 Qdrant 均完成"备份 → 隔离还原 → 一致性校验"闭环，全部通过**；并新增并实测了原生
+T-SQL 备份/还原脚本（`backup-db-native.sql` / `restore-db-native.sql`，无需 `sqlpackage`）。
+- 关系库：45 迁移 / 52 表 / 全部核心表行数一致（Users 6、MetadataSemantics 513、AuditLogs 3044 …）/ `DBCC CHECKDB` 无错；**备份 2.3 s、还原 0.124 s（引擎）**。
+- Qdrant：**592 MB 快照 → 非破坏式还原到新集合，109 s 后 `points_count=1061` 与源完全一致**；源集合全程 green 未受影响。
+- 登录/授权/Ask 数据就绪：6/6 用户 `PasswordHash`+`SecurityStamp` 非空、Permissions 34、RolePermissions 49、MetadataSemantics 513。
+- RPO/RTO 实测基线、失败可定位性验证、脚本坑（`-v` 冒号 / `-i` 重定向）、清理记录：见 `docs/ops/drill-evidence-20260913.md`。
 
 ## 9. 风险与红线
 

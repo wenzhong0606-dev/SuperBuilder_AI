@@ -5191,602 +5191,6 @@ IF NOT EXISTS (
     WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
 )
 BEGIN
-    CREATE TABLE [AgentPlans] (
-        [Id] bigint NOT NULL IDENTITY,
-        [TenantId] bigint NOT NULL,
-        [Code] nvarchar(128) NOT NULL,
-        [Name] nvarchar(256) NOT NULL,
-        [Description] nvarchar(1024) NULL,
-        [Status] nvarchar(32) NOT NULL,
-        [DslVersion] nvarchar(16) NOT NULL,
-        [DslJson] nvarchar(max) NOT NULL,
-        [CreatedTime] datetime2 NOT NULL,
-        [UpdatedTime] datetime2 NULL,
-        [CreatedBy] nvarchar(max) NULL,
-        [UpdatedBy] nvarchar(max) NULL,
-        [RowVersion] bigint NOT NULL DEFAULT CAST(1 AS bigint),
-        CONSTRAINT [PK_AgentPlans] PRIMARY KEY ([Id])
-    );
-    DECLARE @defaultSchema172 AS sysname;
-    SET @defaultSchema172 = SCHEMA_NAME();
-    DECLARE @description172 AS sql_variant;
-    SET @description172 = N'Agent计划';
-    EXEC sp_addextendedproperty 'MS_Description', @description172, 'SCHEMA', @defaultSchema172, 'TABLE', N'AgentPlans';
-    SET @description172 = N'主键';
-    EXEC sp_addextendedproperty 'MS_Description', @description172, 'SCHEMA', @defaultSchema172, 'TABLE', N'AgentPlans', 'COLUMN', N'Id';
-    SET @description172 = N'所属租户（0=全局模板）';
-    EXEC sp_addextendedproperty 'MS_Description', @description172, 'SCHEMA', @defaultSchema172, 'TABLE', N'AgentPlans', 'COLUMN', N'TenantId';
-    SET @description172 = N'业务编码';
-    EXEC sp_addextendedproperty 'MS_Description', @description172, 'SCHEMA', @defaultSchema172, 'TABLE', N'AgentPlans', 'COLUMN', N'Code';
-    SET @description172 = N'名称';
-    EXEC sp_addextendedproperty 'MS_Description', @description172, 'SCHEMA', @defaultSchema172, 'TABLE', N'AgentPlans', 'COLUMN', N'Name';
-    SET @description172 = N'描述';
-    EXEC sp_addextendedproperty 'MS_Description', @description172, 'SCHEMA', @defaultSchema172, 'TABLE', N'AgentPlans', 'COLUMN', N'Description';
-    SET @description172 = N'状态';
-    EXEC sp_addextendedproperty 'MS_Description', @description172, 'SCHEMA', @defaultSchema172, 'TABLE', N'AgentPlans', 'COLUMN', N'Status';
-    SET @description172 = N'DSL版本';
-    EXEC sp_addextendedproperty 'MS_Description', @description172, 'SCHEMA', @defaultSchema172, 'TABLE', N'AgentPlans', 'COLUMN', N'DslVersion';
-    SET @description172 = N'DSL文档（结构化，非裸HTML）';
-    EXEC sp_addextendedproperty 'MS_Description', @description172, 'SCHEMA', @defaultSchema172, 'TABLE', N'AgentPlans', 'COLUMN', N'DslJson';
-    SET @description172 = N'创建时间';
-    EXEC sp_addextendedproperty 'MS_Description', @description172, 'SCHEMA', @defaultSchema172, 'TABLE', N'AgentPlans', 'COLUMN', N'CreatedTime';
-    SET @description172 = N'乐观并发版本(ETag)，每次更新自增';
-    EXEC sp_addextendedproperty 'MS_Description', @description172, 'SCHEMA', @defaultSchema172, 'TABLE', N'AgentPlans', 'COLUMN', N'RowVersion';
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE TABLE [AppPlans] (
-        [Id] bigint NOT NULL IDENTITY,
-        [TenantId] bigint NOT NULL,
-        [Code] nvarchar(128) NOT NULL,
-        [Name] nvarchar(256) NOT NULL,
-        [Description] nvarchar(1024) NULL,
-        [Status] nvarchar(32) NOT NULL,
-        [DslVersion] nvarchar(16) NOT NULL,
-        [DslJson] nvarchar(max) NOT NULL,
-        [ThemeKey] nvarchar(64) NULL,
-        [PublishedDslJson] nvarchar(max) NULL,
-        [PublishedVersion] int NOT NULL,
-        [PublishedAt] datetime2 NULL,
-        [PublishedBy] nvarchar(128) NULL,
-        [CreatedTime] datetime2 NOT NULL,
-        [UpdatedTime] datetime2 NULL,
-        [CreatedBy] nvarchar(max) NULL,
-        [UpdatedBy] nvarchar(max) NULL,
-        [RowVersion] bigint NOT NULL DEFAULT CAST(1 AS bigint),
-        CONSTRAINT [PK_AppPlans] PRIMARY KEY ([Id])
-    );
-    DECLARE @defaultSchema173 AS sysname;
-    SET @defaultSchema173 = SCHEMA_NAME();
-    DECLARE @description173 AS sql_variant;
-    SET @description173 = N'应用';
-    EXEC sp_addextendedproperty 'MS_Description', @description173, 'SCHEMA', @defaultSchema173, 'TABLE', N'AppPlans';
-    SET @description173 = N'主键';
-    EXEC sp_addextendedproperty 'MS_Description', @description173, 'SCHEMA', @defaultSchema173, 'TABLE', N'AppPlans', 'COLUMN', N'Id';
-    SET @description173 = N'所属租户（0=全局模板）';
-    EXEC sp_addextendedproperty 'MS_Description', @description173, 'SCHEMA', @defaultSchema173, 'TABLE', N'AppPlans', 'COLUMN', N'TenantId';
-    SET @description173 = N'业务编码';
-    EXEC sp_addextendedproperty 'MS_Description', @description173, 'SCHEMA', @defaultSchema173, 'TABLE', N'AppPlans', 'COLUMN', N'Code';
-    SET @description173 = N'名称';
-    EXEC sp_addextendedproperty 'MS_Description', @description173, 'SCHEMA', @defaultSchema173, 'TABLE', N'AppPlans', 'COLUMN', N'Name';
-    SET @description173 = N'描述';
-    EXEC sp_addextendedproperty 'MS_Description', @description173, 'SCHEMA', @defaultSchema173, 'TABLE', N'AppPlans', 'COLUMN', N'Description';
-    SET @description173 = N'状态';
-    EXEC sp_addextendedproperty 'MS_Description', @description173, 'SCHEMA', @defaultSchema173, 'TABLE', N'AppPlans', 'COLUMN', N'Status';
-    SET @description173 = N'DSL版本';
-    EXEC sp_addextendedproperty 'MS_Description', @description173, 'SCHEMA', @defaultSchema173, 'TABLE', N'AppPlans', 'COLUMN', N'DslVersion';
-    SET @description173 = N'DSL文档（结构化，非裸HTML）';
-    EXEC sp_addextendedproperty 'MS_Description', @description173, 'SCHEMA', @defaultSchema173, 'TABLE', N'AppPlans', 'COLUMN', N'DslJson';
-    SET @description173 = N'主题键';
-    EXEC sp_addextendedproperty 'MS_Description', @description173, 'SCHEMA', @defaultSchema173, 'TABLE', N'AppPlans', 'COLUMN', N'ThemeKey';
-    SET @description173 = N'已发布DSL快照（null=未发布）';
-    EXEC sp_addextendedproperty 'MS_Description', @description173, 'SCHEMA', @defaultSchema173, 'TABLE', N'AppPlans', 'COLUMN', N'PublishedDslJson';
-    SET @description173 = N'当前发布版本号（0=未发布）';
-    EXEC sp_addextendedproperty 'MS_Description', @description173, 'SCHEMA', @defaultSchema173, 'TABLE', N'AppPlans', 'COLUMN', N'PublishedVersion';
-    SET @description173 = N'最近发布时间(UTC)';
-    EXEC sp_addextendedproperty 'MS_Description', @description173, 'SCHEMA', @defaultSchema173, 'TABLE', N'AppPlans', 'COLUMN', N'PublishedAt';
-    SET @description173 = N'最近发布者';
-    EXEC sp_addextendedproperty 'MS_Description', @description173, 'SCHEMA', @defaultSchema173, 'TABLE', N'AppPlans', 'COLUMN', N'PublishedBy';
-    SET @description173 = N'创建时间';
-    EXEC sp_addextendedproperty 'MS_Description', @description173, 'SCHEMA', @defaultSchema173, 'TABLE', N'AppPlans', 'COLUMN', N'CreatedTime';
-    SET @description173 = N'乐观并发版本(ETag)，每次更新自增';
-    EXEC sp_addextendedproperty 'MS_Description', @description173, 'SCHEMA', @defaultSchema173, 'TABLE', N'AppPlans', 'COLUMN', N'RowVersion';
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE TABLE [AuditLogs] (
-        [Id] bigint NOT NULL IDENTITY,
-        [TenantId] bigint NOT NULL,
-        [UserId] bigint NULL,
-        [Actor] nvarchar(128) NOT NULL,
-        [Action] nvarchar(128) NOT NULL,
-        [EntityType] nvarchar(128) NOT NULL,
-        [EntityId] nvarchar(256) NULL,
-        [BeforeJson] nvarchar(max) NULL,
-        [AfterJson] nvarchar(max) NULL,
-        [Result] nvarchar(32) NOT NULL,
-        [Message] nvarchar(max) NULL,
-        [ManagementTargetTenantId] bigint NULL,
-        [CorrelationId] nvarchar(max) NULL,
-        [Timestamp] datetime2 NOT NULL,
-        [CreatedTime] datetime2 NOT NULL,
-        CONSTRAINT [PK_AuditLogs] PRIMARY KEY ([Id])
-    );
-    DECLARE @defaultSchema174 AS sysname;
-    SET @defaultSchema174 = SCHEMA_NAME();
-    DECLARE @description174 AS sql_variant;
-    SET @description174 = N'审计日志';
-    EXEC sp_addextendedproperty 'MS_Description', @description174, 'SCHEMA', @defaultSchema174, 'TABLE', N'AuditLogs';
-    SET @description174 = N'主键';
-    EXEC sp_addextendedproperty 'MS_Description', @description174, 'SCHEMA', @defaultSchema174, 'TABLE', N'AuditLogs', 'COLUMN', N'Id';
-    SET @description174 = N'所属租户（0=平台级）';
-    EXEC sp_addextendedproperty 'MS_Description', @description174, 'SCHEMA', @defaultSchema174, 'TABLE', N'AuditLogs', 'COLUMN', N'TenantId';
-    SET @description174 = N'操作者标识';
-    EXEC sp_addextendedproperty 'MS_Description', @description174, 'SCHEMA', @defaultSchema174, 'TABLE', N'AuditLogs', 'COLUMN', N'Actor';
-    SET @description174 = N'动作类型';
-    EXEC sp_addextendedproperty 'MS_Description', @description174, 'SCHEMA', @defaultSchema174, 'TABLE', N'AuditLogs', 'COLUMN', N'Action';
-    SET @description174 = N'实体类型';
-    EXEC sp_addextendedproperty 'MS_Description', @description174, 'SCHEMA', @defaultSchema174, 'TABLE', N'AuditLogs', 'COLUMN', N'EntityType';
-    SET @description174 = N'实体Id';
-    EXEC sp_addextendedproperty 'MS_Description', @description174, 'SCHEMA', @defaultSchema174, 'TABLE', N'AuditLogs', 'COLUMN', N'EntityId';
-    SET @description174 = N'结果';
-    EXEC sp_addextendedproperty 'MS_Description', @description174, 'SCHEMA', @defaultSchema174, 'TABLE', N'AuditLogs', 'COLUMN', N'Result';
-    SET @description174 = N'创建时间';
-    EXEC sp_addextendedproperty 'MS_Description', @description174, 'SCHEMA', @defaultSchema174, 'TABLE', N'AuditLogs', 'COLUMN', N'CreatedTime';
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE TABLE [Dashboards] (
-        [Id] bigint NOT NULL IDENTITY,
-        [TenantId] bigint NOT NULL,
-        [Code] nvarchar(128) NOT NULL,
-        [Title] nvarchar(256) NOT NULL,
-        [Description] nvarchar(1024) NULL,
-        [Status] nvarchar(32) NOT NULL,
-        [DslVersion] nvarchar(16) NOT NULL,
-        [DslJson] nvarchar(max) NOT NULL,
-        [ThemeKey] nvarchar(64) NULL,
-        [PublishedDslJson] nvarchar(max) NULL,
-        [PublishedVersion] int NOT NULL,
-        [PublishedAt] datetime2 NULL,
-        [PublishedBy] nvarchar(128) NULL,
-        [CreatedTime] datetime2 NOT NULL,
-        [UpdatedTime] datetime2 NULL,
-        [CreatedBy] nvarchar(max) NULL,
-        [UpdatedBy] nvarchar(max) NULL,
-        [RowVersion] bigint NOT NULL DEFAULT CAST(1 AS bigint),
-        CONSTRAINT [PK_Dashboards] PRIMARY KEY ([Id])
-    );
-    DECLARE @defaultSchema175 AS sysname;
-    SET @defaultSchema175 = SCHEMA_NAME();
-    DECLARE @description175 AS sql_variant;
-    SET @description175 = N'仪表盘';
-    EXEC sp_addextendedproperty 'MS_Description', @description175, 'SCHEMA', @defaultSchema175, 'TABLE', N'Dashboards';
-    SET @description175 = N'主键';
-    EXEC sp_addextendedproperty 'MS_Description', @description175, 'SCHEMA', @defaultSchema175, 'TABLE', N'Dashboards', 'COLUMN', N'Id';
-    SET @description175 = N'所属租户（0=全局模板）';
-    EXEC sp_addextendedproperty 'MS_Description', @description175, 'SCHEMA', @defaultSchema175, 'TABLE', N'Dashboards', 'COLUMN', N'TenantId';
-    SET @description175 = N'业务编码';
-    EXEC sp_addextendedproperty 'MS_Description', @description175, 'SCHEMA', @defaultSchema175, 'TABLE', N'Dashboards', 'COLUMN', N'Code';
-    SET @description175 = N'标题';
-    EXEC sp_addextendedproperty 'MS_Description', @description175, 'SCHEMA', @defaultSchema175, 'TABLE', N'Dashboards', 'COLUMN', N'Title';
-    SET @description175 = N'描述';
-    EXEC sp_addextendedproperty 'MS_Description', @description175, 'SCHEMA', @defaultSchema175, 'TABLE', N'Dashboards', 'COLUMN', N'Description';
-    SET @description175 = N'状态';
-    EXEC sp_addextendedproperty 'MS_Description', @description175, 'SCHEMA', @defaultSchema175, 'TABLE', N'Dashboards', 'COLUMN', N'Status';
-    SET @description175 = N'DSL版本';
-    EXEC sp_addextendedproperty 'MS_Description', @description175, 'SCHEMA', @defaultSchema175, 'TABLE', N'Dashboards', 'COLUMN', N'DslVersion';
-    SET @description175 = N'DSL文档（结构化，非裸HTML）';
-    EXEC sp_addextendedproperty 'MS_Description', @description175, 'SCHEMA', @defaultSchema175, 'TABLE', N'Dashboards', 'COLUMN', N'DslJson';
-    SET @description175 = N'主题键';
-    EXEC sp_addextendedproperty 'MS_Description', @description175, 'SCHEMA', @defaultSchema175, 'TABLE', N'Dashboards', 'COLUMN', N'ThemeKey';
-    SET @description175 = N'已发布DSL快照（null=未发布）';
-    EXEC sp_addextendedproperty 'MS_Description', @description175, 'SCHEMA', @defaultSchema175, 'TABLE', N'Dashboards', 'COLUMN', N'PublishedDslJson';
-    SET @description175 = N'当前发布版本号（0=未发布）';
-    EXEC sp_addextendedproperty 'MS_Description', @description175, 'SCHEMA', @defaultSchema175, 'TABLE', N'Dashboards', 'COLUMN', N'PublishedVersion';
-    SET @description175 = N'最近发布时间(UTC)';
-    EXEC sp_addextendedproperty 'MS_Description', @description175, 'SCHEMA', @defaultSchema175, 'TABLE', N'Dashboards', 'COLUMN', N'PublishedAt';
-    SET @description175 = N'最近发布者';
-    EXEC sp_addextendedproperty 'MS_Description', @description175, 'SCHEMA', @defaultSchema175, 'TABLE', N'Dashboards', 'COLUMN', N'PublishedBy';
-    SET @description175 = N'创建时间';
-    EXEC sp_addextendedproperty 'MS_Description', @description175, 'SCHEMA', @defaultSchema175, 'TABLE', N'Dashboards', 'COLUMN', N'CreatedTime';
-    SET @description175 = N'乐观并发版本(ETag)，每次更新自增';
-    EXEC sp_addextendedproperty 'MS_Description', @description175, 'SCHEMA', @defaultSchema175, 'TABLE', N'Dashboards', 'COLUMN', N'RowVersion';
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE TABLE [Permissions] (
-        [Id] bigint NOT NULL IDENTITY,
-        [TenantId] bigint NOT NULL,
-        [Code] nvarchar(64) NOT NULL,
-        [Name] nvarchar(128) NOT NULL,
-        [Category] nvarchar(32) NOT NULL,
-        [Description] nvarchar(max) NOT NULL,
-        [CreatedTime] datetime2 NOT NULL,
-        CONSTRAINT [PK_Permissions] PRIMARY KEY ([Id])
-    );
-    DECLARE @defaultSchema176 AS sysname;
-    SET @defaultSchema176 = SCHEMA_NAME();
-    DECLARE @description176 AS sql_variant;
-    SET @description176 = N'权限';
-    EXEC sp_addextendedproperty 'MS_Description', @description176, 'SCHEMA', @defaultSchema176, 'TABLE', N'Permissions';
-    SET @description176 = N'主键';
-    EXEC sp_addextendedproperty 'MS_Description', @description176, 'SCHEMA', @defaultSchema176, 'TABLE', N'Permissions', 'COLUMN', N'Id';
-    SET @description176 = N'所属租户（0=全局权限）';
-    EXEC sp_addextendedproperty 'MS_Description', @description176, 'SCHEMA', @defaultSchema176, 'TABLE', N'Permissions', 'COLUMN', N'TenantId';
-    SET @description176 = N'权限码（同租户唯一）';
-    EXEC sp_addextendedproperty 'MS_Description', @description176, 'SCHEMA', @defaultSchema176, 'TABLE', N'Permissions', 'COLUMN', N'Code';
-    SET @description176 = N'权限名';
-    EXEC sp_addextendedproperty 'MS_Description', @description176, 'SCHEMA', @defaultSchema176, 'TABLE', N'Permissions', 'COLUMN', N'Name';
-    SET @description176 = N'权限分类';
-    EXEC sp_addextendedproperty 'MS_Description', @description176, 'SCHEMA', @defaultSchema176, 'TABLE', N'Permissions', 'COLUMN', N'Category';
-    SET @description176 = N'创建时间';
-    EXEC sp_addextendedproperty 'MS_Description', @description176, 'SCHEMA', @defaultSchema176, 'TABLE', N'Permissions', 'COLUMN', N'CreatedTime';
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE TABLE [QuotaPolicies] (
-        [Id] bigint NOT NULL IDENTITY,
-        [TenantId] bigint NOT NULL,
-        [ResourceType] int NOT NULL,
-        [Limit] bigint NOT NULL,
-        [Window] int NOT NULL,
-        [CreatedTime] datetime2 NOT NULL,
-        CONSTRAINT [PK_QuotaPolicies] PRIMARY KEY ([Id])
-    );
-    DECLARE @defaultSchema177 AS sysname;
-    SET @defaultSchema177 = SCHEMA_NAME();
-    DECLARE @description177 AS sql_variant;
-    SET @description177 = N'配额策略';
-    EXEC sp_addextendedproperty 'MS_Description', @description177, 'SCHEMA', @defaultSchema177, 'TABLE', N'QuotaPolicies';
-    SET @description177 = N'主键';
-    EXEC sp_addextendedproperty 'MS_Description', @description177, 'SCHEMA', @defaultSchema177, 'TABLE', N'QuotaPolicies', 'COLUMN', N'Id';
-    SET @description177 = N'所属租户（0=平台默认）';
-    EXEC sp_addextendedproperty 'MS_Description', @description177, 'SCHEMA', @defaultSchema177, 'TABLE', N'QuotaPolicies', 'COLUMN', N'TenantId';
-    SET @description177 = N'资源类型';
-    EXEC sp_addextendedproperty 'MS_Description', @description177, 'SCHEMA', @defaultSchema177, 'TABLE', N'QuotaPolicies', 'COLUMN', N'ResourceType';
-    SET @description177 = N'上限';
-    EXEC sp_addextendedproperty 'MS_Description', @description177, 'SCHEMA', @defaultSchema177, 'TABLE', N'QuotaPolicies', 'COLUMN', N'Limit';
-    SET @description177 = N'周期窗口';
-    EXEC sp_addextendedproperty 'MS_Description', @description177, 'SCHEMA', @defaultSchema177, 'TABLE', N'QuotaPolicies', 'COLUMN', N'Window';
-    SET @description177 = N'创建时间';
-    EXEC sp_addextendedproperty 'MS_Description', @description177, 'SCHEMA', @defaultSchema177, 'TABLE', N'QuotaPolicies', 'COLUMN', N'CreatedTime';
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE TABLE [QuotaUsages] (
-        [Id] bigint NOT NULL IDENTITY,
-        [TenantId] bigint NOT NULL,
-        [ResourceType] int NOT NULL,
-        [Used] bigint NOT NULL,
-        [PeriodKey] nvarchar(32) NOT NULL,
-        [LastReset] datetime2 NOT NULL,
-        [CreatedTime] datetime2 NOT NULL,
-        CONSTRAINT [PK_QuotaUsages] PRIMARY KEY ([Id])
-    );
-    DECLARE @defaultSchema178 AS sysname;
-    SET @defaultSchema178 = SCHEMA_NAME();
-    DECLARE @description178 AS sql_variant;
-    SET @description178 = N'配额使用量';
-    EXEC sp_addextendedproperty 'MS_Description', @description178, 'SCHEMA', @defaultSchema178, 'TABLE', N'QuotaUsages';
-    SET @description178 = N'主键';
-    EXEC sp_addextendedproperty 'MS_Description', @description178, 'SCHEMA', @defaultSchema178, 'TABLE', N'QuotaUsages', 'COLUMN', N'Id';
-    SET @description178 = N'所属租户';
-    EXEC sp_addextendedproperty 'MS_Description', @description178, 'SCHEMA', @defaultSchema178, 'TABLE', N'QuotaUsages', 'COLUMN', N'TenantId';
-    SET @description178 = N'资源类型';
-    EXEC sp_addextendedproperty 'MS_Description', @description178, 'SCHEMA', @defaultSchema178, 'TABLE', N'QuotaUsages', 'COLUMN', N'ResourceType';
-    SET @description178 = N'已用';
-    EXEC sp_addextendedproperty 'MS_Description', @description178, 'SCHEMA', @defaultSchema178, 'TABLE', N'QuotaUsages', 'COLUMN', N'Used';
-    SET @description178 = N'周期键';
-    EXEC sp_addextendedproperty 'MS_Description', @description178, 'SCHEMA', @defaultSchema178, 'TABLE', N'QuotaUsages', 'COLUMN', N'PeriodKey';
-    SET @description178 = N'创建时间';
-    EXEC sp_addextendedproperty 'MS_Description', @description178, 'SCHEMA', @defaultSchema178, 'TABLE', N'QuotaUsages', 'COLUMN', N'CreatedTime';
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE TABLE [Roles] (
-        [Id] bigint NOT NULL IDENTITY,
-        [TenantId] bigint NOT NULL,
-        [Code] nvarchar(64) NOT NULL,
-        [Name] nvarchar(128) NOT NULL,
-        [Description] nvarchar(max) NOT NULL,
-        [CreatedTime] datetime2 NOT NULL,
-        [UpdatedTime] datetime2 NULL,
-        [CreatedBy] nvarchar(max) NULL,
-        [UpdatedBy] nvarchar(max) NULL,
-        [RowVersion] bigint NOT NULL DEFAULT CAST(1 AS bigint),
-        CONSTRAINT [PK_Roles] PRIMARY KEY ([Id])
-    );
-    DECLARE @defaultSchema179 AS sysname;
-    SET @defaultSchema179 = SCHEMA_NAME();
-    DECLARE @description179 AS sql_variant;
-    SET @description179 = N'角色';
-    EXEC sp_addextendedproperty 'MS_Description', @description179, 'SCHEMA', @defaultSchema179, 'TABLE', N'Roles';
-    SET @description179 = N'主键';
-    EXEC sp_addextendedproperty 'MS_Description', @description179, 'SCHEMA', @defaultSchema179, 'TABLE', N'Roles', 'COLUMN', N'Id';
-    SET @description179 = N'所属租户（0=全局角色）';
-    EXEC sp_addextendedproperty 'MS_Description', @description179, 'SCHEMA', @defaultSchema179, 'TABLE', N'Roles', 'COLUMN', N'TenantId';
-    SET @description179 = N'角色码（同租户唯一）';
-    EXEC sp_addextendedproperty 'MS_Description', @description179, 'SCHEMA', @defaultSchema179, 'TABLE', N'Roles', 'COLUMN', N'Code';
-    SET @description179 = N'角色名';
-    EXEC sp_addextendedproperty 'MS_Description', @description179, 'SCHEMA', @defaultSchema179, 'TABLE', N'Roles', 'COLUMN', N'Name';
-    SET @description179 = N'创建时间';
-    EXEC sp_addextendedproperty 'MS_Description', @description179, 'SCHEMA', @defaultSchema179, 'TABLE', N'Roles', 'COLUMN', N'CreatedTime';
-    SET @description179 = N'乐观并发版本(ETag)，每次更新自增';
-    EXEC sp_addextendedproperty 'MS_Description', @description179, 'SCHEMA', @defaultSchema179, 'TABLE', N'Roles', 'COLUMN', N'RowVersion';
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE TABLE [SemanticLabels] (
-        [Id] bigint NOT NULL IDENTITY,
-        [TenantId] bigint NOT NULL,
-        [ConceptType] nvarchar(64) NOT NULL,
-        [ConceptId] bigint NOT NULL,
-        [Culture] nvarchar(16) NOT NULL,
-        [LabelKind] nvarchar(32) NOT NULL,
-        [Value] nvarchar(512) NOT NULL,
-        [Source] nvarchar(32) NULL,
-        [SortOrder] int NOT NULL,
-        [CreatedTime] datetime2 NOT NULL,
-        [UpdatedTime] datetime2 NULL,
-        [CreatedBy] nvarchar(max) NULL,
-        [UpdatedBy] nvarchar(max) NULL,
-        [RowVersion] bigint NOT NULL DEFAULT CAST(1 AS bigint),
-        CONSTRAINT [PK_SemanticLabels] PRIMARY KEY ([Id])
-    );
-    DECLARE @defaultSchema180 AS sysname;
-    SET @defaultSchema180 = SCHEMA_NAME();
-    DECLARE @description180 AS sql_variant;
-    SET @description180 = N'语义多语言标签';
-    EXEC sp_addextendedproperty 'MS_Description', @description180, 'SCHEMA', @defaultSchema180, 'TABLE', N'SemanticLabels';
-    SET @description180 = N'主键';
-    EXEC sp_addextendedproperty 'MS_Description', @description180, 'SCHEMA', @defaultSchema180, 'TABLE', N'SemanticLabels', 'COLUMN', N'Id';
-    SET @description180 = N'所属租户（0=全局共享）';
-    EXEC sp_addextendedproperty 'MS_Description', @description180, 'SCHEMA', @defaultSchema180, 'TABLE', N'SemanticLabels', 'COLUMN', N'TenantId';
-    SET @description180 = N'概念类型';
-    EXEC sp_addextendedproperty 'MS_Description', @description180, 'SCHEMA', @defaultSchema180, 'TABLE', N'SemanticLabels', 'COLUMN', N'ConceptType';
-    SET @description180 = N'概念实体Id';
-    EXEC sp_addextendedproperty 'MS_Description', @description180, 'SCHEMA', @defaultSchema180, 'TABLE', N'SemanticLabels', 'COLUMN', N'ConceptId';
-    SET @description180 = N'语言标签';
-    EXEC sp_addextendedproperty 'MS_Description', @description180, 'SCHEMA', @defaultSchema180, 'TABLE', N'SemanticLabels', 'COLUMN', N'Culture';
-    SET @description180 = N'标签种类';
-    EXEC sp_addextendedproperty 'MS_Description', @description180, 'SCHEMA', @defaultSchema180, 'TABLE', N'SemanticLabels', 'COLUMN', N'LabelKind';
-    SET @description180 = N'标签文本';
-    EXEC sp_addextendedproperty 'MS_Description', @description180, 'SCHEMA', @defaultSchema180, 'TABLE', N'SemanticLabels', 'COLUMN', N'Value';
-    SET @description180 = N'来源';
-    EXEC sp_addextendedproperty 'MS_Description', @description180, 'SCHEMA', @defaultSchema180, 'TABLE', N'SemanticLabels', 'COLUMN', N'Source';
-    SET @description180 = N'排序';
-    EXEC sp_addextendedproperty 'MS_Description', @description180, 'SCHEMA', @defaultSchema180, 'TABLE', N'SemanticLabels', 'COLUMN', N'SortOrder';
-    SET @description180 = N'创建时间';
-    EXEC sp_addextendedproperty 'MS_Description', @description180, 'SCHEMA', @defaultSchema180, 'TABLE', N'SemanticLabels', 'COLUMN', N'CreatedTime';
-    SET @description180 = N'乐观并发版本(ETag)，每次更新自增';
-    EXEC sp_addextendedproperty 'MS_Description', @description180, 'SCHEMA', @defaultSchema180, 'TABLE', N'SemanticLabels', 'COLUMN', N'RowVersion';
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE TABLE [Tenants] (
-        [Id] bigint NOT NULL IDENTITY,
-        [TenantCode] nvarchar(64) NOT NULL,
-        [TenantName] nvarchar(128) NOT NULL,
-        [Enabled] bit NOT NULL,
-        [DisabledReason] nvarchar(512) NULL,
-        [DisabledAt] datetime2 NULL,
-        [DisabledByUserId] bigint NULL,
-        [CreatedTime] datetime2 NOT NULL,
-        [UpdatedTime] datetime2 NULL,
-        [CreatedBy] nvarchar(max) NULL,
-        [UpdatedBy] nvarchar(max) NULL,
-        [RowVersion] bigint NOT NULL DEFAULT CAST(1 AS bigint),
-        CONSTRAINT [PK_Tenants] PRIMARY KEY ([Id])
-    );
-    DECLARE @defaultSchema181 AS sysname;
-    SET @defaultSchema181 = SCHEMA_NAME();
-    DECLARE @description181 AS sql_variant;
-    SET @description181 = N'租户';
-    EXEC sp_addextendedproperty 'MS_Description', @description181, 'SCHEMA', @defaultSchema181, 'TABLE', N'Tenants';
-    SET @description181 = N'主键';
-    EXEC sp_addextendedproperty 'MS_Description', @description181, 'SCHEMA', @defaultSchema181, 'TABLE', N'Tenants', 'COLUMN', N'Id';
-    SET @description181 = N'租户编码（规范化小写存储）';
-    EXEC sp_addextendedproperty 'MS_Description', @description181, 'SCHEMA', @defaultSchema181, 'TABLE', N'Tenants', 'COLUMN', N'TenantCode';
-    SET @description181 = N'租户名称';
-    EXEC sp_addextendedproperty 'MS_Description', @description181, 'SCHEMA', @defaultSchema181, 'TABLE', N'Tenants', 'COLUMN', N'TenantName';
-    SET @description181 = N'是否启用';
-    EXEC sp_addextendedproperty 'MS_Description', @description181, 'SCHEMA', @defaultSchema181, 'TABLE', N'Tenants', 'COLUMN', N'Enabled';
-    SET @description181 = N'停用原因';
-    EXEC sp_addextendedproperty 'MS_Description', @description181, 'SCHEMA', @defaultSchema181, 'TABLE', N'Tenants', 'COLUMN', N'DisabledReason';
-    SET @description181 = N'停用时间(UTC)';
-    EXEC sp_addextendedproperty 'MS_Description', @description181, 'SCHEMA', @defaultSchema181, 'TABLE', N'Tenants', 'COLUMN', N'DisabledAt';
-    SET @description181 = N'停用操作者用户Id';
-    EXEC sp_addextendedproperty 'MS_Description', @description181, 'SCHEMA', @defaultSchema181, 'TABLE', N'Tenants', 'COLUMN', N'DisabledByUserId';
-    SET @description181 = N'创建时间';
-    EXEC sp_addextendedproperty 'MS_Description', @description181, 'SCHEMA', @defaultSchema181, 'TABLE', N'Tenants', 'COLUMN', N'CreatedTime';
-    SET @description181 = N'乐观并发版本(ETag)，每次更新自增';
-    EXEC sp_addextendedproperty 'MS_Description', @description181, 'SCHEMA', @defaultSchema181, 'TABLE', N'Tenants', 'COLUMN', N'RowVersion';
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE TABLE [Themes] (
-        [Id] bigint NOT NULL IDENTITY,
-        [TenantId] bigint NOT NULL,
-        [Key] nvarchar(64) NOT NULL,
-        [Name] nvarchar(128) NOT NULL,
-        [IsBuiltIn] bit NOT NULL,
-        [DslVersion] nvarchar(16) NOT NULL,
-        [DslJson] nvarchar(max) NOT NULL,
-        [CreatedTime] datetime2 NOT NULL,
-        [UpdatedTime] datetime2 NULL,
-        [CreatedBy] nvarchar(max) NULL,
-        [UpdatedBy] nvarchar(max) NULL,
-        [RowVersion] bigint NOT NULL DEFAULT CAST(1 AS bigint),
-        CONSTRAINT [PK_Themes] PRIMARY KEY ([Id])
-    );
-    DECLARE @defaultSchema182 AS sysname;
-    SET @defaultSchema182 = SCHEMA_NAME();
-    DECLARE @description182 AS sql_variant;
-    SET @description182 = N'主题';
-    EXEC sp_addextendedproperty 'MS_Description', @description182, 'SCHEMA', @defaultSchema182, 'TABLE', N'Themes';
-    SET @description182 = N'主键';
-    EXEC sp_addextendedproperty 'MS_Description', @description182, 'SCHEMA', @defaultSchema182, 'TABLE', N'Themes', 'COLUMN', N'Id';
-    SET @description182 = N'所属租户（0=内置/全局模板）';
-    EXEC sp_addextendedproperty 'MS_Description', @description182, 'SCHEMA', @defaultSchema182, 'TABLE', N'Themes', 'COLUMN', N'TenantId';
-    SET @description182 = N'主题键（同租户内唯一）';
-    EXEC sp_addextendedproperty 'MS_Description', @description182, 'SCHEMA', @defaultSchema182, 'TABLE', N'Themes', 'COLUMN', N'Key';
-    SET @description182 = N'主题名称';
-    EXEC sp_addextendedproperty 'MS_Description', @description182, 'SCHEMA', @defaultSchema182, 'TABLE', N'Themes', 'COLUMN', N'Name';
-    SET @description182 = N'是否内置主题';
-    EXEC sp_addextendedproperty 'MS_Description', @description182, 'SCHEMA', @defaultSchema182, 'TABLE', N'Themes', 'COLUMN', N'IsBuiltIn';
-    SET @description182 = N'DSL版本';
-    EXEC sp_addextendedproperty 'MS_Description', @description182, 'SCHEMA', @defaultSchema182, 'TABLE', N'Themes', 'COLUMN', N'DslVersion';
-    SET @description182 = N'主题DSL文档（结构化令牌，非CSS/HTML）';
-    EXEC sp_addextendedproperty 'MS_Description', @description182, 'SCHEMA', @defaultSchema182, 'TABLE', N'Themes', 'COLUMN', N'DslJson';
-    SET @description182 = N'创建时间';
-    EXEC sp_addextendedproperty 'MS_Description', @description182, 'SCHEMA', @defaultSchema182, 'TABLE', N'Themes', 'COLUMN', N'CreatedTime';
-    SET @description182 = N'乐观并发版本(ETag)，每次更新自增';
-    EXEC sp_addextendedproperty 'MS_Description', @description182, 'SCHEMA', @defaultSchema182, 'TABLE', N'Themes', 'COLUMN', N'RowVersion';
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE TABLE [UiLanguages] (
-        [Id] bigint NOT NULL IDENTITY,
-        [Culture] nvarchar(16) NOT NULL,
-        [DisplayName] nvarchar(64) NOT NULL,
-        [NativeName] nvarchar(64) NOT NULL,
-        [Enabled] bit NOT NULL,
-        [SortOrder] int NOT NULL,
-        [CreatedTime] datetime2 NOT NULL,
-        [UpdatedTime] datetime2 NULL,
-        [CreatedBy] nvarchar(max) NULL,
-        [UpdatedBy] nvarchar(max) NULL,
-        [RowVersion] bigint NOT NULL DEFAULT CAST(1 AS bigint),
-        CONSTRAINT [PK_UiLanguages] PRIMARY KEY ([Id])
-    );
-    DECLARE @defaultSchema183 AS sysname;
-    SET @defaultSchema183 = SCHEMA_NAME();
-    DECLARE @description183 AS sql_variant;
-    SET @description183 = N'平台界面语言目录';
-    EXEC sp_addextendedproperty 'MS_Description', @description183, 'SCHEMA', @defaultSchema183, 'TABLE', N'UiLanguages';
-    SET @description183 = N'主键';
-    EXEC sp_addextendedproperty 'MS_Description', @description183, 'SCHEMA', @defaultSchema183, 'TABLE', N'UiLanguages', 'COLUMN', N'Id';
-    SET @description183 = N'创建时间';
-    EXEC sp_addextendedproperty 'MS_Description', @description183, 'SCHEMA', @defaultSchema183, 'TABLE', N'UiLanguages', 'COLUMN', N'CreatedTime';
-    SET @description183 = N'乐观并发版本(ETag)，每次更新自增';
-    EXEC sp_addextendedproperty 'MS_Description', @description183, 'SCHEMA', @defaultSchema183, 'TABLE', N'UiLanguages', 'COLUMN', N'RowVersion';
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE TABLE [UiTextResources] (
-        [Id] bigint NOT NULL IDENTITY,
-        [TenantId] bigint NOT NULL,
-        [Culture] nvarchar(16) NOT NULL,
-        [ResourceKey] nvarchar(160) NOT NULL,
-        [Value] nvarchar(2048) NOT NULL,
-        [Description] nvarchar(256) NULL,
-        [IsTranslated] bit NOT NULL DEFAULT CAST(1 AS bit),
-        [CreatedTime] datetime2 NOT NULL,
-        [UpdatedTime] datetime2 NULL,
-        [CreatedBy] nvarchar(max) NULL,
-        [UpdatedBy] nvarchar(max) NULL,
-        [RowVersion] bigint NOT NULL DEFAULT CAST(1 AS bigint),
-        CONSTRAINT [PK_UiTextResources] PRIMARY KEY ([Id])
-    );
-    DECLARE @defaultSchema184 AS sysname;
-    SET @defaultSchema184 = SCHEMA_NAME();
-    DECLARE @description184 AS sql_variant;
-    SET @description184 = N'平台及租户界面文本';
-    EXEC sp_addextendedproperty 'MS_Description', @description184, 'SCHEMA', @defaultSchema184, 'TABLE', N'UiTextResources';
-    SET @description184 = N'主键';
-    EXEC sp_addextendedproperty 'MS_Description', @description184, 'SCHEMA', @defaultSchema184, 'TABLE', N'UiTextResources', 'COLUMN', N'Id';
-    SET @description184 = N'是否已翻译（新建语言从其它语言复制键集合时标记待翻译）';
-    EXEC sp_addextendedproperty 'MS_Description', @description184, 'SCHEMA', @defaultSchema184, 'TABLE', N'UiTextResources', 'COLUMN', N'IsTranslated';
-    SET @description184 = N'创建时间';
-    EXEC sp_addextendedproperty 'MS_Description', @description184, 'SCHEMA', @defaultSchema184, 'TABLE', N'UiTextResources', 'COLUMN', N'CreatedTime';
-    SET @description184 = N'乐观并发版本(ETag)，每次更新自增';
-    EXEC sp_addextendedproperty 'MS_Description', @description184, 'SCHEMA', @defaultSchema184, 'TABLE', N'UiTextResources', 'COLUMN', N'RowVersion';
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE TABLE [UserLanguagePreferences] (
-        [Id] bigint NOT NULL IDENTITY,
-        [TenantId] bigint NOT NULL,
-        [UserId] bigint NOT NULL,
-        [Culture] nvarchar(16) NOT NULL,
-        [CreatedTime] datetime2 NOT NULL,
-        [UpdatedTime] datetime2 NULL,
-        [CreatedBy] nvarchar(max) NULL,
-        [UpdatedBy] nvarchar(max) NULL,
-        [RowVersion] bigint NOT NULL DEFAULT CAST(1 AS bigint),
-        CONSTRAINT [PK_UserLanguagePreferences] PRIMARY KEY ([Id])
-    );
-    DECLARE @defaultSchema185 AS sysname;
-    SET @defaultSchema185 = SCHEMA_NAME();
-    DECLARE @description185 AS sql_variant;
-    SET @description185 = N'用户界面语言偏好';
-    EXEC sp_addextendedproperty 'MS_Description', @description185, 'SCHEMA', @defaultSchema185, 'TABLE', N'UserLanguagePreferences';
-    SET @description185 = N'主键';
-    EXEC sp_addextendedproperty 'MS_Description', @description185, 'SCHEMA', @defaultSchema185, 'TABLE', N'UserLanguagePreferences', 'COLUMN', N'Id';
-    SET @description185 = N'创建时间';
-    EXEC sp_addextendedproperty 'MS_Description', @description185, 'SCHEMA', @defaultSchema185, 'TABLE', N'UserLanguagePreferences', 'COLUMN', N'CreatedTime';
-    SET @description185 = N'乐观并发版本(ETag)，每次更新自增';
-    EXEC sp_addextendedproperty 'MS_Description', @description185, 'SCHEMA', @defaultSchema185, 'TABLE', N'UserLanguagePreferences', 'COLUMN', N'RowVersion';
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
     CREATE TABLE [AppVersions] (
         [Id] bigint NOT NULL IDENTITY,
         [AppId] bigint NOT NULL,
@@ -5809,1746 +5213,35 @@ BEGIN
         CONSTRAINT [PK_AppVersions] PRIMARY KEY ([Id]),
         CONSTRAINT [FK_AppVersions_AppPlans_AppId] FOREIGN KEY ([AppId]) REFERENCES [AppPlans] ([Id]) ON DELETE CASCADE
     );
-    DECLARE @defaultSchema186 AS sysname;
-    SET @defaultSchema186 = SCHEMA_NAME();
-    DECLARE @description186 AS sql_variant;
-    SET @description186 = N'应用发布版本快照';
-    EXEC sp_addextendedproperty 'MS_Description', @description186, 'SCHEMA', @defaultSchema186, 'TABLE', N'AppVersions';
-    SET @description186 = N'主键';
-    EXEC sp_addextendedproperty 'MS_Description', @description186, 'SCHEMA', @defaultSchema186, 'TABLE', N'AppVersions', 'COLUMN', N'Id';
-    SET @description186 = N'作用域租户（0=全局模板）';
-    EXEC sp_addextendedproperty 'MS_Description', @description186, 'SCHEMA', @defaultSchema186, 'TABLE', N'AppVersions', 'COLUMN', N'TenantId';
-    SET @description186 = N'业务编码快照';
-    EXEC sp_addextendedproperty 'MS_Description', @description186, 'SCHEMA', @defaultSchema186, 'TABLE', N'AppVersions', 'COLUMN', N'Code';
-    SET @description186 = N'名称快照';
-    EXEC sp_addextendedproperty 'MS_Description', @description186, 'SCHEMA', @defaultSchema186, 'TABLE', N'AppVersions', 'COLUMN', N'Name';
-    SET @description186 = N'描述快照';
-    EXEC sp_addextendedproperty 'MS_Description', @description186, 'SCHEMA', @defaultSchema186, 'TABLE', N'AppVersions', 'COLUMN', N'Description';
-    SET @description186 = N'主题键快照';
-    EXEC sp_addextendedproperty 'MS_Description', @description186, 'SCHEMA', @defaultSchema186, 'TABLE', N'AppVersions', 'COLUMN', N'ThemeKey';
-    SET @description186 = N'DSL版本快照';
-    EXEC sp_addextendedproperty 'MS_Description', @description186, 'SCHEMA', @defaultSchema186, 'TABLE', N'AppVersions', 'COLUMN', N'DslVersion';
-    SET @description186 = N'发布时刻固化的DSL文档（只读快照）';
-    EXEC sp_addextendedproperty 'MS_Description', @description186, 'SCHEMA', @defaultSchema186, 'TABLE', N'AppVersions', 'COLUMN', N'DslJson';
-    SET @description186 = N'发布者';
-    EXEC sp_addextendedproperty 'MS_Description', @description186, 'SCHEMA', @defaultSchema186, 'TABLE', N'AppVersions', 'COLUMN', N'PublishedBy';
-    SET @description186 = N'回滚来源版本号（非回滚为null）';
-    EXEC sp_addextendedproperty 'MS_Description', @description186, 'SCHEMA', @defaultSchema186, 'TABLE', N'AppVersions', 'COLUMN', N'RolledBackFromVersion';
-    SET @description186 = N'创建时间';
-    EXEC sp_addextendedproperty 'MS_Description', @description186, 'SCHEMA', @defaultSchema186, 'TABLE', N'AppVersions', 'COLUMN', N'CreatedTime';
-    SET @description186 = N'乐观并发版本(ETag)，每次更新自增';
-    EXEC sp_addextendedproperty 'MS_Description', @description186, 'SCHEMA', @defaultSchema186, 'TABLE', N'AppVersions', 'COLUMN', N'RowVersion';
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE TABLE [DashboardVersions] (
-        [Id] bigint NOT NULL IDENTITY,
-        [DashboardId] bigint NOT NULL,
-        [TenantId] bigint NOT NULL,
-        [Version] int NOT NULL,
-        [Code] nvarchar(128) NOT NULL,
-        [Title] nvarchar(256) NOT NULL,
-        [Description] nvarchar(1024) NULL,
-        [ThemeKey] nvarchar(64) NULL,
-        [DslVersion] nvarchar(16) NOT NULL,
-        [DslJson] nvarchar(max) NOT NULL,
-        [PublishedAt] datetime2 NOT NULL,
-        [PublishedBy] nvarchar(128) NULL,
-        [RolledBackFromVersion] int NULL,
-        [CreatedTime] datetime2 NOT NULL,
-        [UpdatedTime] datetime2 NULL,
-        [CreatedBy] nvarchar(max) NULL,
-        [UpdatedBy] nvarchar(max) NULL,
-        [RowVersion] bigint NOT NULL DEFAULT CAST(1 AS bigint),
-        CONSTRAINT [PK_DashboardVersions] PRIMARY KEY ([Id]),
-        CONSTRAINT [FK_DashboardVersions_Dashboards_DashboardId] FOREIGN KEY ([DashboardId]) REFERENCES [Dashboards] ([Id]) ON DELETE CASCADE
-    );
-    DECLARE @defaultSchema187 AS sysname;
-    SET @defaultSchema187 = SCHEMA_NAME();
-    DECLARE @description187 AS sql_variant;
-    SET @description187 = N'仪表盘发布版本快照';
-    EXEC sp_addextendedproperty 'MS_Description', @description187, 'SCHEMA', @defaultSchema187, 'TABLE', N'DashboardVersions';
-    SET @description187 = N'主键';
-    EXEC sp_addextendedproperty 'MS_Description', @description187, 'SCHEMA', @defaultSchema187, 'TABLE', N'DashboardVersions', 'COLUMN', N'Id';
-    SET @description187 = N'作用域租户（0=全局模板）';
-    EXEC sp_addextendedproperty 'MS_Description', @description187, 'SCHEMA', @defaultSchema187, 'TABLE', N'DashboardVersions', 'COLUMN', N'TenantId';
-    SET @description187 = N'业务编码快照';
-    EXEC sp_addextendedproperty 'MS_Description', @description187, 'SCHEMA', @defaultSchema187, 'TABLE', N'DashboardVersions', 'COLUMN', N'Code';
-    SET @description187 = N'标题快照';
-    EXEC sp_addextendedproperty 'MS_Description', @description187, 'SCHEMA', @defaultSchema187, 'TABLE', N'DashboardVersions', 'COLUMN', N'Title';
-    SET @description187 = N'描述快照';
-    EXEC sp_addextendedproperty 'MS_Description', @description187, 'SCHEMA', @defaultSchema187, 'TABLE', N'DashboardVersions', 'COLUMN', N'Description';
-    SET @description187 = N'主题键快照';
-    EXEC sp_addextendedproperty 'MS_Description', @description187, 'SCHEMA', @defaultSchema187, 'TABLE', N'DashboardVersions', 'COLUMN', N'ThemeKey';
-    SET @description187 = N'DSL版本快照';
-    EXEC sp_addextendedproperty 'MS_Description', @description187, 'SCHEMA', @defaultSchema187, 'TABLE', N'DashboardVersions', 'COLUMN', N'DslVersion';
-    SET @description187 = N'发布时刻固化的DSL文档（只读快照）';
-    EXEC sp_addextendedproperty 'MS_Description', @description187, 'SCHEMA', @defaultSchema187, 'TABLE', N'DashboardVersions', 'COLUMN', N'DslJson';
-    SET @description187 = N'发布者';
-    EXEC sp_addextendedproperty 'MS_Description', @description187, 'SCHEMA', @defaultSchema187, 'TABLE', N'DashboardVersions', 'COLUMN', N'PublishedBy';
-    SET @description187 = N'回滚来源版本号（非回滚为null）';
-    EXEC sp_addextendedproperty 'MS_Description', @description187, 'SCHEMA', @defaultSchema187, 'TABLE', N'DashboardVersions', 'COLUMN', N'RolledBackFromVersion';
-    SET @description187 = N'创建时间';
-    EXEC sp_addextendedproperty 'MS_Description', @description187, 'SCHEMA', @defaultSchema187, 'TABLE', N'DashboardVersions', 'COLUMN', N'CreatedTime';
-    SET @description187 = N'乐观并发版本(ETag)，每次更新自增';
-    EXEC sp_addextendedproperty 'MS_Description', @description187, 'SCHEMA', @defaultSchema187, 'TABLE', N'DashboardVersions', 'COLUMN', N'RowVersion';
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE TABLE [RolePermissions] (
-        [Id] bigint NOT NULL IDENTITY,
-        [TenantId] bigint NOT NULL,
-        [RoleId] bigint NOT NULL,
-        [PermissionId] bigint NOT NULL,
-        CONSTRAINT [PK_RolePermissions] PRIMARY KEY ([Id]),
-        CONSTRAINT [FK_RolePermissions_Permissions_PermissionId] FOREIGN KEY ([PermissionId]) REFERENCES [Permissions] ([Id]) ON DELETE CASCADE,
-        CONSTRAINT [FK_RolePermissions_Roles_RoleId] FOREIGN KEY ([RoleId]) REFERENCES [Roles] ([Id]) ON DELETE CASCADE
-    );
-    DECLARE @defaultSchema188 AS sysname;
-    SET @defaultSchema188 = SCHEMA_NAME();
-    DECLARE @description188 AS sql_variant;
-    SET @description188 = N'角色-权限关联';
-    EXEC sp_addextendedproperty 'MS_Description', @description188, 'SCHEMA', @defaultSchema188, 'TABLE', N'RolePermissions';
-    SET @description188 = N'主键';
-    EXEC sp_addextendedproperty 'MS_Description', @description188, 'SCHEMA', @defaultSchema188, 'TABLE', N'RolePermissions', 'COLUMN', N'Id';
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE TABLE [BusinessDomains] (
-        [Id] bigint NOT NULL IDENTITY,
-        [TenantId] bigint NOT NULL,
-        [Name] nvarchar(200) NOT NULL,
-        [Description] nvarchar(max) NULL,
-        [CreatedTime] datetime2 NOT NULL,
-        [UpdatedTime] datetime2 NULL,
-        [CreatedBy] nvarchar(max) NULL,
-        [UpdatedBy] nvarchar(max) NULL,
-        [RowVersion] bigint NOT NULL DEFAULT CAST(1 AS bigint),
-        CONSTRAINT [PK_BusinessDomains] PRIMARY KEY ([Id]),
-        CONSTRAINT [FK_BusinessDomains_Tenants_TenantId] FOREIGN KEY ([TenantId]) REFERENCES [Tenants] ([Id]) ON DELETE NO ACTION
-    );
-    DECLARE @defaultSchema189 AS sysname;
-    SET @defaultSchema189 = SCHEMA_NAME();
-    DECLARE @description189 AS sql_variant;
-    SET @description189 = N'业务域';
-    EXEC sp_addextendedproperty 'MS_Description', @description189, 'SCHEMA', @defaultSchema189, 'TABLE', N'BusinessDomains';
-    SET @description189 = N'主键';
-    EXEC sp_addextendedproperty 'MS_Description', @description189, 'SCHEMA', @defaultSchema189, 'TABLE', N'BusinessDomains', 'COLUMN', N'Id';
-    SET @description189 = N'业务域名称';
-    EXEC sp_addextendedproperty 'MS_Description', @description189, 'SCHEMA', @defaultSchema189, 'TABLE', N'BusinessDomains', 'COLUMN', N'Name';
-    SET @description189 = N'创建时间';
-    EXEC sp_addextendedproperty 'MS_Description', @description189, 'SCHEMA', @defaultSchema189, 'TABLE', N'BusinessDomains', 'COLUMN', N'CreatedTime';
-    SET @description189 = N'乐观并发版本(ETag)，每次更新自增';
-    EXEC sp_addextendedproperty 'MS_Description', @description189, 'SCHEMA', @defaultSchema189, 'TABLE', N'BusinessDomains', 'COLUMN', N'RowVersion';
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE TABLE [DataSources] (
-        [Id] bigint NOT NULL IDENTITY,
-        [TenantId] bigint NOT NULL,
-        [Name] nvarchar(128) NOT NULL,
-        [NormalizedName] nvarchar(128) NOT NULL,
-        [DbType] nvarchar(32) NOT NULL,
-        [ConnectionString] nvarchar(2048) NOT NULL,
-        [Enabled] bit NOT NULL DEFAULT CAST(1 AS bit),
-        [LastTestStatus] nvarchar(32) NULL,
-        [LastTestTime] datetime2 NULL,
-        [LastErrorCode] nvarchar(64) NULL,
-        [LastScanAt] datetime2 NULL,
-        [CreatedTime] datetime2 NOT NULL,
-        [UpdatedTime] datetime2 NULL,
-        [CreatedBy] nvarchar(max) NULL,
-        [UpdatedBy] nvarchar(max) NULL,
-        [RowVersion] bigint NOT NULL DEFAULT CAST(1 AS bigint),
-        CONSTRAINT [PK_DataSources] PRIMARY KEY ([Id]),
-        CONSTRAINT [AK_DataSources_Id_TenantId] UNIQUE ([Id], [TenantId]),
-        CONSTRAINT [FK_DataSources_Tenants_TenantId] FOREIGN KEY ([TenantId]) REFERENCES [Tenants] ([Id]) ON DELETE NO ACTION
-    );
-    DECLARE @defaultSchema190 AS sysname;
-    SET @defaultSchema190 = SCHEMA_NAME();
-    DECLARE @description190 AS sql_variant;
-    SET @description190 = N'数据源';
-    EXEC sp_addextendedproperty 'MS_Description', @description190, 'SCHEMA', @defaultSchema190, 'TABLE', N'DataSources';
-    SET @description190 = N'主键';
-    EXEC sp_addextendedproperty 'MS_Description', @description190, 'SCHEMA', @defaultSchema190, 'TABLE', N'DataSources', 'COLUMN', N'Id';
-    SET @description190 = N'名称（展示用，保留原始大小写）';
-    EXEC sp_addextendedproperty 'MS_Description', @description190, 'SCHEMA', @defaultSchema190, 'TABLE', N'DataSources', 'COLUMN', N'Name';
-    SET @description190 = N'规范化名称（小写去空白），租户内唯一键';
-    EXEC sp_addextendedproperty 'MS_Description', @description190, 'SCHEMA', @defaultSchema190, 'TABLE', N'DataSources', 'COLUMN', N'NormalizedName';
-    SET @description190 = N'数据库类型(MYSQL/SQLSERVER/POSTGRESQL)';
-    EXEC sp_addextendedproperty 'MS_Description', @description190, 'SCHEMA', @defaultSchema190, 'TABLE', N'DataSources', 'COLUMN', N'DbType';
-    SET @description190 = N'连接字符串（敏感，禁止日志记录）';
-    EXEC sp_addextendedproperty 'MS_Description', @description190, 'SCHEMA', @defaultSchema190, 'TABLE', N'DataSources', 'COLUMN', N'ConnectionString';
-    SET @description190 = N'是否启用';
-    EXEC sp_addextendedproperty 'MS_Description', @description190, 'SCHEMA', @defaultSchema190, 'TABLE', N'DataSources', 'COLUMN', N'Enabled';
-    SET @description190 = N'最近连接测试状态(Ok/Failed/Unknown)';
-    EXEC sp_addextendedproperty 'MS_Description', @description190, 'SCHEMA', @defaultSchema190, 'TABLE', N'DataSources', 'COLUMN', N'LastTestStatus';
-    SET @description190 = N'最近连接测试时间(UTC)';
-    EXEC sp_addextendedproperty 'MS_Description', @description190, 'SCHEMA', @defaultSchema190, 'TABLE', N'DataSources', 'COLUMN', N'LastTestTime';
-    SET @description190 = N'最近连接测试错误码(仅异常类型名,脱敏)';
-    EXEC sp_addextendedproperty 'MS_Description', @description190, 'SCHEMA', @defaultSchema190, 'TABLE', N'DataSources', 'COLUMN', N'LastErrorCode';
-    SET @description190 = N'创建时间';
-    EXEC sp_addextendedproperty 'MS_Description', @description190, 'SCHEMA', @defaultSchema190, 'TABLE', N'DataSources', 'COLUMN', N'CreatedTime';
-    SET @description190 = N'乐观并发版本(ETag)，每次更新自增';
-    EXEC sp_addextendedproperty 'MS_Description', @description190, 'SCHEMA', @defaultSchema190, 'TABLE', N'DataSources', 'COLUMN', N'RowVersion';
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE TABLE [TenantSettings] (
-        [Id] bigint NOT NULL IDENTITY,
-        [TenantId] bigint NOT NULL,
-        [Key] nvarchar(128) NOT NULL,
-        [Value] nvarchar(max) NULL,
-        [DataType] nvarchar(32) NULL,
-        [IsLocked] bit NOT NULL DEFAULT CAST(0 AS bit),
-        [CreatedTime] datetime2 NOT NULL,
-        [UpdatedTime] datetime2 NULL,
-        [CreatedBy] nvarchar(max) NULL,
-        [UpdatedBy] nvarchar(max) NULL,
-        [RowVersion] bigint NOT NULL DEFAULT CAST(1 AS bigint),
-        CONSTRAINT [PK_TenantSettings] PRIMARY KEY ([Id]),
-        CONSTRAINT [FK_TenantSettings_Tenants_TenantId] FOREIGN KEY ([TenantId]) REFERENCES [Tenants] ([Id]) ON DELETE CASCADE
-    );
-    DECLARE @defaultSchema191 AS sysname;
-    SET @defaultSchema191 = SCHEMA_NAME();
-    DECLARE @description191 AS sql_variant;
-    SET @description191 = N'租户键值配置';
-    EXEC sp_addextendedproperty 'MS_Description', @description191, 'SCHEMA', @defaultSchema191, 'TABLE', N'TenantSettings';
-    SET @description191 = N'主键';
-    EXEC sp_addextendedproperty 'MS_Description', @description191, 'SCHEMA', @defaultSchema191, 'TABLE', N'TenantSettings', 'COLUMN', N'Id';
-    SET @description191 = N'配置键';
-    EXEC sp_addextendedproperty 'MS_Description', @description191, 'SCHEMA', @defaultSchema191, 'TABLE', N'TenantSettings', 'COLUMN', N'Key';
-    SET @description191 = N'配置值';
-    EXEC sp_addextendedproperty 'MS_Description', @description191, 'SCHEMA', @defaultSchema191, 'TABLE', N'TenantSettings', 'COLUMN', N'Value';
-    SET @description191 = N'值类型(string|int|bool|json)';
-    EXEC sp_addextendedproperty 'MS_Description', @description191, 'SCHEMA', @defaultSchema191, 'TABLE', N'TenantSettings', 'COLUMN', N'DataType';
-    SET @description191 = N'是否锁定(租户不可覆盖)';
-    EXEC sp_addextendedproperty 'MS_Description', @description191, 'SCHEMA', @defaultSchema191, 'TABLE', N'TenantSettings', 'COLUMN', N'IsLocked';
-    SET @description191 = N'创建时间';
-    EXEC sp_addextendedproperty 'MS_Description', @description191, 'SCHEMA', @defaultSchema191, 'TABLE', N'TenantSettings', 'COLUMN', N'CreatedTime';
-    SET @description191 = N'乐观并发版本(ETag)，每次更新自增';
-    EXEC sp_addextendedproperty 'MS_Description', @description191, 'SCHEMA', @defaultSchema191, 'TABLE', N'TenantSettings', 'COLUMN', N'RowVersion';
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE TABLE [Users] (
-        [Id] bigint NOT NULL IDENTITY,
-        [TenantId] bigint NOT NULL,
-        [Username] nvarchar(128) NOT NULL,
-        [NormalizedUsername] nvarchar(128) NULL,
-        [DisplayName] nvarchar(128) NOT NULL,
-        [Email] nvarchar(256) NOT NULL,
-        [NormalizedEmail] nvarchar(256) NULL,
-        [EmailConfirmed] bit NOT NULL DEFAULT CAST(0 AS bit),
-        [PasswordHash] nvarchar(256) NULL,
-        [SecurityStamp] nvarchar(64) NOT NULL,
-        [Status] int NOT NULL,
-        [CreatedTime] datetime2 NOT NULL,
-        CONSTRAINT [PK_Users] PRIMARY KEY ([Id]),
-        CONSTRAINT [FK_Users_Tenants_TenantId] FOREIGN KEY ([TenantId]) REFERENCES [Tenants] ([Id]) ON DELETE NO ACTION
-    );
-    DECLARE @defaultSchema192 AS sysname;
-    SET @defaultSchema192 = SCHEMA_NAME();
-    DECLARE @description192 AS sql_variant;
-    SET @description192 = N'用户';
-    EXEC sp_addextendedproperty 'MS_Description', @description192, 'SCHEMA', @defaultSchema192, 'TABLE', N'Users';
-    SET @description192 = N'主键';
-    EXEC sp_addextendedproperty 'MS_Description', @description192, 'SCHEMA', @defaultSchema192, 'TABLE', N'Users', 'COLUMN', N'Id';
-    SET @description192 = N'所属租户';
-    EXEC sp_addextendedproperty 'MS_Description', @description192, 'SCHEMA', @defaultSchema192, 'TABLE', N'Users', 'COLUMN', N'TenantId';
-    SET @description192 = N'登录名（展示用，大小写原始）';
-    EXEC sp_addextendedproperty 'MS_Description', @description192, 'SCHEMA', @defaultSchema192, 'TABLE', N'Users', 'COLUMN', N'Username';
-    SET @description192 = N'规范化登录名（小写，租户内唯一）';
-    EXEC sp_addextendedproperty 'MS_Description', @description192, 'SCHEMA', @defaultSchema192, 'TABLE', N'Users', 'COLUMN', N'NormalizedUsername';
-    SET @description192 = N'显示名';
-    EXEC sp_addextendedproperty 'MS_Description', @description192, 'SCHEMA', @defaultSchema192, 'TABLE', N'Users', 'COLUMN', N'DisplayName';
-    SET @description192 = N'邮箱';
-    EXEC sp_addextendedproperty 'MS_Description', @description192, 'SCHEMA', @defaultSchema192, 'TABLE', N'Users', 'COLUMN', N'Email';
-    SET @description192 = N'规范化邮箱（小写）';
-    EXEC sp_addextendedproperty 'MS_Description', @description192, 'SCHEMA', @defaultSchema192, 'TABLE', N'Users', 'COLUMN', N'NormalizedEmail';
-    SET @description192 = N'邮箱是否已验证';
-    EXEC sp_addextendedproperty 'MS_Description', @description192, 'SCHEMA', @defaultSchema192, 'TABLE', N'Users', 'COLUMN', N'EmailConfirmed';
-    SET @description192 = N'口令哈希（PBKDF2，可选）';
-    EXEC sp_addextendedproperty 'MS_Description', @description192, 'SCHEMA', @defaultSchema192, 'TABLE', N'Users', 'COLUMN', N'PasswordHash';
-    SET @description192 = N'安全戳（令牌吊销用）';
-    EXEC sp_addextendedproperty 'MS_Description', @description192, 'SCHEMA', @defaultSchema192, 'TABLE', N'Users', 'COLUMN', N'SecurityStamp';
-    SET @description192 = N'状态';
-    EXEC sp_addextendedproperty 'MS_Description', @description192, 'SCHEMA', @defaultSchema192, 'TABLE', N'Users', 'COLUMN', N'Status';
-    SET @description192 = N'创建时间';
-    EXEC sp_addextendedproperty 'MS_Description', @description192, 'SCHEMA', @defaultSchema192, 'TABLE', N'Users', 'COLUMN', N'CreatedTime';
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE TABLE [TenantUiLanguages] (
-        [Id] bigint NOT NULL IDENTITY,
-        [TenantId] bigint NOT NULL,
-        [UiLanguageId] bigint NOT NULL,
-        [Enabled] bit NOT NULL DEFAULT CAST(1 AS bit),
-        [IsDefault] bit NOT NULL DEFAULT CAST(0 AS bit),
-        [SortOrder] int NOT NULL,
-        [CreatedTime] datetime2 NOT NULL,
-        [UpdatedTime] datetime2 NULL,
-        [CreatedBy] nvarchar(max) NULL,
-        [UpdatedBy] nvarchar(max) NULL,
-        [RowVersion] bigint NOT NULL DEFAULT CAST(1 AS bigint),
-        CONSTRAINT [PK_TenantUiLanguages] PRIMARY KEY ([Id]),
-        CONSTRAINT [FK_TenantUiLanguages_Tenants_TenantId] FOREIGN KEY ([TenantId]) REFERENCES [Tenants] ([Id]) ON DELETE CASCADE,
-        CONSTRAINT [FK_TenantUiLanguages_UiLanguages_UiLanguageId] FOREIGN KEY ([UiLanguageId]) REFERENCES [UiLanguages] ([Id]) ON DELETE NO ACTION
-    );
-    DECLARE @defaultSchema193 AS sysname;
-    SET @defaultSchema193 = SCHEMA_NAME();
-    DECLARE @description193 AS sql_variant;
-    SET @description193 = N'租户界面语言关系（替代 localization:availableCultures/defaultCulture JSON）';
-    EXEC sp_addextendedproperty 'MS_Description', @description193, 'SCHEMA', @defaultSchema193, 'TABLE', N'TenantUiLanguages';
-    SET @description193 = N'主键';
-    EXEC sp_addextendedproperty 'MS_Description', @description193, 'SCHEMA', @defaultSchema193, 'TABLE', N'TenantUiLanguages', 'COLUMN', N'Id';
-    SET @description193 = N'所属租户';
-    EXEC sp_addextendedproperty 'MS_Description', @description193, 'SCHEMA', @defaultSchema193, 'TABLE', N'TenantUiLanguages', 'COLUMN', N'TenantId';
-    SET @description193 = N'平台语言目录 Id';
-    EXEC sp_addextendedproperty 'MS_Description', @description193, 'SCHEMA', @defaultSchema193, 'TABLE', N'TenantUiLanguages', 'COLUMN', N'UiLanguageId';
-    SET @description193 = N'是否启用（租户范围内）';
-    EXEC sp_addextendedproperty 'MS_Description', @description193, 'SCHEMA', @defaultSchema193, 'TABLE', N'TenantUiLanguages', 'COLUMN', N'Enabled';
-    SET @description193 = N'是否为租户默认语言（每租户恰一个）';
-    EXEC sp_addextendedproperty 'MS_Description', @description193, 'SCHEMA', @defaultSchema193, 'TABLE', N'TenantUiLanguages', 'COLUMN', N'IsDefault';
-    SET @description193 = N'排序';
-    EXEC sp_addextendedproperty 'MS_Description', @description193, 'SCHEMA', @defaultSchema193, 'TABLE', N'TenantUiLanguages', 'COLUMN', N'SortOrder';
-    SET @description193 = N'创建时间';
-    EXEC sp_addextendedproperty 'MS_Description', @description193, 'SCHEMA', @defaultSchema193, 'TABLE', N'TenantUiLanguages', 'COLUMN', N'CreatedTime';
-    SET @description193 = N'乐观并发版本(ETag)，每次更新自增';
-    EXEC sp_addextendedproperty 'MS_Description', @description193, 'SCHEMA', @defaultSchema193, 'TABLE', N'TenantUiLanguages', 'COLUMN', N'RowVersion';
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE TABLE [BusinessEntities] (
-        [Id] bigint NOT NULL IDENTITY,
-        [TenantId] bigint NOT NULL,
-        [BusinessKey] nvarchar(200) NOT NULL,
-        [Name] nvarchar(200) NOT NULL,
-        [DisplayName] nvarchar(max) NULL,
-        [Description] nvarchar(max) NULL,
-        [BusinessDomain] nvarchar(max) NULL,
-        [SemanticText] nvarchar(max) NULL,
-        [Status] nvarchar(50) NOT NULL,
-        [BusinessDomainId] bigint NULL,
-        [CreatedTime] datetime2 NOT NULL,
-        [UpdatedTime] datetime2 NULL,
-        [CreatedBy] nvarchar(max) NULL,
-        [UpdatedBy] nvarchar(max) NULL,
-        [RowVersion] bigint NOT NULL DEFAULT CAST(1 AS bigint),
-        CONSTRAINT [PK_BusinessEntities] PRIMARY KEY ([Id]),
-        CONSTRAINT [FK_BusinessEntities_BusinessDomains_BusinessDomainId] FOREIGN KEY ([BusinessDomainId]) REFERENCES [BusinessDomains] ([Id]) ON DELETE NO ACTION,
-        CONSTRAINT [FK_BusinessEntities_Tenants_TenantId] FOREIGN KEY ([TenantId]) REFERENCES [Tenants] ([Id]) ON DELETE NO ACTION
-    );
-    DECLARE @defaultSchema194 AS sysname;
-    SET @defaultSchema194 = SCHEMA_NAME();
-    DECLARE @description194 AS sql_variant;
-    SET @description194 = N'业务实体';
-    EXEC sp_addextendedproperty 'MS_Description', @description194, 'SCHEMA', @defaultSchema194, 'TABLE', N'BusinessEntities';
-    SET @description194 = N'主键';
-    EXEC sp_addextendedproperty 'MS_Description', @description194, 'SCHEMA', @defaultSchema194, 'TABLE', N'BusinessEntities', 'COLUMN', N'Id';
-    SET @description194 = N'创建时间';
-    EXEC sp_addextendedproperty 'MS_Description', @description194, 'SCHEMA', @defaultSchema194, 'TABLE', N'BusinessEntities', 'COLUMN', N'CreatedTime';
-    SET @description194 = N'乐观并发版本(ETag)，每次更新自增';
-    EXEC sp_addextendedproperty 'MS_Description', @description194, 'SCHEMA', @defaultSchema194, 'TABLE', N'BusinessEntities', 'COLUMN', N'RowVersion';
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE TABLE [BusinessEntityDimensions] (
-        [Id] bigint NOT NULL IDENTITY,
-        [TenantId] bigint NOT NULL,
-        [BusinessDomainId] bigint NOT NULL,
-        [Name] nvarchar(200) NOT NULL,
-        [Description] nvarchar(max) NULL,
-        [CreatedTime] datetime2 NOT NULL,
-        [UpdatedTime] datetime2 NULL,
-        [CreatedBy] nvarchar(max) NULL,
-        [UpdatedBy] nvarchar(max) NULL,
-        [RowVersion] bigint NOT NULL DEFAULT CAST(1 AS bigint),
-        CONSTRAINT [PK_BusinessEntityDimensions] PRIMARY KEY ([Id]),
-        CONSTRAINT [FK_BusinessEntityDimensions_BusinessDomains_BusinessDomainId] FOREIGN KEY ([BusinessDomainId]) REFERENCES [BusinessDomains] ([Id]) ON DELETE CASCADE
-    );
-    DECLARE @defaultSchema195 AS sysname;
-    SET @defaultSchema195 = SCHEMA_NAME();
-    DECLARE @description195 AS sql_variant;
-    SET @description195 = N'业务实体维度';
-    EXEC sp_addextendedproperty 'MS_Description', @description195, 'SCHEMA', @defaultSchema195, 'TABLE', N'BusinessEntityDimensions';
-    SET @description195 = N'主键';
-    EXEC sp_addextendedproperty 'MS_Description', @description195, 'SCHEMA', @defaultSchema195, 'TABLE', N'BusinessEntityDimensions', 'COLUMN', N'Id';
-    SET @description195 = N'创建时间';
-    EXEC sp_addextendedproperty 'MS_Description', @description195, 'SCHEMA', @defaultSchema195, 'TABLE', N'BusinessEntityDimensions', 'COLUMN', N'CreatedTime';
-    SET @description195 = N'乐观并发版本(ETag)，每次更新自增';
-    EXEC sp_addextendedproperty 'MS_Description', @description195, 'SCHEMA', @defaultSchema195, 'TABLE', N'BusinessEntityDimensions', 'COLUMN', N'RowVersion';
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE TABLE [DataSourceAccessGrants] (
-        [Id] bigint NOT NULL IDENTITY,
-        [TenantId] bigint NOT NULL,
-        [DataSourceId] bigint NOT NULL,
-        [SubjectType] int NOT NULL,
-        [SubjectId] bigint NOT NULL,
-        [CreatedTime] datetime2 NOT NULL,
-        CONSTRAINT [PK_DataSourceAccessGrants] PRIMARY KEY ([Id]),
-        CONSTRAINT [FK_DataSourceAccessGrants_DataSources_DataSourceId] FOREIGN KEY ([DataSourceId]) REFERENCES [DataSources] ([Id]) ON DELETE CASCADE,
-        CONSTRAINT [FK_DataSourceAccessGrants_Tenants_TenantId] FOREIGN KEY ([TenantId]) REFERENCES [Tenants] ([Id]) ON DELETE CASCADE
-    );
-    DECLARE @defaultSchema196 AS sysname;
-    SET @defaultSchema196 = SCHEMA_NAME();
-    DECLARE @description196 AS sql_variant;
-    SET @description196 = N'主键';
-    EXEC sp_addextendedproperty 'MS_Description', @description196, 'SCHEMA', @defaultSchema196, 'TABLE', N'DataSourceAccessGrants', 'COLUMN', N'Id';
-    SET @description196 = N'创建时间';
-    EXEC sp_addextendedproperty 'MS_Description', @description196, 'SCHEMA', @defaultSchema196, 'TABLE', N'DataSourceAccessGrants', 'COLUMN', N'CreatedTime';
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE TABLE [MetadataScanJobs] (
-        [Id] bigint NOT NULL IDENTITY,
-        [TenantId] bigint NOT NULL,
-        [DataSourceId] bigint NOT NULL,
-        [TriggeredBy] nvarchar(64) NULL,
-        [Status] nvarchar(16) NOT NULL DEFAULT N'Queued',
-        [ProgressPercent] int NOT NULL DEFAULT 0,
-        [StartedAt] datetime2 NULL,
-        [FinishedAt] datetime2 NULL,
-        [TablesScanned] int NOT NULL DEFAULT 0,
-        [ColumnsScanned] int NOT NULL DEFAULT 0,
-        [OrphansDetected] int NOT NULL DEFAULT 0,
-        [ErrorCode] nvarchar(64) NULL,
-        [ErrorMessage] nvarchar(2000) NULL,
-        [CreatedTime] datetime2 NOT NULL,
-        [UpdatedTime] datetime2 NULL,
-        [CreatedBy] nvarchar(max) NULL,
-        [UpdatedBy] nvarchar(max) NULL,
-        [RowVersion] bigint NOT NULL DEFAULT CAST(1 AS bigint),
-        CONSTRAINT [PK_MetadataScanJobs] PRIMARY KEY ([Id]),
-        CONSTRAINT [FK_MetadataScanJobs_DataSources_DataSourceId] FOREIGN KEY ([DataSourceId]) REFERENCES [DataSources] ([Id]) ON DELETE CASCADE
-    );
-    DECLARE @defaultSchema197 AS sysname;
-    SET @defaultSchema197 = SCHEMA_NAME();
-    DECLARE @description197 AS sql_variant;
-    SET @description197 = N'元数据扫描任务';
-    EXEC sp_addextendedproperty 'MS_Description', @description197, 'SCHEMA', @defaultSchema197, 'TABLE', N'MetadataScanJobs';
-    SET @description197 = N'主键';
-    EXEC sp_addextendedproperty 'MS_Description', @description197, 'SCHEMA', @defaultSchema197, 'TABLE', N'MetadataScanJobs', 'COLUMN', N'Id';
-    SET @description197 = N'触发用户标识';
-    EXEC sp_addextendedproperty 'MS_Description', @description197, 'SCHEMA', @defaultSchema197, 'TABLE', N'MetadataScanJobs', 'COLUMN', N'TriggeredBy';
-    SET @description197 = N'扫描状态';
-    EXEC sp_addextendedproperty 'MS_Description', @description197, 'SCHEMA', @defaultSchema197, 'TABLE', N'MetadataScanJobs', 'COLUMN', N'Status';
-    SET @description197 = N'进度百分比';
-    EXEC sp_addextendedproperty 'MS_Description', @description197, 'SCHEMA', @defaultSchema197, 'TABLE', N'MetadataScanJobs', 'COLUMN', N'ProgressPercent';
-    SET @description197 = N'开始时间(UTC)';
-    EXEC sp_addextendedproperty 'MS_Description', @description197, 'SCHEMA', @defaultSchema197, 'TABLE', N'MetadataScanJobs', 'COLUMN', N'StartedAt';
-    SET @description197 = N'结束时间(UTC)';
-    EXEC sp_addextendedproperty 'MS_Description', @description197, 'SCHEMA', @defaultSchema197, 'TABLE', N'MetadataScanJobs', 'COLUMN', N'FinishedAt';
-    SET @description197 = N'已扫描表数';
-    EXEC sp_addextendedproperty 'MS_Description', @description197, 'SCHEMA', @defaultSchema197, 'TABLE', N'MetadataScanJobs', 'COLUMN', N'TablesScanned';
-    SET @description197 = N'已扫描字段数';
-    EXEC sp_addextendedproperty 'MS_Description', @description197, 'SCHEMA', @defaultSchema197, 'TABLE', N'MetadataScanJobs', 'COLUMN', N'ColumnsScanned';
-    SET @description197 = N'孤儿对象数';
-    EXEC sp_addextendedproperty 'MS_Description', @description197, 'SCHEMA', @defaultSchema197, 'TABLE', N'MetadataScanJobs', 'COLUMN', N'OrphansDetected';
-    SET @description197 = N'错误码(仅异常类型名,脱敏)';
-    EXEC sp_addextendedproperty 'MS_Description', @description197, 'SCHEMA', @defaultSchema197, 'TABLE', N'MetadataScanJobs', 'COLUMN', N'ErrorCode';
-    SET @description197 = N'错误摘要(脱敏,不含连接串)';
-    EXEC sp_addextendedproperty 'MS_Description', @description197, 'SCHEMA', @defaultSchema197, 'TABLE', N'MetadataScanJobs', 'COLUMN', N'ErrorMessage';
-    SET @description197 = N'创建时间';
-    EXEC sp_addextendedproperty 'MS_Description', @description197, 'SCHEMA', @defaultSchema197, 'TABLE', N'MetadataScanJobs', 'COLUMN', N'CreatedTime';
-    SET @description197 = N'乐观并发版本(ETag)，每次更新自增';
-    EXEC sp_addextendedproperty 'MS_Description', @description197, 'SCHEMA', @defaultSchema197, 'TABLE', N'MetadataScanJobs', 'COLUMN', N'RowVersion';
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE TABLE [MetadataTables] (
-        [Id] bigint NOT NULL IDENTITY,
-        [TenantId] bigint NOT NULL,
-        [DataSourceId] bigint NOT NULL,
-        [TableName] nvarchar(128) NOT NULL,
-        [CatalogName] nvarchar(128) NULL,
-        [SchemaName] nvarchar(128) NULL,
-        [TableComment] nvarchar(max) NULL,
-        [BusinessDomain] nvarchar(max) NULL,
-        [SearchText] nvarchar(max) NULL,
-        [VectorId] nvarchar(max) NULL,
-        [EmbeddingModel] nvarchar(128) NULL,
-        [VectorDimension] int NULL,
-        [VectorSyncTime] datetime2 NULL,
-        [VectorStatus] nvarchar(16) NULL,
-        [VectorErrorCode] nvarchar(64) NULL,
-        [CreatedTime] datetime2 NOT NULL,
-        [UpdatedTime] datetime2 NULL,
-        [CreatedBy] nvarchar(max) NULL,
-        [UpdatedBy] nvarchar(max) NULL,
-        [RowVersion] bigint NOT NULL DEFAULT CAST(1 AS bigint),
-        CONSTRAINT [PK_MetadataTables] PRIMARY KEY ([Id]),
-        CONSTRAINT [FK_MetadataTables_DataSources_DataSourceId_TenantId] FOREIGN KEY ([DataSourceId], [TenantId]) REFERENCES [DataSources] ([Id], [TenantId]) ON DELETE CASCADE,
-        CONSTRAINT [FK_MetadataTables_Tenants_TenantId] FOREIGN KEY ([TenantId]) REFERENCES [Tenants] ([Id]) ON DELETE NO ACTION
-    );
-    DECLARE @defaultSchema198 AS sysname;
-    SET @defaultSchema198 = SCHEMA_NAME();
-    DECLARE @description198 AS sql_variant;
-    SET @description198 = N'元数据表';
-    EXEC sp_addextendedproperty 'MS_Description', @description198, 'SCHEMA', @defaultSchema198, 'TABLE', N'MetadataTables';
-    SET @description198 = N'主键';
-    EXEC sp_addextendedproperty 'MS_Description', @description198, 'SCHEMA', @defaultSchema198, 'TABLE', N'MetadataTables', 'COLUMN', N'Id';
-    SET @description198 = N'表名';
-    EXEC sp_addextendedproperty 'MS_Description', @description198, 'SCHEMA', @defaultSchema198, 'TABLE', N'MetadataTables', 'COLUMN', N'TableName';
-    SET @description198 = N'目录名';
-    EXEC sp_addextendedproperty 'MS_Description', @description198, 'SCHEMA', @defaultSchema198, 'TABLE', N'MetadataTables', 'COLUMN', N'CatalogName';
-    SET @description198 = N'模式名';
-    EXEC sp_addextendedproperty 'MS_Description', @description198, 'SCHEMA', @defaultSchema198, 'TABLE', N'MetadataTables', 'COLUMN', N'SchemaName';
-    SET @description198 = N'Embedding文本';
-    EXEC sp_addextendedproperty 'MS_Description', @description198, 'SCHEMA', @defaultSchema198, 'TABLE', N'MetadataTables', 'COLUMN', N'SearchText';
-    SET @description198 = N'Qdrant向量ID';
-    EXEC sp_addextendedproperty 'MS_Description', @description198, 'SCHEMA', @defaultSchema198, 'TABLE', N'MetadataTables', 'COLUMN', N'VectorId';
-    SET @description198 = N'Embedding模型';
-    EXEC sp_addextendedproperty 'MS_Description', @description198, 'SCHEMA', @defaultSchema198, 'TABLE', N'MetadataTables', 'COLUMN', N'EmbeddingModel';
-    SET @description198 = N'向量维度';
-    EXEC sp_addextendedproperty 'MS_Description', @description198, 'SCHEMA', @defaultSchema198, 'TABLE', N'MetadataTables', 'COLUMN', N'VectorDimension';
-    SET @description198 = N'向量同步时间(UTC)';
-    EXEC sp_addextendedproperty 'MS_Description', @description198, 'SCHEMA', @defaultSchema198, 'TABLE', N'MetadataTables', 'COLUMN', N'VectorSyncTime';
-    SET @description198 = N'向量状态';
-    EXEC sp_addextendedproperty 'MS_Description', @description198, 'SCHEMA', @defaultSchema198, 'TABLE', N'MetadataTables', 'COLUMN', N'VectorStatus';
-    SET @description198 = N'向量错误码';
-    EXEC sp_addextendedproperty 'MS_Description', @description198, 'SCHEMA', @defaultSchema198, 'TABLE', N'MetadataTables', 'COLUMN', N'VectorErrorCode';
-    SET @description198 = N'创建时间';
-    EXEC sp_addextendedproperty 'MS_Description', @description198, 'SCHEMA', @defaultSchema198, 'TABLE', N'MetadataTables', 'COLUMN', N'CreatedTime';
-    SET @description198 = N'乐观并发版本(ETag)，每次更新自增';
-    EXEC sp_addextendedproperty 'MS_Description', @description198, 'SCHEMA', @defaultSchema198, 'TABLE', N'MetadataTables', 'COLUMN', N'RowVersion';
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE TABLE [PlatformAdminTenantScopes] (
-        [Id] bigint NOT NULL IDENTITY,
-        [AdminUserId] bigint NOT NULL,
-        [TenantId] bigint NOT NULL,
-        [GrantedAt] datetime2 NOT NULL,
-        [GrantedBy] nvarchar(128) NULL,
-        CONSTRAINT [PK_PlatformAdminTenantScopes] PRIMARY KEY ([Id]),
-        CONSTRAINT [FK_PlatformAdminTenantScopes_Tenants_TenantId] FOREIGN KEY ([TenantId]) REFERENCES [Tenants] ([Id]) ON DELETE CASCADE,
-        CONSTRAINT [FK_PlatformAdminTenantScopes_Users_AdminUserId] FOREIGN KEY ([AdminUserId]) REFERENCES [Users] ([Id]) ON DELETE CASCADE
-    );
-    DECLARE @defaultSchema199 AS sysname;
-    SET @defaultSchema199 = SCHEMA_NAME();
-    DECLARE @description199 AS sql_variant;
-    SET @description199 = N'平台管理员租户范围绑定';
-    EXEC sp_addextendedproperty 'MS_Description', @description199, 'SCHEMA', @defaultSchema199, 'TABLE', N'PlatformAdminTenantScopes';
-    SET @description199 = N'主键';
-    EXEC sp_addextendedproperty 'MS_Description', @description199, 'SCHEMA', @defaultSchema199, 'TABLE', N'PlatformAdminTenantScopes', 'COLUMN', N'Id';
-    SET @description199 = N'授权时间(UTC)';
-    EXEC sp_addextendedproperty 'MS_Description', @description199, 'SCHEMA', @defaultSchema199, 'TABLE', N'PlatformAdminTenantScopes', 'COLUMN', N'GrantedAt';
-    SET @description199 = N'授权操作者';
-    EXEC sp_addextendedproperty 'MS_Description', @description199, 'SCHEMA', @defaultSchema199, 'TABLE', N'PlatformAdminTenantScopes', 'COLUMN', N'GrantedBy';
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE TABLE [UserRoles] (
-        [Id] bigint NOT NULL IDENTITY,
-        [TenantId] bigint NOT NULL,
-        [UserId] bigint NOT NULL,
-        [RoleId] bigint NOT NULL,
-        CONSTRAINT [PK_UserRoles] PRIMARY KEY ([Id]),
-        CONSTRAINT [FK_UserRoles_Roles_RoleId] FOREIGN KEY ([RoleId]) REFERENCES [Roles] ([Id]) ON DELETE CASCADE,
-        CONSTRAINT [FK_UserRoles_Users_UserId] FOREIGN KEY ([UserId]) REFERENCES [Users] ([Id]) ON DELETE CASCADE
-    );
-    DECLARE @defaultSchema200 AS sysname;
-    SET @defaultSchema200 = SCHEMA_NAME();
-    DECLARE @description200 AS sql_variant;
-    SET @description200 = N'用户-角色关联';
-    EXEC sp_addextendedproperty 'MS_Description', @description200, 'SCHEMA', @defaultSchema200, 'TABLE', N'UserRoles';
-    SET @description200 = N'主键';
-    EXEC sp_addextendedproperty 'MS_Description', @description200, 'SCHEMA', @defaultSchema200, 'TABLE', N'UserRoles', 'COLUMN', N'Id';
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE TABLE [UserTenants] (
-        [Id] bigint NOT NULL IDENTITY,
-        [UserId] bigint NOT NULL,
-        [TenantId] bigint NOT NULL,
-        [IsDefault] bit NOT NULL,
-        [CreatedAtUtc] datetime2 NOT NULL,
-        [CreatedByUserId] bigint NULL,
-        CONSTRAINT [PK_UserTenants] PRIMARY KEY ([Id]),
-        CONSTRAINT [FK_UserTenants_Tenants_TenantId] FOREIGN KEY ([TenantId]) REFERENCES [Tenants] ([Id]) ON DELETE CASCADE,
-        CONSTRAINT [FK_UserTenants_Users_UserId] FOREIGN KEY ([UserId]) REFERENCES [Users] ([Id]) ON DELETE CASCADE
-    );
-    DECLARE @defaultSchema201 AS sysname;
-    SET @defaultSchema201 = SCHEMA_NAME();
-    DECLARE @description201 AS sql_variant;
-    SET @description201 = N'用户—租户成员关系（多租户切换）';
-    EXEC sp_addextendedproperty 'MS_Description', @description201, 'SCHEMA', @defaultSchema201, 'TABLE', N'UserTenants';
-    SET @description201 = N'主键';
-    EXEC sp_addextendedproperty 'MS_Description', @description201, 'SCHEMA', @defaultSchema201, 'TABLE', N'UserTenants', 'COLUMN', N'Id';
-    SET @description201 = N'操作者用户 Id（管理员代加成员）';
-    EXEC sp_addextendedproperty 'MS_Description', @description201, 'SCHEMA', @defaultSchema201, 'TABLE', N'UserTenants', 'COLUMN', N'CreatedByUserId';
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE TABLE [BusinessEntityAttributes] (
-        [Id] bigint NOT NULL IDENTITY,
-        [BusinessEntityId] bigint NOT NULL,
-        [Name] nvarchar(200) NOT NULL,
-        [DisplayName] nvarchar(max) NULL,
-        [Description] nvarchar(max) NULL,
-        [SemanticType] nvarchar(max) NULL,
-        [IsNullable] bit NOT NULL,
-        [IsIdentifier] bit NOT NULL,
-        [CreatedTime] datetime2 NOT NULL,
-        [UpdatedTime] datetime2 NULL,
-        [CreatedBy] nvarchar(max) NULL,
-        [UpdatedBy] nvarchar(max) NULL,
-        [RowVersion] bigint NOT NULL DEFAULT CAST(1 AS bigint),
-        CONSTRAINT [PK_BusinessEntityAttributes] PRIMARY KEY ([Id]),
-        CONSTRAINT [FK_BusinessEntityAttributes_BusinessEntities_BusinessEntityId] FOREIGN KEY ([BusinessEntityId]) REFERENCES [BusinessEntities] ([Id]) ON DELETE CASCADE
-    );
-    DECLARE @defaultSchema202 AS sysname;
-    SET @defaultSchema202 = SCHEMA_NAME();
-    DECLARE @description202 AS sql_variant;
-    SET @description202 = N'业务实体属性';
-    EXEC sp_addextendedproperty 'MS_Description', @description202, 'SCHEMA', @defaultSchema202, 'TABLE', N'BusinessEntityAttributes';
-    SET @description202 = N'主键';
-    EXEC sp_addextendedproperty 'MS_Description', @description202, 'SCHEMA', @defaultSchema202, 'TABLE', N'BusinessEntityAttributes', 'COLUMN', N'Id';
-    SET @description202 = N'创建时间';
-    EXEC sp_addextendedproperty 'MS_Description', @description202, 'SCHEMA', @defaultSchema202, 'TABLE', N'BusinessEntityAttributes', 'COLUMN', N'CreatedTime';
-    SET @description202 = N'乐观并发版本(ETag)，每次更新自增';
-    EXEC sp_addextendedproperty 'MS_Description', @description202, 'SCHEMA', @defaultSchema202, 'TABLE', N'BusinessEntityAttributes', 'COLUMN', N'RowVersion';
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE TABLE [BusinessEntityKeys] (
-        [Id] bigint NOT NULL IDENTITY,
-        [BusinessEntityId] bigint NOT NULL,
-        [Name] nvarchar(200) NOT NULL,
-        [DisplayName] nvarchar(max) NULL,
-        [Description] nvarchar(max) NULL,
-        [IsPrimary] bit NOT NULL,
-        [KeyType] nvarchar(max) NULL,
-        [CreatedTime] datetime2 NOT NULL,
-        [UpdatedTime] datetime2 NULL,
-        [CreatedBy] nvarchar(max) NULL,
-        [UpdatedBy] nvarchar(max) NULL,
-        [RowVersion] bigint NOT NULL DEFAULT CAST(1 AS bigint),
-        CONSTRAINT [PK_BusinessEntityKeys] PRIMARY KEY ([Id]),
-        CONSTRAINT [FK_BusinessEntityKeys_BusinessEntities_BusinessEntityId] FOREIGN KEY ([BusinessEntityId]) REFERENCES [BusinessEntities] ([Id]) ON DELETE CASCADE
-    );
-    DECLARE @defaultSchema203 AS sysname;
-    SET @defaultSchema203 = SCHEMA_NAME();
-    DECLARE @description203 AS sql_variant;
-    SET @description203 = N'业务实体键';
-    EXEC sp_addextendedproperty 'MS_Description', @description203, 'SCHEMA', @defaultSchema203, 'TABLE', N'BusinessEntityKeys';
-    SET @description203 = N'主键';
-    EXEC sp_addextendedproperty 'MS_Description', @description203, 'SCHEMA', @defaultSchema203, 'TABLE', N'BusinessEntityKeys', 'COLUMN', N'Id';
-    SET @description203 = N'创建时间';
-    EXEC sp_addextendedproperty 'MS_Description', @description203, 'SCHEMA', @defaultSchema203, 'TABLE', N'BusinessEntityKeys', 'COLUMN', N'CreatedTime';
-    SET @description203 = N'乐观并发版本(ETag)，每次更新自增';
-    EXEC sp_addextendedproperty 'MS_Description', @description203, 'SCHEMA', @defaultSchema203, 'TABLE', N'BusinessEntityKeys', 'COLUMN', N'RowVersion';
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE TABLE [BusinessEntityMetrics] (
-        [Id] bigint NOT NULL IDENTITY,
-        [BusinessEntityId] bigint NOT NULL,
-        [Name] nvarchar(200) NOT NULL,
-        [DisplayName] nvarchar(max) NULL,
-        [Description] nvarchar(max) NULL,
-        [SemanticType] nvarchar(max) NULL,
-        [Aggregation] nvarchar(50) NULL,
-        [IsCalculated] bit NOT NULL,
-        [CreatedTime] datetime2 NOT NULL,
-        [UpdatedTime] datetime2 NULL,
-        [CreatedBy] nvarchar(max) NULL,
-        [UpdatedBy] nvarchar(max) NULL,
-        [RowVersion] bigint NOT NULL DEFAULT CAST(1 AS bigint),
-        CONSTRAINT [PK_BusinessEntityMetrics] PRIMARY KEY ([Id]),
-        CONSTRAINT [FK_BusinessEntityMetrics_BusinessEntities_BusinessEntityId] FOREIGN KEY ([BusinessEntityId]) REFERENCES [BusinessEntities] ([Id]) ON DELETE CASCADE
-    );
-    DECLARE @defaultSchema204 AS sysname;
-    SET @defaultSchema204 = SCHEMA_NAME();
-    DECLARE @description204 AS sql_variant;
-    SET @description204 = N'业务实体指标';
-    EXEC sp_addextendedproperty 'MS_Description', @description204, 'SCHEMA', @defaultSchema204, 'TABLE', N'BusinessEntityMetrics';
-    SET @description204 = N'主键';
-    EXEC sp_addextendedproperty 'MS_Description', @description204, 'SCHEMA', @defaultSchema204, 'TABLE', N'BusinessEntityMetrics', 'COLUMN', N'Id';
-    SET @description204 = N'创建时间';
-    EXEC sp_addextendedproperty 'MS_Description', @description204, 'SCHEMA', @defaultSchema204, 'TABLE', N'BusinessEntityMetrics', 'COLUMN', N'CreatedTime';
-    SET @description204 = N'乐观并发版本(ETag)，每次更新自增';
-    EXEC sp_addextendedproperty 'MS_Description', @description204, 'SCHEMA', @defaultSchema204, 'TABLE', N'BusinessEntityMetrics', 'COLUMN', N'RowVersion';
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE TABLE [BusinessEntityRelationships] (
-        [Id] bigint NOT NULL IDENTITY,
-        [SourceEntityId] bigint NOT NULL,
-        [TargetEntityId] bigint NOT NULL,
-        [Name] nvarchar(200) NOT NULL,
-        [DisplayName] nvarchar(max) NULL,
-        [Description] nvarchar(max) NULL,
-        [RelationshipType] nvarchar(max) NULL,
-        [Cardinality] nvarchar(max) NULL,
-        [IsRequired] bit NOT NULL,
-        [CreatedTime] datetime2 NOT NULL,
-        [UpdatedTime] datetime2 NULL,
-        [CreatedBy] nvarchar(max) NULL,
-        [UpdatedBy] nvarchar(max) NULL,
-        [RowVersion] bigint NOT NULL DEFAULT CAST(1 AS bigint),
-        CONSTRAINT [PK_BusinessEntityRelationships] PRIMARY KEY ([Id]),
-        CONSTRAINT [FK_BusinessEntityRelationships_BusinessEntities_SourceEntityId] FOREIGN KEY ([SourceEntityId]) REFERENCES [BusinessEntities] ([Id]) ON DELETE NO ACTION,
-        CONSTRAINT [FK_BusinessEntityRelationships_BusinessEntities_TargetEntityId] FOREIGN KEY ([TargetEntityId]) REFERENCES [BusinessEntities] ([Id]) ON DELETE NO ACTION
-    );
-    DECLARE @defaultSchema205 AS sysname;
-    SET @defaultSchema205 = SCHEMA_NAME();
-    DECLARE @description205 AS sql_variant;
-    SET @description205 = N'业务实体关系';
-    EXEC sp_addextendedproperty 'MS_Description', @description205, 'SCHEMA', @defaultSchema205, 'TABLE', N'BusinessEntityRelationships';
-    SET @description205 = N'主键';
-    EXEC sp_addextendedproperty 'MS_Description', @description205, 'SCHEMA', @defaultSchema205, 'TABLE', N'BusinessEntityRelationships', 'COLUMN', N'Id';
-    SET @description205 = N'创建时间';
-    EXEC sp_addextendedproperty 'MS_Description', @description205, 'SCHEMA', @defaultSchema205, 'TABLE', N'BusinessEntityRelationships', 'COLUMN', N'CreatedTime';
-    SET @description205 = N'乐观并发版本(ETag)，每次更新自增';
-    EXEC sp_addextendedproperty 'MS_Description', @description205, 'SCHEMA', @defaultSchema205, 'TABLE', N'BusinessEntityRelationships', 'COLUMN', N'RowVersion';
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE TABLE [MetadataColumns] (
-        [Id] bigint NOT NULL IDENTITY,
-        [MetadataTableId] bigint NOT NULL,
-        [BusinessKey] nvarchar(max) NULL,
-        [ColumnName] nvarchar(128) NOT NULL,
-        [Ordinal] int NOT NULL DEFAULT 0,
-        [NativeType] nvarchar(64) NULL,
-        [Precision] int NULL,
-        [Scale] int NULL,
-        [ColumnComment] nvarchar(max) NULL,
-        [DataType] nvarchar(max) NULL,
-        [Length] bigint NULL,
-        [IsNullable] bit NULL,
-        [IsPrimaryKey] bit NULL,
-        [SearchText] nvarchar(max) NULL,
-        [VectorId] nvarchar(max) NULL,
-        [EmbeddingModel] nvarchar(128) NULL,
-        [VectorDimension] int NULL,
-        [VectorSyncTime] datetime2 NULL,
-        [VectorStatus] nvarchar(16) NULL,
-        [VectorErrorCode] nvarchar(64) NULL,
-        [CreatedTime] datetime2 NOT NULL,
-        [UpdatedTime] datetime2 NULL,
-        [CreatedBy] nvarchar(max) NULL,
-        [UpdatedBy] nvarchar(max) NULL,
-        [RowVersion] bigint NOT NULL DEFAULT CAST(1 AS bigint),
-        CONSTRAINT [PK_MetadataColumns] PRIMARY KEY ([Id]),
-        CONSTRAINT [FK_MetadataColumns_MetadataTables_MetadataTableId] FOREIGN KEY ([MetadataTableId]) REFERENCES [MetadataTables] ([Id]) ON DELETE CASCADE
-    );
-    DECLARE @defaultSchema206 AS sysname;
-    SET @defaultSchema206 = SCHEMA_NAME();
-    DECLARE @description206 AS sql_variant;
-    SET @description206 = N'元数据字段';
-    EXEC sp_addextendedproperty 'MS_Description', @description206, 'SCHEMA', @defaultSchema206, 'TABLE', N'MetadataColumns';
-    SET @description206 = N'主键';
-    EXEC sp_addextendedproperty 'MS_Description', @description206, 'SCHEMA', @defaultSchema206, 'TABLE', N'MetadataColumns', 'COLUMN', N'Id';
-    SET @description206 = N'字段业务唯一标识';
-    EXEC sp_addextendedproperty 'MS_Description', @description206, 'SCHEMA', @defaultSchema206, 'TABLE', N'MetadataColumns', 'COLUMN', N'BusinessKey';
-    SET @description206 = N'列名';
-    EXEC sp_addextendedproperty 'MS_Description', @description206, 'SCHEMA', @defaultSchema206, 'TABLE', N'MetadataColumns', 'COLUMN', N'ColumnName';
-    SET @description206 = N'列序号';
-    EXEC sp_addextendedproperty 'MS_Description', @description206, 'SCHEMA', @defaultSchema206, 'TABLE', N'MetadataColumns', 'COLUMN', N'Ordinal';
-    SET @description206 = N'原生类型';
-    EXEC sp_addextendedproperty 'MS_Description', @description206, 'SCHEMA', @defaultSchema206, 'TABLE', N'MetadataColumns', 'COLUMN', N'NativeType';
-    SET @description206 = N'精度';
-    EXEC sp_addextendedproperty 'MS_Description', @description206, 'SCHEMA', @defaultSchema206, 'TABLE', N'MetadataColumns', 'COLUMN', N'Precision';
-    SET @description206 = N'小数位';
-    EXEC sp_addextendedproperty 'MS_Description', @description206, 'SCHEMA', @defaultSchema206, 'TABLE', N'MetadataColumns', 'COLUMN', N'Scale';
-    SET @description206 = N'字段Embedding文本';
-    EXEC sp_addextendedproperty 'MS_Description', @description206, 'SCHEMA', @defaultSchema206, 'TABLE', N'MetadataColumns', 'COLUMN', N'SearchText';
-    SET @description206 = N'Qdrant字段向量ID';
-    EXEC sp_addextendedproperty 'MS_Description', @description206, 'SCHEMA', @defaultSchema206, 'TABLE', N'MetadataColumns', 'COLUMN', N'VectorId';
-    SET @description206 = N'Embedding模型';
-    EXEC sp_addextendedproperty 'MS_Description', @description206, 'SCHEMA', @defaultSchema206, 'TABLE', N'MetadataColumns', 'COLUMN', N'EmbeddingModel';
-    SET @description206 = N'向量维度';
-    EXEC sp_addextendedproperty 'MS_Description', @description206, 'SCHEMA', @defaultSchema206, 'TABLE', N'MetadataColumns', 'COLUMN', N'VectorDimension';
-    SET @description206 = N'向量同步时间(UTC)';
-    EXEC sp_addextendedproperty 'MS_Description', @description206, 'SCHEMA', @defaultSchema206, 'TABLE', N'MetadataColumns', 'COLUMN', N'VectorSyncTime';
-    SET @description206 = N'向量状态';
-    EXEC sp_addextendedproperty 'MS_Description', @description206, 'SCHEMA', @defaultSchema206, 'TABLE', N'MetadataColumns', 'COLUMN', N'VectorStatus';
-    SET @description206 = N'向量错误码';
-    EXEC sp_addextendedproperty 'MS_Description', @description206, 'SCHEMA', @defaultSchema206, 'TABLE', N'MetadataColumns', 'COLUMN', N'VectorErrorCode';
-    SET @description206 = N'创建时间';
-    EXEC sp_addextendedproperty 'MS_Description', @description206, 'SCHEMA', @defaultSchema206, 'TABLE', N'MetadataColumns', 'COLUMN', N'CreatedTime';
-    SET @description206 = N'乐观并发版本(ETag)，每次更新自增';
-    EXEC sp_addextendedproperty 'MS_Description', @description206, 'SCHEMA', @defaultSchema206, 'TABLE', N'MetadataColumns', 'COLUMN', N'RowVersion';
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE TABLE [LearningRecords] (
-        [Id] bigint NOT NULL IDENTITY,
-        [TenantId] bigint NOT NULL,
-        [Question] nvarchar(max) NULL,
-        [MetadataColumnId] bigint NULL,
-        [Correct] bit NULL,
-        [Feedback] nvarchar(max) NULL,
-        [CreatedTime] datetime2 NOT NULL,
-        [UpdatedTime] datetime2 NULL,
-        [CreatedBy] nvarchar(max) NULL,
-        [UpdatedBy] nvarchar(max) NULL,
-        [RowVersion] bigint NOT NULL DEFAULT CAST(1 AS bigint),
-        CONSTRAINT [PK_LearningRecords] PRIMARY KEY ([Id]),
-        CONSTRAINT [FK_LearningRecords_MetadataColumns_MetadataColumnId] FOREIGN KEY ([MetadataColumnId]) REFERENCES [MetadataColumns] ([Id]) ON DELETE SET NULL,
-        CONSTRAINT [FK_LearningRecords_Tenants_TenantId] FOREIGN KEY ([TenantId]) REFERENCES [Tenants] ([Id]) ON DELETE CASCADE
-    );
-    DECLARE @defaultSchema207 AS sysname;
-    SET @defaultSchema207 = SCHEMA_NAME();
-    DECLARE @description207 AS sql_variant;
-    SET @description207 = N'学习记录';
-    EXEC sp_addextendedproperty 'MS_Description', @description207, 'SCHEMA', @defaultSchema207, 'TABLE', N'LearningRecords';
-    SET @description207 = N'主键';
-    EXEC sp_addextendedproperty 'MS_Description', @description207, 'SCHEMA', @defaultSchema207, 'TABLE', N'LearningRecords', 'COLUMN', N'Id';
-    SET @description207 = N'创建时间';
-    EXEC sp_addextendedproperty 'MS_Description', @description207, 'SCHEMA', @defaultSchema207, 'TABLE', N'LearningRecords', 'COLUMN', N'CreatedTime';
-    SET @description207 = N'乐观并发版本(ETag)，每次更新自增';
-    EXEC sp_addextendedproperty 'MS_Description', @description207, 'SCHEMA', @defaultSchema207, 'TABLE', N'LearningRecords', 'COLUMN', N'RowVersion';
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE TABLE [MetadataSemantics] (
-        [Id] bigint NOT NULL IDENTITY,
-        [MetadataColumnId] bigint NULL,
-        [BusinessMeaning] nvarchar(max) NULL,
-        [Keywords] nvarchar(2048) NULL,
-        [Synonyms] nvarchar(2048) NULL,
-        [ExampleQuestions] nvarchar(2048) NULL,
-        [BusinessDomain] nvarchar(max) NULL,
-        [BusinessDomainId] bigint NULL,
-        [Confidence] decimal(5,4) NULL,
-        [Source] nvarchar(16) NOT NULL DEFAULT N'Manual',
-        [SearchText] nvarchar(max) NULL,
-        [VectorId] nvarchar(max) NULL,
-        [EmbeddingModel] nvarchar(128) NULL,
-        [VectorDimension] int NULL,
-        [VectorSyncTime] datetime2 NULL,
-        [VectorStatus] nvarchar(16) NULL,
-        [VectorErrorCode] nvarchar(64) NULL,
-        [CreatedTime] datetime2 NOT NULL,
-        [UpdatedTime] datetime2 NULL,
-        [CreatedBy] nvarchar(max) NULL,
-        [UpdatedBy] nvarchar(max) NULL,
-        [RowVersion] bigint NOT NULL DEFAULT CAST(1 AS bigint),
-        CONSTRAINT [PK_MetadataSemantics] PRIMARY KEY ([Id]),
-        CONSTRAINT [CK_MetadataSemantics_Confidence] CHECK ([Confidence] IS NULL OR ([Confidence] >= 0 AND [Confidence] <= 1)),
-        CONSTRAINT [FK_MetadataSemantics_BusinessDomains_BusinessDomainId] FOREIGN KEY ([BusinessDomainId]) REFERENCES [BusinessDomains] ([Id]) ON DELETE SET NULL,
-        CONSTRAINT [FK_MetadataSemantics_MetadataColumns_MetadataColumnId] FOREIGN KEY ([MetadataColumnId]) REFERENCES [MetadataColumns] ([Id]) ON DELETE CASCADE
-    );
-    DECLARE @defaultSchema208 AS sysname;
-    SET @defaultSchema208 = SCHEMA_NAME();
-    DECLARE @description208 AS sql_variant;
-    SET @description208 = N'字段AI语义';
-    EXEC sp_addextendedproperty 'MS_Description', @description208, 'SCHEMA', @defaultSchema208, 'TABLE', N'MetadataSemantics';
-    SET @description208 = N'主键';
-    EXEC sp_addextendedproperty 'MS_Description', @description208, 'SCHEMA', @defaultSchema208, 'TABLE', N'MetadataSemantics', 'COLUMN', N'Id';
-    SET @description208 = N'业务含义';
-    EXEC sp_addextendedproperty 'MS_Description', @description208, 'SCHEMA', @defaultSchema208, 'TABLE', N'MetadataSemantics', 'COLUMN', N'BusinessMeaning';
-    SET @description208 = N'关键词';
-    EXEC sp_addextendedproperty 'MS_Description', @description208, 'SCHEMA', @defaultSchema208, 'TABLE', N'MetadataSemantics', 'COLUMN', N'Keywords';
-    SET @description208 = N'同义词';
-    EXEC sp_addextendedproperty 'MS_Description', @description208, 'SCHEMA', @defaultSchema208, 'TABLE', N'MetadataSemantics', 'COLUMN', N'Synonyms';
-    SET @description208 = N'示例问题';
-    EXEC sp_addextendedproperty 'MS_Description', @description208, 'SCHEMA', @defaultSchema208, 'TABLE', N'MetadataSemantics', 'COLUMN', N'ExampleQuestions';
-    SET @description208 = N'业务域';
-    EXEC sp_addextendedproperty 'MS_Description', @description208, 'SCHEMA', @defaultSchema208, 'TABLE', N'MetadataSemantics', 'COLUMN', N'BusinessDomain';
-    SET @description208 = N'业务域Id（FK 权威，逐步替代字符串 BusinessDomain）';
-    EXEC sp_addextendedproperty 'MS_Description', @description208, 'SCHEMA', @defaultSchema208, 'TABLE', N'MetadataSemantics', 'COLUMN', N'BusinessDomainId';
-    SET @description208 = N'AI生成置信度(0-1)';
-    EXEC sp_addextendedproperty 'MS_Description', @description208, 'SCHEMA', @defaultSchema208, 'TABLE', N'MetadataSemantics', 'COLUMN', N'Confidence';
-    SET @description208 = N'来源';
-    EXEC sp_addextendedproperty 'MS_Description', @description208, 'SCHEMA', @defaultSchema208, 'TABLE', N'MetadataSemantics', 'COLUMN', N'Source';
-    SET @description208 = N'语义Embedding文本';
-    EXEC sp_addextendedproperty 'MS_Description', @description208, 'SCHEMA', @defaultSchema208, 'TABLE', N'MetadataSemantics', 'COLUMN', N'SearchText';
-    SET @description208 = N'Qdrant语义向量ID';
-    EXEC sp_addextendedproperty 'MS_Description', @description208, 'SCHEMA', @defaultSchema208, 'TABLE', N'MetadataSemantics', 'COLUMN', N'VectorId';
-    SET @description208 = N'Embedding模型';
-    EXEC sp_addextendedproperty 'MS_Description', @description208, 'SCHEMA', @defaultSchema208, 'TABLE', N'MetadataSemantics', 'COLUMN', N'EmbeddingModel';
-    SET @description208 = N'向量维度';
-    EXEC sp_addextendedproperty 'MS_Description', @description208, 'SCHEMA', @defaultSchema208, 'TABLE', N'MetadataSemantics', 'COLUMN', N'VectorDimension';
-    SET @description208 = N'向量同步时间(UTC)';
-    EXEC sp_addextendedproperty 'MS_Description', @description208, 'SCHEMA', @defaultSchema208, 'TABLE', N'MetadataSemantics', 'COLUMN', N'VectorSyncTime';
-    SET @description208 = N'向量状态';
-    EXEC sp_addextendedproperty 'MS_Description', @description208, 'SCHEMA', @defaultSchema208, 'TABLE', N'MetadataSemantics', 'COLUMN', N'VectorStatus';
-    SET @description208 = N'向量错误码';
-    EXEC sp_addextendedproperty 'MS_Description', @description208, 'SCHEMA', @defaultSchema208, 'TABLE', N'MetadataSemantics', 'COLUMN', N'VectorErrorCode';
-    SET @description208 = N'创建时间';
-    EXEC sp_addextendedproperty 'MS_Description', @description208, 'SCHEMA', @defaultSchema208, 'TABLE', N'MetadataSemantics', 'COLUMN', N'CreatedTime';
-    SET @description208 = N'乐观并发版本(ETag)，每次更新自增';
-    EXEC sp_addextendedproperty 'MS_Description', @description208, 'SCHEMA', @defaultSchema208, 'TABLE', N'MetadataSemantics', 'COLUMN', N'RowVersion';
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE TABLE [PhysicalBindings] (
-        [Id] bigint NOT NULL IDENTITY,
-        [DataSourceId] bigint NOT NULL,
-        [MetadataTableId] bigint NOT NULL,
-        [MetadataColumnId] bigint NOT NULL,
-        [PhysicalRole] nvarchar(50) NULL,
-        [BindingType] nvarchar(50) NULL,
-        [Priority] int NOT NULL,
-        [IsActive] bit NOT NULL,
-        [BusinessEntityKeyId] bigint NULL,
-        [BusinessEntityAttributeId] bigint NULL,
-        [BusinessEntityMetricId] bigint NULL,
-        [BusinessEntityRelationshipId] bigint NULL,
-        [CreatedTime] datetime2 NOT NULL,
-        [UpdatedTime] datetime2 NULL,
-        [CreatedBy] nvarchar(max) NULL,
-        [UpdatedBy] nvarchar(max) NULL,
-        [RowVersion] bigint NOT NULL DEFAULT CAST(1 AS bigint),
-        CONSTRAINT [PK_PhysicalBindings] PRIMARY KEY ([Id]),
-        CONSTRAINT [CK_PhysicalBindings_PriorityNonNeg] CHECK ([Priority] >= 0),
-        CONSTRAINT [FK_PhysicalBindings_BusinessEntityAttributes_BusinessEntityAttributeId] FOREIGN KEY ([BusinessEntityAttributeId]) REFERENCES [BusinessEntityAttributes] ([Id]),
-        CONSTRAINT [FK_PhysicalBindings_BusinessEntityKeys_BusinessEntityKeyId] FOREIGN KEY ([BusinessEntityKeyId]) REFERENCES [BusinessEntityKeys] ([Id]),
-        CONSTRAINT [FK_PhysicalBindings_BusinessEntityMetrics_BusinessEntityMetricId] FOREIGN KEY ([BusinessEntityMetricId]) REFERENCES [BusinessEntityMetrics] ([Id]),
-        CONSTRAINT [FK_PhysicalBindings_BusinessEntityRelationships_BusinessEntityRelationshipId] FOREIGN KEY ([BusinessEntityRelationshipId]) REFERENCES [BusinessEntityRelationships] ([Id]),
-        CONSTRAINT [FK_PhysicalBindings_DataSources_DataSourceId] FOREIGN KEY ([DataSourceId]) REFERENCES [DataSources] ([Id]) ON DELETE NO ACTION,
-        CONSTRAINT [FK_PhysicalBindings_MetadataColumns_MetadataColumnId] FOREIGN KEY ([MetadataColumnId]) REFERENCES [MetadataColumns] ([Id]) ON DELETE NO ACTION,
-        CONSTRAINT [FK_PhysicalBindings_MetadataTables_MetadataTableId] FOREIGN KEY ([MetadataTableId]) REFERENCES [MetadataTables] ([Id]) ON DELETE NO ACTION
-    );
-    DECLARE @defaultSchema209 AS sysname;
-    SET @defaultSchema209 = SCHEMA_NAME();
-    DECLARE @description209 AS sql_variant;
-    SET @description209 = N'业务语义到物理元数据的映射';
-    EXEC sp_addextendedproperty 'MS_Description', @description209, 'SCHEMA', @defaultSchema209, 'TABLE', N'PhysicalBindings';
-    SET @description209 = N'主键';
-    EXEC sp_addextendedproperty 'MS_Description', @description209, 'SCHEMA', @defaultSchema209, 'TABLE', N'PhysicalBindings', 'COLUMN', N'Id';
-    SET @description209 = N'创建时间';
-    EXEC sp_addextendedproperty 'MS_Description', @description209, 'SCHEMA', @defaultSchema209, 'TABLE', N'PhysicalBindings', 'COLUMN', N'CreatedTime';
-    SET @description209 = N'乐观并发版本(ETag)，每次更新自增';
-    EXEC sp_addextendedproperty 'MS_Description', @description209, 'SCHEMA', @defaultSchema209, 'TABLE', N'PhysicalBindings', 'COLUMN', N'RowVersion';
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE TABLE [RowLevelSecurityPolicies] (
-        [Id] bigint NOT NULL IDENTITY,
-        [TenantId] bigint NOT NULL,
-        [DataSourceId] bigint NOT NULL,
-        [MetadataTableId] bigint NOT NULL,
-        [MetadataColumnId] bigint NOT NULL,
-        [SubjectType] int NOT NULL,
-        [SubjectId] bigint NULL,
-        [SubjectKey] nvarchar(128) NULL,
-        [SubjectValue] nvarchar(512) NULL,
-        [Effect] int NOT NULL,
-        [Operator] nvarchar(16) NOT NULL,
-        [Value] nvarchar(2048) NOT NULL,
-        [Enabled] bit NOT NULL,
-        [Version] bigint NOT NULL,
-        [UpdatedTime] datetime2 NOT NULL,
-        CONSTRAINT [PK_RowLevelSecurityPolicies] PRIMARY KEY ([Id]),
-        CONSTRAINT [CK_RlsPolicies_Operator] CHECK ([Operator] IN ('=', '!=', '>', '>=', '<', '<=', 'LIKE', 'IN', 'IS NULL', 'IS NOT NULL')),
-        CONSTRAINT [CK_RlsPolicies_SubjectConsistency] CHECK (([SubjectType] = 0 AND [SubjectId] IS NULL AND [SubjectKey] IS NULL) OR ([SubjectType] = 1 AND [SubjectId] IS NOT NULL) OR ([SubjectType] = 2 AND [SubjectId] IS NOT NULL) OR ([SubjectType] = 3 AND [SubjectKey] IS NOT NULL) OR ([SubjectType] NOT IN (0,1,2,3))),
-        CONSTRAINT [FK_RowLevelSecurityPolicies_DataSources_DataSourceId] FOREIGN KEY ([DataSourceId]) REFERENCES [DataSources] ([Id]) ON DELETE NO ACTION,
-        CONSTRAINT [FK_RowLevelSecurityPolicies_MetadataColumns_MetadataColumnId] FOREIGN KEY ([MetadataColumnId]) REFERENCES [MetadataColumns] ([Id]) ON DELETE NO ACTION,
-        CONSTRAINT [FK_RowLevelSecurityPolicies_MetadataTables_MetadataTableId] FOREIGN KEY ([MetadataTableId]) REFERENCES [MetadataTables] ([Id]) ON DELETE CASCADE
-    );
-    DECLARE @defaultSchema210 AS sysname;
-    SET @defaultSchema210 = SCHEMA_NAME();
-    DECLARE @description210 AS sql_variant;
-    SET @description210 = N'主键';
-    EXEC sp_addextendedproperty 'MS_Description', @description210, 'SCHEMA', @defaultSchema210, 'TABLE', N'RowLevelSecurityPolicies', 'COLUMN', N'Id';
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE UNIQUE INDEX [IX_AgentPlans_TenantId_Code] ON [AgentPlans] ([TenantId], [Code]);
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE INDEX [IX_AgentPlans_TenantId_Status] ON [AgentPlans] ([TenantId], [Status]);
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE UNIQUE INDEX [IX_AppPlans_TenantId_Code] ON [AppPlans] ([TenantId], [Code]);
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE INDEX [IX_AppPlans_TenantId_Status] ON [AppPlans] ([TenantId], [Status]);
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE UNIQUE INDEX [IX_AppVersions_AppId_Version] ON [AppVersions] ([AppId], [Version]);
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE INDEX [IX_AppVersions_TenantId_AppId] ON [AppVersions] ([TenantId], [AppId]);
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE INDEX [IX_AuditLogs_TenantId] ON [AuditLogs] ([TenantId]);
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE INDEX [IX_AuditLogs_TenantId_Action] ON [AuditLogs] ([TenantId], [Action]);
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE INDEX [IX_AuditLogs_TenantId_EntityType] ON [AuditLogs] ([TenantId], [EntityType]);
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE INDEX [IX_AuditLogs_Timestamp] ON [AuditLogs] ([Timestamp]);
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE INDEX [IX_BusinessDomains_TenantId] ON [BusinessDomains] ([TenantId]);
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE UNIQUE INDEX [IX_BusinessDomains_TenantId_Name] ON [BusinessDomains] ([TenantId], [Name]);
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE INDEX [IX_BusinessEntities_BusinessDomainId] ON [BusinessEntities] ([BusinessDomainId]);
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE UNIQUE INDEX [IX_BusinessEntities_TenantId_BusinessKey] ON [BusinessEntities] ([TenantId], [BusinessKey]);
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE INDEX [IX_BusinessEntityAttributes_BusinessEntityId_IsIdentifier] ON [BusinessEntityAttributes] ([BusinessEntityId], [IsIdentifier]);
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE UNIQUE INDEX [IX_BusinessEntityAttributes_BusinessEntityId_Name] ON [BusinessEntityAttributes] ([BusinessEntityId], [Name]);
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE INDEX [IX_BusinessEntityDimensions_BusinessDomainId] ON [BusinessEntityDimensions] ([BusinessDomainId]);
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE UNIQUE INDEX [IX_BusinessEntityDimensions_TenantId_BusinessDomainId_Name] ON [BusinessEntityDimensions] ([TenantId], [BusinessDomainId], [Name]);
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE INDEX [IX_BusinessEntityKeys_BusinessEntityId_IsPrimary] ON [BusinessEntityKeys] ([BusinessEntityId], [IsPrimary]);
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE UNIQUE INDEX [IX_BusinessEntityKeys_BusinessEntityId_Name] ON [BusinessEntityKeys] ([BusinessEntityId], [Name]);
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE UNIQUE INDEX [IX_BusinessEntityMetrics_BusinessEntityId_Name] ON [BusinessEntityMetrics] ([BusinessEntityId], [Name]);
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE UNIQUE INDEX [IX_BusinessEntityRelationships_SourceEntityId_TargetEntityId_Name] ON [BusinessEntityRelationships] ([SourceEntityId], [TargetEntityId], [Name]);
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE INDEX [IX_BusinessEntityRelationships_TargetEntityId] ON [BusinessEntityRelationships] ([TargetEntityId]);
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE UNIQUE INDEX [IX_Dashboards_TenantId_Code] ON [Dashboards] ([TenantId], [Code]);
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE INDEX [IX_Dashboards_TenantId_Status] ON [Dashboards] ([TenantId], [Status]);
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE UNIQUE INDEX [IX_DashboardVersions_DashboardId_Version] ON [DashboardVersions] ([DashboardId], [Version]);
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE INDEX [IX_DashboardVersions_TenantId_DashboardId] ON [DashboardVersions] ([TenantId], [DashboardId]);
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE INDEX [IX_DataSourceAccessGrants_DataSourceId] ON [DataSourceAccessGrants] ([DataSourceId]);
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE UNIQUE INDEX [IX_DataSourceAccessGrants_TenantId_DataSourceId_SubjectType_SubjectId] ON [DataSourceAccessGrants] ([TenantId], [DataSourceId], [SubjectType], [SubjectId]);
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE INDEX [IX_DataSourceAccessGrants_TenantId_SubjectType_SubjectId] ON [DataSourceAccessGrants] ([TenantId], [SubjectType], [SubjectId]);
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE INDEX [IX_DataSources_TenantId] ON [DataSources] ([TenantId]);
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE UNIQUE INDEX [IX_DataSources_TenantId_NormalizedName] ON [DataSources] ([TenantId], [NormalizedName]);
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE INDEX [IX_LearningRecords_MetadataColumnId] ON [LearningRecords] ([MetadataColumnId]);
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE INDEX [IX_LearningRecords_TenantId] ON [LearningRecords] ([TenantId]);
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE UNIQUE INDEX [IX_MetadataColumns_MetadataTableId_ColumnName] ON [MetadataColumns] ([MetadataTableId], [ColumnName]);
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE INDEX [IX_MetadataScanJobs_DataSourceId] ON [MetadataScanJobs] ([DataSourceId]);
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE INDEX [IX_MetadataScanJobs_Status] ON [MetadataScanJobs] ([Status]);
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE INDEX [IX_MetadataScanJobs_TenantId] ON [MetadataScanJobs] ([TenantId]);
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE INDEX [IX_MetadataSemantics_BusinessDomainId] ON [MetadataSemantics] ([BusinessDomainId]);
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    EXEC(N'CREATE UNIQUE INDEX [IX_MetadataSemantics_MetadataColumnId] ON [MetadataSemantics] ([MetadataColumnId]) WHERE [MetadataColumnId] IS NOT NULL');
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE INDEX [IX_MetadataTables_DataSourceId] ON [MetadataTables] ([DataSourceId]);
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    EXEC(N'CREATE UNIQUE INDEX [IX_MetadataTables_DataSourceId_CatalogName_SchemaName_TableName] ON [MetadataTables] ([DataSourceId], [CatalogName], [SchemaName], [TableName]) WHERE [CatalogName] IS NOT NULL AND [SchemaName] IS NOT NULL');
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE INDEX [IX_MetadataTables_DataSourceId_TenantId] ON [MetadataTables] ([DataSourceId], [TenantId]);
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE INDEX [IX_MetadataTables_TenantId] ON [MetadataTables] ([TenantId]);
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE UNIQUE INDEX [IX_Permissions_TenantId_Code] ON [Permissions] ([TenantId], [Code]);
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE INDEX [IX_PhysicalBindings_BusinessEntityAttributeId_IsActive] ON [PhysicalBindings] ([BusinessEntityAttributeId], [IsActive]);
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE INDEX [IX_PhysicalBindings_BusinessEntityKeyId_BusinessEntityAttributeId_BusinessEntityMetricId_BusinessEntityRelationshipId] ON [PhysicalBindings] ([BusinessEntityKeyId], [BusinessEntityAttributeId], [BusinessEntityMetricId], [BusinessEntityRelationshipId]);
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE INDEX [IX_PhysicalBindings_BusinessEntityKeyId_IsActive] ON [PhysicalBindings] ([BusinessEntityKeyId], [IsActive]);
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE INDEX [IX_PhysicalBindings_BusinessEntityMetricId_IsActive] ON [PhysicalBindings] ([BusinessEntityMetricId], [IsActive]);
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE INDEX [IX_PhysicalBindings_BusinessEntityRelationshipId_PhysicalRole_IsActive] ON [PhysicalBindings] ([BusinessEntityRelationshipId], [PhysicalRole], [IsActive]);
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE INDEX [IX_PhysicalBindings_DataSourceId_MetadataTableId_MetadataColumnId] ON [PhysicalBindings] ([DataSourceId], [MetadataTableId], [MetadataColumnId]);
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE INDEX [IX_PhysicalBindings_DataSourceId_MetadataTableId_MetadataColumnId_Priority] ON [PhysicalBindings] ([DataSourceId], [MetadataTableId], [MetadataColumnId], [Priority]);
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE INDEX [IX_PhysicalBindings_MetadataColumnId] ON [PhysicalBindings] ([MetadataColumnId]);
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE INDEX [IX_PhysicalBindings_MetadataTableId] ON [PhysicalBindings] ([MetadataTableId]);
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE INDEX [IX_PlatformAdminTenantScopes_AdminUserId] ON [PlatformAdminTenantScopes] ([AdminUserId]);
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE UNIQUE INDEX [IX_PlatformAdminTenantScopes_AdminUserId_TenantId] ON [PlatformAdminTenantScopes] ([AdminUserId], [TenantId]);
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE INDEX [IX_PlatformAdminTenantScopes_TenantId] ON [PlatformAdminTenantScopes] ([TenantId]);
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE UNIQUE INDEX [IX_QuotaPolicies_TenantId_ResourceType] ON [QuotaPolicies] ([TenantId], [ResourceType]);
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE UNIQUE INDEX [IX_QuotaUsages_TenantId_ResourceType] ON [QuotaUsages] ([TenantId], [ResourceType]);
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE INDEX [IX_RolePermissions_PermissionId] ON [RolePermissions] ([PermissionId]);
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE INDEX [IX_RolePermissions_RoleId] ON [RolePermissions] ([RoleId]);
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE UNIQUE INDEX [IX_RolePermissions_TenantId_RoleId_PermissionId] ON [RolePermissions] ([TenantId], [RoleId], [PermissionId]);
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE UNIQUE INDEX [IX_Roles_TenantId_Code] ON [Roles] ([TenantId], [Code]);
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE INDEX [IX_RowLevelSecurityPolicies_DataSourceId] ON [RowLevelSecurityPolicies] ([DataSourceId]);
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE INDEX [IX_RowLevelSecurityPolicies_MetadataColumnId] ON [RowLevelSecurityPolicies] ([MetadataColumnId]);
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE INDEX [IX_RowLevelSecurityPolicies_MetadataTableId] ON [RowLevelSecurityPolicies] ([MetadataTableId]);
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE INDEX [IX_RowLevelSecurityPolicies_TenantId_DataSourceId_MetadataTableId_Enabled] ON [RowLevelSecurityPolicies] ([TenantId], [DataSourceId], [MetadataTableId], [Enabled]);
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE INDEX [IX_RowLevelSecurityPolicies_TenantId_SubjectType_SubjectId] ON [RowLevelSecurityPolicies] ([TenantId], [SubjectType], [SubjectId]);
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE INDEX [IX_SemanticLabels_ConceptType_ConceptId_Culture] ON [SemanticLabels] ([ConceptType], [ConceptId], [Culture]);
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE UNIQUE INDEX [IX_SemanticLabels_TenantId_ConceptType_ConceptId_Culture_LabelKind_SortOrder] ON [SemanticLabels] ([TenantId], [ConceptType], [ConceptId], [Culture], [LabelKind], [SortOrder]);
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE UNIQUE INDEX [IX_Tenants_TenantCode] ON [Tenants] ([TenantCode]);
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE UNIQUE INDEX [IX_TenantSettings_TenantId_Key] ON [TenantSettings] ([TenantId], [Key]);
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE INDEX [IX_TenantUiLanguages_TenantId_IsDefault] ON [TenantUiLanguages] ([TenantId], [IsDefault]);
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE UNIQUE INDEX [IX_TenantUiLanguages_TenantId_UiLanguageId] ON [TenantUiLanguages] ([TenantId], [UiLanguageId]);
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE INDEX [IX_TenantUiLanguages_UiLanguageId] ON [TenantUiLanguages] ([UiLanguageId]);
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE INDEX [IX_Themes_TenantId] ON [Themes] ([TenantId]);
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE UNIQUE INDEX [IX_Themes_TenantId_Key] ON [Themes] ([TenantId], [Key]);
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE UNIQUE INDEX [IX_UiLanguages_Culture] ON [UiLanguages] ([Culture]);
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE UNIQUE INDEX [IX_UiTextResources_TenantId_Culture_ResourceKey] ON [UiTextResources] ([TenantId], [Culture], [ResourceKey]);
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE UNIQUE INDEX [IX_UserLanguagePreferences_TenantId_UserId] ON [UserLanguagePreferences] ([TenantId], [UserId]);
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE INDEX [IX_UserRoles_RoleId] ON [UserRoles] ([RoleId]);
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE UNIQUE INDEX [IX_UserRoles_TenantId_UserId_RoleId] ON [UserRoles] ([TenantId], [UserId], [RoleId]);
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE INDEX [IX_UserRoles_UserId] ON [UserRoles] ([UserId]);
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE INDEX [IX_Users_TenantId] ON [Users] ([TenantId]);
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    EXEC(N'CREATE UNIQUE INDEX [IX_Users_TenantId_NormalizedUsername] ON [Users] ([TenantId], [NormalizedUsername]) WHERE [NormalizedUsername] IS NOT NULL');
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE INDEX [IX_UserTenants_TenantId] ON [UserTenants] ([TenantId]);
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE INDEX [IX_UserTenants_UserId] ON [UserTenants] ([UserId]);
-END;
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260906141902_M7_02_AppVersion'
-)
-BEGIN
-    CREATE UNIQUE INDEX [IX_UserTenants_UserId_TenantId] ON [UserTenants] ([UserId], [TenantId]);
+    DECLARE @defaultSchema172 AS sysname;
+    SET @defaultSchema172 = SCHEMA_NAME();
+    DECLARE @description172 AS sql_variant;
+    SET @description172 = N'应用发布版本快照';
+    EXEC sp_addextendedproperty 'MS_Description', @description172, 'SCHEMA', @defaultSchema172, 'TABLE', N'AppVersions';
+    SET @description172 = N'主键';
+    EXEC sp_addextendedproperty 'MS_Description', @description172, 'SCHEMA', @defaultSchema172, 'TABLE', N'AppVersions', 'COLUMN', N'Id';
+    SET @description172 = N'作用域租户（0=全局模板）';
+    EXEC sp_addextendedproperty 'MS_Description', @description172, 'SCHEMA', @defaultSchema172, 'TABLE', N'AppVersions', 'COLUMN', N'TenantId';
+    SET @description172 = N'业务编码快照';
+    EXEC sp_addextendedproperty 'MS_Description', @description172, 'SCHEMA', @defaultSchema172, 'TABLE', N'AppVersions', 'COLUMN', N'Code';
+    SET @description172 = N'名称快照';
+    EXEC sp_addextendedproperty 'MS_Description', @description172, 'SCHEMA', @defaultSchema172, 'TABLE', N'AppVersions', 'COLUMN', N'Name';
+    SET @description172 = N'描述快照';
+    EXEC sp_addextendedproperty 'MS_Description', @description172, 'SCHEMA', @defaultSchema172, 'TABLE', N'AppVersions', 'COLUMN', N'Description';
+    SET @description172 = N'主题键快照';
+    EXEC sp_addextendedproperty 'MS_Description', @description172, 'SCHEMA', @defaultSchema172, 'TABLE', N'AppVersions', 'COLUMN', N'ThemeKey';
+    SET @description172 = N'DSL版本快照';
+    EXEC sp_addextendedproperty 'MS_Description', @description172, 'SCHEMA', @defaultSchema172, 'TABLE', N'AppVersions', 'COLUMN', N'DslVersion';
+    SET @description172 = N'发布时刻固化的DSL文档（只读快照）';
+    EXEC sp_addextendedproperty 'MS_Description', @description172, 'SCHEMA', @defaultSchema172, 'TABLE', N'AppVersions', 'COLUMN', N'DslJson';
+    SET @description172 = N'发布者';
+    EXEC sp_addextendedproperty 'MS_Description', @description172, 'SCHEMA', @defaultSchema172, 'TABLE', N'AppVersions', 'COLUMN', N'PublishedBy';
+    SET @description172 = N'回滚来源版本号（非回滚为null）';
+    EXEC sp_addextendedproperty 'MS_Description', @description172, 'SCHEMA', @defaultSchema172, 'TABLE', N'AppVersions', 'COLUMN', N'RolledBackFromVersion';
+    SET @description172 = N'创建时间';
+    EXEC sp_addextendedproperty 'MS_Description', @description172, 'SCHEMA', @defaultSchema172, 'TABLE', N'AppVersions', 'COLUMN', N'CreatedTime';
+    SET @description172 = N'乐观并发版本(ETag)，每次更新自增';
+    EXEC sp_addextendedproperty 'MS_Description', @description172, 'SCHEMA', @defaultSchema172, 'TABLE', N'AppVersions', 'COLUMN', N'RowVersion';
 END;
 
 IF NOT EXISTS (
@@ -7589,31 +5282,31 @@ BEGIN
         [RowVersion] bigint NOT NULL DEFAULT CAST(1 AS bigint),
         CONSTRAINT [PK_AgentRuns] PRIMARY KEY ([Id])
     );
-    DECLARE @defaultSchema211 AS sysname;
-    SET @defaultSchema211 = SCHEMA_NAME();
-    DECLARE @description211 AS sql_variant;
-    SET @description211 = N'Agent运行记录（M7-03 Agent Runtime）';
-    EXEC sp_addextendedproperty 'MS_Description', @description211, 'SCHEMA', @defaultSchema211, 'TABLE', N'AgentRuns';
-    SET @description211 = N'主键';
-    EXEC sp_addextendedproperty 'MS_Description', @description211, 'SCHEMA', @defaultSchema211, 'TABLE', N'AgentRuns', 'COLUMN', N'Id';
-    SET @description211 = N'所属租户（运行恒归属某一租户）';
-    EXEC sp_addextendedproperty 'MS_Description', @description211, 'SCHEMA', @defaultSchema211, 'TABLE', N'AgentRuns', 'COLUMN', N'TenantId';
-    SET @description211 = N'Agent编码';
-    EXEC sp_addextendedproperty 'MS_Description', @description211, 'SCHEMA', @defaultSchema211, 'TABLE', N'AgentRuns', 'COLUMN', N'PlanCode';
-    SET @description211 = N'运行状态';
-    EXEC sp_addextendedproperty 'MS_Description', @description211, 'SCHEMA', @defaultSchema211, 'TABLE', N'AgentRuns', 'COLUMN', N'Status';
-    SET @description211 = N'触发者';
-    EXEC sp_addextendedproperty 'MS_Description', @description211, 'SCHEMA', @defaultSchema211, 'TABLE', N'AgentRuns', 'COLUMN', N'Actor';
-    SET @description211 = N'授权工具集合（JSON）';
-    EXEC sp_addextendedproperty 'MS_Description', @description211, 'SCHEMA', @defaultSchema211, 'TABLE', N'AgentRuns', 'COLUMN', N'GrantedToolsJson';
-    SET @description211 = N'结果摘要';
-    EXEC sp_addextendedproperty 'MS_Description', @description211, 'SCHEMA', @defaultSchema211, 'TABLE', N'AgentRuns', 'COLUMN', N'ResultSummary';
-    SET @description211 = N'每步执行结果（JSON 信封）';
-    EXEC sp_addextendedproperty 'MS_Description', @description211, 'SCHEMA', @defaultSchema211, 'TABLE', N'AgentRuns', 'COLUMN', N'StepLogJson';
-    SET @description211 = N'创建时间';
-    EXEC sp_addextendedproperty 'MS_Description', @description211, 'SCHEMA', @defaultSchema211, 'TABLE', N'AgentRuns', 'COLUMN', N'CreatedTime';
-    SET @description211 = N'乐观并发版本(ETag)，每次更新自增';
-    EXEC sp_addextendedproperty 'MS_Description', @description211, 'SCHEMA', @defaultSchema211, 'TABLE', N'AgentRuns', 'COLUMN', N'RowVersion';
+    DECLARE @defaultSchema173 AS sysname;
+    SET @defaultSchema173 = SCHEMA_NAME();
+    DECLARE @description173 AS sql_variant;
+    SET @description173 = N'Agent运行记录（M7-03 Agent Runtime）';
+    EXEC sp_addextendedproperty 'MS_Description', @description173, 'SCHEMA', @defaultSchema173, 'TABLE', N'AgentRuns';
+    SET @description173 = N'主键';
+    EXEC sp_addextendedproperty 'MS_Description', @description173, 'SCHEMA', @defaultSchema173, 'TABLE', N'AgentRuns', 'COLUMN', N'Id';
+    SET @description173 = N'所属租户（运行恒归属某一租户）';
+    EXEC sp_addextendedproperty 'MS_Description', @description173, 'SCHEMA', @defaultSchema173, 'TABLE', N'AgentRuns', 'COLUMN', N'TenantId';
+    SET @description173 = N'Agent编码';
+    EXEC sp_addextendedproperty 'MS_Description', @description173, 'SCHEMA', @defaultSchema173, 'TABLE', N'AgentRuns', 'COLUMN', N'PlanCode';
+    SET @description173 = N'运行状态';
+    EXEC sp_addextendedproperty 'MS_Description', @description173, 'SCHEMA', @defaultSchema173, 'TABLE', N'AgentRuns', 'COLUMN', N'Status';
+    SET @description173 = N'触发者';
+    EXEC sp_addextendedproperty 'MS_Description', @description173, 'SCHEMA', @defaultSchema173, 'TABLE', N'AgentRuns', 'COLUMN', N'Actor';
+    SET @description173 = N'授权工具集合（JSON）';
+    EXEC sp_addextendedproperty 'MS_Description', @description173, 'SCHEMA', @defaultSchema173, 'TABLE', N'AgentRuns', 'COLUMN', N'GrantedToolsJson';
+    SET @description173 = N'结果摘要';
+    EXEC sp_addextendedproperty 'MS_Description', @description173, 'SCHEMA', @defaultSchema173, 'TABLE', N'AgentRuns', 'COLUMN', N'ResultSummary';
+    SET @description173 = N'每步执行结果（JSON 信封）';
+    EXEC sp_addextendedproperty 'MS_Description', @description173, 'SCHEMA', @defaultSchema173, 'TABLE', N'AgentRuns', 'COLUMN', N'StepLogJson';
+    SET @description173 = N'创建时间';
+    EXEC sp_addextendedproperty 'MS_Description', @description173, 'SCHEMA', @defaultSchema173, 'TABLE', N'AgentRuns', 'COLUMN', N'CreatedTime';
+    SET @description173 = N'乐观并发版本(ETag)，每次更新自增';
+    EXEC sp_addextendedproperty 'MS_Description', @description173, 'SCHEMA', @defaultSchema173, 'TABLE', N'AgentRuns', 'COLUMN', N'RowVersion';
 END;
 
 IF NOT EXISTS (
@@ -7667,33 +5360,33 @@ BEGIN
         [RowVersion] bigint NOT NULL DEFAULT CAST(1 AS bigint),
         CONSTRAINT [PK_ModelAccounts] PRIMARY KEY ([Id])
     );
-    DECLARE @defaultSchema212 AS sysname;
-    SET @defaultSchema212 = SCHEMA_NAME();
-    DECLARE @description212 AS sql_variant;
-    SET @description212 = N'模型账号绑定（BYO 加密存储）';
-    EXEC sp_addextendedproperty 'MS_Description', @description212, 'SCHEMA', @defaultSchema212, 'TABLE', N'ModelAccounts';
-    SET @description212 = N'主键';
-    EXEC sp_addextendedproperty 'MS_Description', @description212, 'SCHEMA', @defaultSchema212, 'TABLE', N'ModelAccounts', 'COLUMN', N'Id';
-    SET @description212 = N'所属租户（>0）';
-    EXEC sp_addextendedproperty 'MS_Description', @description212, 'SCHEMA', @defaultSchema212, 'TABLE', N'ModelAccounts', 'COLUMN', N'TenantId';
-    SET @description212 = N'供应商标识(Qwen/OpenAI/...)';
-    EXEC sp_addextendedproperty 'MS_Description', @description212, 'SCHEMA', @defaultSchema212, 'TABLE', N'ModelAccounts', 'COLUMN', N'Provider';
-    SET @description212 = N'模型标识(qwen-plus/gpt-4o/...)';
-    EXEC sp_addextendedproperty 'MS_Description', @description212, 'SCHEMA', @defaultSchema212, 'TABLE', N'ModelAccounts', 'COLUMN', N'ModelId';
-    SET @description212 = N'展示名';
-    EXEC sp_addextendedproperty 'MS_Description', @description212, 'SCHEMA', @defaultSchema212, 'TABLE', N'ModelAccounts', 'COLUMN', N'DisplayName';
-    SET @description212 = N'AES-GCM 密文(禁止日志记录/明文下发)';
-    EXEC sp_addextendedproperty 'MS_Description', @description212, 'SCHEMA', @defaultSchema212, 'TABLE', N'ModelAccounts', 'COLUMN', N'EncryptedKey';
-    SET @description212 = N'展示掩码(如 sk-***1234)';
-    EXEC sp_addextendedproperty 'MS_Description', @description212, 'SCHEMA', @defaultSchema212, 'TABLE', N'ModelAccounts', 'COLUMN', N'MaskedKey';
-    SET @description212 = N'备注';
-    EXEC sp_addextendedproperty 'MS_Description', @description212, 'SCHEMA', @defaultSchema212, 'TABLE', N'ModelAccounts', 'COLUMN', N'Note';
-    SET @description212 = N'是否为租户默认模型(每租户至多一个)';
-    EXEC sp_addextendedproperty 'MS_Description', @description212, 'SCHEMA', @defaultSchema212, 'TABLE', N'ModelAccounts', 'COLUMN', N'IsDefault';
-    SET @description212 = N'创建时间';
-    EXEC sp_addextendedproperty 'MS_Description', @description212, 'SCHEMA', @defaultSchema212, 'TABLE', N'ModelAccounts', 'COLUMN', N'CreatedTime';
-    SET @description212 = N'乐观并发版本(ETag)，每次更新自增';
-    EXEC sp_addextendedproperty 'MS_Description', @description212, 'SCHEMA', @defaultSchema212, 'TABLE', N'ModelAccounts', 'COLUMN', N'RowVersion';
+    DECLARE @defaultSchema174 AS sysname;
+    SET @defaultSchema174 = SCHEMA_NAME();
+    DECLARE @description174 AS sql_variant;
+    SET @description174 = N'模型账号绑定（BYO 加密存储）';
+    EXEC sp_addextendedproperty 'MS_Description', @description174, 'SCHEMA', @defaultSchema174, 'TABLE', N'ModelAccounts';
+    SET @description174 = N'主键';
+    EXEC sp_addextendedproperty 'MS_Description', @description174, 'SCHEMA', @defaultSchema174, 'TABLE', N'ModelAccounts', 'COLUMN', N'Id';
+    SET @description174 = N'所属租户（>0）';
+    EXEC sp_addextendedproperty 'MS_Description', @description174, 'SCHEMA', @defaultSchema174, 'TABLE', N'ModelAccounts', 'COLUMN', N'TenantId';
+    SET @description174 = N'供应商标识(Qwen/OpenAI/...)';
+    EXEC sp_addextendedproperty 'MS_Description', @description174, 'SCHEMA', @defaultSchema174, 'TABLE', N'ModelAccounts', 'COLUMN', N'Provider';
+    SET @description174 = N'模型标识(qwen-plus/gpt-4o/...)';
+    EXEC sp_addextendedproperty 'MS_Description', @description174, 'SCHEMA', @defaultSchema174, 'TABLE', N'ModelAccounts', 'COLUMN', N'ModelId';
+    SET @description174 = N'展示名';
+    EXEC sp_addextendedproperty 'MS_Description', @description174, 'SCHEMA', @defaultSchema174, 'TABLE', N'ModelAccounts', 'COLUMN', N'DisplayName';
+    SET @description174 = N'AES-GCM 密文(禁止日志记录/明文下发)';
+    EXEC sp_addextendedproperty 'MS_Description', @description174, 'SCHEMA', @defaultSchema174, 'TABLE', N'ModelAccounts', 'COLUMN', N'EncryptedKey';
+    SET @description174 = N'展示掩码(如 sk-***1234)';
+    EXEC sp_addextendedproperty 'MS_Description', @description174, 'SCHEMA', @defaultSchema174, 'TABLE', N'ModelAccounts', 'COLUMN', N'MaskedKey';
+    SET @description174 = N'备注';
+    EXEC sp_addextendedproperty 'MS_Description', @description174, 'SCHEMA', @defaultSchema174, 'TABLE', N'ModelAccounts', 'COLUMN', N'Note';
+    SET @description174 = N'是否为租户默认模型(每租户至多一个)';
+    EXEC sp_addextendedproperty 'MS_Description', @description174, 'SCHEMA', @defaultSchema174, 'TABLE', N'ModelAccounts', 'COLUMN', N'IsDefault';
+    SET @description174 = N'创建时间';
+    EXEC sp_addextendedproperty 'MS_Description', @description174, 'SCHEMA', @defaultSchema174, 'TABLE', N'ModelAccounts', 'COLUMN', N'CreatedTime';
+    SET @description174 = N'乐观并发版本(ETag)，每次更新自增';
+    EXEC sp_addextendedproperty 'MS_Description', @description174, 'SCHEMA', @defaultSchema174, 'TABLE', N'ModelAccounts', 'COLUMN', N'RowVersion';
 END;
 
 IF NOT EXISTS (
@@ -7750,21 +5443,21 @@ BEGIN
         [RowVersion] bigint NOT NULL DEFAULT CAST(1 AS bigint),
         CONSTRAINT [PK_CustomComponents] PRIMARY KEY ([Id])
     );
-    DECLARE @defaultSchema213 AS sysname;
-    SET @defaultSchema213 = SCHEMA_NAME();
-    DECLARE @description213 AS sql_variant;
-    SET @description213 = N'租户自定义组件定义';
-    EXEC sp_addextendedproperty 'MS_Description', @description213, 'SCHEMA', @defaultSchema213, 'TABLE', N'CustomComponents';
-    SET @description213 = N'主键';
-    EXEC sp_addextendedproperty 'MS_Description', @description213, 'SCHEMA', @defaultSchema213, 'TABLE', N'CustomComponents', 'COLUMN', N'Id';
-    SET @description213 = N'结构化组件草稿DSL（禁止HTML/脚本）';
-    EXEC sp_addextendedproperty 'MS_Description', @description213, 'SCHEMA', @defaultSchema213, 'TABLE', N'CustomComponents', 'COLUMN', N'DslJson';
-    SET @description213 = N'已发布组件DSL快照';
-    EXEC sp_addextendedproperty 'MS_Description', @description213, 'SCHEMA', @defaultSchema213, 'TABLE', N'CustomComponents', 'COLUMN', N'PublishedDslJson';
-    SET @description213 = N'创建时间';
-    EXEC sp_addextendedproperty 'MS_Description', @description213, 'SCHEMA', @defaultSchema213, 'TABLE', N'CustomComponents', 'COLUMN', N'CreatedTime';
-    SET @description213 = N'乐观并发版本(ETag)，每次更新自增';
-    EXEC sp_addextendedproperty 'MS_Description', @description213, 'SCHEMA', @defaultSchema213, 'TABLE', N'CustomComponents', 'COLUMN', N'RowVersion';
+    DECLARE @defaultSchema175 AS sysname;
+    SET @defaultSchema175 = SCHEMA_NAME();
+    DECLARE @description175 AS sql_variant;
+    SET @description175 = N'租户自定义组件定义';
+    EXEC sp_addextendedproperty 'MS_Description', @description175, 'SCHEMA', @defaultSchema175, 'TABLE', N'CustomComponents';
+    SET @description175 = N'主键';
+    EXEC sp_addextendedproperty 'MS_Description', @description175, 'SCHEMA', @defaultSchema175, 'TABLE', N'CustomComponents', 'COLUMN', N'Id';
+    SET @description175 = N'结构化组件草稿DSL（禁止HTML/脚本）';
+    EXEC sp_addextendedproperty 'MS_Description', @description175, 'SCHEMA', @defaultSchema175, 'TABLE', N'CustomComponents', 'COLUMN', N'DslJson';
+    SET @description175 = N'已发布组件DSL快照';
+    EXEC sp_addextendedproperty 'MS_Description', @description175, 'SCHEMA', @defaultSchema175, 'TABLE', N'CustomComponents', 'COLUMN', N'PublishedDslJson';
+    SET @description175 = N'创建时间';
+    EXEC sp_addextendedproperty 'MS_Description', @description175, 'SCHEMA', @defaultSchema175, 'TABLE', N'CustomComponents', 'COLUMN', N'CreatedTime';
+    SET @description175 = N'乐观并发版本(ETag)，每次更新自增';
+    EXEC sp_addextendedproperty 'MS_Description', @description175, 'SCHEMA', @defaultSchema175, 'TABLE', N'CustomComponents', 'COLUMN', N'RowVersion';
 END;
 
 IF NOT EXISTS (
@@ -7794,17 +5487,17 @@ BEGIN
         CONSTRAINT [PK_CustomComponentVersions] PRIMARY KEY ([Id]),
         CONSTRAINT [FK_CustomComponentVersions_CustomComponents_ComponentId] FOREIGN KEY ([ComponentId]) REFERENCES [CustomComponents] ([Id]) ON DELETE CASCADE
     );
-    DECLARE @defaultSchema214 AS sysname;
-    SET @defaultSchema214 = SCHEMA_NAME();
-    DECLARE @description214 AS sql_variant;
-    SET @description214 = N'自定义组件发布版本快照';
-    EXEC sp_addextendedproperty 'MS_Description', @description214, 'SCHEMA', @defaultSchema214, 'TABLE', N'CustomComponentVersions';
-    SET @description214 = N'主键';
-    EXEC sp_addextendedproperty 'MS_Description', @description214, 'SCHEMA', @defaultSchema214, 'TABLE', N'CustomComponentVersions', 'COLUMN', N'Id';
-    SET @description214 = N'创建时间';
-    EXEC sp_addextendedproperty 'MS_Description', @description214, 'SCHEMA', @defaultSchema214, 'TABLE', N'CustomComponentVersions', 'COLUMN', N'CreatedTime';
-    SET @description214 = N'乐观并发版本(ETag)，每次更新自增';
-    EXEC sp_addextendedproperty 'MS_Description', @description214, 'SCHEMA', @defaultSchema214, 'TABLE', N'CustomComponentVersions', 'COLUMN', N'RowVersion';
+    DECLARE @defaultSchema176 AS sysname;
+    SET @defaultSchema176 = SCHEMA_NAME();
+    DECLARE @description176 AS sql_variant;
+    SET @description176 = N'自定义组件发布版本快照';
+    EXEC sp_addextendedproperty 'MS_Description', @description176, 'SCHEMA', @defaultSchema176, 'TABLE', N'CustomComponentVersions';
+    SET @description176 = N'主键';
+    EXEC sp_addextendedproperty 'MS_Description', @description176, 'SCHEMA', @defaultSchema176, 'TABLE', N'CustomComponentVersions', 'COLUMN', N'Id';
+    SET @description176 = N'创建时间';
+    EXEC sp_addextendedproperty 'MS_Description', @description176, 'SCHEMA', @defaultSchema176, 'TABLE', N'CustomComponentVersions', 'COLUMN', N'CreatedTime';
+    SET @description176 = N'乐观并发版本(ETag)，每次更新自增';
+    EXEC sp_addextendedproperty 'MS_Description', @description176, 'SCHEMA', @defaultSchema176, 'TABLE', N'CustomComponentVersions', 'COLUMN', N'RowVersion';
 END;
 
 IF NOT EXISTS (
@@ -7869,29 +5562,29 @@ BEGIN
         [CreatedTime] datetime2 NOT NULL,
         CONSTRAINT [PK_AskQuerySnapshots] PRIMARY KEY ([TurnId])
     );
-    DECLARE @defaultSchema215 AS sysname;
-    SET @defaultSchema215 = SCHEMA_NAME();
-    DECLARE @description215 AS sql_variant;
-    SET @description215 = N'Ask 查询快照（应用运行时引用）';
-    EXEC sp_addextendedproperty 'MS_Description', @description215, 'SCHEMA', @defaultSchema215, 'TABLE', N'AskQuerySnapshots';
-    SET @description215 = N'查询引用标识(GUID)';
-    EXEC sp_addextendedproperty 'MS_Description', @description215, 'SCHEMA', @defaultSchema215, 'TABLE', N'AskQuerySnapshots', 'COLUMN', N'TurnId';
-    SET @description215 = N'所属租户';
-    EXEC sp_addextendedproperty 'MS_Description', @description215, 'SCHEMA', @defaultSchema215, 'TABLE', N'AskQuerySnapshots', 'COLUMN', N'TenantId';
-    SET @description215 = N'快照创建者';
-    EXEC sp_addextendedproperty 'MS_Description', @description215, 'SCHEMA', @defaultSchema215, 'TABLE', N'AskQuerySnapshots', 'COLUMN', N'UserId';
-    SET @description215 = N'解析数据源Id（运行时硬约束）';
-    EXEC sp_addextendedproperty 'MS_Description', @description215, 'SCHEMA', @defaultSchema215, 'TABLE', N'AskQuerySnapshots', 'COLUMN', N'DataSourceId';
-    SET @description215 = N'主表业务实体语义名';
-    EXEC sp_addextendedproperty 'MS_Description', @description215, 'SCHEMA', @defaultSchema215, 'TABLE', N'AskQuerySnapshots', 'COLUMN', N'EntityCode';
-    SET @description215 = N'允许查询的QueryPlan语义(JSON,RLS注入前截取)';
-    EXEC sp_addextendedproperty 'MS_Description', @description215, 'SCHEMA', @defaultSchema215, 'TABLE', N'AskQuerySnapshots', 'COLUMN', N'QueryPlanJson';
-    SET @description215 = N'请求摘要哈希(创建幂等冲突检测)';
-    EXEC sp_addextendedproperty 'MS_Description', @description215, 'SCHEMA', @defaultSchema215, 'TABLE', N'AskQuerySnapshots', 'COLUMN', N'RequestHash';
-    SET @description215 = N'过期时间(UTC)';
-    EXEC sp_addextendedproperty 'MS_Description', @description215, 'SCHEMA', @defaultSchema215, 'TABLE', N'AskQuerySnapshots', 'COLUMN', N'ExpiresAt';
-    SET @description215 = N'创建时间';
-    EXEC sp_addextendedproperty 'MS_Description', @description215, 'SCHEMA', @defaultSchema215, 'TABLE', N'AskQuerySnapshots', 'COLUMN', N'CreatedTime';
+    DECLARE @defaultSchema177 AS sysname;
+    SET @defaultSchema177 = SCHEMA_NAME();
+    DECLARE @description177 AS sql_variant;
+    SET @description177 = N'Ask 查询快照（应用运行时引用）';
+    EXEC sp_addextendedproperty 'MS_Description', @description177, 'SCHEMA', @defaultSchema177, 'TABLE', N'AskQuerySnapshots';
+    SET @description177 = N'查询引用标识(GUID)';
+    EXEC sp_addextendedproperty 'MS_Description', @description177, 'SCHEMA', @defaultSchema177, 'TABLE', N'AskQuerySnapshots', 'COLUMN', N'TurnId';
+    SET @description177 = N'所属租户';
+    EXEC sp_addextendedproperty 'MS_Description', @description177, 'SCHEMA', @defaultSchema177, 'TABLE', N'AskQuerySnapshots', 'COLUMN', N'TenantId';
+    SET @description177 = N'快照创建者';
+    EXEC sp_addextendedproperty 'MS_Description', @description177, 'SCHEMA', @defaultSchema177, 'TABLE', N'AskQuerySnapshots', 'COLUMN', N'UserId';
+    SET @description177 = N'解析数据源Id（运行时硬约束）';
+    EXEC sp_addextendedproperty 'MS_Description', @description177, 'SCHEMA', @defaultSchema177, 'TABLE', N'AskQuerySnapshots', 'COLUMN', N'DataSourceId';
+    SET @description177 = N'主表业务实体语义名';
+    EXEC sp_addextendedproperty 'MS_Description', @description177, 'SCHEMA', @defaultSchema177, 'TABLE', N'AskQuerySnapshots', 'COLUMN', N'EntityCode';
+    SET @description177 = N'允许查询的QueryPlan语义(JSON,RLS注入前截取)';
+    EXEC sp_addextendedproperty 'MS_Description', @description177, 'SCHEMA', @defaultSchema177, 'TABLE', N'AskQuerySnapshots', 'COLUMN', N'QueryPlanJson';
+    SET @description177 = N'请求摘要哈希(创建幂等冲突检测)';
+    EXEC sp_addextendedproperty 'MS_Description', @description177, 'SCHEMA', @defaultSchema177, 'TABLE', N'AskQuerySnapshots', 'COLUMN', N'RequestHash';
+    SET @description177 = N'过期时间(UTC)';
+    EXEC sp_addextendedproperty 'MS_Description', @description177, 'SCHEMA', @defaultSchema177, 'TABLE', N'AskQuerySnapshots', 'COLUMN', N'ExpiresAt';
+    SET @description177 = N'创建时间';
+    EXEC sp_addextendedproperty 'MS_Description', @description177, 'SCHEMA', @defaultSchema177, 'TABLE', N'AskQuerySnapshots', 'COLUMN', N'CreatedTime';
 END;
 
 IF NOT EXISTS (
@@ -7929,11 +5622,11 @@ IF NOT EXISTS (
 )
 BEGIN
     ALTER TABLE [AppPlans] ADD [DraftRevision] int NOT NULL DEFAULT 1;
-    DECLARE @defaultSchema216 AS sysname;
-    SET @defaultSchema216 = SCHEMA_NAME();
-    DECLARE @description216 AS sql_variant;
-    SET @description216 = N'草稿修订乐观并发令牌(每次编辑+1,发布校验用)';
-    EXEC sp_addextendedproperty 'MS_Description', @description216, 'SCHEMA', @defaultSchema216, 'TABLE', N'AppPlans', 'COLUMN', N'DraftRevision';
+    DECLARE @defaultSchema178 AS sysname;
+    SET @defaultSchema178 = SCHEMA_NAME();
+    DECLARE @description178 AS sql_variant;
+    SET @description178 = N'草稿修订乐观并发令牌(每次编辑+1,发布校验用)';
+    EXEC sp_addextendedproperty 'MS_Description', @description178, 'SCHEMA', @defaultSchema178, 'TABLE', N'AppPlans', 'COLUMN', N'DraftRevision';
 END;
 
 IF NOT EXISTS (
@@ -7951,25 +5644,25 @@ BEGIN
         [CreatedAt] datetime2 NOT NULL,
         CONSTRAINT [PK_AppPublishIdempotencies] PRIMARY KEY ([Id])
     );
-    DECLARE @defaultSchema217 AS sysname;
-    SET @defaultSchema217 = SCHEMA_NAME();
-    DECLARE @description217 AS sql_variant;
-    SET @description217 = N'应用发布/回滚幂等记录';
-    EXEC sp_addextendedproperty 'MS_Description', @description217, 'SCHEMA', @defaultSchema217, 'TABLE', N'AppPublishIdempotencies';
-    SET @description217 = N'主键';
-    EXEC sp_addextendedproperty 'MS_Description', @description217, 'SCHEMA', @defaultSchema217, 'TABLE', N'AppPublishIdempotencies', 'COLUMN', N'Id';
-    SET @description217 = N'作用域租户';
-    EXEC sp_addextendedproperty 'MS_Description', @description217, 'SCHEMA', @defaultSchema217, 'TABLE', N'AppPublishIdempotencies', 'COLUMN', N'TenantId';
-    SET @description217 = N'应用业务编码';
-    EXEC sp_addextendedproperty 'MS_Description', @description217, 'SCHEMA', @defaultSchema217, 'TABLE', N'AppPublishIdempotencies', 'COLUMN', N'AppCode';
-    SET @description217 = N'客户端幂等键(UUID)';
-    EXEC sp_addextendedproperty 'MS_Description', @description217, 'SCHEMA', @defaultSchema217, 'TABLE', N'AppPublishIdempotencies', 'COLUMN', N'IdempotencyKey';
-    SET @description217 = N'发布时的期望草稿修订号';
-    EXEC sp_addextendedproperty 'MS_Description', @description217, 'SCHEMA', @defaultSchema217, 'TABLE', N'AppPublishIdempotencies', 'COLUMN', N'ExpectedDraftRevision';
-    SET @description217 = N'成功发布固化的版本号(同键重入返回此值)';
-    EXEC sp_addextendedproperty 'MS_Description', @description217, 'SCHEMA', @defaultSchema217, 'TABLE', N'AppPublishIdempotencies', 'COLUMN', N'PublishedVersion';
-    SET @description217 = N'记录创建时间(UTC)';
-    EXEC sp_addextendedproperty 'MS_Description', @description217, 'SCHEMA', @defaultSchema217, 'TABLE', N'AppPublishIdempotencies', 'COLUMN', N'CreatedAt';
+    DECLARE @defaultSchema179 AS sysname;
+    SET @defaultSchema179 = SCHEMA_NAME();
+    DECLARE @description179 AS sql_variant;
+    SET @description179 = N'应用发布/回滚幂等记录';
+    EXEC sp_addextendedproperty 'MS_Description', @description179, 'SCHEMA', @defaultSchema179, 'TABLE', N'AppPublishIdempotencies';
+    SET @description179 = N'主键';
+    EXEC sp_addextendedproperty 'MS_Description', @description179, 'SCHEMA', @defaultSchema179, 'TABLE', N'AppPublishIdempotencies', 'COLUMN', N'Id';
+    SET @description179 = N'作用域租户';
+    EXEC sp_addextendedproperty 'MS_Description', @description179, 'SCHEMA', @defaultSchema179, 'TABLE', N'AppPublishIdempotencies', 'COLUMN', N'TenantId';
+    SET @description179 = N'应用业务编码';
+    EXEC sp_addextendedproperty 'MS_Description', @description179, 'SCHEMA', @defaultSchema179, 'TABLE', N'AppPublishIdempotencies', 'COLUMN', N'AppCode';
+    SET @description179 = N'客户端幂等键(UUID)';
+    EXEC sp_addextendedproperty 'MS_Description', @description179, 'SCHEMA', @defaultSchema179, 'TABLE', N'AppPublishIdempotencies', 'COLUMN', N'IdempotencyKey';
+    SET @description179 = N'发布时的期望草稿修订号';
+    EXEC sp_addextendedproperty 'MS_Description', @description179, 'SCHEMA', @defaultSchema179, 'TABLE', N'AppPublishIdempotencies', 'COLUMN', N'ExpectedDraftRevision';
+    SET @description179 = N'成功发布固化的版本号(同键重入返回此值)';
+    EXEC sp_addextendedproperty 'MS_Description', @description179, 'SCHEMA', @defaultSchema179, 'TABLE', N'AppPublishIdempotencies', 'COLUMN', N'PublishedVersion';
+    SET @description179 = N'记录创建时间(UTC)';
+    EXEC sp_addextendedproperty 'MS_Description', @description179, 'SCHEMA', @defaultSchema179, 'TABLE', N'AppPublishIdempotencies', 'COLUMN', N'CreatedAt';
 END;
 
 IF NOT EXISTS (
@@ -7987,6 +5680,542 @@ IF NOT EXISTS (
 BEGIN
     INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
     VALUES (N'20260909025001_M7_11_PublishIdempotency', N'10.0.11');
+END;
+
+COMMIT;
+GO
+
+BEGIN TRANSACTION;
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260910053000_M7_02_Fix_AppPlanPublishColumns'
+)
+BEGIN
+
+    IF COL_LENGTH('dbo.AppPlans', 'PublishedDslJson') IS NULL
+        ALTER TABLE [AppPlans] ADD [PublishedDslJson] nvarchar(max) NULL;
+
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260910053000_M7_02_Fix_AppPlanPublishColumns'
+)
+BEGIN
+
+    IF COL_LENGTH('dbo.AppPlans', 'PublishedVersion') IS NULL
+        ALTER TABLE [AppPlans] ADD [PublishedVersion] int NOT NULL DEFAULT 0;
+
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260910053000_M7_02_Fix_AppPlanPublishColumns'
+)
+BEGIN
+
+    IF COL_LENGTH('dbo.AppPlans', 'PublishedAt') IS NULL
+        ALTER TABLE [AppPlans] ADD [PublishedAt] datetime2 NULL;
+
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260910053000_M7_02_Fix_AppPlanPublishColumns'
+)
+BEGIN
+
+    IF COL_LENGTH('dbo.AppPlans', 'PublishedBy') IS NULL
+        ALTER TABLE [AppPlans] ADD [PublishedBy] nvarchar(128) NULL;
+
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260910053000_M7_02_Fix_AppPlanPublishColumns'
+)
+BEGIN
+
+    IF NOT EXISTS (
+            SELECT 1 FROM sys.extended_properties
+            WHERE major_id = OBJECT_ID('dbo.AppPlans')
+              AND minor_id = COLUMNPROPERTY(OBJECT_ID('dbo.AppPlans'), 'PublishedDslJson', 'ColumnId')
+              AND name = 'MS_Description')
+        EXEC sp_addextendedproperty 'MS_Description', N'发布态DSL快照（null=未发布）',
+            'SCHEMA', N'dbo', 'TABLE', N'AppPlans', 'COLUMN', N'PublishedDslJson';
+
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260910053000_M7_02_Fix_AppPlanPublishColumns'
+)
+BEGIN
+
+    IF NOT EXISTS (
+            SELECT 1 FROM sys.extended_properties
+            WHERE major_id = OBJECT_ID('dbo.AppPlans')
+              AND minor_id = COLUMNPROPERTY(OBJECT_ID('dbo.AppPlans'), 'PublishedVersion', 'ColumnId')
+              AND name = 'MS_Description')
+        EXEC sp_addextendedproperty 'MS_Description', N'当前发布版本号（0=未发布）',
+            'SCHEMA', N'dbo', 'TABLE', N'AppPlans', 'COLUMN', N'PublishedVersion';
+
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260910053000_M7_02_Fix_AppPlanPublishColumns'
+)
+BEGIN
+
+    IF NOT EXISTS (
+            SELECT 1 FROM sys.extended_properties
+            WHERE major_id = OBJECT_ID('dbo.AppPlans')
+              AND minor_id = COLUMNPROPERTY(OBJECT_ID('dbo.AppPlans'), 'PublishedAt', 'ColumnId')
+              AND name = 'MS_Description')
+        EXEC sp_addextendedproperty 'MS_Description', N'最近发布时间(UTC)',
+            'SCHEMA', N'dbo', 'TABLE', N'AppPlans', 'COLUMN', N'PublishedAt';
+
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260910053000_M7_02_Fix_AppPlanPublishColumns'
+)
+BEGIN
+
+    IF NOT EXISTS (
+            SELECT 1 FROM sys.extended_properties
+            WHERE major_id = OBJECT_ID('dbo.AppPlans')
+              AND minor_id = COLUMNPROPERTY(OBJECT_ID('dbo.AppPlans'), 'PublishedBy', 'ColumnId')
+              AND name = 'MS_Description')
+        EXEC sp_addextendedproperty 'MS_Description', N'最近发布者',
+            'SCHEMA', N'dbo', 'TABLE', N'AppPlans', 'COLUMN', N'PublishedBy';
+
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260910053000_M7_02_Fix_AppPlanPublishColumns'
+)
+BEGIN
+    INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+    VALUES (N'20260910053000_M7_02_Fix_AppPlanPublishColumns', N'10.0.11');
+END;
+
+COMMIT;
+GO
+
+BEGIN TRANSACTION;
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260911143327_M12_17_IdentityOrganizationUnits'
+)
+BEGIN
+    CREATE TABLE [Organizations] (
+        [Id] bigint NOT NULL IDENTITY,
+        [TenantId] bigint NOT NULL,
+        [Code] nvarchar(64) NOT NULL,
+        [Name] nvarchar(128) NOT NULL,
+        [Description] nvarchar(512) NOT NULL,
+        [IsEnabled] bit NOT NULL DEFAULT CAST(1 AS bit),
+        [NormalizedCode] nvarchar(64) NULL,
+        [CreatedTime] datetime2 NOT NULL,
+        [UpdatedTime] datetime2 NULL,
+        [CreatedBy] nvarchar(max) NULL,
+        [UpdatedBy] nvarchar(max) NULL,
+        [RowVersion] bigint NOT NULL DEFAULT CAST(1 AS bigint),
+        CONSTRAINT [PK_Organizations] PRIMARY KEY ([Id]),
+        CONSTRAINT [FK_Organizations_Tenants_TenantId] FOREIGN KEY ([TenantId]) REFERENCES [Tenants] ([Id]) ON DELETE CASCADE
+    );
+    DECLARE @defaultSchema180 AS sysname;
+    SET @defaultSchema180 = SCHEMA_NAME();
+    DECLARE @description180 AS sql_variant;
+    SET @description180 = N'组织（租户内组织结构单元）';
+    EXEC sp_addextendedproperty 'MS_Description', @description180, 'SCHEMA', @defaultSchema180, 'TABLE', N'Organizations';
+    SET @description180 = N'主键';
+    EXEC sp_addextendedproperty 'MS_Description', @description180, 'SCHEMA', @defaultSchema180, 'TABLE', N'Organizations', 'COLUMN', N'Id';
+    SET @description180 = N'组织编码';
+    EXEC sp_addextendedproperty 'MS_Description', @description180, 'SCHEMA', @defaultSchema180, 'TABLE', N'Organizations', 'COLUMN', N'Code';
+    SET @description180 = N'组织名称';
+    EXEC sp_addextendedproperty 'MS_Description', @description180, 'SCHEMA', @defaultSchema180, 'TABLE', N'Organizations', 'COLUMN', N'Name';
+    SET @description180 = N'描述';
+    EXEC sp_addextendedproperty 'MS_Description', @description180, 'SCHEMA', @defaultSchema180, 'TABLE', N'Organizations', 'COLUMN', N'Description';
+    SET @description180 = N'是否启用';
+    EXEC sp_addextendedproperty 'MS_Description', @description180, 'SCHEMA', @defaultSchema180, 'TABLE', N'Organizations', 'COLUMN', N'IsEnabled';
+    SET @description180 = N'规范化组织编码（小写，租户内唯一）';
+    EXEC sp_addextendedproperty 'MS_Description', @description180, 'SCHEMA', @defaultSchema180, 'TABLE', N'Organizations', 'COLUMN', N'NormalizedCode';
+    SET @description180 = N'创建时间';
+    EXEC sp_addextendedproperty 'MS_Description', @description180, 'SCHEMA', @defaultSchema180, 'TABLE', N'Organizations', 'COLUMN', N'CreatedTime';
+    SET @description180 = N'乐观并发版本(ETag)，每次更新自增';
+    EXEC sp_addextendedproperty 'MS_Description', @description180, 'SCHEMA', @defaultSchema180, 'TABLE', N'Organizations', 'COLUMN', N'RowVersion';
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260911143327_M12_17_IdentityOrganizationUnits'
+)
+BEGIN
+    CREATE TABLE [UserGroups] (
+        [Id] bigint NOT NULL IDENTITY,
+        [TenantId] bigint NOT NULL,
+        [Code] nvarchar(64) NOT NULL,
+        [Name] nvarchar(128) NOT NULL,
+        [Description] nvarchar(512) NOT NULL,
+        [IsEnabled] bit NOT NULL DEFAULT CAST(1 AS bit),
+        [NormalizedCode] nvarchar(64) NULL,
+        [CreatedTime] datetime2 NOT NULL,
+        [UpdatedTime] datetime2 NULL,
+        [CreatedBy] nvarchar(max) NULL,
+        [UpdatedBy] nvarchar(max) NULL,
+        [RowVersion] bigint NOT NULL DEFAULT CAST(1 AS bigint),
+        CONSTRAINT [PK_UserGroups] PRIMARY KEY ([Id]),
+        CONSTRAINT [FK_UserGroups_Tenants_TenantId] FOREIGN KEY ([TenantId]) REFERENCES [Tenants] ([Id]) ON DELETE CASCADE
+    );
+    DECLARE @defaultSchema181 AS sysname;
+    SET @defaultSchema181 = SCHEMA_NAME();
+    DECLARE @description181 AS sql_variant;
+    SET @description181 = N'用户组';
+    EXEC sp_addextendedproperty 'MS_Description', @description181, 'SCHEMA', @defaultSchema181, 'TABLE', N'UserGroups';
+    SET @description181 = N'主键';
+    EXEC sp_addextendedproperty 'MS_Description', @description181, 'SCHEMA', @defaultSchema181, 'TABLE', N'UserGroups', 'COLUMN', N'Id';
+    SET @description181 = N'用户组编码';
+    EXEC sp_addextendedproperty 'MS_Description', @description181, 'SCHEMA', @defaultSchema181, 'TABLE', N'UserGroups', 'COLUMN', N'Code';
+    SET @description181 = N'用户组名称';
+    EXEC sp_addextendedproperty 'MS_Description', @description181, 'SCHEMA', @defaultSchema181, 'TABLE', N'UserGroups', 'COLUMN', N'Name';
+    SET @description181 = N'描述';
+    EXEC sp_addextendedproperty 'MS_Description', @description181, 'SCHEMA', @defaultSchema181, 'TABLE', N'UserGroups', 'COLUMN', N'Description';
+    SET @description181 = N'是否启用';
+    EXEC sp_addextendedproperty 'MS_Description', @description181, 'SCHEMA', @defaultSchema181, 'TABLE', N'UserGroups', 'COLUMN', N'IsEnabled';
+    SET @description181 = N'规范化用户组编码（小写，租户内唯一）';
+    EXEC sp_addextendedproperty 'MS_Description', @description181, 'SCHEMA', @defaultSchema181, 'TABLE', N'UserGroups', 'COLUMN', N'NormalizedCode';
+    SET @description181 = N'创建时间';
+    EXEC sp_addextendedproperty 'MS_Description', @description181, 'SCHEMA', @defaultSchema181, 'TABLE', N'UserGroups', 'COLUMN', N'CreatedTime';
+    SET @description181 = N'乐观并发版本(ETag)，每次更新自增';
+    EXEC sp_addextendedproperty 'MS_Description', @description181, 'SCHEMA', @defaultSchema181, 'TABLE', N'UserGroups', 'COLUMN', N'RowVersion';
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260911143327_M12_17_IdentityOrganizationUnits'
+)
+BEGIN
+    CREATE TABLE [Departments] (
+        [Id] bigint NOT NULL IDENTITY,
+        [TenantId] bigint NOT NULL,
+        [OrganizationId] bigint NOT NULL,
+        [ParentId] bigint NULL,
+        [Code] nvarchar(64) NOT NULL,
+        [Name] nvarchar(128) NOT NULL,
+        [Description] nvarchar(512) NOT NULL,
+        [IsEnabled] bit NOT NULL DEFAULT CAST(1 AS bit),
+        [NormalizedCode] nvarchar(64) NULL,
+        [CreatedTime] datetime2 NOT NULL,
+        [UpdatedTime] datetime2 NULL,
+        [CreatedBy] nvarchar(max) NULL,
+        [UpdatedBy] nvarchar(max) NULL,
+        [RowVersion] bigint NOT NULL DEFAULT CAST(1 AS bigint),
+        CONSTRAINT [PK_Departments] PRIMARY KEY ([Id]),
+        CONSTRAINT [FK_Departments_Organizations_OrganizationId] FOREIGN KEY ([OrganizationId]) REFERENCES [Organizations] ([Id]) ON DELETE NO ACTION,
+        CONSTRAINT [FK_Departments_Tenants_TenantId] FOREIGN KEY ([TenantId]) REFERENCES [Tenants] ([Id]) ON DELETE CASCADE
+    );
+    DECLARE @defaultSchema182 AS sysname;
+    SET @defaultSchema182 = SCHEMA_NAME();
+    DECLARE @description182 AS sql_variant;
+    SET @description182 = N'部门（隶属组织）';
+    EXEC sp_addextendedproperty 'MS_Description', @description182, 'SCHEMA', @defaultSchema182, 'TABLE', N'Departments';
+    SET @description182 = N'主键';
+    EXEC sp_addextendedproperty 'MS_Description', @description182, 'SCHEMA', @defaultSchema182, 'TABLE', N'Departments', 'COLUMN', N'Id';
+    SET @description182 = N'部门编码';
+    EXEC sp_addextendedproperty 'MS_Description', @description182, 'SCHEMA', @defaultSchema182, 'TABLE', N'Departments', 'COLUMN', N'Code';
+    SET @description182 = N'部门名称';
+    EXEC sp_addextendedproperty 'MS_Description', @description182, 'SCHEMA', @defaultSchema182, 'TABLE', N'Departments', 'COLUMN', N'Name';
+    SET @description182 = N'描述';
+    EXEC sp_addextendedproperty 'MS_Description', @description182, 'SCHEMA', @defaultSchema182, 'TABLE', N'Departments', 'COLUMN', N'Description';
+    SET @description182 = N'是否启用';
+    EXEC sp_addextendedproperty 'MS_Description', @description182, 'SCHEMA', @defaultSchema182, 'TABLE', N'Departments', 'COLUMN', N'IsEnabled';
+    SET @description182 = N'规范化部门编码（小写，租户内唯一）';
+    EXEC sp_addextendedproperty 'MS_Description', @description182, 'SCHEMA', @defaultSchema182, 'TABLE', N'Departments', 'COLUMN', N'NormalizedCode';
+    SET @description182 = N'创建时间';
+    EXEC sp_addextendedproperty 'MS_Description', @description182, 'SCHEMA', @defaultSchema182, 'TABLE', N'Departments', 'COLUMN', N'CreatedTime';
+    SET @description182 = N'乐观并发版本(ETag)，每次更新自增';
+    EXEC sp_addextendedproperty 'MS_Description', @description182, 'SCHEMA', @defaultSchema182, 'TABLE', N'Departments', 'COLUMN', N'RowVersion';
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260911143327_M12_17_IdentityOrganizationUnits'
+)
+BEGIN
+    CREATE TABLE [UserGroupMembers] (
+        [Id] bigint NOT NULL IDENTITY,
+        [TenantId] bigint NOT NULL,
+        [UserGroupId] bigint NOT NULL,
+        [UserId] bigint NOT NULL,
+        [CreatedTime] datetime2 NOT NULL,
+        CONSTRAINT [PK_UserGroupMembers] PRIMARY KEY ([Id]),
+        CONSTRAINT [FK_UserGroupMembers_UserGroups_UserGroupId] FOREIGN KEY ([UserGroupId]) REFERENCES [UserGroups] ([Id]) ON DELETE CASCADE,
+        CONSTRAINT [FK_UserGroupMembers_Users_UserId] FOREIGN KEY ([UserId]) REFERENCES [Users] ([Id]) ON DELETE CASCADE
+    );
+    DECLARE @defaultSchema183 AS sysname;
+    SET @defaultSchema183 = SCHEMA_NAME();
+    DECLARE @description183 AS sql_variant;
+    SET @description183 = N'用户组成员';
+    EXEC sp_addextendedproperty 'MS_Description', @description183, 'SCHEMA', @defaultSchema183, 'TABLE', N'UserGroupMembers';
+    SET @description183 = N'主键';
+    EXEC sp_addextendedproperty 'MS_Description', @description183, 'SCHEMA', @defaultSchema183, 'TABLE', N'UserGroupMembers', 'COLUMN', N'Id';
+    SET @description183 = N'创建时间';
+    EXEC sp_addextendedproperty 'MS_Description', @description183, 'SCHEMA', @defaultSchema183, 'TABLE', N'UserGroupMembers', 'COLUMN', N'CreatedTime';
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260911143327_M12_17_IdentityOrganizationUnits'
+)
+BEGIN
+    CREATE TABLE [UserGroupRoles] (
+        [Id] bigint NOT NULL IDENTITY,
+        [TenantId] bigint NOT NULL,
+        [UserGroupId] bigint NOT NULL,
+        [RoleId] bigint NOT NULL,
+        CONSTRAINT [PK_UserGroupRoles] PRIMARY KEY ([Id]),
+        CONSTRAINT [FK_UserGroupRoles_Roles_RoleId] FOREIGN KEY ([RoleId]) REFERENCES [Roles] ([Id]) ON DELETE CASCADE,
+        CONSTRAINT [FK_UserGroupRoles_UserGroups_UserGroupId] FOREIGN KEY ([UserGroupId]) REFERENCES [UserGroups] ([Id]) ON DELETE CASCADE
+    );
+    DECLARE @defaultSchema184 AS sysname;
+    SET @defaultSchema184 = SCHEMA_NAME();
+    DECLARE @description184 AS sql_variant;
+    SET @description184 = N'用户组-角色关联';
+    EXEC sp_addextendedproperty 'MS_Description', @description184, 'SCHEMA', @defaultSchema184, 'TABLE', N'UserGroupRoles';
+    SET @description184 = N'主键';
+    EXEC sp_addextendedproperty 'MS_Description', @description184, 'SCHEMA', @defaultSchema184, 'TABLE', N'UserGroupRoles', 'COLUMN', N'Id';
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260911143327_M12_17_IdentityOrganizationUnits'
+)
+BEGIN
+    CREATE TABLE [UserDepartmentMembers] (
+        [Id] bigint NOT NULL IDENTITY,
+        [TenantId] bigint NOT NULL,
+        [UserId] bigint NOT NULL,
+        [DepartmentId] bigint NOT NULL,
+        [CreatedTime] datetime2 NOT NULL,
+        CONSTRAINT [PK_UserDepartmentMembers] PRIMARY KEY ([Id]),
+        CONSTRAINT [FK_UserDepartmentMembers_Departments_DepartmentId] FOREIGN KEY ([DepartmentId]) REFERENCES [Departments] ([Id]) ON DELETE CASCADE,
+        CONSTRAINT [FK_UserDepartmentMembers_Users_UserId] FOREIGN KEY ([UserId]) REFERENCES [Users] ([Id]) ON DELETE CASCADE
+    );
+    DECLARE @defaultSchema185 AS sysname;
+    SET @defaultSchema185 = SCHEMA_NAME();
+    DECLARE @description185 AS sql_variant;
+    SET @description185 = N'用户-部门归属';
+    EXEC sp_addextendedproperty 'MS_Description', @description185, 'SCHEMA', @defaultSchema185, 'TABLE', N'UserDepartmentMembers';
+    SET @description185 = N'主键';
+    EXEC sp_addextendedproperty 'MS_Description', @description185, 'SCHEMA', @defaultSchema185, 'TABLE', N'UserDepartmentMembers', 'COLUMN', N'Id';
+    SET @description185 = N'创建时间';
+    EXEC sp_addextendedproperty 'MS_Description', @description185, 'SCHEMA', @defaultSchema185, 'TABLE', N'UserDepartmentMembers', 'COLUMN', N'CreatedTime';
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260911143327_M12_17_IdentityOrganizationUnits'
+)
+BEGIN
+    CREATE INDEX [IX_Departments_OrganizationId] ON [Departments] ([OrganizationId]);
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260911143327_M12_17_IdentityOrganizationUnits'
+)
+BEGIN
+    CREATE INDEX [IX_Departments_ParentId] ON [Departments] ([ParentId]);
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260911143327_M12_17_IdentityOrganizationUnits'
+)
+BEGIN
+    EXEC(N'CREATE UNIQUE INDEX [IX_Departments_TenantId_NormalizedCode] ON [Departments] ([TenantId], [NormalizedCode]) WHERE [NormalizedCode] IS NOT NULL');
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260911143327_M12_17_IdentityOrganizationUnits'
+)
+BEGIN
+    CREATE INDEX [IX_Departments_TenantId_OrganizationId] ON [Departments] ([TenantId], [OrganizationId]);
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260911143327_M12_17_IdentityOrganizationUnits'
+)
+BEGIN
+    EXEC(N'CREATE UNIQUE INDEX [IX_Organizations_TenantId_NormalizedCode] ON [Organizations] ([TenantId], [NormalizedCode]) WHERE [NormalizedCode] IS NOT NULL');
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260911143327_M12_17_IdentityOrganizationUnits'
+)
+BEGIN
+    CREATE INDEX [IX_UserDepartmentMembers_DepartmentId] ON [UserDepartmentMembers] ([DepartmentId]);
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260911143327_M12_17_IdentityOrganizationUnits'
+)
+BEGIN
+    CREATE UNIQUE INDEX [IX_UserDepartmentMembers_TenantId_UserId_DepartmentId] ON [UserDepartmentMembers] ([TenantId], [UserId], [DepartmentId]);
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260911143327_M12_17_IdentityOrganizationUnits'
+)
+BEGIN
+    CREATE INDEX [IX_UserDepartmentMembers_UserId] ON [UserDepartmentMembers] ([UserId]);
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260911143327_M12_17_IdentityOrganizationUnits'
+)
+BEGIN
+    CREATE UNIQUE INDEX [IX_UserGroupMembers_TenantId_UserGroupId_UserId] ON [UserGroupMembers] ([TenantId], [UserGroupId], [UserId]);
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260911143327_M12_17_IdentityOrganizationUnits'
+)
+BEGIN
+    CREATE INDEX [IX_UserGroupMembers_UserGroupId] ON [UserGroupMembers] ([UserGroupId]);
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260911143327_M12_17_IdentityOrganizationUnits'
+)
+BEGIN
+    CREATE INDEX [IX_UserGroupMembers_UserId] ON [UserGroupMembers] ([UserId]);
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260911143327_M12_17_IdentityOrganizationUnits'
+)
+BEGIN
+    CREATE INDEX [IX_UserGroupRoles_RoleId] ON [UserGroupRoles] ([RoleId]);
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260911143327_M12_17_IdentityOrganizationUnits'
+)
+BEGIN
+    CREATE UNIQUE INDEX [IX_UserGroupRoles_TenantId_UserGroupId_RoleId] ON [UserGroupRoles] ([TenantId], [UserGroupId], [RoleId]);
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260911143327_M12_17_IdentityOrganizationUnits'
+)
+BEGIN
+    CREATE INDEX [IX_UserGroupRoles_UserGroupId] ON [UserGroupRoles] ([UserGroupId]);
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260911143327_M12_17_IdentityOrganizationUnits'
+)
+BEGIN
+    EXEC(N'CREATE UNIQUE INDEX [IX_UserGroups_TenantId_NormalizedCode] ON [UserGroups] ([TenantId], [NormalizedCode]) WHERE [NormalizedCode] IS NOT NULL');
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260911143327_M12_17_IdentityOrganizationUnits'
+)
+BEGIN
+    INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+    VALUES (N'20260911143327_M12_17_IdentityOrganizationUnits', N'10.0.11');
+END;
+
+COMMIT;
+GO
+
+BEGIN TRANSACTION;
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260911231209_M12_18_MetricDimensionExpression'
+)
+BEGIN
+    ALTER TABLE [BusinessEntityMetrics] ADD [DataType] nvarchar(50) NULL;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260911231209_M12_18_MetricDimensionExpression'
+)
+BEGIN
+    ALTER TABLE [BusinessEntityMetrics] ADD [Expression] nvarchar(1000) NULL;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260911231209_M12_18_MetricDimensionExpression'
+)
+BEGIN
+    ALTER TABLE [BusinessEntityDimensions] ADD [DataType] nvarchar(50) NULL;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260911231209_M12_18_MetricDimensionExpression'
+)
+BEGIN
+    ALTER TABLE [BusinessEntityDimensions] ADD [Expression] nvarchar(1000) NULL;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260911231209_M12_18_MetricDimensionExpression'
+)
+BEGIN
+    INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+    VALUES (N'20260911231209_M12_18_MetricDimensionExpression', N'10.0.11');
+END;
+
+COMMIT;
+GO
+
+BEGIN TRANSACTION;
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260912103000_M13_03_DataSourceConnectionStringEncryption'
+)
+BEGIN
+    DECLARE @var186 nvarchar(max);
+    SELECT @var186 = QUOTENAME([d].[name])
+    FROM [sys].[default_constraints] [d]
+    INNER JOIN [sys].[columns] [c] ON [d].[parent_column_id] = [c].[column_id] AND [d].[parent_object_id] = [c].[object_id]
+    WHERE ([d].[parent_object_id] = OBJECT_ID(N'[DataSources]') AND [c].[name] = N'ConnectionString');
+    IF @var186 IS NOT NULL EXEC(N'ALTER TABLE [DataSources] DROP CONSTRAINT ' + @var186 + ';');
+    ALTER TABLE [DataSources] ALTER COLUMN [ConnectionString] nvarchar(max) NOT NULL;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260912103000_M13_03_DataSourceConnectionStringEncryption'
+)
+BEGIN
+    INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+    VALUES (N'20260912103000_M13_03_DataSourceConnectionStringEncryption', N'10.0.11');
 END;
 
 COMMIT;

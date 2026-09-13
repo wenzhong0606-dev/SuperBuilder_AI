@@ -45,9 +45,9 @@ G1 有若干项被 Active Plan 的「待决事项（OPEN）」阻塞。下表明
 
 | OPEN 待决项 | 阻塞的 G1 项 | 最晚确认时点 | 建议回填动作（谁/产出） |
 |---|---|---|---|
-| 支持环境（部署 OS、单/双实例、支持的数据源类型、已验证到连接/扫描/查询哪一层） | E2E-01(M13-09)、DR-01(M13-10)、PERF-01(M13-12) 的「范围与验收口径」 | 对应集成验证前 | 产品/运维确认单实例试点 + 已验证数据源清单（SQL Server/MySQL，连接到查询层）；双实例列为 CACHE-01 验证项 |
+| 支持环境（部署 OS、单/双实例、支持的数据源类型、已验证到连接/扫描/查询哪一层） | E2E-01(M13-09)、PERF-01(M13-12) 的「范围与验收口径」（DR-01 已于 2026-09-13 实测闭环，不再受此阻塞） | 对应集成验证前 | 产品/运维确认单实例试点 + 已验证数据源清单（SQL Server/MySQL，连接到查询层）；双实例列为 CACHE-01 验证项 |
 | 试点业务口径（业务场景、指标计算方式、参考结果确认人） | M14-01（试点产品包）、M14-08a（测量方案） | Golden/业务验收标准调整前 | 产品负责人从已验证场景（库存/入库）锁定 1 个试点场景 + 验收问题集 |
-| 性能和恢复目标（数据规模、并发、P95、错误率、允许数据损失、RTO） | PERF-01(M13-12)、DR-01(M13-10) | PERF/DR 执行前 | 锁定发布目标 N 并发、P95≤T、失败率≤E、成本≤C、RPO/RTO，入 `docs/ops` |
+| 性能和恢复目标（数据规模、并发、P95、错误率、允许数据损失、RTO） | PERF-01(M13-12)（DR-01 演练已完成，仅其文档「目标值」列待回填） | PERF 执行前 | 锁定发布目标 N 并发、P95≤T、失败率≤E、成本≤C、RPO/RTO，入 `docs/ops` |
 | 密钥与升级安排（注入/保管位置、存量转换维护窗口、失败恢复） | 已随 SEC-01(G0) 收口，本项 CLOSED | — | 不再阻塞 |
 
 **回填策略**：DB-02 / QUOTA-01 / OBS-01 不依赖上述 OPEN，可立即开工；E2E-01 核心浏览器链可用既有测试配置先行（支持环境仅影响范围边界，不阻塞骨架）；PERF/DR/M14-01/07/08a **必须等对应 OPEN 回填后**再定稿验收。
@@ -166,6 +166,17 @@ G1 有若干项被 Active Plan 的「待决事项（OPEN）」阻塞。下表明
 - **设计取舍（须告知验收）**：澄清会话/Ask 缓存为**进程内**；跨实例不共享但已做租户/用户隔离，最坏退化为一次未命中，不产生越权。如需跨实例续话，应引入带 (tenantId,userId,conversationId) 归属校验的分布式存储（后续增强，不在 CACHE-01 范围）。
 - **CI 验证（已闭环）**：提交 `9f62a0c` 推送后 CI run **34742720340**（head `9f62a0c2`）三 job 全绿——编译检查 ✅ / V2.6 Evaluation Controller Runtime Smoke ✅ / Web·Blazor E2E (Playwright) ✅。CACHE-01 代码 + CI 双绿闭环。
 
+### 4.7 DR-01 (M13-10) — 备份/恢复真实演练闭环 ✅ 已完成（2026-09-13）
+
+- **起点纠正**：原 DR 交付（M9-14）仅有"架构级/脚本级"证据，并把数据级演练挂为"环境门禁"；但其 2026-09-10 勘误已确认 **SQL Server 与 Qdrant 均可达**（`ss`/`netstat` 在本沙箱看不到宿主监听，端口扫描法整体不可用）→ **环境门禁不成立**，本项补做真实演练。
+- **关系库演练（真实）**：原生 `BACKUP ... WITH INIT, COMPRESSION, CHECKSUM` + `RESTORE VERIFYONLY` → 备份 6.18 MB / **2.3 s**；`RESTORE ... WITH MOVE` 到独立目标库 → **0.124 s（引擎）/≈4 s（墙钟）**；**全部核心表行数一致**（45 迁移 / 52 表 / Users 6 / MetadataSemantics 513 / AuditLogs 3044 …），`DBCC CHECKDB` 无错；6/6 用户 `PasswordHash`+`SecurityStamp` 非空（登录/授权/Ask 数据就绪）。
+- **Qdrant 演练（真实）**：快照 592 MB（checksum `7d8d1cb2…`，15.9 s）→ **服务端非破坏式还原到新集合** `snapshots/recover`（无 592 MB 客户端下载）→ **109 s** 后 `status=green / points_count=1061` 与源一致；源集合全程未受影响。
+- **空库重放（迁移即恢复）**：空库重放幂等脚本 → **46 迁移 / 52 表 / 5.9 s**，`DataSources.ConnectionString=nvarchar(max)` 落实。
+- **修复的缺陷**：① 运行手册 6 处脚本路径错误（`scripts\backup\` → 实际 `scripts\dr-backup\`，照抄必失败）；② `restore-schema-from-migrations.sql` 陈旧（42 迁移 → 重新生成 **46**，否则空库恢复漏 3~4 个迁移）；③ 手册陈旧计数（迁移 42→46、Qdrant `vectors_count`→`points_count`）与 §8 自相矛盾表述。
+- **失败可定位性**：故意以不存在目录还原，SQL Server 给出精确到"缺哪个文件/OS 错误 2/WITH MOVE 补救"的错误链。✅
+- **交付**：`scripts/dr-backup/backup-db-native.sql`、`restore-db-native.sql`（新增并实测）、重生成的 `restore-schema-from-migrations.sql`；`docs/ops/drill-evidence-20260913.md`（真实演练证据）；`docs/ops/backup-restore-dr.md`（修正）；Backlog DR-01 → DONE。
+- **残留（须告知验收）**：**RPO/RTO 目标值**仍待平台 owner 按 OPEN「性能与恢复目标」定稿（本项只给实测基线）。演练另发现两处相邻漂移（**开发库落后 1 个迁移 45 vs 46**；`schema-version.json` 清单 45）——已记入 `drill-evidence-20260913.md §7.1`，**不在 DR-01 范围**，建议另行 `dotnet ef database update` 归并。
+
 ---
 
 ## 5. 提交与 CI 纪律（沿用 G0 约束）
@@ -182,7 +193,7 @@ G1 有若干项被 Active Plan 的「待决事项（OPEN）」阻塞。下表明
 
 ## 6. 建议推进方式
 
-1. **已完成（无 OPEN 阻塞）**：E2E-01、DB-02（`e772684`）、QUOTA-01（`bcbc71d`）、ONBOARD-01（引导清单）、**OBS-01（指标细分+扫描积压+告警；首提 CI 暴露启动期 DI 崩溃，二次提交 `7b43566` 修复后 CI 全绿）**、**CACHE-01（组授权变更轮换安全戳；Ask 缓存/授权/会话一致性核查）** 均已 DONE。**下一步可立即开工**：受 OPEN「支持环境/性能恢复目标」约束的 **DR-01 / PERF-01**，以及无阻塞的 **OBS 后续打磨**（阈值按 OPEN 定稿）；关键路径收口后进入 **M14-07（可用交接包）**。
+1. **已完成（无 OPEN 阻塞）**：E2E-01、DB-02（`e772684`）、QUOTA-01（`bcbc71d`）、ONBOARD-01（引导清单）、**OBS-01（指标细分+扫描积压+告警；首提 CI 暴露启动期 DI 崩溃，二次提交 `7b43566` 修复后 CI 全绿）**、**CACHE-01（组授权变更轮换安全戳；CI `34742720340` 全绿）**、**DR-01（备份/恢复真实演练闭环：SQL+Qdrant+空库重放；新增原生脚本；残留仅 RPO/RTO 目标待 OPEN）** 均已 DONE。**下一步可立即开工**：无 OPEN 阻塞的 **M14-07 交接包草稿**（手册开发期起草、验收前依 M13-10/11/12 实测定稿）；**PERF-01 / M14-01 / M14-08a 仍受 OPEN 阻塞**（性能与恢复目标、试点业务口径）。
 2. **骨架先行（范围待 OPEN 回填）**：E2E-01 用既有测试配置补齐业务链骨架。
 3. **OPEN 回填后再定稿**：PERF-01 / DR-01 / M14-01 / M14-08a / M14-07 必须在对应 OPEN 决策落地后锁定验收。
 4. **节奏**：每项独立提交并触发 CI；优先让「编译检查 / Web-Blazor-E2E」保持绿，V2.6 维持绿。
