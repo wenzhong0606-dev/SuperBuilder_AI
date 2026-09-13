@@ -164,7 +164,7 @@ G1 有若干项被 Active Plan 的「待决事项（OPEN）」阻塞。下表明
   - **修复**（`IdentityDirectoryService`，+45 行）：新增 `RotateSecurityStampsAsync`（显式 `TenantId` 过滤、`ExecuteUpdateAsync`）与 `GetUserGroupMemberIdsAsync`；在 **`SetUserGroupRolesAsync`（角色集变化时）/ `SetUserGroupEnabledAsync`（状态变化时）/ `AddUserGroupMemberAsync` / `RemoveUserGroupMemberAsync` / `DeleteUserGroupAsync`** 轮换受影响成员安全戳，与 `IdentityService` 的角色/口令/状态变更吊销策略一致。去抖：角色集未变、组启停未变时不轮换。
 - **交付**：`IdentityDirectoryService.cs`（修复）；`tests/.../IdentityDirectorySecurityStampTests.cs`（新增，7 例：五类变更的轮换与作用域 + 未变不轮换 + 端到端旧令牌吊销语义）；`docs/ops/cache-auth-consistency.md`（一致性模型、失效策略、双实例/重启结论表）；Backlog CACHE-01 → DONE。
 - **设计取舍（须告知验收）**：澄清会话/Ask 缓存为**进程内**；跨实例不共享但已做租户/用户隔离，最坏退化为一次未命中，不产生越权。如需跨实例续话，应引入带 (tenantId,userId,conversationId) 归属校验的分布式存储（后续增强，不在 CACHE-01 范围）。
-- **CI 验证**：编译检查覆盖新增代码/测试编译；待提交后由 `dotnet-build.yml` 三 job 守护。
+- **CI 验证（已闭环）**：提交 `9f62a0c` 推送后 CI run **34742720340**（head `9f62a0c2`）三 job 全绿——编译检查 ✅ / V2.6 Evaluation Controller Runtime Smoke ✅ / Web·Blazor E2E (Playwright) ✅。CACHE-01 代码 + CI 双绿闭环。
 
 ---
 
