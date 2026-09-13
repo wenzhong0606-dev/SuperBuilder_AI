@@ -177,7 +177,10 @@ public class DataSourcesControllerTests
 		Assert.Equal("Primary Renamed", saved.Name);
 		Assert.Equal("primary renamed", saved.NormalizedName);
 		Assert.Equal("POSTGRESQL", saved.DbType);
-		Assert.Equal("Host=localhost;", saved.ConnectionString);
+		// SEC-01（M13-03）：连接串以 AEAD 密文（v1: 前缀）落库，明文仅服务端可解——
+		// 断言值需先解密，直接比明文会得到密文而失败。
+		Assert.StartsWith("v1:", saved.ConnectionString);
+		Assert.Equal("Host=localhost;", new AesGcmSecretStore(new byte[32]).Unprotect(saved.ConnectionString));
 	}
 
 	[Fact]
