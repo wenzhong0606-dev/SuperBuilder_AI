@@ -298,7 +298,7 @@ jobs:
         # Microsoft.Playwright.CLI 已废弃（最新 1.2.3，不随 Microsoft.Playwright 版本走）；
         # .NET 绑定 Microsoft.Playwright 1.50.0 对应 Playwright 1.50.0，用匹配的 npm 包安装浏览器最可靠。
         run: npx -y playwright@1.50.0 install --with-deps chromium
-      - name: 运行 E2E 测试（M12-P0 权限矩阵）
+      - name: 运行 E2E 业务链测试（M13-09 全量接入 CI）
         env:
           # 账号由 API 的 E2E_SEED 种子创建，凭据与 E2ESandboxSeedService 硬编码一致；
           # 租户 id 由测试经 tenant-by-code 按编码 e2eapp 解析，故无需 SB_E2E_TENANT。
@@ -308,15 +308,21 @@ jobs:
           SB_E2E_PASSWORD: longping00
           SB_E2E_READER_USER: e2ereader
           SB_E2E_READER_PASSWORD: longping00
-        # 关键：测试工程必须“自带完整 restore+build”而非复用 slnf 的 --no-restore。
+        # 关键：测试工程必须"自带完整 restore+build"而非复用 slnf 的 --no-restore。
         # slnf 的 restore/build 携带全局 -p:TargetFrameworks=net10.0（规避 Components 的
         # android/ios workload），会使该全局属性传入测试工程的 NuGet 资产关联，导致
         # xunit.runner.visualstudio 适配器 build/*.targets 与 net10.0 错配、适配器 DLL
-        # 不进输出，dotnet test 报“No test is available”（0 用例→退出码 0→假绿）。
+        # 不进输出，dotnet test 报"No test is available"（0 用例→退出码 0→假绿）。
         # 此处对测试工程单独 dotnet test（自带 restore+build、不加该属性）：测试工程
         # 仅引用 NuGet 包、无 ProjectReference，不会触发 android/ios，且 xunit 适配器
         # 正常部署、可被 VSTest 发现。
-        run: dotnet test tests/SuperBuilder_AI.E2E.Tests/SuperBuilder_AI.E2E.Tests.csproj --configuration Release --filter "FullyQualifiedName~PermissionMatrixE2ETests" --logger "console;verbosity=normal"
+        # 过滤器边界（M13-09 全量接入）：`FullyQualifiedName~E2ETests` 选中全部"业务链 E2E"
+        # 功能类（PlatformLogin / AppRuntime / DataSourceScan / DashboardRender /
+        # RlsIsolation / PermissionMatrix），天然排除辅助类（VisualBaseline / Accessibility /
+        # AuthFlow / LanguageSwitch / PermissionDeny）——后者命名不含 "E2E"，且部分依赖 CI
+        # 未设的 SB_E2E_TENANT/READER_TENANT 会诚实跳过；DataSourceScan 还需
+        # SB_E2E_SCAN_CONNECTION 才真实执行（CI 未设→诚实跳过，不假绿）。
+        run: dotnet test tests/SuperBuilder_AI.E2E.Tests/SuperBuilder_AI.E2E.Tests.csproj --configuration Release --filter "FullyQualifiedName~E2ETests" --logger "console;verbosity=normal"
       - name: 上传视觉基线产物
         if: always()
         uses: actions/upload-artifact@v4

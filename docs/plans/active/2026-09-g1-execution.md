@@ -78,10 +78,16 @@ G1 有若干项被 Active Plan 的「待决事项（OPEN）」阻塞。下表明
 
 ## 4. 首批三项现状快照（已核对源码，避免幻想式规划）
 
-### 4.1 E2E-01 (M13-09) — 起点已具骨架
-- `tests/SuperBuilder_AI.E2E.Tests/` 已存在：Playwright 夹具（`PlaywrightFixture`/`PlaywrightCollection`）、`LoginHelper`、`AuthFlowTests`、`PermissionMatrixE2ETests`、`AppRuntimeE2ETests`、`LanguageSwitchTests`、`VisualBaselineTests`、`AccessibilityTests`。
-- **缺口**：尚无覆盖「数据源预测试/保存/授权/扫描 → Ask 澄清 → Designer 拖拽保存发布 → RLS 查询变化」的完整业务链；已有测试多是单点。
-- **可直接开工**：用既有 `LoginHelper` + 受控测试配置（凭据走测试配置，非生产）补齐业务链；支持环境 OPEN 仅影响「验证到哪一层」的口径，不阻塞骨架。
+### 4.1 E2E-01 (M13-09) — 三段补齐 + 全量业务链接入 CI ✅ 已完成
+- **起点（已具骨架）**：`tests/SuperBuilder_AI.E2E.Tests/` 已有 Playwright 夹具（`PlaywrightFixture`/`PlaywrightCollection`）、`LoginHelper`、`AuthFlowTests`、`PermissionMatrixE2ETests`、`AppRuntimeE2ETests`、`LanguageSwitchTests`、`VisualBaselineTests`、`AccessibilityTests`。但真实业务链（AppRuntime/PlatformLogin）虽已写却**未进 CI 门禁**，且 `DataSource→Scan` / `Dashboard 渲染` / `RLS 数据隔离` 三段缺失。
+- **补全的三段（2026-09-13，新增 4 文件）**：
+  - `E2EApiHelper.cs`：浏览器侧从 `localStorage['sb_auth_v1']` 取 Bearer 令牌与租户上下文，向 `E2EConfig.ApiUrl` 绝对地址发 `fetch`（绕开 Web 宿主不转发 `/api/**`）。
+  - `DataSourceScanE2ETests.cs`：创建数据源 → `POST api/data-sources/{id}/metadata/scan`（202+jobId）→ 轮询 90s 至 Succeeded → `tablesScanned>0`。**受 `SB_E2E_SCAN_CONNECTION` 控**：CI 无可达业务库 → 诚实跳过，不假绿。
+  - `DashboardRenderE2ETests.cs`：取 `api/dashboards/editor/blueprint` 骨架 → `POST api/dashboards`（草稿）→ 打开 `/dashboards/{id}` → 断言「返回列表」按钮可见（页面未落到错误态）。
+  - `RlsIsolationE2ETests.cs`：令牌作用域查询 `GET api/data-sources` 与显式 `?tenantId=0`（平台）计数必须相等 → 证明令牌租户作用域压倒查询参数，防跨租户泄漏（DB-02/M13-17 修复的端到端守护）。
+- **CI 接线（M13-09 收口关键）**：`.github/workflows/dotnet-build.yml` 的 e2e job 过滤器由 `--filter "FullyQualifiedName~PermissionMatrixE2ETests"` 改为 `--filter "FullyQualifiedName~E2ETests"`，运行整支业务链 E2E 功能类（PlatformLogin / AppRuntime / DataSourceScan / DashboardRender / RlsIsolation / PermissionMatrix），**天然排除**辅助类（VisualBaseline / Accessibility / AuthFlow / LanguageSwitch / PermissionDeny——命名不含 "E2E"，且部分依赖 CI 未设的 `SB_E2E_TENANT`/`READER_TENANT` 会跳过）。`DataSourceScan` 还需 `SB_E2E_SCAN_CONNECTION`（CI 未设→诚实跳过）。
+- **诚实跳过设计**：本环境无法跑浏览器、也无可达业务库；所有新用例均 `SkippableFact + E2EConfig.Require`，缺环境变量即跳过而非失败，避免「0 用例→退出码 0→假绿」。CI 设了 `BASE_URL/USER/PASSWORD/READER_*` 但未设 `TENANT`/`SCAN_CONNECTION` → 仅 PermissionMatrix/PlatformLogin/AppRuntime/DashboardRender/RlsIsolation 实跑，DataSourceScan/AuthFlow/LanguageSwitch/PermissionDeny 跳过，VisualBaseline 从未 CI 验证故排除。
+- **验收边界**：E2E 工程因沙箱 NuGet `CommonApplicationData` 静态构造坑**无法在本环境编译验证**，但 CI 对该测试工程单独 `dotnet test`（自带 restore+build）会自动恢复与编译；已逐一对齐 `LoginHelper.ApiLoginByCodeAsync(page,user,pwd,tenantCode)`、`E2EConfig.Require`/`ApiUrl` 签名，并对 `PlaywrightFixture.NewPageAsync` 在无浏览器时 `Skip.If(true)` 降级行为做了源码核对，降低 CI 风险。
 
 ### 4.2 DB-02 (M13-17) — 过滤已建，风险在 opt-in 与 10622
 - `SuperBIContext` 已实施全局租户过滤：私有字段 `_tenantFilterEnabled` + `_scopedTenantId`，由 `ApplyTenantScope(tenantId)` **显式开启**（注释明确：Golden/系统路径不调用 → no-op，不产 WHERE）。
