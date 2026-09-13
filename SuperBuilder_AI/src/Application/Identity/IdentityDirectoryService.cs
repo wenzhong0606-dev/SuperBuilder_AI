@@ -383,8 +383,12 @@ public sealed class IdentityDirectoryService : IIdentityDirectoryService
             .FirstOrDefaultAsync(x => x.Id == id && x.TenantId == tenantId, ct);
         if (group is null) return IdentityResult.Fail("用户组不存在或不属于当前租户。");
 
+        var changed = group.IsEnabled != enabled;
         group.IsEnabled = enabled;
         await _ctx.SaveChangesAsync(ct);
+        // CACHE-01：组停用/启用即整体收回/授予组角色权限；轮换全部成员安全戳，使携旧权限的令牌失效。
+        if (changed)
+            await RotateSecurityStampsAsync(tenantId, await GetUserGroupMemberIdsAsync(tenantId, id, ct), ct);
         return IdentityResult.Ok(group.Id);
     }
 
@@ -398,11 +402,14 @@ public sealed class IdentityDirectoryService : IIdentityDirectoryService
             .Where(x => x.TenantId == tenantId && x.UserGroupId == id).ToListAsync(ct);
         var roles = await _ctx.UserGroupRoles.IgnoreQueryFilters()
             .Where(x => x.TenantId == tenantId && x.UserGroupId == id).ToListAsync(ct);
+        var memberIds = members.Select(m => m.UserId).ToList();
 
         if (members.Count > 0) _ctx.UserGroupMembers.RemoveRange(members);
         if (roles.Count > 0) _ctx.UserGroupRoles.RemoveRange(roles);
         _ctx.UserGroups.Remove(group);
         await _ctx.SaveChangesAsync(ct);
+        // CACHE-01：删组即收回全部成员的组角色权限；轮换成员安全戳使携旧权限的令牌失效。
+        await RotateSecurityStampsAsync(tenantId, memberIds, ct);
         return IdentityResult.Ok(id);
     }
 
@@ -417,10 +424,15 @@ public sealed class IdentityDirectoryService : IIdentityDirectoryService
         var existing = await _ctx.UserGroupRoles.IgnoreQueryFilters()
             .Where(x => x.TenantId == tenantId && x.UserGroupId == groupId)
             .ToListAsync(ct);
+        var beforeRoleIds = existing.Select(x => x.RoleId).ToHashSet();
         _ctx.UserGroupRoles.RemoveRange(existing);
         foreach (var roleId in roleIds)
             _ctx.UserGroupRoles.Add(new UserGroupRole { TenantId = tenantId, UserGroupId = groupId, RoleId = roleId });
         await _ctx.SaveChangesAsync(ct);
+        // CACHE-01：组角色集变化即改变全体成员的有效权限；轮换成员安全戳使携旧权限的令牌失效。
+        // 角色集未变时跳过，避免无谓的强制重登。
+        if (!beforeRoleIds.SetEquals(roleIds))
+            await RotateSecurityStampsAsync(tenantId, await GetUserGroupMemberIdsAsync(tenantId, groupId, ct), ct);
         return IdentityResult.Ok(groupId);
     }
 
@@ -440,6 +452,9 @@ public sealed class IdentityDirectoryService : IIdentityDirectoryService
         {
             _ctx.UserGroupMembers.Add(new UserGroupMember { TenantId = tenantId, UserGroupId = groupId, UserId = userId });
             await _ctx.SaveChangesAsync(ct);
+            // CACHE-01：成员入组即经组角色获得权限；轮换其安全戳，使不含新权限的旧令牌失效，
+            // 强制重新登录以取得最新权限（与 IdentityService.AssignRoleAsync 的吊销策略一致）。
+            await RotateSecurityStampsAsync(tenantId, new[] { userId }, ct);
         }
         return IdentityResult.Ok(groupId);
     }
@@ -457,6 +472,8 @@ public sealed class IdentityDirectoryService : IIdentityDirectoryService
         {
             _ctx.UserGroupMembers.RemoveRange(existing);
             await _ctx.SaveChangesAsync(ct);
+            // CACHE-01：移出成员即收回其组角色权限；轮换该用户安全戳，使携旧权限的令牌立即失效。
+            await RotateSecurityStampsAsync(tenantId, new[] { userId }, ct);
         }
         return IdentityResult.Ok(groupId);
     }
@@ -485,6 +502,34 @@ public sealed class IdentityDirectoryService : IIdentityDirectoryService
     }
 
     // ---------------- 内部 ----------------
+
+    /// <summary>
+    /// CACHE-01：轮换指定用户在租户内的安全戳。
+    /// <para>
+    /// 令牌内嵌签发时的权限声明（含组角色），AuthMiddleware 每请求以安全戳比对判定是否已吊销。
+    /// 组角色/成员变更会改变用户的**有效权限**，但不会改动其直接角色，故须在此显式轮换安全戳，
+    /// 使携旧权限的令牌在下次请求即 401（重新登录后取得最新权限）——与 <see cref="IdentityService"/>
+    /// 的角色/口令/状态变更吊销策略一致。
+    /// </para>
+    /// <para>仅影响传入用户，显式 <c>TenantId</c> 过滤，绝不跨租户。</para>
+    /// </summary>
+    private async Task RotateSecurityStampsAsync(long tenantId, IEnumerable<long> userIds, CancellationToken ct)
+    {
+        if (tenantId <= 0) return;
+        var ids = userIds.Where(id => id > 0).Distinct().ToList();
+        if (ids.Count == 0) return;
+
+        await _ctx.Users.IgnoreQueryFilters()
+            .Where(u => u.TenantId == tenantId && ids.Contains(u.Id))
+            .ExecuteUpdateAsync(u => u.SetProperty(x => x.SecurityStamp, Guid.NewGuid().ToString("N")), ct);
+    }
+
+    /// <summary>取用户组的成员用户 Id（仅本租户）。</summary>
+    private async Task<List<long>> GetUserGroupMemberIdsAsync(long tenantId, long groupId, CancellationToken ct) =>
+        await _ctx.UserGroupMembers.IgnoreQueryFilters().AsNoTracking()
+            .Where(x => x.TenantId == tenantId && x.UserGroupId == groupId)
+            .Select(x => x.UserId)
+            .ToListAsync(ct);
 
     /// <summary>按角色码解析角色 Id（同租户角色 + 全局角色；platform-admin 不可指派）。</summary>
     private async Task<List<long>> ResolveRoleIdsAsync(long tenantId, IEnumerable<string> roleCodes, CancellationToken ct)

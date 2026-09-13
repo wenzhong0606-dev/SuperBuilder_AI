@@ -152,6 +152,20 @@ G1 有若干项被 Active Plan 的「待决事项（OPEN）」阻塞。下表明
 - **验证**：`RequestMetricsCollectorTests`（401/403/429 拆分 + 登录成功率）、`ScanBacklogGauge`/`AlertEvaluator`/`AlertEvaluationService` 测试（触发+恢复闭环）已补；CI 编译检查 + Web/Blazor E2E 守护（沙箱 NuGet 坑下 E2E 工程无法本地编译，改完靠 CI 实跑）。
   - **CI 收尾（2026-09-13 第二次提交）**：首提 `1a80cc4` 后 CI 两个 runtime job（V2.6 Evaluation Controller Runtime Smoke / Web·Blazor E2E）在「等待 Controller 启动」失败——API 进程启动即崩溃。根因：`AddHostedService<T>()` 仅把 `AlertEvaluationService` 注册为 `IHostedService`，而 `/metrics` 端点按**具体类型**注入它取 `LastAlerts`；`RequestDelegateFactory` 在启动期校验 handler 依赖时抛 `Unable to resolve service for type 'AlertEvaluationService'`。修复：先 `AddSingleton<AlertEvaluationService>()` 再 `AddHostedService(sp => sp.GetRequiredService<AlertEvaluationService>())`，保证端点与后台服务复用同一实例（LastAlerts 一致）。改后 CI 重跑 run **34739032646**（head `7b435661`）三 job 全绿（编译检查 / V2.6 Evaluation Controller Runtime Smoke / Web·Blazor E2E），**OBS-01 代码 + CI 双绿闭环**。
 
+### 4.6 CACHE-01 (M13-16) — 撤权、重启、双实例缓存一致性 ✅ 已完成
+
+- **目标**：组角色修改/组停用/移除成员/撤销数据源授权、进程重启、双实例交替请求的一致性；过期授权不被旧 token/缓存复用；会话按策略恢复或失效；禁止跨用户/租户复用。
+- **核查结论（源码）**：
+  - **数据源授权**：`DataSourceAuthorizationService.GetAuthorizedDataSourceIdsAsync` **每次实时查库、无缓存** → 撤权立即生效，无复用窗口。
+  - **Ask 语义缓存**：`AskController` **先授权（dashboard:view + 数据源 403 前置）后查缓存**；键含 `tenantId+dataSourceId+问题哈希` 并叠加 **7 维版本上下文**（M6-04：权限/策略/语言/模型/语义/元数据/数据源目录指纹）→ 撤权/策略变更即换键，不跨租户复用。
+  - **澄清会话**：`AskConversationService`（Singleton，进程内）以 (tenantId,userId) 校验读取，**跨用户/租户访问被拒绝**；30 分钟 TTL，进程重启即失效（按策略），双实例不共享（退化为新问题，无越权）。
+  - **令牌**：无状态 HMAC；`AuthMiddleware` 每请求比对库中安全戳 → 重启/双实例天然一致。
+- **发现并修复的缺陷（CACHE-01 核心）**：**用户组授权变更不轮换成员安全戳**。有效权限 = 直接角色 ∪ **组角色**（仅启用组），但 `IdentityDirectoryService` 的组角色集修改、组停用/启用、成员增/删、删组**均不改动成员直接角色**，故不触发安全戳轮换 → 成员旧令牌中的 `perms` 在最长 60 分钟内继续生效（撤权延迟 = 安全缺口）。
+  - **修复**（`IdentityDirectoryService`，+45 行）：新增 `RotateSecurityStampsAsync`（显式 `TenantId` 过滤、`ExecuteUpdateAsync`）与 `GetUserGroupMemberIdsAsync`；在 **`SetUserGroupRolesAsync`（角色集变化时）/ `SetUserGroupEnabledAsync`（状态变化时）/ `AddUserGroupMemberAsync` / `RemoveUserGroupMemberAsync` / `DeleteUserGroupAsync`** 轮换受影响成员安全戳，与 `IdentityService` 的角色/口令/状态变更吊销策略一致。去抖：角色集未变、组启停未变时不轮换。
+- **交付**：`IdentityDirectoryService.cs`（修复）；`tests/.../IdentityDirectorySecurityStampTests.cs`（新增，7 例：五类变更的轮换与作用域 + 未变不轮换 + 端到端旧令牌吊销语义）；`docs/ops/cache-auth-consistency.md`（一致性模型、失效策略、双实例/重启结论表）；Backlog CACHE-01 → DONE。
+- **设计取舍（须告知验收）**：澄清会话/Ask 缓存为**进程内**；跨实例不共享但已做租户/用户隔离，最坏退化为一次未命中，不产生越权。如需跨实例续话，应引入带 (tenantId,userId,conversationId) 归属校验的分布式存储（后续增强，不在 CACHE-01 范围）。
+- **CI 验证**：编译检查覆盖新增代码/测试编译；待提交后由 `dotnet-build.yml` 三 job 守护。
+
 ---
 
 ## 5. 提交与 CI 纪律（沿用 G0 约束）
@@ -168,7 +182,7 @@ G1 有若干项被 Active Plan 的「待决事项（OPEN）」阻塞。下表明
 
 ## 6. 建议推进方式
 
-1. **已完成（无 OPEN 阻塞）**：DB-02（`e772684`）、QUOTA-01（`bcbc71d`）、ONBOARD-01（引导清单）、**OBS-01（指标细分+扫描积压+告警；首提 CI 暴露启动期 DI 崩溃，二次提交 `7b43566` 修复后 CI 全绿）** 均已 DONE。**下一步可立即开工**：受 OPEN「支持环境/性能恢复目标」约束的 **DR-01 / PERF-01**，以及无阻塞的 **OBS 后续打磨**（阈值按 OPEN 定稿）；关键路径收口后进入 **M14-07（可用交接包）**。
+1. **已完成（无 OPEN 阻塞）**：E2E-01、DB-02（`e772684`）、QUOTA-01（`bcbc71d`）、ONBOARD-01（引导清单）、**OBS-01（指标细分+扫描积压+告警；首提 CI 暴露启动期 DI 崩溃，二次提交 `7b43566` 修复后 CI 全绿）**、**CACHE-01（组授权变更轮换安全戳；Ask 缓存/授权/会话一致性核查）** 均已 DONE。**下一步可立即开工**：受 OPEN「支持环境/性能恢复目标」约束的 **DR-01 / PERF-01**，以及无阻塞的 **OBS 后续打磨**（阈值按 OPEN 定稿）；关键路径收口后进入 **M14-07（可用交接包）**。
 2. **骨架先行（范围待 OPEN 回填）**：E2E-01 用既有测试配置补齐业务链骨架。
 3. **OPEN 回填后再定稿**：PERF-01 / DR-01 / M14-01 / M14-08a / M14-07 必须在对应 OPEN 决策落地后锁定验收。
 4. **节奏**：每项独立提交并触发 CI；优先让「编译检查 / Web-Blazor-E2E」保持绿，V2.6 维持绿。
