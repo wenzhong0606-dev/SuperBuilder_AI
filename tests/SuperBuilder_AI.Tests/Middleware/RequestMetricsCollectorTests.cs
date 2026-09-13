@@ -95,4 +95,58 @@ public class RequestMetricsCollectorTests
 		// 不抛异常；空键归入 __other__，至少有一条记录。
 		Assert.NotEmpty(c.StageSnapshot());
 	}
+
+	[Fact]
+	public void Record_Splits401_403_429_FromClientErrors()
+	{
+		var c = new RequestMetricsCollector();
+		c.Record("POST /api/auth/login", 401, 10);
+		c.Record("POST /api/auth/login", 401, 10);
+		c.Record("POST /api/auth/login", 403, 10);
+		c.Record("GET /api/data-sources", 429, 10);
+		c.Record("GET /api/data-sources", 200, 10);
+
+		var snap = Assert.Single(c.Snapshot(), x => x.Route == "POST /api/auth/login");
+		Assert.Equal(3, snap.Count);
+		Assert.Equal(2, snap.Unauthorized);
+		Assert.Equal(1, snap.Forbidden);
+		Assert.Equal(0, snap.TooManyRequests);
+		// ClientErrors 仍是全部 4xx 的聚合（细分键之外的上卷），此处 2×401 + 1×403 = 3。
+		Assert.Equal(3, snap.ClientErrors);
+
+		var ds = Assert.Single(c.Snapshot(), x => x.Route == "GET /api/data-sources");
+		Assert.Equal(1, ds.TooManyRequests);
+		Assert.Equal(0, ds.Unauthorized);
+	}
+
+	[Fact]
+	public void LoginSuccessRate_DerivedFromUnauthorized()
+	{
+		var c = new RequestMetricsCollector();
+		// 登录路由：10 次中 3 次 401 → 成功率 0.7
+		for (var i = 0; i < 7; i++) c.Record("POST /api/auth/login", 200, 10);
+		for (var i = 0; i < 3; i++) c.Record("POST /api/auth/login", 401, 10);
+
+		var login = Assert.Single(c.Snapshot(), x => x.Route.Contains("login"));
+		Assert.Equal(0.7, login.LoginSuccessRate);
+
+		// 非登录路由的 LoginSuccessRate 恒为 1（不参与登录成功率计算）。
+		c.Record("GET /api/ask", 401, 10);
+		var ask = Assert.Single(c.Snapshot(), x => x.Route == "GET /api/ask");
+		Assert.Equal(1.0, ask.LoginSuccessRate);
+	}
+
+	[Fact]
+	public void Snapshot_NewColumns_DoNotBreakExistingFields()
+	{
+		var c = new RequestMetricsCollector();
+		c.Record("GET /api/ask", 200, 50);
+		c.Record("GET /api/ask", 500, 50);
+
+		var snap = Assert.Single(c.Snapshot());
+		Assert.Equal(2, snap.Count);
+		Assert.Equal(1, snap.Errors);
+		Assert.Equal(0.5, snap.ErrorRate);
+		Assert.Equal(50.0, snap.AvgMs);
+	}
 }

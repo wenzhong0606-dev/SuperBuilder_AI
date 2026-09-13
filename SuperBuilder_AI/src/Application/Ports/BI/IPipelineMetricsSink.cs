@@ -31,6 +31,17 @@ public interface IPipelineMetricsSink
 	public const string OutcomeEarlyReturn = "outcome.earlyReturn";
 	public const string OutcomeRepair = "outcome.repair";
 
+	/// <summary>管线结果分类——Ask 成功产出结果（非提前返回/拒绝）。</summary>
+	public const string OutcomeSuccess = "outcome.ask.success";
+	/// <summary>管线结果分类——Ask 执行抛异常（DB/LLM/超时之外的兜底失败）。</summary>
+	public const string OutcomeFailure = "outcome.ask.failure";
+	/// <summary>管线结果分类——Ask 超时（捕获 TimeoutException/取消，或总耗时超阈值）。</summary>
+	public const string OutcomeTimeout = "outcome.ask.timeout";
+	/// <summary>管线结果分类——Ask 在数据执行阶段失败（EF/SqlException/System.Data）。</summary>
+	public const string OutcomeDbError = "outcome.ask.dbError";
+	/// <summary>管线结果分类——Ask 在理解/结果解析阶段失败（LLM/AI 后端，非 DB/超时兜底）。</summary>
+	public const string OutcomeLlmError = "outcome.ask.llmError";
+
 	/// <summary>记录一次管线分段耗时（毫秒）。</summary>
 	/// <param name="stage">分段键（见 <see cref="StageUnderstand"/> 等常量）。</param>
 	/// <param name="elapsedMs">耗时（毫秒）。</param>

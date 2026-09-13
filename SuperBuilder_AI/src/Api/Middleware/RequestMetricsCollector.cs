@@ -70,11 +70,16 @@ public sealed class RequestMetricsCollector : IPipelineMetricsSink
 					}
 				}
 
-				m.Count++;
-				if (statusCode >= 500) m.Errors++;
-				else if (statusCode >= 400) m.ClientErrors++;
+			m.Count++;
+			if (statusCode >= 500) m.Errors++;
+			else if (statusCode >= 400) m.ClientErrors++;
 
-				m.TotalMs += elapsedMs;
+			// OBS-01：401/403/429 细分——登录成功率、限流、鉴权拒绝需独立可观测。
+			if (statusCode == 401) m.Unauthorized++;
+			else if (statusCode == 403) m.Forbidden++;
+			else if (statusCode == 429) m.TooManyRequests++;
+
+			m.TotalMs += elapsedMs;
 				if (elapsedMs > m.MaxMs) m.MaxMs = elapsedMs;
 
 				if (m.Samples.Count < SampleCapacity) m.Samples.Add(elapsedMs);
@@ -214,17 +219,20 @@ public sealed class RequestMetricsCollector : IPipelineMetricsSink
 				copy = _routes.ToList();
 			}
 
-			return copy
-				.Select(kv => new RouteMetricsSnapshot(
-					kv.Key,
-					kv.Value.Count,
-					kv.Value.Errors,
-					kv.Value.ClientErrors,
-					kv.Value.Count == 0 ? 0 : Math.Round(kv.Value.TotalMs / (double)kv.Value.Count, 2),
-					Percentile(kv.Value.Samples, 0.95),
-					kv.Value.MaxMs))
-				.OrderByDescending(s => s.Count)
-				.ToList();
+				return copy
+					.Select(kv => new RouteMetricsSnapshot(
+						kv.Key,
+						kv.Value.Count,
+						kv.Value.Errors,
+						kv.Value.ClientErrors,
+						kv.Value.Unauthorized,
+						kv.Value.Forbidden,
+						kv.Value.TooManyRequests,
+						kv.Value.Count == 0 ? 0 : Math.Round(kv.Value.TotalMs / (double)kv.Value.Count, 2),
+						Percentile(kv.Value.Samples, 0.95),
+						kv.Value.MaxMs))
+					.OrderByDescending(s => s.Count)
+					.ToList();
 		}
 		catch
 		{
@@ -268,6 +276,9 @@ public sealed class RequestMetricsCollector : IPipelineMetricsSink
 		public long Count;
 		public long Errors;
 		public long ClientErrors;
+		public long Unauthorized;
+		public long Forbidden;
+		public long TooManyRequests;
 		public long TotalMs;
 		public long MaxMs;
 		public int SampleCursor;
@@ -279,7 +290,10 @@ public sealed class RequestMetricsCollector : IPipelineMetricsSink
 /// <param name="Route">路由标识。</param>
 /// <param name="Count">请求数。</param>
 /// <param name="Errors">服务端错误数（HTTP &gt;= 500）。</param>
-/// <param name="ClientErrors">客户端错误数（HTTP 400~499）。</param>
+/// <param name="ClientErrors">客户端错误数（HTTP 400~499，不含下列细分）。</param>
+/// <param name="Unauthorized">未授权数（HTTP 401，用于登录成功率反推）。</param>
+/// <param name="Forbidden">禁止数（HTTP 403，含行级/列级/权限拒绝）。</param>
+/// <param name="TooManyRequests">限流拒绝数（HTTP 429）。</param>
 /// <param name="AvgMs">平均耗时（毫秒）。</param>
 /// <param name="P95Ms">P95 耗时（毫秒）。</param>
 /// <param name="MaxMs">最大耗时（毫秒）。</param>
@@ -288,12 +302,21 @@ public sealed record RouteMetricsSnapshot(
 	long Count,
 	long Errors,
 	long ClientErrors,
+	long Unauthorized,
+	long Forbidden,
+	long TooManyRequests,
 	double AvgMs,
 	double P95Ms,
 	long MaxMs)
 {
 	/// <summary>服务端错误率（0~1，保留 4 位小数）。</summary>
 	public double ErrorRate => Count == 0 ? 0 : Math.Round(Errors / (double)Count, 4);
+
+	/// <summary>登录成功率（0~1）：登录路由上 <c>成功数 = 总数 − 401 数</c> 反推。无样本时为 1。</summary>
+	public double LoginSuccessRate =>
+		!Route.Contains("login", StringComparison.OrdinalIgnoreCase) || Count == 0
+			? 1.0
+			: Math.Round((Count - Unauthorized) / (double)Count, 4);
 }
 
 /// <summary>单段管线分段延迟快照。</summary>

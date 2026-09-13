@@ -7,6 +7,7 @@ using SuperBuilder_AI.Api.Errors;
 using SuperBuilder_AI.Data;
 using SuperBuilder_AI.Interfaces.Identity;
 using SuperBuilder_AI.Models.Metadata;
+using SuperBuilder_AI.Api.Diagnostics;
 
 
 namespace SuperBuilder_AI.Controllers;
@@ -23,6 +24,7 @@ public class MetadataController : Controller
 	private readonly SuperBIContext? _db;
 	private readonly IDataSourceAuthorizationService? _authorization;
 	private readonly IIdentityService? _identity;
+	private readonly ScanBacklogGauge? _backlog;
 
 	public MetadataController(
 		MetadataScannerService scanner,
@@ -30,7 +32,8 @@ public class MetadataController : Controller
 		IMetadataScanQueue queue,
 		SuperBIContext? db = null,
 		IDataSourceAuthorizationService? authorization = null,
-		IIdentityService? identity = null)
+		IIdentityService? identity = null,
+		ScanBacklogGauge? backlog = null)
 	{
 		_scanner = scanner;
 		_builder = builder;
@@ -38,6 +41,7 @@ public class MetadataController : Controller
 		_db = db;
 		_authorization = authorization;
 		_identity = identity;
+		_backlog = backlog;
 	}
 
 	/// <summary>
@@ -88,6 +92,7 @@ public class MetadataController : Controller
 		_db.MetadataScanJobs.Add(job);
 		await _db.SaveChangesAsync(cancellationToken);
 		await _queue.EnqueueAsync(job.Id, cancellationToken);
+		_backlog?.Increment();
 
 		return StatusCode(202, new { jobId = job.Id, dataSourceId, status = job.Status.ToString() });
 	}

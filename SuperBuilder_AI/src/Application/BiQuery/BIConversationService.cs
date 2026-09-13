@@ -192,6 +192,8 @@ public class BIConversationService
 			long? requestedDataSourceId = null,
 			IReadOnlyCollection<long>? authorizedDataSourceIds = null)
 	{
+		try
+		{
 		/*
 		 * Step 0（P4）
 		 *
@@ -418,11 +420,16 @@ public class BIConversationService
          *
          * BI最终响应
          *
-         * Phase 2.5:
+         * Phase 2.5：
          *
          * 将 QueryPlan Explainability
          * 一并返回给上层。
          */
+		// OBS-01：Ask 成功产出结果埋点（成功 = 真实返回答案，区别于 EarlyReturn/Reject）。
+		_metrics?.RecordOutcome(IPipelineMetricsSink.OutcomeSuccess, true);
+		if (swTotal.ElapsedMilliseconds > AskTimeoutMs)
+			_metrics?.RecordOutcome(IPipelineMetricsSink.OutcomeTimeout, true);
+
 		return new BIResponse
 		{
 			Success = true,
@@ -447,5 +454,50 @@ public class BIConversationService
 			DurationMs = swTotal.ElapsedMilliseconds,
 			SegmentTimings = new AskSegmentTimings(metadataUnderstandMs, planMs, sqlBuildMs, dbExecMs, resultUnderstandMs)
 		};
+		}
+		catch (Exception ex)
+		{
+			// OBS-01：Ask 执行异常分类埋点。异常仍向上传播，由 UnifiedExceptionMiddleware 处理。
+			RecordAskFailure(ex);
+			throw;
+		}
+	}
+
+	/// <summary>OBS-01：Ask 整体耗时的「慢查询」阈值（毫秒）。超过即额外标记一次 Timeout 结果，便于告警。</summary>
+	private const long AskTimeoutMs = 30000;
+
+	/// <summary>OBS-01：Ask 失败分类埋点（异常静默，不影响主链路）。</summary>
+	private void RecordAskFailure(Exception ex)
+	{
+		try
+		{
+			_metrics?.RecordOutcome(IPipelineMetricsSink.OutcomeFailure, true);
+			if (ex is TimeoutException or TaskCanceledException or OperationCanceledException)
+				_metrics?.RecordOutcome(IPipelineMetricsSink.OutcomeTimeout, true);
+			else if (IsDbException(ex))
+				_metrics?.RecordOutcome(IPipelineMetricsSink.OutcomeDbError, true);
+			else
+				_metrics?.RecordOutcome(IPipelineMetricsSink.OutcomeLlmError, true);
+		}
+		catch
+		{
+			// 指标采集失败不影响主链路
+		}
+	}
+
+	/// <summary>OBS-01：判断异常是否源自数据访问层（EF / ADO.NET / SQL 驱动）。</summary>
+	private static bool IsDbException(Exception ex)
+	{
+		for (var e = ex; e is not null; e = e.InnerException)
+		{
+			if (e is System.Data.Common.DbException or Microsoft.EntityFrameworkCore.DbUpdateException)
+				return true;
+			var name = e.GetType().FullName ?? string.Empty;
+			if (name.Contains("EntityFramework", StringComparison.OrdinalIgnoreCase)
+				|| name.Contains("SqlClient", StringComparison.OrdinalIgnoreCase)
+				|| name.Contains("System.Data", StringComparison.OrdinalIgnoreCase))
+				return true;
+		}
+		return false;
 	}
 }

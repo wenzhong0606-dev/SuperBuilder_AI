@@ -35,7 +35,7 @@
 | AGENT-02 | M13-08 | Query Tool 真实后端 | BACKLOG | M13（G1 后；客户明确需要时转条件门禁） |
 | AGENT-03 | M13-08 | Dashboard Tool 真实后端 | BACKLOG | M13（G1 后；客户明确需要时转条件门禁） |
 | AGENT-04 | M13-08 | Report Tool 真实后端 | BACKLOG | M13（G1 后；客户明确需要时转条件门禁） |
-| OBS-01 | M13-11 | Login/Ask/错误/P95/CorrelationId 指标告警 | BACKLOG | M13 |
+| OBS-01 | M13-11 | Login/Ask/错误/P95/CorrelationId 指标告警 | DONE | M13 |
 | DR-01 | M13-10 | SQL + Qdrant + config/secret reference 完整恢复 | BACKLOG | M13 |
 | PERF-01 | M13-12 | 容量、P95、错误率、成本、过载恢复 | BACKLOG | M13 |
 | SEC-02 | M13-13 | 列级权限管理 UI 与有效权限预览 | BACKLOG | M13（条件门禁：客户需要时） |

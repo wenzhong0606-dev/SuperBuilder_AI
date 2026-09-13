@@ -414,6 +414,15 @@ builder.Services.AddSingleton<SuperBuilder_AI.Interfaces.BI.IPipelineMetricsSink
 
 // M0-05：受控启动诊断单例（供 /health 与初始化端点读取，绝不向普通用户输出堆栈）
 builder.Services.AddSingleton<StartupDiagnostics>();
+
+// OBS-01：扫描积压量规（Queued+Running 待处理计数）
+builder.Services.AddSingleton<SuperBuilder_AI.Api.Diagnostics.ScanBacklogGauge>();
+// OBS-01：告警阈值（出厂基线，可在 Program.cs 覆盖敏感数值）
+builder.Services.AddSingleton(new SuperBuilder_AI.Api.Diagnostics.AlertThresholds());
+// OBS-01：告警接收端（默认仅记录日志；测试用 TestAlertSink 验证触发+恢复）
+builder.Services.AddSingleton<SuperBuilder_AI.Api.Diagnostics.IAlertSink, SuperBuilder_AI.Api.Diagnostics.LoggingAlertSink>();
+// OBS-01：告警评估主机服务（周期评估指标并分发告警，含恢复判定）
+builder.Services.AddHostedService<SuperBuilder_AI.Api.Diagnostics.AlertEvaluationService>();
 // M0-05：本地化目录种子服务，使 UiLanguage/Text 在启动序列中固定顺序执行
 builder.Services.AddScoped<ILocalizationSeedService, LocalizationSeedService>();
 builder.Services.AddScoped<IThemeSeedService, ThemeSeedService>();
@@ -643,7 +652,9 @@ app.MapGet("/health", (StartupDiagnostics d) => new
 });
 // SB-P0-09 请求指标端点：由 AuthMiddleware 强制 platform:diagnostics:view 权限。
 app.MapGet("/metrics", (SuperBuilder_AI.Middleware.RequestMetricsCollector metrics,
-		SuperBuilder_AI.Api.Caching.IAskResponseCache cache) =>
+		SuperBuilder_AI.Api.Caching.IAskResponseCache cache,
+	SuperBuilder_AI.Api.Diagnostics.ScanBacklogGauge backlog,
+	SuperBuilder_AI.Api.Diagnostics.AlertEvaluationService alerts) =>
 {
 	try
 	{
@@ -663,7 +674,13 @@ app.MapGet("/metrics", (SuperBuilder_AI.Middleware.RequestMetricsCollector metri
 				hits,
 				misses,
 				hitRate = total == 0 ? 0.0 : Math.Round(hits / (double)total, 4)
-			}
+			},
+			scanBacklog = new
+			{
+				pending = backlog.Pending,
+				peak = backlog.Peak
+			},
+			activeAlerts = alerts.LastAlerts
 		});
 	}
 	catch
@@ -673,7 +690,9 @@ app.MapGet("/metrics", (SuperBuilder_AI.Middleware.RequestMetricsCollector metri
 			generatedAt = System.DateTime.UtcNow,
 			routes = Array.Empty<object>(),
 			pipelineStages = Array.Empty<object>(),
-			outcomes = Array.Empty<object>()
+			outcomes = Array.Empty<object>(),
+			scanBacklog = new { pending = 0, peak = 0 },
+			activeAlerts = Array.Empty<object>()
 		});
 	}
 });

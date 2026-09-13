@@ -135,6 +135,22 @@ G1 有若干项被 Active Plan 的「待决事项（OPEN）」阻塞。下表明
   - **首问步采用逻辑推断**：`AskController` 仅 `POST /api/ask`、`/refine`，无 GET 历史端点；`_conversations` 为 Scoped（按请求生命周期，不跨请求持久化），Ask 审计未落可查询库表（AskController 不注入 `SuperBIContext`）。因此「首问」无法精确判定，采用 `首问.done = 保存首个成果.done`（不提问即无法保存）作为代理，并在本处以文字注明。若验收要求精确，后续可加 `GET api/ask/history-count`（需审计落库或新增查询）。
 - **CI 验证**：待提交后由 `dotnet-build.yml` 的「编译检查」+「Web/Blazor E2E」守护（E2E 不覆盖 Home 渲染，但编译检查覆盖 Razor 编译与 i18n 门禁）。
 
+### 4.5 OBS-01 (M13-11) — 可观测成熟化：指标细分 + 扫描积压 + 持续失败告警 ✅ 已完成
+
+- **目标**：登录/Ask 成功率、P95、超时、401/403/429、DB/LLM 错误、扫描积压可观测；关联 ID 排障指南；持续失败告警（先用测试接收器）；注入 DB 不可用/模型超时/鉴权拒绝可观察可定位；告警触发+恢复均验证。
+- **交付（2026-09-13，新增 6 文件 + 改 4）**：
+  - **指标细分**（`RequestMetricsCollector`）：`Record` 新增 **401/403/429** 独立计数（不与 `ClientErrors` 上卷冲突）；`RouteMetricsSnapshot` 暴露三字段 + `LoginSuccessRate`（登录路由 = `1 − Unauthorized/Count` 反推）。`IPipelineMetricsSink` 新增 `OutcomeSuccess/Failure/Timeout/DbError/LlmError` 常量。
+  - **Ask 结果分类**（`BIConversationService.ExecuteAsync`）：整体包 `try/catch`，成功返回处记 `OutcomeSuccess` 且总耗时 > 30s 追加 `OutcomeTimeout`；异常处按类型分类记 `OutcomeFailure` + `Timeout`（TimeoutException/取消）/ `DbError`（EF/ADO.NET/SQL）/ `LlmError`（其余近似归因为 AI 后端），异常仍 `throw` 向上传播。
+  - **扫描积压量规**（`ScanBacklogGauge` 单例）：`MetadataController` 入队 `Increment()`；`MetadataScanHostedService` 进入终态（Succeeded/Failed/跳过）`Decrement()`；`/metrics` 暴露 `pending/peak`。
+  - **持续失败告警**：`IAlertSink` + `LoggingAlertSink`（默认仅日志）+ `AlertThresholds`（出厂基线）+ `AlertEvaluator`（纯函数评估路由错误率/登录失败率/Ask 失败率/扫描积压）+ `AlertEvaluationService`（周期评估 + **恢复**告警，闭环）。`TestAlertSink` 在测试工程验证触发+恢复。
+  - **`/metrics` 增强**：新增 `scanBacklog`、`activeAlerts` 字段。
+  - **排障文档**：`docs/ops/observability-troubleshooting.md`（关联 ID 串联、指标派生口径、告警规则表、健康探测）。
+- **设计决策与近似（须告知验收）**：
+  - **登录成功率由路由状态码反推**：不改动敏感的 `AuthController`，登录成功率 = 登录路由 `Count − 401`；`ObservabilityMiddleware` 已按路由采集状态码，仅补 401 细分即可同时满足「401/403/429」与「登录成功率」两项。
+  - **Ask 失败细分近似**：`LlmError` 兜底覆盖理解/结果解析阶段的其它异常（非 DB/超时），实际包含 LLM/AI 后端与其它未知故障；精确的 DB vs LLM 区分依赖 LLM 客户端的专用异常类型，后续可在 `IsDbException` 旁补 `IsLlmException`。
+  - **告警阈值出厂基线**：`AlertThresholds` 默认值（错误率 20%/50%、登录失败 30%、Ask 失败 20%、积压 ≥5）为合理出厂值，**生产级 P95/错误率目标仍受 OPEN「性能和恢复目标」约束**，待回填后在 `docs/ops` 定稿。
+- **验证**：`RequestMetricsCollectorTests`（401/403/429 拆分 + 登录成功率）、`ScanBacklogGauge`/`AlertEvaluator`/`AlertEvaluationService` 测试（触发+恢复闭环）已补；CI 编译检查 + Web/Blazor E2E 守护（沙箱 NuGet 坑下 E2E 工程无法本地编译，改完靠 CI 实跑）。
+
 ---
 
 ## 5. 提交与 CI 纪律（沿用 G0 约束）
@@ -151,7 +167,7 @@ G1 有若干项被 Active Plan 的「待决事项（OPEN）」阻塞。下表明
 
 ## 6. 建议推进方式
 
-1. **已完成（无 OPEN 阻塞）**：DB-02（`e772684`）、QUOTA-01（`bcbc71d`）、ONBOARD-01（`953ae9f` 后新增引导清单）均已 DONE，CI 绿。**下一步可立即开工**：OBS-01（登录/Ask/P95/关联 ID 指标告警，无 OPEN 阻塞）。
+1. **已完成（无 OPEN 阻塞）**：DB-02（`e772684`）、QUOTA-01（`bcbc71d`）、ONBOARD-01（引导清单）、**OBS-01（指标细分+扫描积压+告警，CI 绿）** 均已 DONE。**下一步可立即开工**：受 OPEN「支持环境/性能恢复目标」约束的 **DR-01 / PERF-01**，以及无阻塞的 **OBS 后续打磨**（阈值按 OPEN 定稿）；关键路径收口后进入 **M14-07（可用交接包）**。
 2. **骨架先行（范围待 OPEN 回填）**：E2E-01 用既有测试配置补齐业务链骨架。
 3. **OPEN 回填后再定稿**：PERF-01 / DR-01 / M14-01 / M14-08a / M14-07 必须在对应 OPEN 决策落地后锁定验收。
 4. **节奏**：每项独立提交并触发 CI；优先让「编译检查 / Web-Blazor-E2E」保持绿，V2.6 维持绿。

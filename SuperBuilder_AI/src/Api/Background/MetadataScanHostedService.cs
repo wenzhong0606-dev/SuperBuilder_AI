@@ -9,6 +9,7 @@ using SuperBuilder_AI.Services;
 using SuperBuilder_AI.Data;
 using SuperBuilder_AI.Infrastructure.Security;
 using SuperBuilder_AI.Models.Metadata;
+using SuperBuilder_AI.Api.Diagnostics;
 
 namespace SuperBuilder_AI.Api.Background;
 
@@ -21,15 +22,18 @@ public sealed class MetadataScanHostedService : BackgroundService
     private readonly IMetadataScanQueue _queue;
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<MetadataScanHostedService> _logger;
+    private readonly ScanBacklogGauge _backlog;
 
     public MetadataScanHostedService(
         IMetadataScanQueue queue,
         IServiceScopeFactory scopeFactory,
-        ILogger<MetadataScanHostedService> logger)
+        ILogger<MetadataScanHostedService> logger,
+        ScanBacklogGauge backlog)
     {
         _queue = queue;
         _scopeFactory = scopeFactory;
         _logger = logger;
+        _backlog = backlog;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -69,11 +73,13 @@ public sealed class MetadataScanHostedService : BackgroundService
         if (job is null)
         {
             _logger.LogWarning("扫描任务 {JobId} 不存在，跳过。", jobId);
+            _backlog.Decrement();
             return;
         }
         if (job.Status != MetadataScanJobStatus.Queued)
         {
             _logger.LogWarning("扫描任务 {JobId} 状态为 {Status}，跳过。", jobId, job.Status);
+            _backlog.Decrement();
             return;
         }
 
@@ -131,6 +137,7 @@ public sealed class MetadataScanHostedService : BackgroundService
         job.ErrorMessage = null;
         dataSource.LastScanAt = DateTime.UtcNow;
         await context.SaveChangesAsync(stoppingToken);
+        _backlog.Decrement();
     }
 
     private async Task FailJobAsync(SuperBIContext context, MetadataScanJob job, Exception ex, CancellationToken ct)
@@ -147,6 +154,7 @@ public sealed class MetadataScanHostedService : BackgroundService
         job.ErrorCode = code.Length > 64 ? code[..64] : code;
         job.ErrorMessage = message.Length > 2000 ? message[..2000] : message;
         await context.SaveChangesAsync(ct);
+        _backlog.Decrement();
     }
 
     /// <summary>
