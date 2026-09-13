@@ -60,27 +60,37 @@ jobs:
         # 因全局 env CI=true，SuperBuilder_AI.Components 只产 net10.0（见其 csproj），
         # 故 ProjectReference → Components 不会要求 android/ios workload。
         # 测试为纯内存 SQLite（Microsoft.EntityFrameworkCore.Sqlite），不依赖 SQL Server / Qdrant 容器。
-        # "执行数 > 0" 由 xunit 汇总行的 Total 保证：0 用例即判定失败，防假绿。
+        # 执行数取自 trx 的 <Counters total=…>（机器生成、唯一），而非 console 摘要文本——
+        # console 文本里的 "Total" 会与 run 脚本回显及测试自身输出混淆，解析值不可信。
         run: |
           set -o pipefail
           dotnet test tests/SuperBuilder_AI.Tests/SuperBuilder_AI.Tests.csproj \
             --configuration Release \
-            --logger "console;verbosity=normal" 2>&1 | tee unit-tests.log
+            --logger "console;verbosity=normal" \
+            --logger "trx;LogFileName=unit-tests.trx" \
+            --results-directory "$GITHUB_WORKSPACE/TestResults" 2>&1 | tee unit-tests.log
           test_exit=$?
-          # 兼容 classic（"Total tests: N"）与 terminal（"Total:  N"）两种摘要格式
-          total=$(grep -oE 'Total[^0-9]*[0-9]+' unit-tests.log | tail -1 | grep -oE '[0-9]+$' || true)
-          echo "执行用例数（Total）= ${total:-0}"
+          trx="$GITHUB_WORKSPACE/TestResults/unit-tests.trx"
+          # 先截出 <Counters …> 标签本身，再逐属性提取——避免贪婪匹配把相邻属性数字一并带入
+          counters=$(grep -oE '<Counters[^>]*>' "$trx" | head -1)
+          total=$(printf '%s\n' "$counters" | grep -oE '\btotal="[0-9]+"' | grep -oE '[0-9]+')
+          executed=$(printf '%s\n' "$counters" | grep -oE '\bexecuted="[0-9]+"' | grep -oE '[0-9]+')
+          passed=$(printf '%s\n' "$counters" | grep -oE '\bpassed="[0-9]+"' | grep -oE '[0-9]+')
+          failed=$(printf '%s\n' "$counters" | grep -oE '\bfailed="[0-9]+"' | grep -oE '[0-9]+')
+          echo "trx 计数：total=${total:-0} executed=${executed:-0} passed=${passed:-0} failed=${failed:-0}"
           if [ "${total:-0}" -eq 0 ]; then
-            echo "::error::单元测试执行数为 0，疑似适配器未部署/工程未构建——按失败处理，防止假绿。"
+            echo "::error::单元测试 total=0，疑似 0 用例（xunit 适配器未部署/工程未构建）——按失败处理，防止假绿。"
             exit 1
           fi
           exit $test_exit
-      - name: 上传单元测试日志
+      - name: 上传单元测试日志与结果
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: unit-tests-log
-          path: unit-tests.log
+          path: |
+            unit-tests.log
+            TestResults/
           if-no-files-found: ignore
 
   controller-runtime:
