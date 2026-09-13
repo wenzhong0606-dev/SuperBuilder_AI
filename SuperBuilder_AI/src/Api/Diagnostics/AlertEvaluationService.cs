@@ -81,8 +81,9 @@ public sealed class AlertEvaluationService : BackgroundService
 				now));
 		}
 
-		// 触发
-		foreach (var a in alerts) _sink.Raise(a);
+		// 触发：仅对「本周期新进入触发态」的规则发告警。上周期已触发且本周期仍越界的不重复发，
+		// 与恢复分支对称（状态变化时才通知），避免每周期重复轰炸告警接收端。
+		foreach (var a in alerts.Where(a => !prev.Contains(a.Rule))) _sink.Raise(a);
 
 		lock (_gate)
 		{
