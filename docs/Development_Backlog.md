@@ -39,7 +39,7 @@
 | DR-01 | M13-10 | SQL + Qdrant + config/secret reference 完整恢复 | BACKLOG | M13 |
 | PERF-01 | M13-12 | 容量、P95、错误率、成本、过载恢复 | BACKLOG | M13 |
 | SEC-02 | M13-13 | 列级权限管理 UI 与有效权限预览 | BACKLOG | M13（条件门禁：客户需要时） |
-| ONBOARD-01 | M13-14 | 空白租户到首个分析成果引导 | BACKLOG | M13 |
+| ONBOARD-01 | M13-14 | 空白租户到首个分析成果引导 | DONE | M13 |
 | APP-01 | M13-15 | Custom Component Version → App DSL/runtime | BACKLOG | M13（条件门禁：客户需要时） |
 | CACHE-01 | M13-16 | 撤权、重启、双实例缓存一致性 | BACKLOG | M13 |
 

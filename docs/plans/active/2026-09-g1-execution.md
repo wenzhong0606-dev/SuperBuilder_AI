@@ -116,6 +116,25 @@ G1 有若干项被 Active Plan 的「待决事项（OPEN）」阻塞。下表明
   - 配套：补 `GetOrCreateUsageAsync` 的并发安全、周期滚动的并发安全。
 - **验收（须以并发测试证明）**：最后一份额度并发争抢最多一份成功；失败事务不耗额度；重试不重复计数；读配额（`CheckAsync`/`GetQuotaAsync`）不创建用量行；直接 API 请求无法绕过服务端检查。
 
+### 4.4 ONBOARD-01 (M13-14) — 空白租户→首个分析成果引导 ✅ 已完成
+
+- **目标**：把「连接→授权→扫描→实体/指标确认→首问→保存」串成状态感知的引导清单，落在工作台首页（替代原静态「快速开始」文案），满足「新用户不改 SQL/配置走完路径；每步可说明失败并重试」。卡在 G1 验收关键路径（`BASE-01→G0→M13-09→M13-14→M14-07→G1`）。
+- **交付（2026-09-13，新增 2 文件 + 改 1）**：
+  - `Components/Shared/OnboardingChecklist.razor` + `.razor.css`：拉取各端点判定 6 步状态，渲染进度条 + 步骤（done/blocked 态）+ 链接 + 失败重试提示；空白租户（`data-sources/manage` 计数 0）用 `SbEmptyState` 引导首连。每步失败说明：连接失败→`OnbConnectFailed` 重试提示；已连未扫→`OnbScanRetry` 提示重扫。
+  - `Pages/Home.razor`：用 `<OnboardingChecklist />` 替换静态 `<ol>` 快速开始面板（组件位于 `Components/Shared`，已被 `_Imports` 全局引入）。
+  - i18n 四处一致（新增 22 键）：`Keys.cs`(const+Defaults) / `ResourceKeys.cs`(const+Catalog) / `LocalizationSeedService.cs`(zh) / 消费 razor，满足 `ResourceKeyRegistryTests` 四地一致。
+- **步骤判定端点（全部复用现有 GET，无新增后端）**：
+  1. 接入数据源（连接+授权）：`api/data-sources/manage` 任一 `lastTestStatus=="Ok"`；授权因保存即自动授予当前管理员，故并入此步。
+  2. 扫描元数据：同上任一 `tableCount>0`（或 `lastScanAt`）。
+  3. 确认业务语义：`api/business-model/entities` 与 `api/business-model/metrics` 均 >0。
+  4. 提出首个问题：`done = 保存步.done`（近似，见下）。
+  5. 保存首个成果：`api/dashboards` 或 `api/apps` 任一 >0。
+  6. （可选）加载行业样例：`GetDemoDataPlanAsync().AlreadyInstalled`。
+- **设计决策与近似（须告知验收）**：
+  - **授权并入连接步**：`DataSources.razor` 保存即 `POST api/data-sources` 并自动授权当前管理员（见其 Save 的 Toast），无独立授权端点可判定，故不再单列「授权」步，避免额外每 DS `api/data-source-access` 调用与模糊判定。
+  - **首问步采用逻辑推断**：`AskController` 仅 `POST /api/ask`、`/refine`，无 GET 历史端点；`_conversations` 为 Scoped（按请求生命周期，不跨请求持久化），Ask 审计未落可查询库表（AskController 不注入 `SuperBIContext`）。因此「首问」无法精确判定，采用 `首问.done = 保存首个成果.done`（不提问即无法保存）作为代理，并在本处以文字注明。若验收要求精确，后续可加 `GET api/ask/history-count`（需审计落库或新增查询）。
+- **CI 验证**：待提交后由 `dotnet-build.yml` 的「编译检查」+「Web/Blazor E2E」守护（E2E 不覆盖 Home 渲染，但编译检查覆盖 Razor 编译与 i18n 门禁）。
+
 ---
 
 ## 5. 提交与 CI 纪律（沿用 G0 约束）
@@ -132,7 +151,7 @@ G1 有若干项被 Active Plan 的「待决事项（OPEN）」阻塞。下表明
 
 ## 6. 建议推进方式
 
-1. **已完成（无 OPEN 阻塞）**：DB-02（`e772684`，租户过滤 + 10622 + 跨租户回归）、QUOTA-01（`bcbc71d`，原子消费 + 并发回归）均已 DONE，CI 绿。**下一步可立即开工**：OBS-01（登录/Ask/P95/关联 ID 指标告警，无 OPEN 阻塞）。
+1. **已完成（无 OPEN 阻塞）**：DB-02（`e772684`）、QUOTA-01（`bcbc71d`）、ONBOARD-01（`953ae9f` 后新增引导清单）均已 DONE，CI 绿。**下一步可立即开工**：OBS-01（登录/Ask/P95/关联 ID 指标告警，无 OPEN 阻塞）。
 2. **骨架先行（范围待 OPEN 回填）**：E2E-01 用既有测试配置补齐业务链骨架。
 3. **OPEN 回填后再定稿**：PERF-01 / DR-01 / M14-01 / M14-08a / M14-07 必须在对应 OPEN 决策落地后锁定验收。
 4. **节奏**：每项独立提交并触发 CI；优先让「编译检查 / Web-Blazor-E2E」保持绿，V2.6 维持绿。

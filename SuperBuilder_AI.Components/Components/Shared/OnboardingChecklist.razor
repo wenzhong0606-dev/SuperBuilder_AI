@@ -1,0 +1,215 @@
+@inject IApiClient Api
+@inject AppState State
+@inject NavigationManager Nav
+@using System.Text.Json
+
+<SbPanel Icon="sb-ico-rocket" Title="@L10n.T(Keys.Content.OnboardingTitle, "开始使用")" Desc="@L10n.T(Keys.Content.OnboardingDesc, "按此清单完成首次接入，从空白租户走到第一个分析成果。")">
+    <Body>
+        @if (_loading)
+        {
+            <LoadingState Text="@L10n.T(Keys.Content.CommonLoading, "加载中…")" />
+        }
+        else if (_blank)
+        {
+            <SbEmptyState Icon="sb-ico-db" Title="@L10n.T(Keys.Content.OnboardingBlankTitle, "欢迎，先接入你的第一个数据源")" Text="@L10n.T(Keys.Content.OnboardingBlankText, "完成下面几步，即可用自然语言提问，并把结果沉淀为仪表盘或应用。")" />
+        }
+        else
+        {
+            <div class="onb-progress">
+                <SbProgress Percent="@(_steps.Count == 0 ? 0 : DoneCount() * 100.0 / _steps.Count)" />
+                <span>@L10n.T(Keys.Content.OnboardingProgress, "完成进度")：@DoneCount() / @_steps.Count</span>
+            </div>
+            <ol class="sb-steps onb-steps">
+                @foreach (var s in _steps)
+                {
+                    <li class="@StepClass(s)">
+                        <span class="onb-dot"></span>
+                        <div class="onb-body">
+                            <div class="onb-title">@s.Title</div>
+                            @if (!string.IsNullOrEmpty(s.Hint))
+                            {
+                                <div class="onb-hint">@s.Hint</div>
+                            }
+                            <div class="onb-actions">
+                                @if (s.Done)
+                                {
+                                    <span class="onb-done">@L10n.T(Keys.Content.OnbDone, "已完成")</span>
+                                }
+                                else
+                                {
+                                    <button class="btn btn-sm btn-primary" @onclick="() => Nav.NavigateTo(s.Href)">@L10n.T(Keys.Content.OnbGo, "去完成")</button>
+                                    @if (s.Retry)
+                                    {
+                                        <button class="btn btn-sm btn-outline-secondary" @onclick="() => Nav.NavigateTo(s.Href)">@L10n.T(Keys.Content.OnbRetry, "重试")</button>
+                                    }
+                                }
+                            </div>
+                        </div>
+                    </li>
+                }
+            </ol>
+        }
+    </Body>
+</SbPanel>
+
+@code {
+    private bool _loading = true;
+    private bool _blank;
+    private List<OnbStep> _steps = new();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        if (!State.IsAuthenticated) { _loading = false; return; }
+        await LoadAsync();
+        StateHasChanged();
+    }
+
+    private int DoneCount() => _steps.Count(s => s.Done);
+
+    private static string StepClass(OnbStep s) =>
+        s.Done ? "is-done" : s.Blocked ? "is-blocked" : "";
+
+    private async Task LoadAsync()
+    {
+        var tid = State.TenantId;
+        var dsRows = await RowsOf("api/data-sources/manage");
+        var anyDs = dsRows.Count > 0;
+        var connected = dsRows.Any(r => Str(r, "lastTestStatus") == "Ok");
+        var failedConn = dsRows.Any(r => Str(r, "lastTestStatus") == "Failed");
+        var scanned = dsRows.Any(r => Num(r, "tableCount") > 0);
+        var firstDsId = anyDs ? Str(dsRows[0], "id") : "";
+
+        var entities = await CountOf($"api/business-model/entities?tenantId={tid}");
+        var metrics = await CountOf($"api/business-model/metrics?tenantId={tid}");
+        var semanticDone = entities > 0 && metrics > 0;
+
+        var dashboards = await CountOf($"api/dashboards?tenantId={tid}");
+        var apps = await CountOf($"api/apps?tenantId={tid}");
+        var saved = dashboards > 0 || apps > 0;
+
+        var sampleInstalled = await SampleInstalledAsync();
+
+        _blank = !anyDs;
+
+        _steps = new List<OnbStep>
+        {
+            new OnbStep {
+                Title = L10n.T(Keys.Content.OnbConnectTitle, "接入数据源（连接 + 授权）"),
+                Hint = failedConn
+                    ? L10n.T(Keys.Content.OnbConnectFailed, "连接测试失败，请重新测试连接。")
+                    : L10n.T(Keys.Content.OnbConnectDesc, "在「数据源管理」登记业务库、测试连接；保存后即自动授权给当前管理员。"),
+                Href = "/data-sources",
+                Done = connected,
+                Retry = failedConn,
+                Blocked = false
+            },
+            new OnbStep {
+                Title = L10n.T(Keys.Content.OnbScanTitle, "扫描元数据"),
+                Hint = (anyDs && !scanned)
+                    ? L10n.T(Keys.Content.OnbScanRetry, "连接已建立但尚未扫描，请重新扫描。")
+                    : L10n.T(Keys.Content.OnbScanDesc, "对数据源执行一次元数据扫描，自动识别表与字段。"),
+                Href = string.IsNullOrEmpty(firstDsId) ? "/data-sources" : $"/data-sources/{firstDsId}",
+                Done = scanned,
+                Retry = anyDs && !scanned,
+                Blocked = !connected
+            },
+            new OnbStep {
+                Title = L10n.T(Keys.Content.OnbSemanticTitle, "确认业务语义（实体 / 指标）"),
+                Hint = L10n.T(Keys.Content.OnbSemanticDesc, "在「语义模型」核对实体与指标，让 AI 听懂业务口径。"),
+                Href = "/business-model",
+                Done = semanticDone,
+                Blocked = !scanned
+            },
+            new OnbStep {
+                Title = L10n.T(Keys.Content.OnbAskTitle, "提出首个分析问题"),
+                Hint = L10n.T(Keys.Content.OnbAskDesc, "进入「Ask BI 智能问数」，用自然语言提出第一个问题并查看结果与 SQL。"),
+                Href = "/ask",
+                Done = saved,
+                Blocked = !semanticDone
+            },
+            new OnbStep {
+                Title = L10n.T(Keys.Content.OnbSaveTitle, "保存首个分析成果"),
+                Hint = L10n.T(Keys.Content.OnbSaveDesc, "把满意的问答一键发布为仪表盘或应用，团队即可复用。"),
+                Href = "/dashboards",
+                Done = saved,
+                Blocked = !semanticDone
+            },
+            new OnbStep {
+                Title = L10n.T(Keys.Content.OnbSampleTitle, "（可选）加载行业样例数据"),
+                Hint = L10n.T(Keys.Content.OnbSampleDesc, "安装演示租户与示例数据快速体验；可随时删除演示租户清理。"),
+                Href = "/admin/demo-data",
+                Done = sampleInstalled,
+                Blocked = false,
+                Optional = true
+            }
+        };
+        _loading = false;
+    }
+
+    private async Task<int> CountOf(string url)
+    {
+        try
+        {
+            var (data, _, _, _) = await Api.GetJsonAsync(url);
+            if (data is { ValueKind: JsonValueKind.Array }) return data.Value.GetArrayLength();
+            if (data is { ValueKind: JsonValueKind.Object } && data.Value.TryGetProperty("items", out var items)
+                && items.ValueKind == JsonValueKind.Array)
+                return items.GetArrayLength();
+            return 0;
+        }
+        catch
+        {
+            return 0;
+        }
+    }
+
+    private async Task<List<JsonElement>> RowsOf(string url)
+    {
+        try
+        {
+            var (data, _, _, _) = await Api.GetJsonAsync(url);
+            if (data is { ValueKind: JsonValueKind.Array }) return data.Value.EnumerateArray().ToList();
+            if (data is { ValueKind: JsonValueKind.Object } && data.Value.TryGetProperty("items", out var items)
+                && items.ValueKind == JsonValueKind.Array)
+                return items.EnumerateArray().ToList();
+            return new List<JsonElement>();
+        }
+        catch
+        {
+            return new List<JsonElement>();
+        }
+    }
+
+    private static string Str(JsonElement e, string name) =>
+        e.TryGetProperty(name, out var v)
+            ? v.ValueKind == JsonValueKind.String ? v.GetString() ?? "" : v.ToString()
+            : "";
+
+    private static int Num(JsonElement e, string name) =>
+        e.TryGetProperty(name, out var v) && v.TryGetInt32(out var n) ? n : 0;
+
+    private async Task<bool> SampleInstalledAsync()
+    {
+        try
+        {
+            var (plan, _) = await Api.GetDemoDataPlanAsync();
+            return plan?.AlreadyInstalled ?? false;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private sealed record OnbStep
+    {
+        public string Title { get; set; } = "";
+        public string Hint { get; set; } = "";
+        public string Href { get; set; } = "";
+        public bool Done { get; set; }
+        public bool Retry { get; set; }
+        public bool Blocked { get; set; }
+        public bool Optional { get; set; }
+    }
+}

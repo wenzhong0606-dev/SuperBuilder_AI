@@ -42,16 +42,7 @@
         </a>
     </div>
 
-    <SbPanel Icon="sb-ico-activity" Title="@L10n.T(Keys.Content.HomePanelQuickStart, "快速开始")">
-        <Body>
-            <ol class="sb-steps">
-                <li>@L10n.T(Keys.Content.HomeStep1, "在「数据源管理」登记业务库并完成连接测试。")</li>
-                <li>@L10n.T(Keys.Content.HomeStep2, "在「语义模型 / 语义标签」补齐业务口径，让 AI 听得懂行话。")</li>
-                <li>@L10n.T(Keys.Content.HomeStep3, "进入「Ask BI 智能问数」提问，检查结果与生成的 SQL。")</li>
-                <li>@L10n.T(Keys.Content.HomeStep4, "把满意的结果一键发布为仪表盘或应用。")</li>
-            </ol>
-        </Body>
-    </SbPanel>
+    <OnboardingChecklist />
 </AuthGuard>
 
 @code {
