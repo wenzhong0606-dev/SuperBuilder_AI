@@ -52,6 +52,8 @@ G1 有若干项被 Active Plan 的「待决事项（OPEN）」阻塞。下表明
 
 **回填策略**：DB-02 / QUOTA-01 / OBS-01 不依赖上述 OPEN，可立即开工；E2E-01 核心浏览器链可用既有测试配置先行（支持环境仅影响范围边界，不阻塞骨架）；PERF/DR/M14-01/07/08a **必须等对应 OPEN 回填后**再定稿验收。
 
+> **可填写的收口表单**：`docs/plans/active/2026-09-open-decisions-form.md`（O1 支持环境 / O2 性能和恢复目标 / O3 试点业务口径，含每项的定稿去向与回填后动作）。回填后请把上表对应行改为 `CLOSED`。
+
 ---
 
 ## 3. G1 执行顺序（权威：M13 §4 第一批顺序 + 关键路径）
@@ -177,6 +179,24 @@ G1 有若干项被 Active Plan 的「待决事项（OPEN）」阻塞。下表明
 - **交付**：`scripts/dr-backup/backup-db-native.sql`、`restore-db-native.sql`（新增并实测）、重生成的 `restore-schema-from-migrations.sql`；`docs/ops/drill-evidence-20260913.md`（真实演练证据）；`docs/ops/backup-restore-dr.md`（修正）；Backlog DR-01 → DONE。
 - **残留（须告知验收）**：**RPO/RTO 目标值**仍待平台 owner 按 OPEN「性能与恢复目标」定稿（本项只给实测基线）。演练另发现的**两处相邻漂移已于 2026-09-13 归并**（开发库 `dotnet ef database update` 应用 M13_03 → 已应用 46；`schema-version.json` 重生成 → 46）：程序集/清单/开发库三方一致，`(Pending)`=0，`SchemaProbe` 不再判 `MigrationsPending`（见 `docs/ops/migration-seed-schemaversion.md §7.5`）。
 
+### 4.8 M14-07 (M14) — 支持与客户交接包：草稿已交付 ⏳ 待实测定稿
+
+- **起点与依赖语义**：`M14.md` §M14-07 明确「手册可在开发期起草，但**必须在 M13-10/11/14 完成后、G1 验收之前，依据实测结果完成定稿**；G1 只接受可用交接包，不接受未经验证的草稿」。其依赖 M13-10（DR-01）、M13-11（OBS-01）、M13-14（ONBOARD-01）均已 DONE → 具备起草条件，本次交付**草稿**。
+- **交付（2026-09-13，新增 8 文件）**：`docs/handover/` — `README.md`（索引 + 受众分层 + 定稿条件）＋ 7 册：
+  1. `01-install-upgrade.md` 安装与升级（组件/密钥前置、首次安装、升级判定与漂移处置、回退、验收记录表）
+  2. `02-customer-config-checklist.md` 客户配置清单（按 `OnboardingChecklist` 同序 7 步 + 6 项已知限制 + 交付填写表）
+  3. `03-operations-runbook.md` 日常运维（SLO 表占位、每日/每周巡检、告警响应、例行操作、多实例注意）
+  4. `04-incident-and-support.md` 故障级别/处理责任/支持入口 + **`SB_*` 错误码速查（19 项）** + FAQ（11 项）
+  5. `05-backup-restore.md` 备份恢复（组件清单、策略、恢复步骤与校验、实测基线、失败处置）
+  6. `06-data-export-and-exit.md` 数据导出与退出（5 阶段流程、导出通道、保留删除政策、授权记录模板）
+  7. `07-acceptance-checklist.md` 验收自检（4 条判据 + 定稿门槛 + 文档完备性 8 项）
+- **诚实边界（须告知验收）**：
+  - **服务目标（P95/可用性/失败率/成本）与 RPO/RTO 全部为占位**，标注 `【待实测回填】`/`【待定稿】`；`07` §0 明确「门槛未过时本包不得作为 G1 交付物提交」。
+  - **能力边界如实列明**：无自助「租户数据导出」API、无「租户物理删除」API（仅 `PATCH api/tenant-management/{id}/disable`）、Qdrant 快照为二进制 → 导出/退出走 DBA 脚本通道。
+  - 与既有 `docs/ops/*`（DR 手册、可观测排障、缓存一致性、迁移清单）**交叉引用不重复抄写**，避免双份真相。
+- **同步产出**：`docs/plans/active/2026-09-open-decisions-form.md`（O1 支持环境 / O2 性能和恢复目标 / O3 试点业务口径，含定稿去向与回填后动作）；Backlog M14-07：BACKLOG → **ACTIVE**；`docs/README.md` 新增 `handover/` 目录与两个入口链接。
+- **定稿（残余工作）**：① 回填 O1/O2/O3；② 以 PERF-01/DR-01 实测替换占位符；③ 完成 `07` 的四条判据演练（非开发人员安装+升级、关联 ID 定位、退出导出+授权记录、承诺≤实测）。
+
 ---
 
 ## 5. 提交与 CI 纪律（沿用 G0 约束）
@@ -193,7 +213,7 @@ G1 有若干项被 Active Plan 的「待决事项（OPEN）」阻塞。下表明
 
 ## 6. 建议推进方式
 
-1. **已完成（无 OPEN 阻塞）**：E2E-01、DB-02（`e772684`）、QUOTA-01（`bcbc71d`）、ONBOARD-01（引导清单）、**OBS-01（指标细分+扫描积压+告警；首提 CI 暴露启动期 DI 崩溃，二次提交 `7b43566` 修复后 CI 全绿）**、**CACHE-01（组授权变更轮换安全戳；CI `34742720340` 全绿）**、**DR-01（备份/恢复真实演练闭环：SQL+Qdrant+空库重放；新增原生脚本；残留仅 RPO/RTO 目标待 OPEN）** 均已 DONE。**下一步可立即开工**：无 OPEN 阻塞的 **M14-07 交接包草稿**（手册开发期起草、验收前依 M13-10/11/12 实测定稿）；**PERF-01 / M14-01 / M14-08a 仍受 OPEN 阻塞**（性能与恢复目标、试点业务口径）。
+1. **已完成（无 OPEN 阻塞）**：E2E-01、DB-02（`e772684`）、QUOTA-01（`bcbc71d`）、ONBOARD-01（引导清单）、**OBS-01（指标细分+扫描积压+告警；首提 CI 暴露启动期 DI 崩溃，二次提交 `7b43566` 修复后 CI 全绿）**、**CACHE-01（组授权变更轮换安全戳；CI `34742720340` 全绿）**、**DR-01（备份/恢复真实演练闭环：SQL+Qdrant+空库重放；新增原生脚本；残留仅 RPO/RTO 目标待 OPEN）**、**迁移漂移归并（45→46，`0771f52`，CI `34744475335` 全绿）** 均已 DONE；**M14-07 交接包草稿已交付（`docs/handover/` 7 册，Backlog → ACTIVE，待 PERF-01/OPEN 回填后定稿）**。**下一步可立即开工**：等待 `docs/plans/active/2026-09-open-decisions-form.md` 的 O1/O2/O3 回填（定性为「需用户/平台 owner 决策」）；**PERF-01 / M14-01 / M14-08a / M14-07 定稿仍受 OPEN 阻塞**。
 2. **骨架先行（范围待 OPEN 回填）**：E2E-01 用既有测试配置补齐业务链骨架。
 3. **OPEN 回填后再定稿**：PERF-01 / DR-01 / M14-01 / M14-08a / M14-07 必须在对应 OPEN 决策落地后锁定验收。
 4. **节奏**：每项独立提交并触发 CI；优先让「编译检查 / Web-Blazor-E2E」保持绿，V2.6 维持绿。

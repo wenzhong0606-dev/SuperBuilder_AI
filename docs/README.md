@@ -1,7 +1,7 @@
 # SuperBuilder AI 文档中心
 
 > Status: ACTIVE  
-> Last Updated: 2026-09-12
+> Last Updated: 2026-09-13
 
 本目录采用“战略总账 → 里程碑 → 当前执行计划 → Backlog → 历史证据”的治理方式，避免旧计划、旧审计和当前代码状态互相冲突。
 
@@ -31,6 +31,7 @@
 - `architecture/`：长期架构规范。
 - `specs/`：专项契约与设计说明。
 - `ops/`：迁移、备份、恢复、部署、运维证据。
+- `handover/`：M14-07 支持与客户交接包（安装升级、配置、运维、故障支持、备份恢复、数据退出）。
 - `api/`：OpenAPI 等 API 产物。
 
 ## 状态规范
@@ -62,6 +63,9 @@
 - Master：[`Master_Development_Plan.md`](Master_Development_Plan.md)
 - Backlog：[`Development_Backlog.md`](Development_Backlog.md)
 - 当前执行计划：[`plans/active/2026-09-production-readiness.md`](plans/active/2026-09-production-readiness.md)
+- G1 执行计划：[`plans/active/2026-09-g1-execution.md`](plans/active/2026-09-g1-execution.md)
+- **OPEN 待决回填表**：[`plans/active/2026-09-open-decisions-form.md`](plans/active/2026-09-open-decisions-form.md)
+- **客户交接包（M14-07）**：[`handover/README.md`](handover/README.md)
 - M13：[`milestones/M13.md`](milestones/M13.md)
 - M14：[`milestones/M14.md`](milestones/M14.md)
 - 发布证据记录：[`ops/release-evidence.md`](ops/release-evidence.md)（`BASE-01` 载体）
