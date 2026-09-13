@@ -90,8 +90,10 @@ G1 有若干项被 Active Plan 的「待决事项（OPEN）」阻塞。下表明
 - **风险 2（EF 10622）**：required-navigation + global query filter 组合可能触发 EF Core 警告/翻译异常。**第一项动作 = 实跑构建确认是否出现该警告**，再决定消除方式（通常：为 required 导航补 `.IsRequired()` 一致性或调整 Include 策略）。
 - 已有 `SuperBIContextTenantFilterTests.cs`，DB-02 在其基础上扩充跨租户回归。
 
-### 4.3 QUOTA-01 (M13-18) — 消费非原子，last-quota 竞态真实
-- 现状 `QuotaService.ConsumeAsync`（约 L79–90）：
+### 4.3 QUOTA-01 (M13-18) — 消费非原子，last-quota 竞态真实 ✅ 已完成
+- **实现（2026-09-13）**：`ConsumeAsync` 改为「单语句条件 `ExecuteUpdateAsync`」——`WHERE TenantId=@t AND ResourceType=@r AND PeriodKey=@key AND Used + @amt <= @limit` 时 `SET Used = Used + @amt`，影响行数 > 0 即成功；无当前周期行/周期滚动/已超额时先 `EnsureUsageRowAsync`（幂等插入或滚动，插入竞态 `IsUniqueViolation` 重试），再重试原子自增。读路径 `GetOrCreateUsageAsync` 同样加插入竞态重试。`ExecuteUpdate` 绕过变更跟踪器，成功后 `ReloadUsageTrackerAsync` 拉取最新 `Used` 避免同上下文后续查询读陈旧快照。无需新增迁移（仅 UPDATE/INSERT 语义变更）。
+- **验收已落地**：`QuotaServiceTests.Consume_Concurrent_NoOverconsumption`（12 并发 × 单次 6、上限 10）→ 断言 `Used <= 10` 且 `Used == 6 * 成功次数` 且成功次数 ≤ 1，证明最后一份额度并发争抢最多一份成功、不超额、不重复计数。原顺序测试 12 项 + 控制器 13 项全绿，0 编译错误。
+- 历史现状 `QuotaService.ConsumeAsync`（约 L79–90）：
   ```csharp
   var usage = await GetOrCreateUsageAsync(...);     // 读 Used
   if (usage.Used + amount > limit) return false;    // 检查

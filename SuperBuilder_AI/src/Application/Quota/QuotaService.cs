@@ -81,12 +81,28 @@ public class QuotaService : IQuotaService
         if (amount < 0) throw new ArgumentException("amount 不能为负。", nameof(amount));
         var now = DateTime.UtcNow;
         var (limit, window) = await ResolveLimitAsync(tenantId, resourceType, ct);
-        var usage = await GetOrCreateUsageAsync(tenantId, resourceType, window, now, ct);
-        if (usage.Used + amount > limit) return false;
-        usage.Used += amount;
-        usage.PeriodKey = PeriodKeyFor(window, now);
-        await _ctx.SaveChangesAsync(ct);
-        return true;
+        var key = PeriodKeyFor(window, now);
+
+        // 原子条件自增：单语句 UPDATE，仅当「当前周期且自增后仍不超额」时 +amount。
+        // 数据库层判定，彻底消除 read-modify-write 竞态导致的超额消费（M13-18 / QUOTA-01）。
+        // ExecuteUpdate 绕过变更跟踪器，成功后需 Reload 跟踪中的用量实体，避免后续读取看到陈旧快照。
+        if (await AtomicIncrementAsync(tenantId, resourceType, key, amount, limit, ct) > 0)
+        {
+            await ReloadUsageTrackerAsync(tenantId, resourceType, ct);
+            return true;
+        }
+
+        // 未命中：无行 / 周期已滚动 / 已超额。先确保当前周期行就绪（去重+滚动，幂等）。
+        if (!await EnsureUsageRowAsync(tenantId, resourceType, window, now, ct))
+            return false; // 行无法就绪或已超额
+
+        // 行就绪后重试原子自增（此时 PeriodKey 必为当前周期，且门禁未超额时才成功）。
+        if (await AtomicIncrementAsync(tenantId, resourceType, key, amount, limit, ct) > 0)
+        {
+            await ReloadUsageTrackerAsync(tenantId, resourceType, ct);
+            return true;
+        }
+        return false;
     }
 
     public async Task<QuotaItemView> UpsertPolicyAsync(
@@ -227,39 +243,143 @@ public class QuotaService : IQuotaService
         return (usage.Used, usage.PeriodKey);
     }
 
-    // 写路径：创建或滚动并持久化
+    // 写路径：创建或滚动并持久化（插入竞态下幂等重试；供 SetUsageAsync 使用）。
     private async Task<QuotaUsage> GetOrCreateUsageAsync(long tenantId, QuotaResourceType rt, QuotaWindow window, DateTime now, CancellationToken ct)
     {
         var key = PeriodKeyFor(window, now);
-        var usage = await _ctx.QuotaUsages
-            .Where(u => u.TenantId == tenantId && u.ResourceType == rt)
-            .OrderByDescending(u => u.Id)
-            .FirstOrDefaultAsync(ct);
-
-        if (usage == null)
+        for (int attempt = 0; attempt < 3; attempt++)
         {
-            usage = new QuotaUsage
+            var usage = await _ctx.QuotaUsages
+                .Where(u => u.TenantId == tenantId && u.ResourceType == rt)
+                .OrderByDescending(u => u.Id)
+                .FirstOrDefaultAsync(ct);
+
+            if (usage is null)
             {
-                TenantId = tenantId,
-                ResourceType = rt,
-                Used = 0,
-                PeriodKey = key,
-                LastReset = now,
-                CreatedTime = now,
-            };
-            _ctx.QuotaUsages.Add(usage);
-            await _ctx.SaveChangesAsync(ct);
+                var created = new QuotaUsage
+                {
+                    TenantId = tenantId,
+                    ResourceType = rt,
+                    Used = 0,
+                    PeriodKey = key,
+                    LastReset = now,
+                    CreatedTime = now,
+                };
+                _ctx.QuotaUsages.Add(created);
+                try
+                {
+                    await _ctx.SaveChangesAsync(ct);
+                    return created;
+                }
+                catch (DbUpdateException ex) when (IsUniqueViolation(ex))
+                {
+                    // 并发线程已先行插入：清理本次失败实体，下一轮接管既有行。
+                    DetachAddedUsages();
+                    await Task.Delay(20 * (attempt + 1), ct);
+                    continue;
+                }
+            }
+
+            if (usage.PeriodKey != key)
+            {
+                usage.Used = 0;
+                usage.PeriodKey = key;
+                usage.LastReset = now;
+                await _ctx.SaveChangesAsync(ct);
+            }
             return usage;
         }
+        throw new InvalidOperationException("无法确保配额用量行（并发唯一冲突重试耗尽）。");
+    }
 
-        if (usage.PeriodKey != key)
+    // 原子条件自增：单语句 UPDATE，仅当当前周期且自增后仍不超额时 +amount。
+    private Task<int> AtomicIncrementAsync(long tenantId, QuotaResourceType rt, string key, long amount, long limit, CancellationToken ct) =>
+        _ctx.QuotaUsages
+            .Where(u => u.TenantId == tenantId && u.ResourceType == rt && u.PeriodKey == key && u.Used + amount <= limit)
+            .ExecuteUpdateAsync(u => u.SetProperty(x => x.Used, x => x.Used + amount), ct);
+
+    // 写路径：确保当前周期用量行就绪（无则插入、跨周期则滚动），插入竞态下幂等重试。
+    private async Task<bool> EnsureUsageRowAsync(long tenantId, QuotaResourceType rt, QuotaWindow window, DateTime now, CancellationToken ct)
+    {
+        var key = PeriodKeyFor(window, now);
+        for (int attempt = 0; attempt < 3; attempt++)
         {
-            usage.Used = 0;
-            usage.PeriodKey = key;
-            usage.LastReset = now;
-            await _ctx.SaveChangesAsync(ct);
+            var usage = await _ctx.QuotaUsages
+                .Where(u => u.TenantId == tenantId && u.ResourceType == rt)
+                .OrderByDescending(u => u.Id)
+                .FirstOrDefaultAsync(ct);
+
+            if (usage is null)
+            {
+                var created = new QuotaUsage
+                {
+                    TenantId = tenantId,
+                    ResourceType = rt,
+                    Used = 0,
+                    PeriodKey = key,
+                    LastReset = now,
+                    CreatedTime = now,
+                };
+                _ctx.QuotaUsages.Add(created);
+                try
+                {
+                    await _ctx.SaveChangesAsync(ct);
+                    return true;
+                }
+                catch (DbUpdateException ex) when (IsUniqueViolation(ex))
+                {
+                    DetachAddedUsages();
+                    await Task.Delay(20 * (attempt + 1), ct);
+                    continue;
+                }
+            }
+
+            if (usage.PeriodKey != key)
+            {
+                usage.Used = 0;
+                usage.PeriodKey = key;
+                usage.LastReset = now;
+                await _ctx.SaveChangesAsync(ct);
+            }
+            return true;
         }
-        return usage;
+        return false;
+    }
+
+    private void DetachAddedUsages()
+    {
+        foreach (var e in _ctx.ChangeTracker.Entries<QuotaUsage>().Where(e => e.State == EntityState.Added).ToList())
+            e.State = EntityState.Detached;
+    }
+
+    // ExecuteUpdate 不更新变更跟踪器中的实体；Reload 拉取 DB 最新 Used，避免同一上下文后续查询读到陈旧值。
+    private async Task ReloadUsageTrackerAsync(long tenantId, QuotaResourceType rt, CancellationToken ct)
+    {
+        var tracked = _ctx.ChangeTracker.Entries<QuotaUsage>()
+            .FirstOrDefault(e => e.Entity.TenantId == tenantId && e.Entity.ResourceType == rt);
+        if (tracked is not null)
+            await tracked.ReloadAsync(ct);
+    }
+
+    // SQLite: Microsoft.Data.Sqlite.SqliteException（SqliteErrorCode 2067 唯一约束 / 1555 约束）
+    // SQL Server: Microsoft.Data.SqlClient.SqlException（Number 2601 / 2627）
+    private static bool IsUniqueViolation(DbUpdateException ex)
+    {
+        var inner = ex.InnerException;
+        if (inner is null) return false;
+        var t = inner.GetType();
+        var name = t.Name;
+        if (name == "SqliteException")
+        {
+            var code = (int?)t.GetProperty("SqliteErrorCode")?.GetValue(inner);
+            return code == 2067 || code == 1555;
+        }
+        if (name == "SqlException")
+        {
+            var number = (int?)t.GetProperty("Number")?.GetValue(inner);
+            return number == 2601 || number == 2627;
+        }
+        return false;
     }
 
     private static string PeriodKeyFor(QuotaWindow window, DateTime now) => window switch

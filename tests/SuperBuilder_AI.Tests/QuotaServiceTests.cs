@@ -1,3 +1,4 @@
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
@@ -231,5 +232,76 @@ public class QuotaServiceTests
         Assert.Equal(42, row.Used);
         Assert.Equal(158, row.Remaining);
         Assert.Equal(System.DateTime.UtcNow.ToString("yyyy-MM-dd"), row.PeriodKey);
+    }
+
+    [Fact]
+    public async Task Consume_Concurrent_NoOverconsumption()
+    {
+        // 共享 SQLite 文件库 + 多上下文并发扣减，验证原子条件自增不会超额（M13-18 / QUOTA-01）。
+        var path = Path.GetTempFileName();
+        try
+        {
+            var connString = new Microsoft.Data.Sqlite.SqliteConnectionStringBuilder
+            {
+                DataSource = path,
+                Mode = Microsoft.Data.Sqlite.SqliteOpenMode.ReadWriteCreate,
+            }.ToString();
+
+            // 建库 + 种子：用租户覆盖把 Users 上限压到 10（单次消费 6，并发下必然触发超额竞态）。
+            using (var seedCtx = CreateFileContext(connString))
+            {
+                seedCtx.Database.EnsureCreated();
+                seedCtx.Tenants.Add(new Tenant { Id = Tenant100, TenantCode = "t-100", TenantName = "T", Enabled = true });
+                seedCtx.QuotaPolicies.Add(new QuotaPolicy
+                {
+                    TenantId = Tenant100,
+                    ResourceType = QuotaResourceType.Users,
+                    Limit = 10,
+                    Window = QuotaWindow.Total,
+                    CreatedTime = System.DateTime.UtcNow,
+                });
+                seedCtx.SaveChanges();
+            }
+
+            const int N = 12;
+            var tasks = new Task<bool>[N];
+            for (int i = 0; i < N; i++)
+            {
+                tasks[i] = Task.Run(async () =>
+                {
+                    await using var ctx = CreateFileContext(connString);
+                    var svc = new QuotaService(ctx);
+                    try { return await svc.ConsumeAsync(Tenant100, QuotaResourceType.Users, 6); }
+                    catch { return false; } // 锁等待等瞬态异常视为未消费
+                });
+            }
+            var results = await Task.WhenAll(tasks);
+            var trueCount = results.Count(r => r);
+
+            await using var verifyCtx = CreateFileContext(connString);
+            var used = await verifyCtx.QuotaUsages
+                .Where(u => u.TenantId == Tenant100 && u.ResourceType == QuotaResourceType.Users)
+                .Select(u => u.Used).FirstOrDefaultAsync();
+
+            // 关键不变量：绝不过额（Limit=10、单次 6，最多 1 次成功通过门禁）。
+            Assert.True(used <= 10, $"超额消费：Used={used} > Limit=10");
+            Assert.Equal(6L * trueCount, used);
+            Assert.True(trueCount <= 1, $"并发超额门禁失效：{trueCount} 次成功");
+        }
+        finally
+        {
+            try { File.Delete(path); } catch (IOException) { /* 连接释放竞态，忽略 */ }
+        }
+    }
+
+    // 打开连接并设置 busy_timeout（Microsoft.Data.Sqlite 不支持该连接字符串关键字），避免并发写锁瞬态失败。
+    private static SuperBIContext CreateFileContext(string connString)
+    {
+        var conn = new Microsoft.Data.Sqlite.SqliteConnection(connString);
+        conn.Open();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = "PRAGMA busy_timeout = 10000;";
+        cmd.ExecuteNonQuery();
+        return new SuperBIContext(new DbContextOptionsBuilder<SuperBIContext>().UseSqlite(conn).Options);
     }
 }
