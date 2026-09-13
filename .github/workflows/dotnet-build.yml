@@ -37,6 +37,52 @@ jobs:
         if: success()
         run: echo "SuperBuilder AI Release 编译通过"
 
+  unit-tests:
+    name: 单元测试 (SuperBuilder_AI.Tests)
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: 检出源码
+        uses: actions/checkout@v4
+      - name: 设置 .NET 环境
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: 运行全量单元测试
+        # CI-02：全量主单测 job。此前 tests/SuperBuilder_AI.Tests 不在 SuperBuilder_AI.CI.slnf 中，
+        # 其 1061 个 [Fact]/[Theory] 从未在 CI 编译或执行——代码改动破坏单测无人发现。
+        #
+        # 关键：测试工程必须"自带完整 restore+build"（本命令即完整 dotnet test，未加 --no-restore/--no-build），
+        # 且**不得**携带全局 -p:TargetFrameworks=net10.0：该全局属性会污染测试工程的 NuGet 资产关联，
+        # 使 xunit.runner.visualstudio 适配器 build/*.targets 与 net10.0 错配、适配器 DLL 不进输出，
+        # dotnet test 报 "No test is available" → 0 用例 → 退出码 0 → 假绿（同 e2e job 的既有注释）。
+        # 因全局 env CI=true，SuperBuilder_AI.Components 只产 net10.0（见其 csproj），
+        # 故 ProjectReference → Components 不会要求 android/ios workload。
+        # 测试为纯内存 SQLite（Microsoft.EntityFrameworkCore.Sqlite），不依赖 SQL Server / Qdrant 容器。
+        # "执行数 > 0" 由 xunit 汇总行的 Total 保证：0 用例即判定失败，防假绿。
+        run: |
+          set -o pipefail
+          dotnet test tests/SuperBuilder_AI.Tests/SuperBuilder_AI.Tests.csproj \
+            --configuration Release \
+            --logger "console;verbosity=normal" 2>&1 | tee unit-tests.log
+          test_exit=$?
+          # 兼容 classic（"Total tests: N"）与 terminal（"Total:  N"）两种摘要格式
+          total=$(grep -oE 'Total[^0-9]*[0-9]+' unit-tests.log | tail -1 | grep -oE '[0-9]+$' || true)
+          echo "执行用例数（Total）= ${total:-0}"
+          if [ "${total:-0}" -eq 0 ]; then
+            echo "::error::单元测试执行数为 0，疑似适配器未部署/工程未构建——按失败处理，防止假绿。"
+            exit 1
+          fi
+          exit $test_exit
+      - name: 上传单元测试日志
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-tests-log
+          path: unit-tests.log
+          if-no-files-found: ignore
+
   controller-runtime:
     name: V2.6 Evaluation Controller Runtime Smoke
     needs: build

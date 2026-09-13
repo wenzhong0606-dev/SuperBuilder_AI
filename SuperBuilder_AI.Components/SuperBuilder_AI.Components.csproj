@@ -1,8 +1,16 @@
 <Project Sdk="Microsoft.NET.Sdk.Razor">
 
   <PropertyGroup>
-    <!-- 多目标：net10.0 供 Blazor Web Head / MAUI Windows；android/ios 供 MAUI 移动端原生构建 -->
-    <TargetFrameworks>net10.0;net10.0-android;net10.0-ios</TargetFrameworks>
+    <!-- 多目标：net10.0 供 Blazor Web Head / MAUI Windows；android/ios 供 MAUI 移动端原生构建。
+         CI（GitHub Actions 设 CI=true，runner 无 android/ios workload）只产 net10.0，原因有二：
+         ① 无移动端 workload 时构建 android/ios 目标直接 NETSDK1147 失败；
+         ② 使单元测试工程可"自带完整 restore+build"，无需携带全局 -p:TargetFrameworks=net10.0
+            （该全局属性会污染测试工程 NuGet 资产关联 → xunit.runner.visualstudio 适配器不进输出
+             → dotnet test 报 "No test is available" → 0 用例退出码 0 假绿）。
+         现有 CI job 显式传 -p:TargetFrameworks=net10.0（全局属性优先级更高），行为保持不变。
+         本地开发（未设 CI）仍产三目标。 -->
+    <TargetFrameworks Condition="'$(CI)' != 'true'">net10.0;net10.0-android;net10.0-ios</TargetFrameworks>
+    <TargetFrameworks Condition="'$(CI)' == 'true'">net10.0</TargetFrameworks>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>SuperBuilder_AI.Components</RootNamespace>
