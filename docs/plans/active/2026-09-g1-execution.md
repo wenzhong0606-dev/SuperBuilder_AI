@@ -90,7 +90,8 @@ G1 有若干项被 Active Plan 的「待决事项（OPEN）」阻塞。下表明
 - **验收边界**：E2E 工程因沙箱 NuGet `CommonApplicationData` 静态构造坑**无法在本环境编译验证**，但 CI 对该测试工程单独 `dotnet test`（自带 restore+build）会自动恢复与编译；已逐一对齐 `LoginHelper.ApiLoginByCodeAsync(page,user,pwd,tenantCode)`、`E2EConfig.Require`/`ApiUrl` 签名，并对 `PlaywrightFixture.NewPageAsync` 在无浏览器时 `Skip.If(true)` 降级行为做了源码核对，降低 CI 风险。
 - **CI 验证（闭环）**：首跑 run `34733590844`（add71d38）因 `E2EApiHelper.CallApiAsync` 误用 `EvaluateAsync<JsonElement>` 解析 `JSON.stringify(...)` 返回值（得到 String 类型 JsonElement），首行 `GetProperty("status")` 抛「requires an element of type 'Object'」→ 2 个新用例失败。修复为 `EvaluateAsync<string>` 回原始串、C# 侧 `JsonDocument` 解析，并补齐 e2e API 启动 env 的 `SecretStore__MasterKey`（与 build job 一致，消除种子/加解密降级）。重跑 run `34734277058`（c8afcc26）= **success**（编译检查 / Web-Blazor E2E / V2.6 三 job 全绿）——整支业务链 E2E 已被 CI 守护，E2E-01 正式收口。
 
-### 4.2 DB-02 (M13-17) — 过滤已建，风险在 opt-in 与 10622
+### 4.2 DB-02 (M13-17) — 租户过滤已建 + 跨租户回归 ✅ 已完成
+- **验收已落地（2026-09-13，`e772684`）**：全局租户过滤已对 ~25 实体生效，并为 7 个依赖实体补 `HasQueryFilter`（含 `_tenantFilterEnabled` 守卫），消除 required-navigation + global filter 的 EF Core 10622 模型告警；`SuperBIContextTenantFilterTests` 扩充跨租户回归，CI 编译/E2E 绿。残留 opt-in 审计作为 M13 收口后的持续加固项，见下。
 - `SuperBIContext` 已实施全局租户过滤：私有字段 `_tenantFilterEnabled` + `_scopedTenantId`，由 `ApplyTenantScope(tenantId)` **显式开启**（注释明确：Golden/系统路径不调用 → no-op，不产 WHERE）。
 - 已对 ~25 个实体声明 `HasQueryFilter`（`DataSource`/`MetadataTable`/`BusinessEntity`/`TenantSetting`/`SemanticLabel`/`Dashboard`/`Theme`/`ModelAccount`/`CustomComponent*`/`AppPlan`/`AgentPlan`/`AgentRun`/`User`/`Role`/`Permission`/`AuditLog`/`QuotaPolicy`/`QuotaUsage`/`UiTextResource`/`Organization`/`Department`/`UserGroup*`/`UserDepartmentMember` 等）。含 `TenantId==0` 全局放行的是共享模板/基线类（SemanticLabel/Dashboard/Theme/AppPlan/AgentPlan/Role/Permission/AuditLog/QuotaPolicy/UiTextResource）。
 - **风险 1（opt-in 缺口）**：过滤是**调用点显式开启**，任何漏调 `ApplyTenantScope` 的租户作用域读路径会静默看到跨租户数据。DB-02 第一项工作 = 审计所有租户查询入口确认开启，或评估改为基于 `ITenantContextAccessor` 的默认开启（需规避 P4.3 曾因 System 上下文 TenantId=0 过度过滤的回归，须保留 Golden no-op 路径）。
@@ -131,7 +132,7 @@ G1 有若干项被 Active Plan 的「待决事项（OPEN）」阻塞。下表明
 
 ## 6. 建议推进方式
 
-1. **立即可开工（无 OPEN 阻塞）**：DB-02（先做 10622 核查 + opt-in 审计）、QUOTA-01（先定义并发计数规则 + 原子 Consume）、OBS-01。
+1. **已完成（无 OPEN 阻塞）**：DB-02（`e772684`，租户过滤 + 10622 + 跨租户回归）、QUOTA-01（`bcbc71d`，原子消费 + 并发回归）均已 DONE，CI 绿。**下一步可立即开工**：OBS-01（登录/Ask/P95/关联 ID 指标告警，无 OPEN 阻塞）。
 2. **骨架先行（范围待 OPEN 回填）**：E2E-01 用既有测试配置补齐业务链骨架。
 3. **OPEN 回填后再定稿**：PERF-01 / DR-01 / M14-01 / M14-08a / M14-07 必须在对应 OPEN 决策落地后锁定验收。
 4. **节奏**：每项独立提交并触发 CI；优先让「编译检查 / Web-Blazor-E2E」保持绿，V2.6 维持绿。

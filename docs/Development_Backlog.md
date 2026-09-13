@@ -29,8 +29,8 @@
 
 | ID | 来源 | 工作项 | 状态 | Milestone |
 |---|---|---|---|---|
-| DB-02 | EF Warning | Required relation + global query filter 一致性 | BACKLOG | M13 |
-| QUOTA-01 | M14-03 | Quota 原子消费、并发、幂等。**边界**：本项只做数据库原子性（最后一份额度并发、失败回滚、幂等）；全业务路径强制与周期重置归 M14-03 | BACKLOG | M13（原子性）→ M14-03（全路径） |
+| DB-02 | EF Warning | Required relation + global query filter 一致性 | DONE | M13 |
+| QUOTA-01 | M14-03 | Quota 原子消费、并发、幂等。**边界**：本项只做数据库原子性（最后一份额度并发、失败回滚、幂等）；全业务路径强制与周期重置归 M14-03 | DONE | M13（原子性）→ M14-03（全路径） |
 | E2E-01 | M13-09 | DataSource→Scan→Ask→Dashboard/App→RLS 浏览器链（补 DataSource→Scan / Dashboard 渲染 / RLS 隔离三段 + 全量业务链接入 CI 门禁，M13-09 收口） | DONE | M13 |
 | AGENT-02 | M13-08 | Query Tool 真实后端 | BACKLOG | M13（G1 后；客户明确需要时转条件门禁） |
 | AGENT-03 | M13-08 | Dashboard Tool 真实后端 | BACKLOG | M13（G1 后；客户明确需要时转条件门禁） |
