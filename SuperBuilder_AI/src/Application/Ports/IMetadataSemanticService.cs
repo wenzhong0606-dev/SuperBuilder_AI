@@ -59,8 +59,7 @@ public interface IMetadataSemanticService
 	/// </returns>
 	Task<MetadataSemantic?>
 		GenerateAsync(
-			MetadataColumn column,
-			CancellationToken ct = default);
+			MetadataColumn column);
 
 
 
@@ -95,9 +94,13 @@ public interface IMetadataSemanticService
 	/// </returns>
 	Task<List<MetadataSemantic>>
 		GenerateBatchAsync(
-			List<MetadataColumn> columns,
-			Action<SemanticGenerationProgress>? progress = null,
-			CancellationToken ct = default);
+			List<MetadataColumn> columns);
+
+	Task<List<MetadataSemantic>> GenerateBatchAsync(
+		List<MetadataColumn> columns,
+		Action<SemanticGenerationProgress>? progress,
+		CancellationToken ct)
+		=> GenerateBatchAsync(columns);
 
 
 
