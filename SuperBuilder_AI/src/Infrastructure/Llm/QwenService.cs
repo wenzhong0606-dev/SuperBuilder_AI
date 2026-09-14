@@ -111,28 +111,25 @@ public class QwenService
 
 
 
-		var content =
-		new StringContent(
-			json,
-			Encoding.UTF8,
-			"application/json");
+		using var requestMessage = new HttpRequestMessage(
+			HttpMethod.Post,
+			_configuration["Qwen:Endpoint"]);
 
-
-
-		_httpClient.DefaultRequestHeaders
-			.Authorization =
+		requestMessage.Headers.Authorization =
 			new AuthenticationHeaderValue(
 				"Bearer",
 				apiKey);
 
+		requestMessage.Content =
+			new StringContent(
+				json,
+				Encoding.UTF8,
+				"application/json");
 
-
-		var response =
-		await _httpClient.PostAsync(
-			_configuration["Qwen:Endpoint"],
-			content,
-			ct);
-
+		using var response =
+			await _httpClient.SendAsync(
+				requestMessage,
+				ct);
 
 
 		response.EnsureSuccessStatusCode();
