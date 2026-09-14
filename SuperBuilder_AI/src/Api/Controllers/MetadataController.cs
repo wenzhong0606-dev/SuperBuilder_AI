@@ -125,6 +125,8 @@ public class MetadataController : Controller
 			dataSourceId = job.DataSourceId,
 			status = job.Status.ToString(),
 			progressPercent = job.ProgressPercent,
+			stage = job.Stage,
+			progressDetails = ScanTelemetry.FromJson(job.ProgressDetailsJson),
 			tablesScanned = job.TablesScanned,
 			columnsScanned = job.ColumnsScanned,
 			orphansDetected = job.OrphansDetected,

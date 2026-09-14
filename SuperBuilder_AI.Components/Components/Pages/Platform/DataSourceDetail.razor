@@ -22,24 +22,95 @@
             </SbToolbar>
             @if (_scanJob is not null)
             {
-                <div class="scan-job @ScanStatusClass(_scanJob.Status)">
+                var scan = _scanJob.ProgressDetails ?? new ScanProgressDetailsView();
+                var tablesTotal = scan.TablesDiscovered > 0 ? scan.TablesDiscovered : _scanJob.TablesScanned;
+                var tablesDone = scan.TablesProcessed > 0 ? scan.TablesProcessed : _scanJob.TablesScanned;
+                var columnsTotal = scan.ColumnsDiscovered > 0 ? scan.ColumnsDiscovered : _scanJob.ColumnsScanned;
+                var columnsDone = scan.ColumnsProcessed > 0 ? scan.ColumnsProcessed : _scanJob.ColumnsScanned;
+
+                <div class="scan-job scan-monitor @ScanStatusClass(_scanJob.Status)">
                     <div class="scan-job-head">
-                        <span class="badge @ScanStatusBadge(_scanJob.Status)">@ScanStatusLabel(_scanJob.Status)</span>
-                        <span class="scan-job-time">@ScanTimeLabel(_scanJob)</span>
+                        <div class="scan-monitor-title">
+                            <span class="badge @ScanStatusBadge(_scanJob.Status)">@ScanStatusLabel(_scanJob.Status)</span>
+                            <strong>@string.Format(L10n.T(Keys.Content.DataSourceScanStage, "当前阶段：{0}"), StageDisplay(_scanJob.Stage))</strong>
+                        </div>
+                        <div class="scan-monitor-time">
+                            <span>@string.Format(L10n.T(Keys.Content.DataSourceScanElapsed, "已耗时 {0}"), FormatDuration(scan.ElapsedMs))</span>
+                            @if (_scanJob.Status == "Running" && scan.EstimatedRemainingMs is > 0)
+                            {
+                                <span>@string.Format(L10n.T(Keys.Content.DataSourceScanEta, "预计剩余 {0}"), FormatDuration(scan.EstimatedRemainingMs.Value))</span>
+                            }
+                            <span>@_scanJob.ProgressPercent%</span>
+                        </div>
                         @if (_scanJob.Status == "Failed")
                         {
                             <button class="btn btn-sm btn-outline-secondary ms-auto" @onclick="RetryScan">@L10n.T(Keys.Content.DataSourceScanRetry, "重试")</button>
                         }
                     </div>
-                    <div class="progress"><span style="@($"width:{_scanJob.ProgressPercent}%")"></span></div>
-                    <div class="scan-job-stats">
-                        <span>@string.Format(L10n.T(Keys.Content.DataSourceScanTablesScanned, "已扫描表：{0}"), _scanJob.TablesScanned)</span>
-                        <span>@string.Format(L10n.T(Keys.Content.DataSourceScanColumnsScanned, "已扫描字段：{0}"), _scanJob.ColumnsScanned)</span>
-                        @if (_scanJob.OrphansDetected > 0)
-                        {
-                            <span>@string.Format(L10n.T(Keys.Content.DataSourceScanOrphansRemoved, "已清理孤儿对象：{0}"), _scanJob.OrphansDetected)</span>
-                        }
+
+                    <div class="progress scan-monitor-progress"><span style="@($"width:{_scanJob.ProgressPercent}%")"></span></div>
+
+                    <div class="scan-monitor-metrics">
+                        <div class="scan-monitor-metric">
+                            <strong>@string.Format(L10n.T(Keys.Content.DataSourceScanTablesProgress, "表 {0}/{1}"), tablesDone, tablesTotal)</strong>
+                        </div>
+                        <div class="scan-monitor-metric">
+                            <strong>@string.Format(L10n.T(Keys.Content.DataSourceScanColumnsProgress, "字段 {0}/{1}"), columnsDone, columnsTotal)</strong>
+                        </div>
+                        <div class="scan-monitor-metric">
+                            <strong>@string.Format(L10n.T(Keys.Content.DataSourceScanSemanticsProgress, "语义 {0}/{1}"), scan.SemanticsProcessed, scan.SemanticsTotal)</strong>
+                        </div>
+                        <div class="scan-monitor-metric">
+                            <strong>@string.Format(L10n.T(Keys.Content.DataSourceScanVectorsProgress, "向量 {0}/{1}"), scan.VectorsProcessed, scan.VectorsTotal)</strong>
+                        </div>
                     </div>
+
+                    @if (!string.IsNullOrWhiteSpace(scan.CurrentObjectName))
+                    {
+                        <div class="scan-monitor-current">
+                            <span class="status-pulse"></span>
+                            @string.Format(L10n.T(Keys.Content.DataSourceScanCurrentObject, "当前处理：{0}"), scan.CurrentObjectName)
+                        </div>
+                    }
+
+                    <div class="scan-monitor-detail-grid">
+                        <section class="scan-monitor-detail">
+                            <div class="scan-monitor-section-title">@L10n.T(Keys.Content.DataSourceScanChanges, "本次变化")</div>
+                            <div class="scan-job-stats">
+                                <span>@string.Format(L10n.T(Keys.Content.DataSourceScanChangeTables, "表 +{0} / 更新 {1}"), scan.AddedTables, scan.UpdatedTables)</span>
+                                <span>@string.Format(L10n.T(Keys.Content.DataSourceScanChangeColumns, "字段 +{0} / 更新 {1}"), scan.AddedColumns, scan.UpdatedColumns)</span>
+                                @if (scan.OrphansRemoved > 0)
+                                {
+                                    <span>@string.Format(L10n.T(Keys.Content.DataSourceScanOrphansRemoved, "已清理孤儿对象：{0}"), scan.OrphansRemoved)</span>
+                                }
+                                @if (scan.WarningsCount > 0)
+                                {
+                                    <span>@string.Format(L10n.T(Keys.Content.DataSourceScanWarnings, "警告 {0}"), scan.WarningsCount)</span>
+                                }
+                            </div>
+                        </section>
+
+                        <section class="scan-monitor-detail">
+                            <div class="scan-monitor-section-title">@L10n.T(Keys.Content.DataSourceScanEvents, "实时动态")</div>
+                            <div class="scan-event-list">
+                                @if (scan.Events.Count == 0)
+                                {
+                                    <span class="muted tiny">@ScanStatusLabel(_scanJob.Status)</span>
+                                }
+                                else
+                                {
+                                    @foreach (var evt in scan.Events.OrderByDescending(x => x.TimestampUtc).Take(8))
+                                    {
+                                        <div class="scan-event @(evt.Level == "Warning" ? "is-warning" : "")">
+                                            <time>@evt.TimestampUtc.ToLocalTime().ToString("HH:mm:ss")</time>
+                                            <span>@evt.Message</span>
+                                        </div>
+                                    }
+                                }
+                            </div>
+                        </section>
+                    </div>
+
                     @if (_scanJob.Status == "Failed" && !string.IsNullOrWhiteSpace(_scanJob.ErrorCode))
                     {
                         <div class="scan-job-error">
@@ -255,7 +326,7 @@
         _scanCts = new CancellationTokenSource();
         var ct = _scanCts.Token;
         _scanPolling = true;
-        _scanJob = new ScanJobView { JobId = jobId, DataSourceId = Id, Status = "Queued", ProgressPercent = 0 };
+        _scanJob = new ScanJobView { JobId = jobId, DataSourceId = Id, Status = "Queued", Stage = "Queued", ProgressPercent = 0 };
         try
         {
             while (!ct.IsCancellationRequested)
@@ -295,6 +366,31 @@
     }
 
     public void Dispose() => _scanCts?.Cancel();
+
+    private string StageDisplay(string? stage) => stage switch
+    {
+        "Connecting" => L10n.T(Keys.Content.DataSourceScanStageConnecting, "连接数据库"),
+        "DiscoveringTables" or "DiscoveringColumns" => L10n.T(Keys.Content.DataSourceScanStageDiscovering, "发现数据库结构"),
+        "ComparingMetadata" => L10n.T(Keys.Content.DataSourceScanStageComparing, "比对元数据"),
+        "CleaningOrphans" => L10n.T(Keys.Content.DataSourceScanStageCleaning, "检查失效元数据"),
+        "SyncingMetadata" => L10n.T(Keys.Content.DataSourceScanStageSyncing, "同步元数据"),
+        "GeneratingSemantics" => L10n.T(Keys.Content.DataSourceScanStageSemantics, "AI 语义生成"),
+        "IndexingVectors" => L10n.T(Keys.Content.DataSourceScanStageVectors, "向量索引"),
+        "Finalizing" => L10n.T(Keys.Content.DataSourceScanStageFinalizing, "最终一致性检查"),
+        "Succeeded" => L10n.T(Keys.Content.DataSourceScanSucceededBanner, "扫描完成"),
+        "Failed" => L10n.T(Keys.Content.DataSourceScanFailedBanner, "扫描失败"),
+        "Queued" => L10n.T(Keys.Content.DataSourceScanQueued, "已排队，等待后台扫描…"),
+        _ => L10n.T(Keys.Content.DataSourceScanRunning, "正在扫描元数据…")
+    };
+
+    private static string FormatDuration(long milliseconds)
+    {
+        if (milliseconds <= 0) return "00:00";
+        var span = TimeSpan.FromMilliseconds(milliseconds);
+        return span.TotalHours >= 1
+            ? $"{(int)span.TotalHours:00}:{span.Minutes:00}:{span.Seconds:00}"
+            : $"{span.Minutes:00}:{span.Seconds:00}";
+    }
 
     private static string ScanStatusClass(string status) => status switch
     {

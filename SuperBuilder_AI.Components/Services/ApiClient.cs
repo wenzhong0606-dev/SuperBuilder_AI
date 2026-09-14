@@ -159,6 +159,8 @@ public sealed class ScanJobView
     public long DataSourceId { get; set; }
     public string Status { get; set; } = "Queued";
     public int ProgressPercent { get; set; }
+    public string Stage { get; set; } = "Queued";
+    public ScanProgressDetailsView ProgressDetails { get; set; } = new();
     public int TablesScanned { get; set; }
     public int ColumnsScanned { get; set; }
     public int OrphansDetected { get; set; }
@@ -166,6 +168,42 @@ public sealed class ScanJobView
     public string? ErrorMessage { get; set; }
     public DateTime? StartedAt { get; set; }
     public DateTime? FinishedAt { get; set; }
+}
+
+public sealed class ScanProgressDetailsView
+{
+    public string? StageMessage { get; set; }
+    public int TablesDiscovered { get; set; }
+    public int TablesProcessed { get; set; }
+    public int ColumnsDiscovered { get; set; }
+    public int ColumnsProcessed { get; set; }
+    public int SemanticsTotal { get; set; }
+    public int SemanticsProcessed { get; set; }
+    public int VectorsTotal { get; set; }
+    public int VectorsProcessed { get; set; }
+    public string? CurrentObjectType { get; set; }
+    public string? CurrentObjectName { get; set; }
+    public int AddedTables { get; set; }
+    public int UpdatedTables { get; set; }
+    public int AddedColumns { get; set; }
+    public int UpdatedColumns { get; set; }
+    public int SemanticsGenerated { get; set; }
+    public int VectorsIndexed { get; set; }
+    public int OrphansRemoved { get; set; }
+    public int WarningsCount { get; set; }
+    public long ElapsedMs { get; set; }
+    public long? EstimatedRemainingMs { get; set; }
+    public List<ScanProgressEventView> Events { get; set; } = new();
+}
+
+public sealed class ScanProgressEventView
+{
+    public DateTime TimestampUtc { get; set; }
+    public string Level { get; set; } = "Info";
+    public string EventCode { get; set; } = "";
+    public string Message { get; set; } = "";
+    public int? Current { get; set; }
+    public int? Total { get; set; }
 }
 
 /// <summary>登录 / 当前用户响应（与 api/auth 的 AuthResult 字段对齐）。</summary>

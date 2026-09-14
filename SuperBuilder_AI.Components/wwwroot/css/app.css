@@ -927,6 +927,64 @@ button.mini { padding: 4px 10px; font-size: 12px; border-radius: var(--sb-radius
     word-break: break-word;
 }
 
+.scan-monitor { gap: 14px; }
+.scan-monitor-title { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.scan-monitor-title strong { font-size: 14px; }
+.scan-monitor-time { display: flex; gap: 12px; flex-wrap: wrap; margin-left: auto; font-size: 12px; color: var(--sb-muted); }
+.scan-monitor-progress { height: 8px; }
+.scan-monitor-metrics {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(120px, 1fr));
+    gap: 10px;
+}
+.scan-monitor-metric {
+    border: 1px solid var(--sb-border);
+    border-radius: var(--sb-radius);
+    background: color-mix(in srgb, var(--sb-primary) 4%, var(--sb-surface));
+    padding: 12px;
+}
+.scan-monitor-metric strong { display: block; font-size: 14px; }
+.scan-monitor-current {
+    display: flex; align-items: center; gap: 8px;
+    border-radius: var(--sb-radius);
+    background: color-mix(in srgb, var(--sb-primary) 7%, transparent);
+    padding: 9px 11px;
+    font-size: 12.5px;
+    word-break: break-all;
+}
+.scan-monitor-detail-grid {
+    display: grid;
+    grid-template-columns: minmax(0, .85fr) minmax(0, 1.15fr);
+    gap: 12px;
+}
+.scan-monitor-detail {
+    min-width: 0;
+    border-top: 1px solid var(--sb-border);
+    padding-top: 10px;
+}
+.scan-monitor-section-title {
+    font-size: 12px;
+    font-weight: 700;
+    margin-bottom: 8px;
+}
+.scan-event-list { display: flex; flex-direction: column; gap: 6px; max-height: 180px; overflow: auto; }
+.scan-event {
+    display: grid;
+    grid-template-columns: 64px minmax(0, 1fr);
+    gap: 8px;
+    font-size: 12px;
+    line-height: 1.45;
+}
+.scan-event time { color: var(--sb-muted); font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
+.scan-event span { min-width: 0; word-break: break-word; }
+.scan-event.is-warning span { color: var(--sb-warning, #b7791f); }
+
+@media (max-width: 760px) {
+    .scan-monitor-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .scan-monitor-detail-grid { grid-template-columns: 1fr; }
+    .scan-monitor-time { margin-left: 0; width: 100%; }
+}
+
 /* —— 网格卡（通用） —— */
 .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; margin-bottom: 18px; }
 .feature-card {

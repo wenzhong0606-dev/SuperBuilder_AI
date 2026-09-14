@@ -1,695 +1,350 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using SuperBuilder_AI.Data;
 using SuperBuilder_AI.Interfaces;
-using System;
 using SuperBuilder_AI.Models.Metadata;
-
 
 namespace SuperBuilder_AI.Services;
 
 /// <summary>
-/// Metadata扫描服务
-///
-/// 功能:
-///
-/// 1. 扫描业务数据库结构
-/// 2. 同步MetadataTable
-/// 3. 同步MetadataColumn
-/// 4. Batch生成MetadataSemantic
-/// 5. 创建Table/Column/Semantic Vector
-/// 6. 回写Qdrant VectorId
-///
-/// 流程:
-///
-/// 数据库
-///    ↓
-/// MetadataTable
-///    ↓
-/// MetadataColumn
-///    ↓
-/// Qwen Batch Semantic
-///    ↓
-/// MetadataSemantic
-///    ↓
-/// Embedding
-///    ↓
-/// Qdrant
-///
+/// Metadata 扫描服务：读取物理结构、同步元数据、生成语义并建立向量索引。
+/// 富进度通过 ScanTelemetry + IProgress&lt;int&gt; 上报；不改变扫描业务契约。
 /// </summary>
 public class MetadataScannerService
 {
-
-
-	private readonly SuperBIContext _context;
-
-
-	private readonly IDataSourceMetadataReader _reader;
-
-
-	private readonly IMetadataSearchTextBuilder _textBuilder;
-
-
-	private readonly IMetadataSemanticService _semanticService;
-
-
-	private readonly IMetadataVectorService _vectorService;
-
-
-
-	public MetadataScannerService(
-		SuperBIContext context,
-		IDataSourceMetadataReader reader,
-		IMetadataSearchTextBuilder textBuilder,
-		IMetadataSemanticService semanticService,
-		IMetadataVectorService vectorService)
-	{
-
-		_context = context;
-
-		_reader = reader;
-
-		_textBuilder = textBuilder;
-
-		_semanticService = semanticService;
-
-		_vectorService = vectorService;
-
-	}
-
-
-
-
-
-
-	/// <summary>
-	/// 扫描Metadata
-	/// </summary>
-	public async Task ScanAsync(
-		long tenantId,
-		long dataSourceId,
-		string connectionString,
-		IProgress<int>? progress = null,
-		ScanTelemetry? telemetry = null,
-		bool cleanupOrphans = false,
-		CancellationToken ct = default)
-	{
-
-
-		// M0-06：元数据扫描写入强制从 DataSource 继承 TenantId。
-		// 解析归属数据源，以 dataSource.TenantId 为权威写入租户；拒绝非归属租户的扫描请求。
-		var dataSource = await _context.DataSources
-			.AsNoTracking()
-			.FirstOrDefaultAsync(x => x.Id == dataSourceId, ct);
-		if (dataSource is null)
-			throw new KeyNotFoundException($"数据源 {dataSourceId} 不存在，无法扫描元数据。");
-		if (dataSource.TenantId != tenantId)
-			throw new InvalidOperationException(
-				$"数据源 {dataSourceId} 不属于租户 {tenantId}（实际归属租户 {dataSource.TenantId}），拒绝元数据扫描写入。");
-		var effectiveTenantId = dataSource.TenantId;
-
-		/*
-		 * =============================
-		 *
-		 * 1.
-		 * 读取数据库结构
-		 *
-		 * =============================
-		 */
-
-
-		var tables =
-			await _reader
-			.GetTablesAsync(
-				connectionString);
-
-
-
-		var columns =
-			await _reader
-			.GetColumnsAsync(
-				connectionString);
-
-		// M4-05：记录可观测基数并上报初始进度。
-		if (telemetry is not null)
-		{
-			telemetry.TablesScanned = tables.Count;
-			telemetry.ColumnsScanned = columns.Count;
-		}
-		progress?.Report(10);
-
-
-
-
-
-
-
-		/*
-		 * =============================
-		 *
-		 * 2.
-		 * 加载已有Metadata
-		 *
-		 * =============================
-		 */
-
-
-		var existsTables =
-			await _context.MetadataTables
-
-			.Include(x =>
-				x.Columns)
-
-			.Where(x =>
-				x.TenantId == effectiveTenantId
-				&&
-				x.DataSourceId == dataSourceId)
-
-			.ToListAsync(ct);
-
-
-
-
-
-
-
-		// M4-05：安全孤儿清理（在同步前执行）。移除源中已不存在的表/字段，
-		// 但跳过被行级安全策略或学习记录引用的对象，避免破坏租户安全配置或丢失学习数据。
-		if (cleanupOrphans)
-		{
-			var protectedColumnIds = await _context.RowLevelSecurityPolicies
-				.Select(p => p.MetadataColumnId)
-				.ToListAsync(ct);
-			protectedColumnIds.AddRange(await _context.LearningRecords
-				.Where(r => r.MetadataColumnId.HasValue)
-				.Select(r => r.MetadataColumnId!.Value)
-				.ToListAsync(ct));
-			var protectedColumns = new HashSet<long>(protectedColumnIds);
-
-			var protectedTables = new HashSet<long>(await _context.RowLevelSecurityPolicies
-				.Select(p => p.MetadataTableId)
-				.ToListAsync(ct));
-
-			var sourceTableNames = new HashSet<string>(
-				tables.Select(t => t.TableName ?? string.Empty),
-				StringComparer.OrdinalIgnoreCase);
-			var sourceColumnsByTable = columns
-				.GroupBy(c => c.TableName ?? string.Empty, StringComparer.OrdinalIgnoreCase)
-				.ToDictionary(
-					g => g.Key,
-					g => new HashSet<string>(g.Select(c => c.ColumnName ?? string.Empty), StringComparer.OrdinalIgnoreCase),
-					StringComparer.OrdinalIgnoreCase);
-
-			var orphanRemoved = 0;
-			foreach (var existingTable in existsTables)
-			{
-				var tableName = existingTable.TableName ?? string.Empty;
-				if (!sourceTableNames.Contains(tableName))
-				{
-					var tableProtected = protectedTables.Contains(existingTable.Id)
-						|| existingTable.Columns.Any(c => protectedColumns.Contains(c.Id));
-					if (!tableProtected)
-					{
-						_context.MetadataTables.Remove(existingTable);
-						orphanRemoved += 1 + existingTable.Columns.Count;
-					}
-					continue;
-				}
-
-				if (sourceColumnsByTable.TryGetValue(tableName, out var sourceCols))
-				{
-					foreach (var col in existingTable.Columns.ToList())
-					{
-						if (!sourceCols.Contains(col.ColumnName ?? string.Empty)
-							&& !protectedColumns.Contains(col.Id))
-						{
-							_context.MetadataColumns.Remove(col);
-							orphanRemoved++;
-						}
-					}
-				}
-			}
-
-			if (telemetry is not null)
-			{
-				telemetry.OrphansDetected = orphanRemoved;
-			}
-		}
-
-		foreach (var table in tables)
-		{
-
-
-			var metadataTable =
-				existsTables
-				.FirstOrDefault(x =>
-					x.TableName ==
-					table.TableName);
-
-
-
-
-			if (metadataTable == null)
-			{
-
-				metadataTable =
-					new MetadataTable
-					{
-
-					TenantId =
-						effectiveTenantId,
-
-
-						DataSourceId =
-							dataSourceId,
-
-
-						TableName =
-							table.TableName,
-
-
-						TableComment =
-							table.TableComment
-
-					};
-
-
-
-				_context.MetadataTables
-					.Add(metadataTable);
-
-			}
-			else
-			{
-
-				metadataTable.TableComment =
-					table.TableComment;
-
-			}
-
-
-
-
-
-
-
-			/*
-			 * =============================
-			 *
-			 * 3.
-			 * Column同步
-			 *
-			 * =============================
-			 */
-
-
-			var tableColumns =
-				columns
-				.Where(x =>
-					x.TableName ==
-					table.TableName);
-
-
-
-			foreach (var column in tableColumns)
-			{
-
-
-				var metadataColumn =
-					metadataTable.Columns
-					.FirstOrDefault(x =>
-						x.ColumnName ==
-						column.ColumnName);
-
-
-
-
-				if (metadataColumn == null)
-				{
-
-					metadataColumn =
-						new MetadataColumn
-						{
-
-							ColumnName =
-								column.ColumnName,
-
-
-							ColumnComment =
-								column.ColumnComment,
-
-
-							DataType =
-								column.DataType,
-
-
-							Length =
-								column.Length,
-
-
-							IsNullable =
-								column.IsNullable,
-
-
-							IsPrimaryKey =
-								column.IsPrimaryKey
-
-						};
-
-
-
-					metadataTable.Columns
-						.Add(metadataColumn);
-
-				}
-				else
-				{
-
-					metadataColumn.ColumnComment =
-						column.ColumnComment;
-
-
-					metadataColumn.DataType =
-						column.DataType;
-
-				}
-
-
-
-
-
-
-				/*
-				 * Column SearchText
-				 */
-
-
-				metadataColumn.SearchText =
-					_textBuilder
-					.BuildColumnText(
-
-						table.TableName,
-
-						column.ColumnName,
-
-						column.ColumnComment,
-
-						column.DataType
-
-					);
-
-
-
-			}
-
-
-
-
-
-
-
-			/*
-			 * =============================
-			 *
-			 * 4.
-			 * Table SearchText
-			 *
-			 * =============================
-			 */
-
-
-			metadataTable.SearchText =
-				_textBuilder
-				.BuildMetadataText(
-
-					table.TableName,
-
-					table.TableComment,
-
-
-					metadataTable.Columns
-					.Select(x =>
-						x.SearchText ?? "")
-
-				);
-
-
-		}
-
-
-
-
-
-
-
-		/*
-		 * =============================
-		 *
-		 * 5.
-		 * 保存Metadata
-		 *
-		 * 获取Column Id
-		 *
-		 * =============================
-		 */
-
-		progress?.Report(45);
-
-		await _context
-			.SaveChangesAsync(ct);
-
-		progress?.Report(55);
-
-
-
-
-
-
-
-
-
-		/*
-		 * =============================
-		 *
-		 * 6.
-		 * Batch生成Semantic
-		 *
-		 * =============================
-		 */
-
-
-		var semanticColumns =
-			await _context.MetadataColumns
-
-			.Include(x =>
-				x.MetadataTable)
-
-			.Include(x =>
-				x.Semantic)
-
-			.Where(x =>
-				x.MetadataTable!.TenantId == effectiveTenantId
-				&&
-				x.MetadataTable.DataSourceId == dataSourceId
-				&&
-				x.Semantic == null)
-
-			.ToListAsync(ct);
-
-
-
-
-
-		if (semanticColumns.Count > 0)
-		{
-
-			await _semanticService
-				.GenerateBatchAsync(
-					semanticColumns);
-
-		}
-
-		progress?.Report(70);
-
-
-
-
-
-
-
-		/*
-		 * =============================
-		 *
-		 * 7.
-		 * Vector同步
-		 *
-		 * =============================
-		 */
-
-
-		var syncTables =
-			await _context.MetadataTables
-
-			.Include(x =>
-				x.Columns)
-
-			.ThenInclude(x =>
-				x.Semantic)
-
-			.Where(x =>
-				x.TenantId == effectiveTenantId
-				&&
-				x.DataSourceId == dataSourceId)
-
-			.ToListAsync(ct);
-
-
-
-
-
-
-
-		foreach (var metadataTable in syncTables)
-		{
-
-
-			var needIndex =
-				string.IsNullOrWhiteSpace(
-					metadataTable.VectorId);
-
-
-
-
-			if (!needIndex)
-			{
-
-				needIndex =
-					metadataTable.Columns
-					.Any(x =>
-						string.IsNullOrWhiteSpace(
-							x.VectorId)
-
-						||
-
-						x.Semantic != null
-						&&
-						string.IsNullOrWhiteSpace(
-							x.Semantic.VectorId));
-
-			}
-
-
-
-
-			if (!needIndex)
-			{
-				continue;
-			}
-
-
-
-
-
-
-
-			var result =
-				await _vectorService
-				.IndexAsync(
-					metadataTable);
-
-
-
-
-
-
-
-			/*
-			 * Table Vector
-			 */
-
-
-			if (!string.IsNullOrWhiteSpace(
-				result.TableVectorId))
-			{
-
-				metadataTable.VectorId =
-					result.TableVectorId;
-
-			}
-
-
-
-
-
-
-
-			/*
-			 * Column / Semantic Vector
-			 */
-
-
-			foreach (var column in metadataTable.Columns)
-			{
-
-
-				if (result.ColumnVectors
-					.TryGetValue(
-						column.Id,
-						out var columnVectorId))
-				{
-
-					column.VectorId =
-						columnVectorId;
-
-				}
-
-
-
-
-
-
-				if (column.Semantic != null
-					&&
-					result.SemanticVectors
-					.TryGetValue(
-						column.Semantic.Id,
-						out var semanticVectorId))
-				{
-
-					column.Semantic.VectorId =
-						semanticVectorId;
-
-				}
-
-
-			}
-
-
-		}
-
-
-
-
-
-
-
-		/*
-		 * =============================
-		 *
-		 * 8.
-		 * 保存VectorId
-		 *
-		 * =============================
-		 */
-
-
-		progress?.Report(95);
-
-		await _context
-			.SaveChangesAsync(ct);
-
-		progress?.Report(100);
-
-	}
-
-
+    private readonly SuperBIContext _context;
+    private readonly IDataSourceMetadataReader _reader;
+    private readonly IMetadataSearchTextBuilder _textBuilder;
+    private readonly IMetadataSemanticService _semanticService;
+    private readonly IMetadataVectorService _vectorService;
+
+    public MetadataScannerService(
+        SuperBIContext context,
+        IDataSourceMetadataReader reader,
+        IMetadataSearchTextBuilder textBuilder,
+        IMetadataSemanticService semanticService,
+        IMetadataVectorService vectorService)
+    {
+        _context = context;
+        _reader = reader;
+        _textBuilder = textBuilder;
+        _semanticService = semanticService;
+        _vectorService = vectorService;
+    }
+
+    public async Task ScanAsync(
+        long tenantId,
+        long dataSourceId,
+        string connectionString,
+        IProgress<int>? progress = null,
+        ScanTelemetry? telemetry = null,
+        bool cleanupOrphans = false,
+        CancellationToken ct = default)
+    {
+        telemetry ??= new ScanTelemetry();
+
+        var dataSource = await _context.DataSources
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Id == dataSourceId, ct);
+        if (dataSource is null)
+            throw new KeyNotFoundException($"数据源 {dataSourceId} 不存在，无法扫描元数据。");
+        if (dataSource.TenantId != tenantId)
+            throw new InvalidOperationException(
+                $"数据源 {dataSourceId} 不属于租户 {tenantId}（实际归属租户 {dataSource.TenantId}），拒绝元数据扫描写入。");
+
+        var effectiveTenantId = dataSource.TenantId;
+
+        ReportStage(telemetry, progress, "Connecting", "正在连接业务数据库…", 3, "DatabaseConnecting");
+
+        var tables = await _reader.GetTablesAsync(connectionString);
+        telemetry.Details.TablesDiscovered = tables.Count;
+        telemetry.AddEvent("Info", "TablesDiscovered", $"已发现 {tables.Count} 张数据表。", tables.Count, tables.Count);
+        ReportStage(telemetry, progress, "DiscoveringColumns", "正在读取字段结构…", 12, "TablesReady");
+
+        var columns = await _reader.GetColumnsAsync(connectionString);
+        telemetry.Details.ColumnsDiscovered = columns.Count;
+        telemetry.AddEvent("Info", "ColumnsDiscovered", $"已发现 {columns.Count} 个字段。", columns.Count, columns.Count);
+        ReportStage(telemetry, progress, "ComparingMetadata", "正在与已有元数据进行比对…", 22, "ColumnsReady");
+
+        var existsTables = await _context.MetadataTables
+            .Include(x => x.Columns)
+            .Where(x => x.TenantId == effectiveTenantId && x.DataSourceId == dataSourceId)
+            .ToListAsync(ct);
+
+        telemetry.AddEvent("Info", "MetadataCompared", $"已加载 {existsTables.Count} 张历史元数据表用于差异比对。");
+
+        if (cleanupOrphans)
+        {
+            ReportStage(telemetry, progress, "CleaningOrphans", "正在检查失效元数据…", 27, "OrphanCheckStarted");
+
+            var protectedColumnIds = await _context.RowLevelSecurityPolicies
+                .Select(p => p.MetadataColumnId)
+                .ToListAsync(ct);
+            protectedColumnIds.AddRange(await _context.LearningRecords
+                .Where(r => r.MetadataColumnId.HasValue)
+                .Select(r => r.MetadataColumnId!.Value)
+                .ToListAsync(ct));
+            var protectedColumns = new HashSet<long>(protectedColumnIds);
+
+            var protectedTables = new HashSet<long>(await _context.RowLevelSecurityPolicies
+                .Select(p => p.MetadataTableId)
+                .ToListAsync(ct));
+
+            var sourceTableNames = new HashSet<string>(
+                tables.Select(t => t.TableName ?? string.Empty),
+                StringComparer.OrdinalIgnoreCase);
+            var sourceColumnsByTable = columns
+                .GroupBy(c => c.TableName ?? string.Empty, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(
+                    g => g.Key,
+                    g => new HashSet<string>(g.Select(c => c.ColumnName ?? string.Empty), StringComparer.OrdinalIgnoreCase),
+                    StringComparer.OrdinalIgnoreCase);
+
+            var orphanRemoved = 0;
+            foreach (var existingTable in existsTables)
+            {
+                var tableName = existingTable.TableName ?? string.Empty;
+                if (!sourceTableNames.Contains(tableName))
+                {
+                    var tableProtected = protectedTables.Contains(existingTable.Id)
+                        || existingTable.Columns.Any(c => protectedColumns.Contains(c.Id));
+                    if (!tableProtected)
+                    {
+                        _context.MetadataTables.Remove(existingTable);
+                        orphanRemoved += 1 + existingTable.Columns.Count;
+                    }
+                    continue;
+                }
+
+                if (!sourceColumnsByTable.TryGetValue(tableName, out var sourceCols))
+                    continue;
+
+                foreach (var col in existingTable.Columns.ToList())
+                {
+                    if (!sourceCols.Contains(col.ColumnName ?? string.Empty)
+                        && !protectedColumns.Contains(col.Id))
+                    {
+                        _context.MetadataColumns.Remove(col);
+                        orphanRemoved++;
+                    }
+                }
+            }
+
+            telemetry.OrphansDetected = orphanRemoved;
+            if (orphanRemoved > 0)
+                telemetry.AddEvent("Info", "OrphansRemoved", $"已安全清理 {orphanRemoved} 个失效元数据对象。", orphanRemoved, orphanRemoved);
+        }
+
+        ReportStage(telemetry, progress, "SyncingMetadata", "正在同步表与字段结构…", 32, "MetadataSyncStarted");
+
+        for (var tableIndex = 0; tableIndex < tables.Count; tableIndex++)
+        {
+            ct.ThrowIfCancellationRequested();
+            var table = tables[tableIndex];
+            telemetry.SetCurrent("Table", table.TableName);
+
+            var metadataTable = existsTables.FirstOrDefault(x => x.TableName == table.TableName);
+            if (metadataTable is null)
+            {
+                metadataTable = new MetadataTable
+                {
+                    TenantId = effectiveTenantId,
+                    DataSourceId = dataSourceId,
+                    TableName = table.TableName,
+                    TableComment = table.TableComment
+                };
+                _context.MetadataTables.Add(metadataTable);
+                telemetry.Details.AddedTables++;
+            }
+            else
+            {
+                metadataTable.TableComment = table.TableComment;
+                telemetry.Details.UpdatedTables++;
+            }
+
+            var tableColumns = columns
+                .Where(x => x.TableName == table.TableName)
+                .ToList();
+
+            foreach (var column in tableColumns)
+            {
+                var metadataColumn = metadataTable.Columns
+                    .FirstOrDefault(x => x.ColumnName == column.ColumnName);
+
+                if (metadataColumn is null)
+                {
+                    metadataColumn = new MetadataColumn
+                    {
+                        ColumnName = column.ColumnName,
+                        ColumnComment = column.ColumnComment,
+                        DataType = column.DataType,
+                        Length = column.Length,
+                        IsNullable = column.IsNullable,
+                        IsPrimaryKey = column.IsPrimaryKey
+                    };
+                    metadataTable.Columns.Add(metadataColumn);
+                    telemetry.Details.AddedColumns++;
+                }
+                else
+                {
+                    metadataColumn.ColumnComment = column.ColumnComment;
+                    metadataColumn.DataType = column.DataType;
+                    telemetry.Details.UpdatedColumns++;
+                }
+
+                metadataColumn.SearchText = _textBuilder.BuildColumnText(
+                    table.TableName,
+                    column.ColumnName,
+                    column.ColumnComment,
+                    column.DataType);
+            }
+
+            metadataTable.SearchText = _textBuilder.BuildMetadataText(
+                table.TableName,
+                table.TableComment,
+                metadataTable.Columns.Select(x => x.SearchText ?? ""));
+
+            telemetry.Details.TablesProcessed = tableIndex + 1;
+            telemetry.Details.ColumnsProcessed += tableColumns.Count;
+            progress?.Report(ProgressBetween(32, 52, tableIndex + 1, Math.Max(1, tables.Count)));
+        }
+
+        telemetry.SetCurrent(null, null);
+        await _context.SaveChangesAsync(ct);
+        telemetry.AddEvent(
+            "Info",
+            "MetadataSynced",
+            $"元数据结构同步完成：新增 {telemetry.Details.AddedTables} 张表 / {telemetry.Details.AddedColumns} 个字段，更新 {telemetry.Details.UpdatedTables} 张表 / {telemetry.Details.UpdatedColumns} 个字段。");
+        progress?.Report(55);
+
+        var semanticColumns = await _context.MetadataColumns
+            .Include(x => x.MetadataTable)
+            .Include(x => x.Semantic)
+            .Where(x =>
+                x.MetadataTable!.TenantId == effectiveTenantId
+                && x.MetadataTable.DataSourceId == dataSourceId
+                && x.Semantic == null)
+            .ToListAsync(ct);
+
+        telemetry.Details.SemanticsTotal = semanticColumns.Count;
+        ReportStage(
+            telemetry,
+            progress,
+            "GeneratingSemantics",
+            semanticColumns.Count == 0 ? "无需生成新的业务语义。" : $"AI 正在为 {semanticColumns.Count} 个字段生成业务语义…",
+            60,
+            "SemanticGenerationStarted");
+
+        if (semanticColumns.Count > 0)
+        {
+            var generated = await _semanticService.GenerateBatchAsync(semanticColumns);
+            telemetry.Details.SemanticsProcessed = generated.Count;
+            telemetry.Details.SemanticsGenerated = generated.Count;
+
+            if (generated.Count < semanticColumns.Count)
+            {
+                telemetry.AddWarning(
+                    "SemanticPartial",
+                    $"业务语义已生成 {generated.Count}/{semanticColumns.Count}，部分字段未生成成功，可在扫描后继续完善。");
+            }
+            else
+            {
+                telemetry.AddEvent("Info", "SemanticGenerationCompleted", $"业务语义生成完成：{generated.Count}/{semanticColumns.Count}。", generated.Count, semanticColumns.Count);
+            }
+        }
+        progress?.Report(75);
+
+        var syncTables = await _context.MetadataTables
+            .Include(x => x.Columns)
+            .ThenInclude(x => x.Semantic)
+            .Where(x => x.TenantId == effectiveTenantId && x.DataSourceId == dataSourceId)
+            .ToListAsync(ct);
+
+        var vectorTables = syncTables.Where(NeedsIndex).ToList();
+        telemetry.Details.VectorsTotal = vectorTables.Sum(ExpectedVectorCount);
+        ReportStage(
+            telemetry,
+            progress,
+            "IndexingVectors",
+            vectorTables.Count == 0 ? "向量索引已是最新状态。" : $"正在为 {vectorTables.Count} 张表更新向量索引…",
+            78,
+            "VectorIndexStarted");
+
+        for (var i = 0; i < vectorTables.Count; i++)
+        {
+            ct.ThrowIfCancellationRequested();
+            var metadataTable = vectorTables[i];
+            telemetry.SetCurrent("Table", metadataTable.TableName);
+
+            var result = await _vectorService.IndexAsync(metadataTable);
+
+            if (!string.IsNullOrWhiteSpace(result.TableVectorId))
+                metadataTable.VectorId = result.TableVectorId;
+
+            foreach (var column in metadataTable.Columns)
+            {
+                if (result.ColumnVectors.TryGetValue(column.Id, out var columnVectorId))
+                    column.VectorId = columnVectorId;
+
+                if (column.Semantic != null
+                    && result.SemanticVectors.TryGetValue(column.Semantic.Id, out var semanticVectorId))
+                    column.Semantic.VectorId = semanticVectorId;
+            }
+
+            var indexed = (string.IsNullOrWhiteSpace(result.TableVectorId) ? 0 : 1)
+                + result.ColumnVectors.Count
+                + result.SemanticVectors.Count;
+            telemetry.Details.VectorsProcessed += indexed;
+            telemetry.Details.VectorsIndexed += indexed;
+            progress?.Report(ProgressBetween(78, 94, i + 1, Math.Max(1, vectorTables.Count)));
+        }
+
+        telemetry.SetCurrent(null, null);
+        telemetry.AddEvent(
+            "Info",
+            "VectorIndexCompleted",
+            telemetry.Details.VectorsTotal == 0
+                ? "无需更新向量索引。"
+                : $"向量索引更新完成：{telemetry.Details.VectorsProcessed}/{telemetry.Details.VectorsTotal}。",
+            telemetry.Details.VectorsProcessed,
+            telemetry.Details.VectorsTotal);
+
+        ReportStage(telemetry, progress, "Finalizing", "正在保存扫描结果并执行最终一致性检查…", 97, "Finalizing");
+        await _context.SaveChangesAsync(ct);
+
+        telemetry.SetCurrent(null, null);
+        telemetry.SetStage("Succeeded", "扫描处理完成。", "ScanCompleted");
+        progress?.Report(100);
+    }
+
+    private static void ReportStage(
+        ScanTelemetry telemetry,
+        IProgress<int>? progress,
+        string stage,
+        string message,
+        int percent,
+        string eventCode)
+    {
+        telemetry.SetStage(stage, message, eventCode);
+        progress?.Report(percent);
+    }
+
+    private static int ProgressBetween(int from, int to, int current, int total)
+    {
+        if (total <= 0) return to;
+        var ratio = Math.Clamp(current / (double)total, 0d, 1d);
+        return from + (int)Math.Round((to - from) * ratio);
+    }
+
+    private static bool NeedsIndex(MetadataTable metadataTable)
+    {
+        if (string.IsNullOrWhiteSpace(metadataTable.VectorId))
+            return true;
+
+        return metadataTable.Columns.Any(x =>
+            string.IsNullOrWhiteSpace(x.VectorId)
+            || x.Semantic != null && string.IsNullOrWhiteSpace(x.Semantic.VectorId));
+    }
+
+    private static int ExpectedVectorCount(MetadataTable metadataTable)
+        => 1 + metadataTable.Columns.Count + metadataTable.Columns.Count(x => x.Semantic != null);
 }

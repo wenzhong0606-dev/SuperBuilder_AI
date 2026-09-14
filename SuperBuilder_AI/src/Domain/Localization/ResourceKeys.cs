@@ -583,6 +583,28 @@ public static class ResourceKeys
         public const string DataSourceEmptyMetaNextStep = "Content.DataSourceEmptyMetaNextStep";
         public const string DataSourceScanPollingError = "Content.DataSourceScanPollingError";
 
+        public const string DataSourceScanStage = "Content.DataSourceScanStage";
+        public const string DataSourceScanElapsed = "Content.DataSourceScanElapsed";
+        public const string DataSourceScanEta = "Content.DataSourceScanEta";
+        public const string DataSourceScanTablesProgress = "Content.DataSourceScanTablesProgress";
+        public const string DataSourceScanColumnsProgress = "Content.DataSourceScanColumnsProgress";
+        public const string DataSourceScanSemanticsProgress = "Content.DataSourceScanSemanticsProgress";
+        public const string DataSourceScanVectorsProgress = "Content.DataSourceScanVectorsProgress";
+        public const string DataSourceScanCurrentObject = "Content.DataSourceScanCurrentObject";
+        public const string DataSourceScanChanges = "Content.DataSourceScanChanges";
+        public const string DataSourceScanEvents = "Content.DataSourceScanEvents";
+        public const string DataSourceScanWarnings = "Content.DataSourceScanWarnings";
+        public const string DataSourceScanChangeTables = "Content.DataSourceScanChangeTables";
+        public const string DataSourceScanChangeColumns = "Content.DataSourceScanChangeColumns";
+        public const string DataSourceScanStageConnecting = "Content.DataSourceScanStageConnecting";
+        public const string DataSourceScanStageDiscovering = "Content.DataSourceScanStageDiscovering";
+        public const string DataSourceScanStageComparing = "Content.DataSourceScanStageComparing";
+        public const string DataSourceScanStageCleaning = "Content.DataSourceScanStageCleaning";
+        public const string DataSourceScanStageSyncing = "Content.DataSourceScanStageSyncing";
+        public const string DataSourceScanStageSemantics = "Content.DataSourceScanStageSemantics";
+        public const string DataSourceScanStageVectors = "Content.DataSourceScanStageVectors";
+        public const string DataSourceScanStageFinalizing = "Content.DataSourceScanStageFinalizing";
+
         public const string DataSourceFieldsBadge = "Content.DataSourceFieldsBadge";
         public const string DataSourceColFieldRel = "Content.DataSourceColFieldRel";
         public const string DataSourceColType = "Content.DataSourceColType";
@@ -2338,6 +2360,28 @@ public static class ResourceKeys
         [Content.DataSourceScanRetry] = new("Content", Page: "DataSource", DefaultValue: "Retry"),
         [Content.DataSourceEmptyMetaNextStep] = new("Content", Page: "DataSource", DefaultValue: "Test the connection and grant access, then re-scan."),
         [Content.DataSourceScanPollingError] = new("Content", Page: "DataSource", DefaultValue: "Failed to poll scan status: {0}"),
+
+        [Content.DataSourceScanStage] = new("Content", Page: "DataSource", DefaultValue: "Current stage: {0}"),
+        [Content.DataSourceScanElapsed] = new("Content", Page: "DataSource", DefaultValue: "Elapsed {0}"),
+        [Content.DataSourceScanEta] = new("Content", Page: "DataSource", DefaultValue: "ETA {0}"),
+        [Content.DataSourceScanTablesProgress] = new("Content", Page: "DataSource", DefaultValue: "Tables {0}/{1}"),
+        [Content.DataSourceScanColumnsProgress] = new("Content", Page: "DataSource", DefaultValue: "Columns {0}/{1}"),
+        [Content.DataSourceScanSemanticsProgress] = new("Content", Page: "DataSource", DefaultValue: "Semantics {0}/{1}"),
+        [Content.DataSourceScanVectorsProgress] = new("Content", Page: "DataSource", DefaultValue: "Vectors {0}/{1}"),
+        [Content.DataSourceScanCurrentObject] = new("Content", Page: "DataSource", DefaultValue: "Processing: {0}"),
+        [Content.DataSourceScanChanges] = new("Content", Page: "DataSource", DefaultValue: "Changes"),
+        [Content.DataSourceScanEvents] = new("Content", Page: "DataSource", DefaultValue: "Live activity"),
+        [Content.DataSourceScanWarnings] = new("Content", Page: "DataSource", DefaultValue: "Warnings {0}"),
+        [Content.DataSourceScanChangeTables] = new("Content", Page: "DataSource", DefaultValue: "Tables +{0} / updated {1}"),
+        [Content.DataSourceScanChangeColumns] = new("Content", Page: "DataSource", DefaultValue: "Columns +{0} / updated {1}"),
+        [Content.DataSourceScanStageConnecting] = new("Content", Page: "DataSource", DefaultValue: "Connecting"),
+        [Content.DataSourceScanStageDiscovering] = new("Content", Page: "DataSource", DefaultValue: "Discovering schema"),
+        [Content.DataSourceScanStageComparing] = new("Content", Page: "DataSource", DefaultValue: "Comparing metadata"),
+        [Content.DataSourceScanStageCleaning] = new("Content", Page: "DataSource", DefaultValue: "Checking stale metadata"),
+        [Content.DataSourceScanStageSyncing] = new("Content", Page: "DataSource", DefaultValue: "Syncing metadata"),
+        [Content.DataSourceScanStageSemantics] = new("Content", Page: "DataSource", DefaultValue: "AI semantic generation"),
+        [Content.DataSourceScanStageVectors] = new("Content", Page: "DataSource", DefaultValue: "Vector indexing"),
+        [Content.DataSourceScanStageFinalizing] = new("Content", Page: "DataSource", DefaultValue: "Finalizing"),
 
         [Content.DataSourceFieldsBadge] = new("Content", Page: "DataSource", DefaultValue: "{0} fields"),
         [Content.DataSourceColFieldRel] = new("Content", Page: "DataSource", DefaultValue: "Field / Relation"),

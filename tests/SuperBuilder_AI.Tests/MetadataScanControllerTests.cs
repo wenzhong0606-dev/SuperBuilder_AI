@@ -210,4 +210,49 @@ public class MetadataScanControllerTests
 		var result = ctrl.Scan();
 		Assert.Equal(410, Assert.IsType<ObjectResult>(result).StatusCode);
 	}
+
+	[Fact]
+	public async Task GetScanJob_Returns_RichProgressSnapshot()
+	{
+		var ctx = CreateContext(out var connection);
+		await using var _ = connection;
+		await using var __ = ctx;
+
+		var dsId = SeedDataSource(ctx, TenantA);
+		var telemetry = new ScanTelemetry();
+		telemetry.SetStage("IndexingVectors", "正在写入向量索引。", "VectorIndexStarted");
+		telemetry.Details.TablesDiscovered = 8;
+		telemetry.Details.TablesProcessed = 8;
+		telemetry.Details.ColumnsDiscovered = 80;
+		telemetry.Details.ColumnsProcessed = 80;
+		telemetry.Details.VectorsTotal = 120;
+		telemetry.Details.VectorsProcessed = 60;
+
+		var job = new MetadataScanJob
+		{
+			TenantId = TenantA,
+			DataSourceId = dsId,
+			Status = MetadataScanJobStatus.Running,
+			Stage = "IndexingVectors",
+			ProgressPercent = 86,
+			ProgressDetailsJson = telemetry.ToJson()
+		};
+		ctx.MetadataScanJobs.Add(job);
+		await ctx.SaveChangesAsync();
+
+		var (ctrl, _) = Build(ctx, new PermissiveIdentity(), new PermissiveAuth(), TenantA);
+		var result = Assert.IsType<OkObjectResult>(
+			await ctrl.GetScanJob(dsId, job.Id, CancellationToken.None));
+
+		Assert.NotNull(result.Value);
+		var type = result.Value!.GetType();
+		Assert.Equal("IndexingVectors", type.GetProperty("stage")!.GetValue(result.Value));
+
+		var details = Assert.IsType<ScanProgressDetails>(
+			type.GetProperty("progressDetails")!.GetValue(result.Value));
+		Assert.Equal(8, details.TablesDiscovered);
+		Assert.Equal(120, details.VectorsTotal);
+		Assert.Equal(60, details.VectorsProcessed);
+		Assert.Contains(details.Events, e => e.EventCode == "VectorIndexStarted");
+	}
 }

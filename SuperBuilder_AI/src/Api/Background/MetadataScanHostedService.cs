@@ -94,6 +94,7 @@ public sealed class MetadataScanHostedService : BackgroundService
         job.Status = MetadataScanJobStatus.Running;
         job.StartedAt = DateTime.UtcNow;
         job.ProgressPercent = 0;
+        job.Stage = "Connecting";
         await context.SaveChangesAsync(stoppingToken);
 
         var telemetry = new ScanTelemetry();
@@ -133,6 +134,9 @@ public sealed class MetadataScanHostedService : BackgroundService
         job.TablesScanned = telemetry.TablesScanned;
         job.ColumnsScanned = telemetry.ColumnsScanned;
         job.OrphansDetected = telemetry.OrphansDetected;
+        job.Stage = "Succeeded";
+        telemetry.UpdateTiming(job.StartedAt, 100);
+        job.ProgressDetailsJson = telemetry.ToJson();
         job.ErrorCode = null;
         job.ErrorMessage = null;
         dataSource.LastScanAt = DateTime.UtcNow;
@@ -151,6 +155,7 @@ public sealed class MetadataScanHostedService : BackgroundService
     {
         job.Status = MetadataScanJobStatus.Failed;
         job.FinishedAt = DateTime.UtcNow;
+        job.Stage = "Failed";
         job.ErrorCode = code.Length > 64 ? code[..64] : code;
         job.ErrorMessage = message.Length > 2000 ? message[..2000] : message;
         await context.SaveChangesAsync(ct);
@@ -181,6 +186,7 @@ public sealed class MetadataScanHostedService : BackgroundService
         private readonly MetadataScanJob _job;
         private readonly ScanTelemetry _telemetry;
         private readonly Func<CancellationToken, Task> _flush;
+        private int _lastPersistedPercent = -1;
 
         public JobProgress(MetadataScanJob job, ScanTelemetry telemetry, Func<CancellationToken, Task> flush)
         {
@@ -192,9 +198,15 @@ public sealed class MetadataScanHostedService : BackgroundService
         public void Report(int value)
         {
             _job.ProgressPercent = value;
+            _job.Stage = _telemetry.Stage;
             _job.TablesScanned = _telemetry.TablesScanned;
             _job.ColumnsScanned = _telemetry.ColumnsScanned;
             _job.OrphansDetected = _telemetry.OrphansDetected;
+            _telemetry.UpdateTiming(_job.StartedAt, value);
+            _job.ProgressDetailsJson = _telemetry.ToJson();
+            if (value == _lastPersistedPercent && value is not (0 or 100))
+                return;
+            _lastPersistedPercent = value;
             _flush(CancellationToken.None).GetAwaiter().GetResult();
         }
     }

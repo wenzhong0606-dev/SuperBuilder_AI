@@ -26,6 +26,12 @@ public class MetadataScanJob : BaseEntity
     /// <summary>进度百分比（0-100）。</summary>
     public int ProgressPercent { get; set; }
 
+    /// <summary>当前扫描阶段（Connecting / DiscoveringTables / SyncingMetadata / GeneratingSemantics / IndexingVectors / Finalizing 等）。</summary>
+    public string Stage { get; set; } = "Queued";
+
+    /// <summary>结构化富进度 JSON：真实 processed/total、当前对象、ETA、差异摘要和最近事件。</summary>
+    public string? ProgressDetailsJson { get; set; }
+
     /// <summary>扫描开始时间（UTC）。</summary>
     public DateTime? StartedAt { get; set; }
 

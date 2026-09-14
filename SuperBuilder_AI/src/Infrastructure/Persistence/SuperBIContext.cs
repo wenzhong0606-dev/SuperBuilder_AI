@@ -365,6 +365,8 @@ public class SuperBIContext : DbContext
         builder.Entity<MetadataScanJob>().ToTable(tb => tb.HasComment("元数据扫描任务"));
         builder.Entity<MetadataScanJob>().Property(x => x.Status).HasConversion<string>().HasMaxLength(16).IsRequired().HasDefaultValue(MetadataScanJobStatus.Queued).HasComment("扫描状态");
         builder.Entity<MetadataScanJob>().Property(x => x.ProgressPercent).HasDefaultValue(0).HasComment("进度百分比");
+        builder.Entity<MetadataScanJob>().Property(x => x.Stage).HasMaxLength(64).IsRequired().HasDefaultValue("Queued").HasComment("当前扫描阶段");
+        builder.Entity<MetadataScanJob>().Property(x => x.ProgressDetailsJson).HasColumnType("nvarchar(max)").HasComment("扫描富进度快照(JSON)");
         builder.Entity<MetadataScanJob>().Property(x => x.StartedAt).HasConversion(UtcNullableDateTimeConverter).HasComment("开始时间(UTC)");
         builder.Entity<MetadataScanJob>().Property(x => x.FinishedAt).HasConversion(UtcNullableDateTimeConverter).HasComment("结束时间(UTC)");
         builder.Entity<MetadataScanJob>().Property(x => x.TablesScanned).HasDefaultValue(0).HasComment("已扫描表数");

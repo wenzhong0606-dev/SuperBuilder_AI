@@ -2958,6 +2958,18 @@ namespace SuperBuilder_AI.Infrastructure.Persistence.Migrations
                         .HasDefaultValue(0)
                         .HasComment("进度百分比");
 
+                    b.Property<string>("ProgressDetailsJson")
+                        .HasColumnType("nvarchar(max)")
+                        .HasComment("扫描富进度快照(JSON)");
+
+                    b.Property<string>("Stage")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)")
+                        .HasDefaultValue("Queued")
+                        .HasComment("当前扫描阶段");
+
                     b.Property<long>("RowVersion")
                         .IsConcurrencyToken()
                         .ValueGeneratedOnAdd()

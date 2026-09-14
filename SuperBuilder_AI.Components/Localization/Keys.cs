@@ -618,6 +618,28 @@ public static class Keys
         public const string DataSourceEmptyMetaNextStep = "Content.DataSourceEmptyMetaNextStep";
         public const string DataSourceScanPollingError = "Content.DataSourceScanPollingError";
 
+        public const string DataSourceScanStage = "Content.DataSourceScanStage";
+        public const string DataSourceScanElapsed = "Content.DataSourceScanElapsed";
+        public const string DataSourceScanEta = "Content.DataSourceScanEta";
+        public const string DataSourceScanTablesProgress = "Content.DataSourceScanTablesProgress";
+        public const string DataSourceScanColumnsProgress = "Content.DataSourceScanColumnsProgress";
+        public const string DataSourceScanSemanticsProgress = "Content.DataSourceScanSemanticsProgress";
+        public const string DataSourceScanVectorsProgress = "Content.DataSourceScanVectorsProgress";
+        public const string DataSourceScanCurrentObject = "Content.DataSourceScanCurrentObject";
+        public const string DataSourceScanChanges = "Content.DataSourceScanChanges";
+        public const string DataSourceScanEvents = "Content.DataSourceScanEvents";
+        public const string DataSourceScanWarnings = "Content.DataSourceScanWarnings";
+        public const string DataSourceScanChangeTables = "Content.DataSourceScanChangeTables";
+        public const string DataSourceScanChangeColumns = "Content.DataSourceScanChangeColumns";
+        public const string DataSourceScanStageConnecting = "Content.DataSourceScanStageConnecting";
+        public const string DataSourceScanStageDiscovering = "Content.DataSourceScanStageDiscovering";
+        public const string DataSourceScanStageComparing = "Content.DataSourceScanStageComparing";
+        public const string DataSourceScanStageCleaning = "Content.DataSourceScanStageCleaning";
+        public const string DataSourceScanStageSyncing = "Content.DataSourceScanStageSyncing";
+        public const string DataSourceScanStageSemantics = "Content.DataSourceScanStageSemantics";
+        public const string DataSourceScanStageVectors = "Content.DataSourceScanStageVectors";
+        public const string DataSourceScanStageFinalizing = "Content.DataSourceScanStageFinalizing";
+
         public const string DataSourceFieldsBadge = "Content.DataSourceFieldsBadge";
         public const string DataSourceColFieldRel = "Content.DataSourceColFieldRel";
         public const string DataSourceColType = "Content.DataSourceColType";
@@ -2359,6 +2381,28 @@ public static class Keys
         [Content.DataSourceScanRetry] = new("重试", "Retry"),
         [Content.DataSourceEmptyMetaNextStep] = new("可先测试数据源连接、授予访问授权，再重新扫描。", "Test the connection and grant access, then re-scan."),
         [Content.DataSourceScanPollingError] = new("轮询扫描状态失败：{0}", "Failed to poll scan status: {0}"),
+
+        [Content.DataSourceScanStage] = new("当前阶段：{0}", "Current stage: {0}"),
+        [Content.DataSourceScanElapsed] = new("已耗时 {0}", "Elapsed {0}"),
+        [Content.DataSourceScanEta] = new("预计剩余 {0}", "ETA {0}"),
+        [Content.DataSourceScanTablesProgress] = new("表 {0}/{1}", "Tables {0}/{1}"),
+        [Content.DataSourceScanColumnsProgress] = new("字段 {0}/{1}", "Columns {0}/{1}"),
+        [Content.DataSourceScanSemanticsProgress] = new("语义 {0}/{1}", "Semantics {0}/{1}"),
+        [Content.DataSourceScanVectorsProgress] = new("向量 {0}/{1}", "Vectors {0}/{1}"),
+        [Content.DataSourceScanCurrentObject] = new("当前处理：{0}", "Processing: {0}"),
+        [Content.DataSourceScanChanges] = new("本次变化", "Changes"),
+        [Content.DataSourceScanEvents] = new("实时动态", "Live activity"),
+        [Content.DataSourceScanWarnings] = new("警告 {0}", "Warnings {0}"),
+        [Content.DataSourceScanChangeTables] = new("表 +{0} / 更新 {1}", "Tables +{0} / updated {1}"),
+        [Content.DataSourceScanChangeColumns] = new("字段 +{0} / 更新 {1}", "Columns +{0} / updated {1}"),
+        [Content.DataSourceScanStageConnecting] = new("连接数据库", "Connecting"),
+        [Content.DataSourceScanStageDiscovering] = new("发现数据库结构", "Discovering schema"),
+        [Content.DataSourceScanStageComparing] = new("比对元数据", "Comparing metadata"),
+        [Content.DataSourceScanStageCleaning] = new("检查失效元数据", "Checking stale metadata"),
+        [Content.DataSourceScanStageSyncing] = new("同步元数据", "Syncing metadata"),
+        [Content.DataSourceScanStageSemantics] = new("AI 语义生成", "AI semantic generation"),
+        [Content.DataSourceScanStageVectors] = new("向量索引", "Vector indexing"),
+        [Content.DataSourceScanStageFinalizing] = new("最终一致性检查", "Finalizing"),
 
         [Content.DataSourceFieldsBadge] = new("{0} 字段", "{0} fields"),
         [Content.DataSourceColFieldRel] = new("字段 / 关系", "Field / Relation"),
