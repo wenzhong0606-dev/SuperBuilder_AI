@@ -20,8 +20,9 @@
 - 无 `gh` CLI。CI 触发/轮询走 REST：令牌取自 `git credential fill`（GCM 的 `gho_*`），勿 echo；`C:/tmp/ci_check.py`、`ci_jobs.py <run_id>`。⚠️ 后台 shell 里 python 管道 `| head` 会零输出（块缓冲），须前台跑。
 
 ### 沙箱特有坑（会阻塞一切构建）
-- ⚠️ **`dotnet restore/build/test` 全失败**根因：`Environment.GetFolderPath(CommonApplicationData)` 返回 null → NuGet `XPlatMachineWideSetting`/`ConfigurationDefaults` 静态构造抛 `Value cannot be null (path1)`。**`NUGET_PACKAGES`/`ProgramData` 等 env 均无效**（非 NuGet.config 问题）。
-  绕过：预编译 DLL 直接 `dotnet vstest <dll>`；构建统一 `build --no-restore` + `test --no-build`。CI 干净环境不受影响。
+- ⚠️ **`dotnet restore/build/test` 全失败**（2026-09-14 实测复现：`NuGet.targets(782,5): error : Value cannot be null. (Parameter 'path1')`，全部 csproj 均报）。
+  根因：沙箱 Git Bash 进程**未继承 Windows 系统环境变量**——`ProgramData`/`APPDATA`/`CommonApplicationData` 实测全为空（`echo [$ProgramData]`='[]'，但 `USERPROFILE`/`LOCALAPPDATA` 有值）。.NET `Environment.GetFolderPath(CommonApplicationData)` 在 Windows 上走 `SHGetKnownFolderPath` 系统 API（**不读 `ProgramData` 环境变量**），该 API 在沙箱返回空 → NuGet `XPlatMachineWideSetting`/`ConfigurationDefaults` 静态构造 `Path.Combine(null,...)` 抛 `ArgumentNullException`。
+  ⚠️ **`export ProgramData/APPDATA` 无效**（已实测）：因 GetFolderPath 只认系统 Known Folder API 而非环境变量。绕过：预编译 DLL 直接 `dotnet vstest <dll>`；构建统一 `build --no-restore` + `test --no-build`（须 `project.assets.json` 已存在）。CI 干净 Windows runner 环境完整不受影响。
 - ⚠️ 用 EF 工具前先 `export APPDATA="C:\Users\ThinkPad  X1\AppData\Roaming"`，再直调 `"$HOME/.dotnet/tools/dotnet-ef.exe"`（dotnet-ef 10.0.10 已全局安装）。
 - ⚠️ 沙箱内 `ss`/`netstat` 看不到宿主监听 → 可达性必须真实连接实测，端口扫描结论不可信。
 - ⚠️ 宿主 `HTTP_PROXY/HTTPS_PROXY=127.0.0.1:53963` → .NET gRPC 连 localhost 报 HTTP/2 失败。`QdrantService` 已改 `SocketsHttpHandler{UseProxy=false}`（**勿回退**）。
