@@ -379,13 +379,13 @@ public class MetadataSemanticService
 						.Select(x => x.First())
 						.ToList();
 
-					if (items.Count > lastPartial.Count)
-						lastPartial = items;
+					// 合并部分结果（按 Id 取并集，避免不同子集互相覆盖丢字段）
+						lastPartial = MergeById(lastPartial, items);
 
-					if (items.Count == batch.Columns.Count)
+					if (lastPartial.Count == batch.Columns.Count)
 					{
-						_logger.LogInformation("Metadata semantic batch {Batch}/{TotalBatches} completed on attempt {Attempt}: {Count} fields.", batch.Number, totalBatches, attempt, items.Count);
-						return new SemanticBatchResult(items, batch.Columns.Count, "第 " + batch.Number + "/" + totalBatches + " 批完成：" + items.Count + "/" + batch.Columns.Count + " 个字段。");
+						_logger.LogInformation("Metadata semantic batch {Batch}/{TotalBatches} completed on attempt {Attempt}: {Count} fields.", batch.Number, totalBatches, attempt, lastPartial.Count);
+						return new SemanticBatchResult(lastPartial, batch.Columns.Count, "第 " + batch.Number + "/" + totalBatches + " 批完成：" + lastPartial.Count + "/" + batch.Columns.Count + " 个字段。");
 					}
 
 					throw new InvalidDataException("Qwen semantic response incomplete: " + items.Count + "/" + batch.Columns.Count + ".");
@@ -411,7 +411,20 @@ public class MetadataSemanticService
 		}
 	}
 
-	private sealed record SemanticBatch(int Number, List<MetadataColumn> Columns);
+	private static List<MetadataSemanticBatchItem> MergeById(
+    List<MetadataSemanticBatchItem> existing,
+    List<MetadataSemanticBatchItem> incoming)
+{
+    var result = new List<MetadataSemanticBatchItem>(existing);
+    foreach (var item in incoming)
+    {
+        if (result.FindIndex(m => m.Id == item.Id) < 0)
+            result.Add(item);
+    }
+    return result;
+}
+
+private sealed record SemanticBatch(int Number, List<MetadataColumn> Columns);
 	private sealed record SemanticBatchResult(List<MetadataSemanticBatchItem> Items, int BatchSize, string Message);
 
 

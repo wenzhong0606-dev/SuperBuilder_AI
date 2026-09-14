@@ -138,7 +138,7 @@ public class QwenService
 
 		var result =
 		await response.Content
-		.ReadAsStringAsync();
+		.ReadAsStringAsync(ct);
 
 
 
