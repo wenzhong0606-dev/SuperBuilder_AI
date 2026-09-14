@@ -309,4 +309,18 @@ SuperBuilder AI 应建设为一个支持平台治理、多租户隔离、多语�
 
 ---
 
+## 17. G1 支持环境边界（2026-09-14 O1 回填）
+
+企业 Web 试点首批准入的数据源与运行边界（与 `release-evidence.md`「O1 回填」一致）：
+
+| 维度 | 边界 |
+|---|---|
+| 支持的业务数据源类型 | **MySQL**（连接→扫描→查询三层完整实现并验证）；SQL Server / PostgreSQL 仅连接分支存在，业务库元数据扫描未实现，**不纳入 G1 验收** |
+| 已验证层级 | MySQL 三层已验证（WMS `steccn_wms` 真实库）；SQL Server / PostgreSQL 未做业务库扫描验证 |
+| 浏览器 | Chromium 内核（Chrome / Edge 最新两大版本）；其余内核首批不认证 |
+| 语言 | 首批 zh-CN；多语言界面需显式配置，不在 G1 验收 |
+| 部署 | Windows Server 2022 x64、直接安装、单实例（拓扑不要求 API/Web 同进程，不要求 SQL Server/Qdrant 同机） |
+
+> SQL Server / PostgreSQL 业务库扫描能力若客户需要，列为 G1 后增强项，不得写入当前 G1 对外承诺。
+
 文档状态：当前需求基线。后续需求变更时，应同步更新本文档及相应验收条目。
