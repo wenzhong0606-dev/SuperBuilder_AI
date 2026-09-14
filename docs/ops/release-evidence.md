@@ -102,3 +102,17 @@
 ## 本机隔离启动与全量单测（2026-09-14）
 
 基于 HEAD 445e7a2 新编译：Web 构建成功（3 warnings），API/单测工程编译完成；最终全量单测 1168/1168，0 失败、0 跳过。独立空库 SuperBuilder_Preflight_20260914 应用 46 条迁移后 API Ready，E2E 账号真实接口登录成功，Web 登录页 HTTP 200。临时进程已关闭，测试库保留。首轮因输出目录在仓库外导致 5 项源码发现测试失败，迁回仓库内独立目录复跑通过。详见 [完整证据与限制](local-preflight-20260914.md)。本轮未验证浏览器交互、模型业务查询或性能，不代表 G1 通过。
+
+## O1 回填（支持环境边界，2026-09-14）
+
+OPEN「支持环境」已回填并 CLOSED（来源：`plans/active/2026-09-open-decisions-form.md`）。G1 验收边界补充如下：
+
+| 维度 | G1 边界 |
+|---|---|
+| 支持的业务数据源类型 | **MySQL**（连接→扫描→查询三层验证）；SQL Server / PostgreSQL 仅连接分支存在，业务库元数据扫描未实现，**不纳入 G1 验收** |
+| 已验证层级 | MySQL 三层已验证（WMS `steccn_wms`）；SQL Server / PostgreSQL 未做业务库扫描验证 |
+| 浏览器支持范围 | Chromium 内核（Chrome / Edge 最新两大版本）；其余内核首批不认证 |
+| 语言支持范围 | 首批 zh-CN；多语言需显式配置，不在 G1 验收 |
+| 部署 OS / 实例 / 安装 | Windows Server 2022 / 单实例 / 直接安装（见上方「首批部署范围决策」「参考配置确认」） |
+
+> 数据源能力边界与 `Platform_Product_Development_Requirements.md` 一致；SQL Server / PostgreSQL 扫描能力若客户需要，列为 G1 后增强项。
