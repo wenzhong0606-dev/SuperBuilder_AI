@@ -236,8 +236,27 @@ public class MetadataScannerService
 
         if (semanticColumns.Count > 0)
         {
-            var generated = await _semanticService.GenerateBatchAsync(semanticColumns);
-            telemetry.Details.SemanticsProcessed = generated.Count;
+            var generated = await _semanticService.GenerateBatchAsync(
+                semanticColumns,
+                semanticProgress =>
+                {
+                    telemetry.Details.SemanticsProcessed = semanticProgress.FieldsCompleted;
+                    telemetry.Details.SemanticsGenerated = semanticProgress.FieldsGenerated;
+                    telemetry.SetStage(
+                        "GeneratingSemantics",
+                        "AI 业务语义生成中：已处理 " + semanticProgress.FieldsCompleted + "/" + semanticProgress.FieldsTotal
+                            + "，成功 " + semanticProgress.FieldsGenerated
+                            + (semanticProgress.FieldsFailed > 0 ? "，失败 " + semanticProgress.FieldsFailed : string.Empty)
+                            + "；批次 " + semanticProgress.BatchesCompleted + "/" + semanticProgress.BatchesTotal + "。",
+                        "SemanticBatchProgress");
+                    progress?.Report(ProgressBetween(
+                        60,
+                        75,
+                        semanticProgress.FieldsCompleted,
+                        Math.Max(1, semanticProgress.FieldsTotal)));
+                },
+                ct);
+            telemetry.Details.SemanticsProcessed = semanticColumns.Count;
             telemetry.Details.SemanticsGenerated = generated.Count;
 
             if (generated.Count < semanticColumns.Count)
