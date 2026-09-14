@@ -1,4 +1,5 @@
-﻿using SuperBuilder_AI.Models.AI;
+﻿using System.Collections.Generic;
+using SuperBuilder_AI.Models.AI;
 using System.Threading;
 
 namespace SuperBuilder_AI.Interfaces;
@@ -35,6 +36,23 @@ public interface IQdrantService
 		string id,
 		float[] vector,
 		Dictionary<string, object> payload);
+
+	/// <summary>
+	/// 批量插入或更新 Vector。顺序与输入一致。
+	/// 默认实现退化为逐条 Upsert；具体实现（Qdrant）应覆盖为单次批量写入以减少往返。
+	/// </summary>
+	async Task UpsertBatchAsync(
+		IEnumerable<(string Id, float[] VectorData, IReadOnlyDictionary<string, object> Payload)> points)
+	{
+		if (points == null)
+			return;
+		foreach (var (id, vector, payload) in points)
+		{
+			var dict = payload as Dictionary<string, object>
+				?? new Dictionary<string, object>(payload);
+			await UpsertAsync(id, vector, dict);
+		}
+	}
 
 	/// <summary>
 	/// 搜索 Vector。

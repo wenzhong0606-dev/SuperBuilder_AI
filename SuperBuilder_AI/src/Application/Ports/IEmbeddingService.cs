@@ -1,4 +1,6 @@
-﻿namespace SuperBuilder_AI.Interfaces;
+﻿using System.Collections.Generic;
+
+namespace SuperBuilder_AI.Interfaces;
 
 /// <summary>
 /// 文本向量化服务。
@@ -41,6 +43,21 @@ public interface IEmbeddingService
 	Task<float[]> GenerateAsync(
 		string text,
 		string textType = "document");
+
+	/// <summary>
+	/// 批量将文本转换为 Embedding 向量。返回顺序与输入一致；任一文本为空将抛异常。
+	/// 默认实现退化为逐条调用；具体实现（如 Qwen）应覆盖为真正的批量请求以减少网络往返。
+	/// </summary>
+	async Task<IReadOnlyList<float[]>> GenerateBatchAsync(
+		IEnumerable<string> texts,
+		string textType = "document")
+	{
+		var list = texts.ToList();
+		var results = new List<float[]>(list.Count);
+		foreach (var t in list)
+			results.Add(await GenerateAsync(t, textType));
+		return results;
+	}
 
 	/// <summary>
 	/// 当前模型维度。

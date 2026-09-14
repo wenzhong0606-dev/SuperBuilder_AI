@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using System.Threading;
 using SuperBuilder_AI.Data;
 using SuperBuilder_AI.Interfaces;
 using SuperBuilder_AI.Models.Metadata;
@@ -288,34 +289,63 @@ public class MetadataScannerService
             78,
             "VectorIndexStarted");
 
-        for (var i = 0; i < vectorTables.Count; i++)
-        {
-            ct.ThrowIfCancellationRequested();
-            var metadataTable = vectorTables[i];
-            telemetry.SetCurrent("Table", metadataTable.TableName);
+		/*
+         * 阶段4：表间并发索引。
+         * 表内批量 embedding + upsert 已在 MetadataVectorService 内完成，
+         * 此处进一步对多张表并行处理，受并发度限制。
+         */
+		const int maxVectorConcurrency = 4;
+		using var indexSemaphore =
+			new SemaphoreSlim(maxVectorConcurrency, maxVectorConcurrency);
+		var completedTables = 0;
+		var tallyLock = new object();
+		var tasks = vectorTables
+			.Select(async table =>
+			{
+				await indexSemaphore.WaitAsync(ct);
+				try
+				{
+					ct.ThrowIfCancellationRequested();
+					telemetry.SetCurrent("Table", table.TableName);
 
-            var result = await _vectorService.IndexAsync(metadataTable);
+					var result = await _vectorService.IndexAsync(table);
 
-            if (!string.IsNullOrWhiteSpace(result.TableVectorId))
-                metadataTable.VectorId = result.TableVectorId;
+					if (!string.IsNullOrWhiteSpace(result.TableVectorId))
+						table.VectorId = result.TableVectorId;
 
-            foreach (var column in metadataTable.Columns)
-            {
-                if (result.ColumnVectors.TryGetValue(column.Id, out var columnVectorId))
-                    column.VectorId = columnVectorId;
+					foreach (var column in table.Columns)
+					{
+						if (result.ColumnVectors.TryGetValue(column.Id, out var columnVectorId))
+							column.VectorId = columnVectorId;
 
-                if (column.Semantic != null
-                    && result.SemanticVectors.TryGetValue(column.Semantic.Id, out var semanticVectorId))
-                    column.Semantic.VectorId = semanticVectorId;
-            }
+						if (column.Semantic != null
+							&& result.SemanticVectors.TryGetValue(column.Semantic.Id, out var semanticVectorId))
+							column.Semantic.VectorId = semanticVectorId;
+					}
 
-            var indexed = (string.IsNullOrWhiteSpace(result.TableVectorId) ? 0 : 1)
-                + result.ColumnVectors.Count
-                + result.SemanticVectors.Count;
-            telemetry.Details.VectorsProcessed += indexed;
-            telemetry.Details.VectorsIndexed += indexed;
-            progress?.Report(ProgressBetween(78, 94, i + 1, Math.Max(1, vectorTables.Count)));
-        }
+					var indexed = (string.IsNullOrWhiteSpace(result.TableVectorId) ? 0 : 1)
+						+ result.ColumnVectors.Count
+						+ result.SemanticVectors.Count;
+
+					int processedTotal;
+					lock (tallyLock)
+					{
+						telemetry.Details.VectorsProcessed += indexed;
+						telemetry.Details.VectorsIndexed += indexed;
+						processedTotal = telemetry.Details.VectorsProcessed;
+					}
+
+					var done = Interlocked.Increment(ref completedTables);
+					progress?.Report(ProgressBetween(78, 94, done, Math.Max(1, vectorTables.Count)));
+				}
+				finally
+				{
+					indexSemaphore.Release();
+				}
+			})
+			.ToList();
+
+		await Task.WhenAll(tasks);
 
         telemetry.SetCurrent(null, null);
         telemetry.AddEvent(

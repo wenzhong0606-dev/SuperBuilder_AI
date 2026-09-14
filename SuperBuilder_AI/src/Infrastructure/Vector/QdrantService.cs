@@ -180,6 +180,70 @@ public class QdrantService
 	}
 
 	/// <summary>
+	/// 批量插入或更新 Vector。单次 gRPC 调用写入全部 points。
+	/// 维度校验与单条一致；空 points 直接返回。
+	/// </summary>
+	public async Task UpsertBatchAsync(
+		IEnumerable<(string Id, float[] VectorData, IReadOnlyDictionary<string, object> Payload)> points)
+	{
+		var list = points?.ToList()
+			?? new List<(string, float[], IReadOnlyDictionary<string, object>)>();
+		if (list.Count == 0)
+			return;
+
+		foreach (var (id, vector, payload) in list)
+		{
+			if (vector == null ||
+				vector.Length == 0)
+			{
+				throw new ArgumentException(
+					"Vector不能为空。",
+					nameof(points));
+			}
+
+			if ((ulong)vector.Length !=
+				_options.VectorSize)
+			{
+				throw new InvalidOperationException(
+					$"Vector维度不匹配。" +
+					$"Qdrant配置={_options.VectorSize}。" +
+					$"实际={vector.Length}。");
+			}
+		}
+
+		await CreateCollectionAsync();
+
+		var structs = list.Select(p =>
+		{
+			var point = new PointStruct
+			{
+				Id = new PointId
+				{
+					Uuid = p.Id
+				},
+
+				Vectors = p.VectorData
+			};
+
+			foreach (var item in p.Payload)
+			{
+				point.Payload.Add(
+					item.Key,
+					ConvertPayload(item.Value));
+			}
+
+			return point;
+		}).ToArray();
+
+		await _client
+			.UpsertAsync(
+				collectionName:
+					_options.CollectionName,
+
+				points: structs);
+	}
+
+	/// <summary>
 	/// 搜索 Vector。
 	/// </summary>
 	public async Task<List<VectorSearchResult>> QueryAsync(

@@ -4,6 +4,7 @@ using System.Text.Json;
 using Microsoft.Extensions.Options;
 using SuperBuilder_AI.Application.Common.Options;
 using SuperBuilder_AI.Interfaces;
+using System.Collections.Generic;
 
 namespace SuperBuilder_AI.Services;
 
@@ -34,11 +35,26 @@ public class QwenEmbeddingService : IEmbeddingService
         string text,
         string textType = "document")
     {
-        if (string.IsNullOrWhiteSpace(text))
+        var vectors = await GenerateBatchAsync(
+            new[] { text },
+            textType);
+        return vectors[0];
+    }
+
+    public async Task<IReadOnlyList<float[]>> GenerateBatchAsync(
+        IEnumerable<string> texts,
+        string textType = "document")
+    {
+        var list = texts?.ToList() ?? new List<string>();
+        if (list.Count == 0)
+            return Array.Empty<float[]>();
+
+        foreach (var t in list)
         {
-            throw new ArgumentException(
-                "Embedding文本不能为空。",
-                nameof(text));
+            if (string.IsNullOrWhiteSpace(t))
+                throw new ArgumentException(
+                    "Embedding文本不能为空。",
+                    nameof(texts));
         }
 
         if (string.IsNullOrWhiteSpace(_options.ApiKey))
@@ -58,16 +74,13 @@ public class QwenEmbeddingService : IEmbeddingService
 
         // qwen3.7-text-embedding 的 OpenAI Compatible API 支持
         // model/input/dimensions/encoding_format，但 text_type 仅通过
-        // DashScope 原生 API/SDK 提供。此前将 text_type 直接发送到
-        // /compatible-mode/v1/embeddings 会导致 Runtime 请求契约失败。
-        // 当前保持 IEmbeddingService 的 textType 参数兼容性，但不向
-        // OpenAI Compatible Endpoint 发送该非兼容字段。
+        // DashScope 原生 API/SDK 提供。兼容端点不接收该非兼容字段。
         _ = textType;
 
         var requestBody = new
         {
             model = _options.Model,
-            input = text,
+            input = list,
             dimensions = _options.Dimensions,
             encoding_format = "float"
         };
@@ -111,23 +124,36 @@ public class QwenEmbeddingService : IEmbeddingService
                 "Qwen Embedding API 返回结果为空。");
         }
 
-        var embedding = result.Data[0].Embedding;
-
-        if (embedding == null || embedding.Count == 0)
+        if (result.Data.Count != list.Count)
         {
             throw new InvalidOperationException(
-                "Qwen Embedding API 未返回有效向量。");
+                $"Embedding 数量不匹配。" +
+                $"请求={list.Count}。" +
+                $"返回={result.Data.Count}。");
         }
 
-        if (embedding.Count != _options.Dimensions)
+        var vectors = new List<float[]>(list.Count);
+        for (var i = 0; i < result.Data.Count; i++)
         {
-            throw new InvalidOperationException(
-                $"Embedding维度不匹配。" +
-                $"配置={_options.Dimensions}。" +
-                $"实际={embedding.Count}。");
+            var embedding = result.Data[i].Embedding;
+            if (embedding == null || embedding.Count == 0)
+            {
+                throw new InvalidOperationException(
+                    "Qwen Embedding API 未返回有效向量。");
+            }
+
+            if (embedding.Count != _options.Dimensions)
+            {
+                throw new InvalidOperationException(
+                    $"Embedding维度不匹配。" +
+                    $"配置={_options.Dimensions}。" +
+                    $"实际={embedding.Count}。");
+            }
+
+            vectors.Add(embedding.ToArray());
         }
 
-        return embedding.ToArray();
+        return vectors;
     }
 
     private sealed class QwenEmbeddingResponse
