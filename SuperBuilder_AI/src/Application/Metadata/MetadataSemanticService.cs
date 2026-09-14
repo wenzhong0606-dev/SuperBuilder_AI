@@ -1,6 +1,7 @@
 ﻿using System.Text;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using SuperBuilder_AI.Data;
 using SuperBuilder_AI.Interfaces;
 using SuperBuilder_AI.Models.AI;
@@ -40,6 +41,8 @@ public class MetadataSemanticService
 
 	private readonly IQwenService _qwenService;
 
+	private readonly ILogger<MetadataSemanticService> _logger;
+
 
 
 	/// <summary>
@@ -47,18 +50,23 @@ public class MetadataSemanticService
 	///
 	/// 根据Prompt长度调整
 	/// </summary>
-	private const int QwenBatchSize = 50;
+	private const int QwenBatchSize = 25;
+	private const int MaxConcurrency = 3;
+	private const int MaxAttempts = 3;
 
 
 
 	public MetadataSemanticService(
 		SuperBIContext context,
-		IQwenService qwenService)
+		IQwenService qwenService,
+		ILogger<MetadataSemanticService> logger)
 	{
 
 		_context = context;
 
 		_qwenService = qwenService;
+
+		_logger = logger;
 
 	}
 
@@ -72,7 +80,8 @@ public class MetadataSemanticService
 	/// </summary>
 	public async Task<MetadataSemantic?>
 		GenerateAsync(
-			MetadataColumn column)
+			MetadataColumn column,
+			CancellationToken ct = default)
 	{
 
 		var result =
@@ -80,7 +89,8 @@ public class MetadataSemanticService
 				new List<MetadataColumn>
 				{
 					column
-				});
+				},
+				ct: ct);
 
 
 		return result.FirstOrDefault();
@@ -97,7 +107,9 @@ public class MetadataSemanticService
 	/// </summary>
 	public async Task<List<MetadataSemantic>>
 		GenerateBatchAsync(
-			List<MetadataColumn> columns)
+			List<MetadataColumn> columns,
+			Action<SemanticGenerationProgress>? progress = null,
+			CancellationToken ct = default)
 	{
 
 
@@ -150,47 +162,43 @@ public class MetadataSemanticService
 
 
 
-		foreach (var batch in columns.Chunk(QwenBatchSize))
+		var batches = columns
+			.Chunk(QwenBatchSize)
+			.Select((batch, index) => new SemanticBatch(index + 1, batch.ToList()))
+			.ToList();
+
+		using var semaphore = new SemaphoreSlim(MaxConcurrency, MaxConcurrency);
+		var pending = batches
+			.Select(batch => ProcessBatchAsync(batch, batches.Count, semaphore, ct))
+			.ToList();
+
+		var batchesCompleted = 0;
+		var fieldsCompleted = 0;
+		var fieldsGenerated = 0;
+		var fieldsFailed = 0;
+
+		while (pending.Count > 0)
 		{
+			ct.ThrowIfCancellationRequested();
+			var finishedTask = await Task.WhenAny(pending);
+			pending.Remove(finishedTask);
+			var batchResult = await finishedTask;
 
-			try
-			{
+			batchesCompleted++;
+			fieldsCompleted += batchResult.BatchSize;
+			fieldsGenerated += batchResult.Items.Count;
+			fieldsFailed += Math.Max(0, batchResult.BatchSize - batchResult.Items.Count);
+			allItems.AddRange(batchResult.Items);
 
-				var response =
-					await GenerateBatchPromptAsync(
-						batch.ToList());
-
-
-
-				var items =
-					ParseJson(response);
-
-
-
-				allItems.AddRange(items);
-
-			}
-			catch (Exception)
-			{
-
-				/*
-				 * 单批失败不影响其它批次
-				 *
-				 * 后续可以增加日志
-				 */
-
-				continue;
-
-			}
-
+			progress?.Invoke(new SemanticGenerationProgress(
+				batchesCompleted,
+				batches.Count,
+				fieldsCompleted,
+				columns.Count,
+				fieldsGenerated,
+				fieldsFailed,
+				batchResult.Message));
 		}
-
-
-
-
-
-
-
 
 		if (allItems.Count == 0)
 		{
@@ -330,7 +338,7 @@ public class MetadataSemanticService
 
 
 		await _context
-			.SaveChangesAsync();
+			.SaveChangesAsync(ct);
 
 
 
@@ -340,6 +348,65 @@ public class MetadataSemanticService
 	}
 
 
+
+	private async Task<SemanticBatchResult> ProcessBatchAsync(
+		SemanticBatch batch,
+		int totalBatches,
+		SemaphoreSlim semaphore,
+		CancellationToken ct)
+	{
+		await semaphore.WaitAsync(ct);
+		try
+		{
+			List<MetadataSemanticBatchItem> lastPartial = new();
+
+			for (var attempt = 1; attempt <= MaxAttempts; attempt++)
+			{
+				ct.ThrowIfCancellationRequested();
+				try
+				{
+					var response = await GenerateBatchPromptAsync(batch.Columns, ct);
+					var expectedIds = batch.Columns.Select(x => x.Id).ToHashSet();
+					var items = ParseJson(response)
+						.Where(x => expectedIds.Contains(x.Id))
+						.GroupBy(x => x.Id)
+						.Select(x => x.First())
+						.ToList();
+
+					if (items.Count > lastPartial.Count)
+						lastPartial = items;
+
+					if (items.Count == batch.Columns.Count)
+					{
+						_logger.LogInformation("Metadata semantic batch {Batch}/{TotalBatches} completed on attempt {Attempt}: {Count} fields.", batch.Number, totalBatches, attempt, items.Count);
+						return new SemanticBatchResult(items, batch.Columns.Count, "第 " + batch.Number + "/" + totalBatches + " 批完成：" + items.Count + "/" + batch.Columns.Count + " 个字段。");
+					}
+
+					throw new InvalidDataException("Qwen semantic response incomplete: " + items.Count + "/" + batch.Columns.Count + ".");
+				}
+				catch (OperationCanceledException) when (ct.IsCancellationRequested)
+				{
+					throw;
+				}
+				catch (Exception ex)
+				{
+					_logger.LogWarning(ex, "Metadata semantic batch {Batch}/{TotalBatches} attempt {Attempt}/{MaxAttempts} failed.", batch.Number, totalBatches, attempt, MaxAttempts);
+					if (attempt < MaxAttempts)
+						await Task.Delay(TimeSpan.FromSeconds(Math.Pow(2, attempt)), ct);
+				}
+			}
+
+			_logger.LogError("Metadata semantic batch {Batch}/{TotalBatches} exhausted retries. Generated {Generated}/{Total} fields.", batch.Number, totalBatches, lastPartial.Count, batch.Columns.Count);
+			return new SemanticBatchResult(lastPartial, batch.Columns.Count, "第 " + batch.Number + "/" + totalBatches + " 批重试结束：成功 " + lastPartial.Count + "/" + batch.Columns.Count + "。");
+		}
+		finally
+		{
+			semaphore.Release();
+		}
+	}
+
+	private sealed record SemanticBatch(int Number, List<MetadataColumn> Columns);
+	private sealed record SemanticBatchResult(List<MetadataSemanticBatchItem> Items, int BatchSize, string Message);
 
 
 
@@ -352,7 +419,8 @@ public class MetadataSemanticService
 	/// </summary>
 	private async Task<string>
 		GenerateBatchPromptAsync(
-			List<MetadataColumn> columns)
+			List<MetadataColumn> columns,
+			CancellationToken ct)
 	{
 
 
@@ -447,7 +515,8 @@ public class MetadataSemanticService
 
 		return await _qwenService
 			.GenerateSqlAsync(
-				prompt.ToString());
+				prompt.ToString(),
+				ct);
 
 	}
 
