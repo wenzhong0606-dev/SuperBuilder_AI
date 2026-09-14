@@ -72,7 +72,7 @@ public class QwenService
 
 
 	public async Task<string>
-		GenerateSqlAsync(string prompt)
+		GenerateSqlAsync(string prompt, CancellationToken ct = default)
 	{
 
 
@@ -127,7 +127,8 @@ public class QwenService
 		var response =
 		await _httpClient.PostAsync(
 			_configuration["Qwen:Endpoint"],
-			content);
+			content,
+			ct);
 
 
 
