@@ -78,6 +78,9 @@ public class MetadataSemanticService
 	/// <summary>
 	/// 单字段生成语义
 	/// </summary>
+	public Task<MetadataSemantic?> GenerateAsync(MetadataColumn column)
+		=> GenerateAsync(column, CancellationToken.None);
+
 	public async Task<MetadataSemantic?>
 		GenerateAsync(
 			MetadataColumn column,
@@ -105,6 +108,9 @@ public class MetadataSemanticService
 	/// <summary>
 	/// 批量生成字段语义
 	/// </summary>
+	public Task<List<MetadataSemantic>> GenerateBatchAsync(List<MetadataColumn> columns)
+		=> GenerateBatchAsync(columns, null, CancellationToken.None);
+
 	public async Task<List<MetadataSemantic>>
 		GenerateBatchAsync(
 			List<MetadataColumn> columns,
