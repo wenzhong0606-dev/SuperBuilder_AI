@@ -71,6 +71,9 @@ public class QwenService
 
 
 
+	public Task<string> GenerateSqlAsync(string prompt)
+		=> GenerateSqlAsync(prompt, CancellationToken.None);
+
 	public async Task<string>
 		GenerateSqlAsync(string prompt, CancellationToken ct = default)
 	{
