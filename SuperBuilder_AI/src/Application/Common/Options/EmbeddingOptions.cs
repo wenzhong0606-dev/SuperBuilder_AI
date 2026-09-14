@@ -48,4 +48,12 @@ public class EmbeddingOptions
 	/// HTTP 请求超时时间。
 	/// </summary>
 	public int TimeoutSeconds { get; set; } = 120;
+
+	/// <summary>
+	/// 单次批量 Embedding 请求的最大文本条数。
+	///
+	/// 单批过大可能触发 Qwen 单批上限或限流（429）。
+	/// 分片后片内仍是批量请求（保留吞吐），片间避免单次过载。
+	/// </summary>
+	public int BatchSize { get; set; } = 16;
 }

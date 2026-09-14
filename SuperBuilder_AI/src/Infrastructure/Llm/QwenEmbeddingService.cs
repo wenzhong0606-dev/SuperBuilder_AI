@@ -58,29 +58,78 @@ public class QwenEmbeddingService : IEmbeddingService
         }
 
         if (string.IsNullOrWhiteSpace(_options.ApiKey))
-        {
-            throw new InvalidOperationException("Embedding API Key 未配置。");
-        }
-
+            throw new InvalidOperationException("EMB_CFG: API Key 未配置。");
         if (string.IsNullOrWhiteSpace(_options.Endpoint))
-        {
-            throw new InvalidOperationException("Embedding Endpoint 未配置。");
-        }
-
+            throw new InvalidOperationException("EMB_CFG: Endpoint 未配置。");
         if (string.IsNullOrWhiteSpace(_options.Model))
-        {
-            throw new InvalidOperationException("Embedding Model 未配置。");
-        }
+            throw new InvalidOperationException("EMB_CFG: Model 未配置。");
 
         // qwen3.7-text-embedding 的 OpenAI Compatible API 支持
         // model/input/dimensions/encoding_format，但 text_type 仅通过
         // DashScope 原生 API/SDK 提供。兼容端点不接收该非兼容字段。
         _ = textType;
 
+        // 分片：单批过大可能触发 Qwen 单批上限或限流（429）。
+        // 片内仍是批量请求，保留吞吐；片间避免单次过载。
+        var batchSize = _options.BatchSize <= 0 ? 16 : _options.BatchSize;
+        var results = new List<float[]>(list.Count);
+
+        for (var start = 0; start < list.Count; start += batchSize)
+        {
+            var count = Math.Min(batchSize, list.Count - start);
+            var slice = list.GetRange(start, count);
+            var sliceVectors = await GenerateSliceWithRetryAsync(slice);
+            results.AddRange(sliceVectors);
+        }
+
+        return results;
+    }
+
+    /// <summary>
+    /// 对单一切片做带退避重试的 embedding 调用。
+    /// 仅对可重试错误（限流 429 / 服务端 5xx）重试，最多 3 次。
+    /// </summary>
+    private async Task<IReadOnlyList<float[]>> GenerateSliceWithRetryAsync(
+        List<string> slice)
+    {
+        const int maxAttempts = 3;
+        var delayMs = 300;
+        Exception? lastError = null;
+
+        for (var attempt = 1; attempt <= maxAttempts; attempt++)
+        {
+            try
+            {
+                return await GenerateSliceAsync(slice);
+            }
+            catch (InvalidOperationException ex)
+                when (attempt < maxAttempts
+                    && (ex.Message.StartsWith("EMB_HTTP_429")
+                        || ex.Message.StartsWith("EMB_HTTP_5")))
+            {
+                lastError = ex;
+                await Task.Delay(delayMs);
+                delayMs = Math.Min(delayMs * 2, 5000);
+            }
+        }
+
+        var detail = (lastError?.Message?.Length ?? 0) > 50
+            ? lastError!.Message[..50]
+            : (lastError?.Message ?? "unknown");
+        throw new InvalidOperationException($"EMB_RETRY_FAIL: {detail}");
+    }
+
+    /// <summary>
+    /// 单次切片 embedding 调用。失败时抛出以 EMB_ 短码前缀的
+    /// InvalidOperationException，便于上层在 VectorErrorCode 内诊断。
+    /// </summary>
+    private async Task<IReadOnlyList<float[]>> GenerateSliceAsync(
+        List<string> slice)
+    {
         var requestBody = new
         {
             model = _options.Model,
-            input = list,
+            input = slice,
             dimensions = _options.Dimensions,
             encoding_format = "float"
         };
@@ -105,10 +154,14 @@ public class QwenEmbeddingService : IEmbeddingService
 
         if (!response.IsSuccessStatusCode)
         {
-            throw new InvalidOperationException(
-                $"Qwen Embedding API 调用失败。" +
-                $" HTTP={(int)response.StatusCode} " +
-                $" Response={responseBody}");
+            var code = (int)response.StatusCode;
+            var tag = code == 429
+                ? "EMB_HTTP_429"
+                : (code >= 500 ? $"EMB_HTTP_{code}" : $"EMB_HTTP_{code}");
+            var snippet = responseBody.Length > 48
+                ? responseBody[..48]
+                : responseBody;
+            throw new InvalidOperationException($"{tag}: {snippet}");
         }
 
         var result = JsonSerializer.Deserialize<QwenEmbeddingResponse>(
@@ -119,36 +172,22 @@ public class QwenEmbeddingService : IEmbeddingService
             });
 
         if (result?.Data == null || result.Data.Count == 0)
-        {
-            throw new InvalidOperationException(
-                "Qwen Embedding API 返回结果为空。");
-        }
+            throw new InvalidOperationException("EMB_EMPTY_RESP");
 
-        if (result.Data.Count != list.Count)
-        {
+        if (result.Data.Count != slice.Count)
             throw new InvalidOperationException(
-                $"Embedding 数量不匹配。" +
-                $"请求={list.Count}。" +
-                $"返回={result.Data.Count}。");
-        }
+                $"EMB_COUNT_MISMATCH(req={slice.Count},ret={result.Data.Count})");
 
-        var vectors = new List<float[]>(list.Count);
+        var vectors = new List<float[]>(slice.Count);
         for (var i = 0; i < result.Data.Count; i++)
         {
             var embedding = result.Data[i].Embedding;
             if (embedding == null || embedding.Count == 0)
-            {
-                throw new InvalidOperationException(
-                    "Qwen Embedding API 未返回有效向量。");
-            }
+                throw new InvalidOperationException("EMB_NULL_VECTOR");
 
             if (embedding.Count != _options.Dimensions)
-            {
                 throw new InvalidOperationException(
-                    $"Embedding维度不匹配。" +
-                    $"配置={_options.Dimensions}。" +
-                    $"实际={embedding.Count}。");
-            }
+                    $"EMB_DIM_MISMATCH(cfg={_options.Dimensions},act={embedding.Count})");
 
             vectors.Add(embedding.ToArray());
         }

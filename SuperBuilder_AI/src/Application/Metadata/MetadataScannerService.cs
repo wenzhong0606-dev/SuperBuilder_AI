@@ -310,6 +310,10 @@ public class MetadataScannerService
 
 					var result = await _vectorService.IndexAsync(table);
 
+					// 单表向量索引失败（如 Qwen 瞬时限流/5xx）重试一次。
+					if (table.VectorStatus == "Failed")
+						result = await _vectorService.IndexAsync(table);
+
 					if (!string.IsNullOrWhiteSpace(result.TableVectorId))
 						table.VectorId = result.TableVectorId;
 

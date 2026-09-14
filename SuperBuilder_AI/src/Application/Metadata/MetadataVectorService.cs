@@ -274,23 +274,25 @@ public class MetadataVectorService
 		}
 		catch (Exception ex)
 		{
-			// 单表整体失败不影响其它表；记录脱敏后的异常类型名。
+			// 单表整体失败不影响其它表；记录短诊断码（含 EMB_ 前缀，
+			// 见 QwenEmbeddingService），便于在 VectorErrorCode(nvarchar 64) 内定位。
+			var errCode = ex.Message.Length > 60
+				? ex.Message[..60]
+				: ex.Message;
+
 			metadataTable.VectorStatus = "Failed";
-			metadataTable.VectorErrorCode =
-				ex.GetType().Name;
+			metadataTable.VectorErrorCode = errCode;
 
 			foreach (var column in metadataTable.Columns)
 			{
 				column.VectorStatus = "Failed";
-				column.VectorErrorCode =
-					ex.GetType().Name;
+				column.VectorErrorCode = errCode;
 
 				if (column.Semantic != null)
 				{
 					column.Semantic.VectorStatus =
 						"Failed";
-					column.Semantic.VectorErrorCode =
-						ex.GetType().Name;
+					column.Semantic.VectorErrorCode = errCode;
 				}
 			}
 		}
