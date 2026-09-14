@@ -1,5 +1,8 @@
 # G1 企业试点开工计划（2026-09）
 
+**2026-09-14 用户已确认的首批部署范围**：Windows + 直接安装 + 单实例。其他操作系统、容器化及多实例部署组合后续再考虑，不属于本批 G1 验收范围。单实例指应用部署拓扑，不表示 API 与 Web 必须合并为同一进程，也不要求 SQL Server/Qdrant 与应用同机。Windows 具体版本、托管方式、依赖服务位置与版本、浏览器、硬件及联网条件仍需实施核验；本决策不等于安装或性能验收已通过。
+
+
 > Status: ACTIVE（待开工，计划草案）  
 > Created: 2026-09-13  
 > Parent: ../../Master_Development_Plan.md · ../../milestones/M13.md · ../../milestones/M14.md  

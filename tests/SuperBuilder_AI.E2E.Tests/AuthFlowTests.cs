@@ -34,6 +34,15 @@ public sealed class AuthFlowTests
         var page = await _fx.NewPageAsync();
         await LoginHelper.LoginAsync(page, _fx, E2EConfig.User!, E2EConfig.Password!, E2EConfig.Tenant!);
         Assert.Contains("/ask", page.Url);
+        await page.Locator("[data-testid=ask-input]").WaitForAsync(
+            new LocatorWaitForOptions { State = WaitForSelectorState.Visible, Timeout = 20000 });
+
+        // 整页刷新后仍须恢复真实表单登录得到的会话，不能只检查路由未变化。
+        await page.ReloadAsync();
+        await page.Locator("[data-testid=ask-input]").WaitForAsync(
+            new LocatorWaitForOptions { State = WaitForSelectorState.Visible, Timeout = 20000 });
+        Assert.Contains("/ask", page.Url);
+        Assert.Equal(0, await page.Locator("[data-testid=login-submit]").CountAsync());
     }
 
     /// <summary>无效凭据登录必须停留在登录页并显示错误提示（role=alert）。</summary>
