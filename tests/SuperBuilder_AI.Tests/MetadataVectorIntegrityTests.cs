@@ -397,7 +397,10 @@ public class MetadataVectorIntegrityTests
 		await svc.IndexAsync(table);
 
 		Assert.Equal("Failed", table.VectorStatus);
-		Assert.Equal("InvalidOperationException", table.VectorErrorCode);
+		// 失败时 VectorErrorCode 记录异常诊断信息（生产环境为含 EMB_ 前缀的短码，
+		// 如 EMB_HTTP_429 / EMB_RETRY_FAIL），便于在 nvarchar(64) 列内定位根因，
+		// 而非仅记录异常类型名。FakeEmbedding 抛出的消息为 "embedding failed"。
+		Assert.Equal("embedding failed", table.VectorErrorCode);
 	}
 
 	[Fact]
