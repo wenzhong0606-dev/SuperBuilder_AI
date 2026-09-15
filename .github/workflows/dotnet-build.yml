@@ -27,8 +27,61 @@ env:
   CI: "true"
 
 jobs:
+  changes:
+    name: 变更范围分析
+    runs-on: ubuntu-latest
+    outputs:
+      runtime: ${{ steps.scope.outputs.runtime }}
+      e2e: ${{ steps.scope.outputs.e2e }}
+    steps:
+      - name: 检出源码
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: 判断是否需要重型测试
+        id: scope
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "runtime=true" >> "$GITHUB_OUTPUT"
+            echo "e2e=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            git fetch origin "${{ github.base_ref }}" --depth=1
+            BASE="origin/${{ github.base_ref }}"
+          else
+            BASE="${{ github.event.before }}"
+            if [ -z "$BASE" ] || [ "$BASE" = "0000000000000000000000000000000000000000" ]; then
+              BASE="${GITHUB_SHA}^"
+            fi
+          fi
+
+          files=$(git diff --name-only "$BASE" "$GITHUB_SHA" || true)
+          printf '%s\n' "$files"
+
+          runtime=false
+          e2e=false
+
+          if printf '%s\n' "$files" | grep -Eq '^(SuperBuilder_AI/src/Api/|SuperBuilder_AI/src/Application/(Golden|BiQuery)/|SuperBuilder_AI/src/Infrastructure/(Persistence|Llm)/|SuperBuilder_AI/src/Domain/(Golden|BiQuery)/|SuperBuilder_AI/appsettings|SuperBuilder_AI/SuperBuilder_AI\.csproj|\.github/workflows/dotnet-build\.yml)'; then
+            runtime=true
+          fi
+
+          if printf '%s\n' "$files" | grep -Eq '^(SuperBuilder_AI\.Web/|SuperBuilder_AI\.Components/|SuperBuilder_AI/src/(Api|Application|Domain|Infrastructure)/|tests/SuperBuilder_AI\.E2E\.Tests/|SuperBuilder_AI/appsettings|\.github/workflows/dotnet-build\.yml)'; then
+            e2e=true
+          fi
+
+          echo "runtime=$runtime" >> "$GITHUB_OUTPUT"
+          echo "e2e=$e2e" >> "$GITHUB_OUTPUT"
+          echo "Runtime Smoke: $runtime"
+          echo "Web E2E: $e2e"
+
   build:
     name: 编译检查
+    needs: changes
     runs-on: ubuntu-latest
     steps:
       - name: 检出源码
@@ -105,7 +158,8 @@ jobs:
 
   controller-runtime:
     name: V2.6 Evaluation Controller Runtime Smoke
-    needs: build
+    needs: [changes, build]
+    if: needs.changes.outputs.runtime == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: 检出源码
@@ -271,7 +325,8 @@ jobs:
 
   e2e:
     name: Web/Blazor E2E (Playwright)
-    needs: build
+    needs: [changes, build]
+    if: needs.changes.outputs.e2e == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: 检出源码
@@ -393,13 +448,46 @@ jobs:
         # AuthFlow / LanguageSwitch / PermissionDeny）——后者命名不含 "E2E"，且部分依赖 CI
         # 未设的 SB_E2E_TENANT/READER_TENANT 会诚实跳过；DataSourceScan 还需
         # SB_E2E_SCAN_CONNECTION 才真实执行（CI 未设→诚实跳过，不假绿）。
-        run: dotnet test tests/SuperBuilder_AI.E2E.Tests/SuperBuilder_AI.E2E.Tests.csproj --configuration Release --filter "FullyQualifiedName~E2ETests" --logger "console;verbosity=normal"
+        run: |
+          set -o pipefail
+          mkdir -p "$GITHUB_WORKSPACE/E2EResults"
+          dotnet test tests/SuperBuilder_AI.E2E.Tests/SuperBuilder_AI.E2E.Tests.csproj \
+            --configuration Release \
+            --filter "FullyQualifiedName~E2ETests" \
+            --logger "console;verbosity=normal" \
+            --logger "trx;LogFileName=e2e-tests.trx" \
+            --results-directory "$GITHUB_WORKSPACE/E2EResults" 2>&1 | tee e2e-tests.log
+          test_exit=$?
+
+          trx="$GITHUB_WORKSPACE/E2EResults/e2e-tests.trx"
+          if [ ! -f "$trx" ]; then
+            echo "::error::E2E 未生成 TRX 结果，拒绝假绿。"
+            exit 1
+          fi
+
+          counters=$(grep -oE '<Counters[^>]*>' "$trx" | head -1)
+          total=$(printf '%s\n' "$counters" | grep -oE '\btotal="[0-9]+"' | grep -oE '[0-9]+' || true)
+          executed=$(printf '%s\n' "$counters" | grep -oE '\bexecuted="[0-9]+"' | grep -oE '[0-9]+' || true)
+          passed=$(printf '%s\n' "$counters" | grep -oE '\bpassed="[0-9]+"' | grep -oE '[0-9]+' || true)
+          failed=$(printf '%s\n' "$counters" | grep -oE '\bfailed="[0-9]+"' | grep -oE '[0-9]+' || true)
+
+          echo "E2E trx：total=${total:-0} executed=${executed:-0} passed=${passed:-0} failed=${failed:-0}"
+
+          if [ "${total:-0}" -eq 0 ] || [ "${executed:-0}" -eq 0 ] || [ "${passed:-0}" -eq 0 ]; then
+            echo "::error::E2E 没有真实执行并通过任何用例（可能全部 Skip / 浏览器未启动），拒绝假绿。"
+            exit 1
+          fi
+
+          exit $test_exit
       - name: 上传视觉基线产物
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: e2e-visual-baselines
-          path: tests/SuperBuilder_AI.E2E.Tests/artifacts/visual-baselines/
+          path: |
+            tests/SuperBuilder_AI.E2E.Tests/artifacts/visual-baselines/
+            e2e-tests.log
+            E2EResults/
           if-no-files-found: ignore
       - name: 输出服务日志
         if: always()
