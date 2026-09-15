@@ -501,3 +501,45 @@ jobs:
           docker rm -f superbuilder-e2e-sqlserver superbuilder-e2e-qdrant || true
           [ -f /tmp/sb-api.pid ] && kill "$(cat /tmp/sb-api.pid)" || true
           [ -f /tmp/sb-web.pid ] && kill "$(cat /tmp/sb-web.pid)" || true
+
+
+  quality-gate:
+    name: 最终质量门禁
+    needs: [build, unit-tests, controller-runtime, e2e]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: 汇总质量结果
+        shell: bash
+        env:
+          BUILD_RESULT: ${{ needs.build.result }}
+          UNIT_RESULT: ${{ needs.unit-tests.result }}
+          RUNTIME_RESULT: ${{ needs.controller-runtime.result }}
+          E2E_RESULT: ${{ needs.e2e.result }}
+        run: |
+          echo "Build:   $BUILD_RESULT"
+          echo "Unit:    $UNIT_RESULT"
+          echo "Runtime: $RUNTIME_RESULT"
+          echo "E2E:     $E2E_RESULT"
+
+          if [ "$BUILD_RESULT" != "success" ]; then
+            echo "::error::Build 未通过"
+            exit 1
+          fi
+
+          if [ "$UNIT_RESULT" != "success" ]; then
+            echo "::error::Unit Tests 未通过"
+            exit 1
+          fi
+
+          case "$RUNTIME_RESULT" in
+            success|skipped) ;;
+            *) echo "::error::Runtime Smoke 未通过"; exit 1 ;;
+          esac
+
+          case "$E2E_RESULT" in
+            success|skipped) ;;
+            *) echo "::error::E2E 未通过"; exit 1 ;;
+          esac
+
+          echo "质量门禁通过。"
