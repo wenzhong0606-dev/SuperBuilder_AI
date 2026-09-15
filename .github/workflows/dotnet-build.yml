@@ -23,7 +23,8 @@ permissions:
   contents: read
 
 env:
-  TEST_SQL_PASSWORD: "SuperBuilder_C13_3!Test2026"
+  TEST_SQL_PASSWORD: "C1_Test_${{ github.run_id }}!Aa"
+  CI_PLATFORM_PASSWORD: "C1_Admin_${{ github.run_id }}!Aa"
   CI: "true"
 
 jobs:
@@ -230,7 +231,7 @@ jobs:
           # CI 此前匿名调用返回 401。经 PlatformBootstrap 配置落地一名平台管理员（幂等），
           # 供本 job 登录后持令牌调用该管理端点。仅 CI 测试环境使用。
           PlatformBootstrap__Username: "ci-platform-admin"
-          PlatformBootstrap__Password: "C13_3_CI_Admin_Pass_2026"
+          PlatformBootstrap__Password: "${{ env.CI_PLATFORM_PASSWORD }}"
           # SEC-01：CI 测试密钥（AES-256）。生产环境须由 KeyVault/环境变量注入真实主密钥，缺失即 fail-fast。
           SecretStore__MasterKey: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
         run: |
@@ -261,7 +262,7 @@ jobs:
           echo "Platform tenant id = $TID"
           [ -n "$TID" ] || { echo "::error::未能解析 platform 租户 ID"; exit 1; }
 
-          LOGIN_BODY=$(jq -n --arg u "ci-platform-admin" --argjson t "$TID" --arg p "C13_3_CI_Admin_Pass_2026" \
+          LOGIN_BODY=$(jq -n --arg u "ci-platform-admin" --argjson t "$TID" --arg p "${{ env.CI_PLATFORM_PASSWORD }}" \
             '{username:$u, tenantId:$t, password:$p}')
           TOKEN=$(curl --fail --silent --show-error -X POST http://127.0.0.1:5050/api/auth/login \
             -H 'Content-Type: application/json' -d "$LOGIN_BODY" | jq -r '.token')
