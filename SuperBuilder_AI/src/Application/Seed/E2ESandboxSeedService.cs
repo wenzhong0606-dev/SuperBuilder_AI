@@ -1,6 +1,7 @@
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Data.SqlClient;
 using SuperBuilder_AI.Data;
 using SuperBuilder_AI.Interfaces.Identity;
 using SuperBuilder_AI.Interfaces.Localization;
@@ -40,6 +41,9 @@ public sealed class E2ESandboxSeedService : IE2ESandboxSeedService
 
     public async Task SeedAsync(CancellationToken ct = default)
     {
+        if (IsCi())
+            await EnsureCiBusinessDatabaseAsync(ct);
+
         var existing = await _db.Tenants.IgnoreQueryFilters()
             .FirstOrDefaultAsync(t => t.TenantCode == E2ETenantCode, ct);
         if (existing is not null) return; // 幂等
@@ -63,4 +67,78 @@ public sealed class E2ESandboxSeedService : IE2ESandboxSeedService
         if (reader.Success && reader.Id.HasValue)
             await _identity.SetPasswordAsync(tenant.Id, reader.Id.Value, E2EPassword, ct);
     }
+    private static bool IsCi()
+        => string.Equals(
+            Environment.GetEnvironmentVariable("CI"),
+            "true",
+            StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// CI 下复用元数据库所在 SQL Server，创建独立的“外部业务库”。
+    /// 这样 DataSource Scan E2E 连接的是另一数据库，而不是扫描平台自己的元数据库。
+    /// </summary>
+    private async Task EnsureCiBusinessDatabaseAsync(CancellationToken ct)
+    {
+        var sourceConnection = _db.Database.GetDbConnection().ConnectionString;
+        if (string.IsNullOrWhiteSpace(sourceConnection))
+            throw new InvalidOperationException("CI E2E 无法读取元数据库连接字符串。");
+
+        var builder = new SqlConnectionStringBuilder(sourceConnection);
+        builder.InitialCatalog = "master";
+
+        await using (var master = new SqlConnection(builder.ConnectionString))
+        {
+            await master.OpenAsync(ct);
+            await using var createDb = master.CreateCommand();
+            createDb.CommandText =
+                "IF DB_ID(N'SuperBuilder_E2E_Business') IS NULL CREATE DATABASE [SuperBuilder_E2E_Business];";
+            await createDb.ExecuteNonQueryAsync(ct);
+        }
+
+        builder.InitialCatalog = "SuperBuilder_E2E_Business";
+        await using var business = new SqlConnection(builder.ConnectionString);
+        await business.OpenAsync(ct);
+
+        await using var schema = business.CreateCommand();
+        schema.CommandText =
+            """
+            IF OBJECT_ID(N'dbo.Inventory', N'U') IS NULL
+            CREATE TABLE dbo.Inventory(
+                Id BIGINT IDENTITY(1,1) PRIMARY KEY,
+                MaterialCode NVARCHAR(64) NOT NULL,
+                MaterialName NVARCHAR(128) NOT NULL,
+                WarehouseCode NVARCHAR(32) NOT NULL,
+                Quantity DECIMAL(18,4) NOT NULL,
+                UpdatedAt DATETIME2 NOT NULL
+            );
+
+            IF OBJECT_ID(N'dbo.PurchaseOrder', N'U') IS NULL
+            CREATE TABLE dbo.PurchaseOrder(
+                Id BIGINT IDENTITY(1,1) PRIMARY KEY,
+                OrderNo NVARCHAR(64) NOT NULL,
+                SupplierCode NVARCHAR(64) NOT NULL,
+                MaterialCode NVARCHAR(64) NOT NULL,
+                OrderQty DECIMAL(18,4) NOT NULL,
+                Amount DECIMAL(18,2) NOT NULL,
+                OrderDate DATE NOT NULL
+            );
+
+            IF OBJECT_ID(N'dbo.SalesOrder', N'U') IS NULL
+            CREATE TABLE dbo.SalesOrder(
+                Id BIGINT IDENTITY(1,1) PRIMARY KEY,
+                OrderNo NVARCHAR(64) NOT NULL,
+                CustomerCode NVARCHAR(64) NOT NULL,
+                MaterialCode NVARCHAR(64) NOT NULL,
+                SalesQty DECIMAL(18,4) NOT NULL,
+                SalesAmount DECIMAL(18,2) NOT NULL,
+                OrderDate DATE NOT NULL
+            );
+
+            IF NOT EXISTS (SELECT 1 FROM dbo.Inventory)
+            INSERT INTO dbo.Inventory(MaterialCode, MaterialName, WarehouseCode, Quantity, UpdatedAt)
+            VALUES (N'MAT-001', N'E2E Material A', N'WH-01', 100, SYSUTCDATETIME());
+            """;
+        await schema.ExecuteNonQueryAsync(ct);
+    }
+
 }

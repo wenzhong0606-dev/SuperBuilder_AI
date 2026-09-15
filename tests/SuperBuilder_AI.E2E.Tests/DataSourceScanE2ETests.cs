@@ -19,15 +19,47 @@ public sealed class DataSourceScanE2ETests
     private readonly PlaywrightFixture _fx;
     public DataSourceScanE2ETests(PlaywrightFixture fx) => _fx = fx;
 
-    private static string? ScanConnection => Environment.GetEnvironmentVariable("SB_E2E_SCAN_CONNECTION");
-    private static string ScanDbType => Environment.GetEnvironmentVariable("SB_E2E_SCAN_DB_TYPE") ?? "SQLSERVER";
+    private static bool IsCi =>
+        string.Equals(
+            Environment.GetEnvironmentVariable("CI"),
+            "true",
+            StringComparison.OrdinalIgnoreCase);
+
+    private static string? ScanConnection
+    {
+        get
+        {
+            var explicitConnection = Environment.GetEnvironmentVariable("SB_E2E_SCAN_CONNECTION");
+            if (!string.IsNullOrWhiteSpace(explicitConnection))
+                return explicitConnection;
+
+            if (!IsCi)
+                return null;
+
+            var sqlPassword = Environment.GetEnvironmentVariable("TEST_SQL_PASSWORD");
+            if (string.IsNullOrWhiteSpace(sqlPassword))
+                return null;
+
+            return $"Server=127.0.0.1,1433;Database=SuperBuilder_E2E_Business;User Id=sa;Password={sqlPassword};TrustServerCertificate=True;";
+        }
+    }
+
+    private static string ScanDbType =>
+        Environment.GetEnvironmentVariable("SB_E2E_SCAN_DB_TYPE")
+        ?? (IsCi ? "SQLSERVER" : "SQLSERVER");
 
     /// <summary>数据源创建 + 元数据扫描 → 任务 Succeeded 且 tablesScanned &gt; 0。</summary>
     [SkippableFact]
     public async Task Admin_CreateDataSource_ThenScan_PopulatesMetadata()
     {
         var conn = ScanConnection;
-        Skip.If(string.IsNullOrWhiteSpace(conn), "未配置 SB_E2E_SCAN_CONNECTION（可达业务库），跳过 DataSource→Scan 链。");
+        if (string.IsNullOrWhiteSpace(conn))
+        {
+            if (IsCi)
+                Assert.Fail("CI 必须配置 SB_E2E_SCAN_CONNECTION，DataSource→Scan 核心链路不得跳过。");
+
+            Skip.If(true, "未配置 SB_E2E_SCAN_CONNECTION（可达业务库），本地跳过 DataSource→Scan 链。");
+        }
         E2EConfig.Require(_fx.BaseUrl, E2EConfig.User, E2EConfig.Password);
         var page = await _fx.NewPageAsync();
         await LoginHelper.ApiLoginByCodeAsync(page, E2EConfig.User!, E2EConfig.Password!, "e2eapp");
@@ -40,11 +72,19 @@ public sealed class DataSourceScanE2ETests
             dbType = ScanDbType,
             connectionString = conn,
         });
-        Skip.If(!create.Ok || create.Status is < 200 or >= 300,
-            $"数据源创建失败（{create.Status}）：{create.Body}");
+        if (!create.Ok || create.Status is < 200 or >= 300)
+        {
+            if (IsCi)
+                Assert.Fail($"CI 数据源创建失败（{create.Status}）：{create.Body}");
+
+            Skip.If(true, $"数据源创建失败（{create.Status}）：{create.Body}");
+        }
         if (!JsonDocument.Parse(create.Body).RootElement.TryGetProperty("id", out var idEl)
             || idEl.ValueKind != JsonValueKind.Number)
         {
+            if (IsCi)
+                Assert.Fail($"CI 数据源创建响应缺少 id：{create.Body}");
+
             Skip.If(true, $"数据源创建响应缺少 id：{create.Body}");
             return;
         }
@@ -52,7 +92,13 @@ public sealed class DataSourceScanE2ETests
 
         // 2) 触发扫描，拿到 jobId（接口返回 202 + jobId）
         var scan = await E2EApiHelper.CallApiAsync(page, "POST", $"api/data-sources/{dsId}/metadata/scan");
-        Skip.If(scan.Status != 202, $"扫描触发失败（{scan.Status}）：{scan.Body}");
+        if (scan.Status != 202)
+        {
+            if (IsCi)
+                Assert.Fail($"CI 扫描触发失败（{scan.Status}）：{scan.Body}");
+
+            Skip.If(true, $"扫描触发失败（{scan.Status}）：{scan.Body}");
+        }
         var jobId = JsonDocument.Parse(scan.Body).RootElement.GetProperty("jobId").GetInt64();
 
         // 3) 轮询任务状态直到终态（最多约 90s）
@@ -70,6 +116,8 @@ public sealed class DataSourceScanE2ETests
         }
 
         Assert.Equal("Succeeded", status);
-        Assert.True(tablesScanned > 0, $"扫描成功但 tablesScanned=0（job：{status}）。");
+        Assert.True(
+            tablesScanned >= 3,
+            $"扫描成功但 tablesScanned={tablesScanned}，CI 业务 Fixture 预期至少 3 张表（job：{status}）。");
     }
 }

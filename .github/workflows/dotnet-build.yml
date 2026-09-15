@@ -23,12 +23,72 @@ permissions:
   contents: read
 
 env:
-  TEST_SQL_PASSWORD: "SuperBuilder_C13_3!Test2026"
+  TEST_SQL_PASSWORD: "C1_Test_${{ github.run_id }}!Aa"
+  CI_PLATFORM_PASSWORD: "C1_Admin_${{ github.run_id }}!Aa"
   CI: "true"
 
 jobs:
+  changes:
+    name: 变更范围分析
+    runs-on: ubuntu-latest
+    outputs:
+      runtime: ${{ steps.scope.outputs.runtime }}
+      e2e: ${{ steps.scope.outputs.e2e }}
+      e2e_filter: ${{ steps.scope.outputs.e2e_filter }}
+    steps:
+      - name: 检出源码
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: 判断是否需要重型测试
+        id: scope
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "runtime=true" >> "$GITHUB_OUTPUT"
+            echo "e2e=true" >> "$GITHUB_OUTPUT"
+            echo "e2e_filter=FullyQualifiedName~E2ETests" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            git fetch origin "${{ github.base_ref }}" --depth=1
+            BASE="origin/${{ github.base_ref }}"
+          else
+            BASE="${{ github.event.before }}"
+            if [ -z "$BASE" ] || [ "$BASE" = "0000000000000000000000000000000000000000" ]; then
+              BASE="${GITHUB_SHA}^"
+            fi
+          fi
+
+          files=$(git diff --name-only "$BASE" "$GITHUB_SHA" || true)
+          printf '%s\n' "$files"
+          printf '%s\n' "$files" > /tmp/changed-files.txt
+
+          runtime=false
+          e2e=false
+
+          if printf '%s\n' "$files" | grep -Eq '^(SuperBuilder_AI/src/Api/|SuperBuilder_AI/src/Application/(Golden|BiQuery)/|SuperBuilder_AI/src/Infrastructure/(Persistence|Llm)/|SuperBuilder_AI/src/Domain/(Golden|BiQuery)/|SuperBuilder_AI/appsettings|SuperBuilder_AI/SuperBuilder_AI\.csproj|\.github/workflows/dotnet-build\.yml)'; then
+            runtime=true
+          fi
+
+          e2e_filter=$(bash scripts/ci/e2e-scope.sh /tmp/changed-files.txt)
+          if [ -n "$e2e_filter" ]; then
+            e2e=true
+          fi
+
+          echo "runtime=$runtime" >> "$GITHUB_OUTPUT"
+          echo "e2e=$e2e" >> "$GITHUB_OUTPUT"
+          echo "e2e_filter=$e2e_filter" >> "$GITHUB_OUTPUT"
+          echo "Runtime Smoke: $runtime"
+          echo "Web E2E: $e2e"
+          echo "E2E Filter: ${e2e_filter:-n/a}"
+
   build:
     name: 编译检查
+    needs: changes
     runs-on: ubuntu-latest
     steps:
       - name: 检出源码
@@ -105,7 +165,8 @@ jobs:
 
   controller-runtime:
     name: V2.6 Evaluation Controller Runtime Smoke
-    needs: build
+    needs: [changes, build]
+    if: needs.changes.outputs.runtime == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: 检出源码
@@ -161,7 +222,7 @@ jobs:
       - name: 初始化 CI Metadata 数据库
         env:
           ASPNETCORE_ENVIRONMENT: Development
-          ConnectionStrings__DefaultConnection: "Server=127.0.0.1,1433;Database=SuperBuilder_C13_3;User Id=sa;Password=${{ env.TEST_SQL_PASSWORD }};TrustServerCertificate=True;"
+          ConnectionStrings__DefaultConnection: "Server=127.0.0.1,1433;Database=SuperBuilder_C13_3;User Id=sa;Password=${{ env.TEST_SQL_PASSWORD }};TrustServerCertificate=True;Persist Security Info=True;"
         run: |
           dotnet ef database update --project SuperBuilder_AI/SuperBuilder_AI.csproj --startup-project SuperBuilder_AI/SuperBuilder_AI.csproj --configuration Release
       - name: Release 编译 Runtime 应用
@@ -169,14 +230,14 @@ jobs:
       - name: 启动 Web API
         env:
           ASPNETCORE_ENVIRONMENT: Development
-          ConnectionStrings__DefaultConnection: "Server=127.0.0.1,1433;Database=SuperBuilder_C13_3;User Id=sa;Password=${{ env.TEST_SQL_PASSWORD }};TrustServerCertificate=True;"
+          ConnectionStrings__DefaultConnection: "Server=127.0.0.1,1433;Database=SuperBuilder_C13_3;User Id=sa;Password=${{ env.TEST_SQL_PASSWORD }};TrustServerCertificate=True;Persist Security Info=True;"
           Qdrant__Host: 127.0.0.1
           Qdrant__Port: 6334
           # V2.6 修复：/api/metadata-vector/rebuild 受 DiagnosticsAccessPolicy 保护，需 platform:diagnostics:manage。
           # CI 此前匿名调用返回 401。经 PlatformBootstrap 配置落地一名平台管理员（幂等），
           # 供本 job 登录后持令牌调用该管理端点。仅 CI 测试环境使用。
           PlatformBootstrap__Username: "ci-platform-admin"
-          PlatformBootstrap__Password: "C13_3_CI_Admin_Pass_2026"
+          PlatformBootstrap__Password: "${{ env.CI_PLATFORM_PASSWORD }}"
           # SEC-01：CI 测试密钥（AES-256）。生产环境须由 KeyVault/环境变量注入真实主密钥，缺失即 fail-fast。
           SecretStore__MasterKey: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
         run: |
@@ -207,7 +268,7 @@ jobs:
           echo "Platform tenant id = $TID"
           [ -n "$TID" ] || { echo "::error::未能解析 platform 租户 ID"; exit 1; }
 
-          LOGIN_BODY=$(jq -n --arg u "ci-platform-admin" --argjson t "$TID" --arg p "C13_3_CI_Admin_Pass_2026" \
+          LOGIN_BODY=$(jq -n --arg u "ci-platform-admin" --argjson t "$TID" --arg p "${{ env.CI_PLATFORM_PASSWORD }}" \
             '{username:$u, tenantId:$t, password:$p}')
           TOKEN=$(curl --fail --silent --show-error -X POST http://127.0.0.1:5050/api/auth/login \
             -H 'Content-Type: application/json' -d "$LOGIN_BODY" | jq -r '.token')
@@ -271,7 +332,8 @@ jobs:
 
   e2e:
     name: Web/Blazor E2E (Playwright)
-    needs: build
+    needs: [changes, build]
+    if: needs.changes.outputs.e2e == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: 检出源码
@@ -323,12 +385,12 @@ jobs:
       - name: 初始化 CI 元数据库
         env:
           ASPNETCORE_ENVIRONMENT: Development
-          ConnectionStrings__DefaultConnection: "Server=127.0.0.1,1433;Database=SuperBuilder_C13_3;User Id=sa;Password=${{ env.TEST_SQL_PASSWORD }};TrustServerCertificate=True;"
+          ConnectionStrings__DefaultConnection: "Server=127.0.0.1,1433;Database=SuperBuilder_C13_3;User Id=sa;Password=${{ env.TEST_SQL_PASSWORD }};TrustServerCertificate=True;Persist Security Info=True;"
         run: dotnet ef database update --project SuperBuilder_AI/SuperBuilder_AI.csproj --startup-project SuperBuilder_AI/SuperBuilder_AI.csproj --configuration Release
       - name: 启动 Web API (5050)
         env:
           ASPNETCORE_ENVIRONMENT: Development
-          ConnectionStrings__DefaultConnection: "Server=127.0.0.1,1433;Database=SuperBuilder_C13_3;User Id=sa;Password=${{ env.TEST_SQL_PASSWORD }};TrustServerCertificate=True;"
+          ConnectionStrings__DefaultConnection: "Server=127.0.0.1,1433;Database=SuperBuilder_C13_3;User Id=sa;Password=${{ env.TEST_SQL_PASSWORD }};TrustServerCertificate=True;Persist Security Info=True;"
           Qdrant__Host: 127.0.0.1
           Qdrant__Port: 6334
           ASPNETCORE_URLS: http://127.0.0.1:5050
@@ -350,7 +412,7 @@ jobs:
       - name: 启动 Web (Blazor Server, 5080)
         env:
           ASPNETCORE_ENVIRONMENT: Development
-          ConnectionStrings__DefaultConnection: "Server=127.0.0.1,1433;Database=SuperBuilder_C13_3;User Id=sa;Password=${{ env.TEST_SQL_PASSWORD }};TrustServerCertificate=True;"
+          ConnectionStrings__DefaultConnection: "Server=127.0.0.1,1433;Database=SuperBuilder_C13_3;User Id=sa;Password=${{ env.TEST_SQL_PASSWORD }};TrustServerCertificate=True;Persist Security Info=True;"
           ApiBaseUrl: http://127.0.0.1:5050
           ASPNETCORE_URLS: http://127.0.0.1:5080
         run: |
@@ -393,13 +455,46 @@ jobs:
         # AuthFlow / LanguageSwitch / PermissionDeny）——后者命名不含 "E2E"，且部分依赖 CI
         # 未设的 SB_E2E_TENANT/READER_TENANT 会诚实跳过；DataSourceScan 还需
         # SB_E2E_SCAN_CONNECTION 才真实执行（CI 未设→诚实跳过，不假绿）。
-        run: dotnet test tests/SuperBuilder_AI.E2E.Tests/SuperBuilder_AI.E2E.Tests.csproj --configuration Release --filter "FullyQualifiedName~E2ETests" --logger "console;verbosity=normal"
+        run: |
+          set -o pipefail
+          mkdir -p "$GITHUB_WORKSPACE/E2EResults"
+          dotnet test tests/SuperBuilder_AI.E2E.Tests/SuperBuilder_AI.E2E.Tests.csproj \
+            --configuration Release \
+            --filter "${{ needs.changes.outputs.e2e_filter }}" \
+            --logger "console;verbosity=normal" \
+            --logger "trx;LogFileName=e2e-tests.trx" \
+            --results-directory "$GITHUB_WORKSPACE/E2EResults" 2>&1 | tee e2e-tests.log
+          test_exit=$?
+
+          trx="$GITHUB_WORKSPACE/E2EResults/e2e-tests.trx"
+          if [ ! -f "$trx" ]; then
+            echo "::error::E2E 未生成 TRX 结果，拒绝假绿。"
+            exit 1
+          fi
+
+          counters=$(grep -oE '<Counters[^>]*>' "$trx" | head -1)
+          total=$(printf '%s\n' "$counters" | grep -oE '\btotal="[0-9]+"' | grep -oE '[0-9]+' || true)
+          executed=$(printf '%s\n' "$counters" | grep -oE '\bexecuted="[0-9]+"' | grep -oE '[0-9]+' || true)
+          passed=$(printf '%s\n' "$counters" | grep -oE '\bpassed="[0-9]+"' | grep -oE '[0-9]+' || true)
+          failed=$(printf '%s\n' "$counters" | grep -oE '\bfailed="[0-9]+"' | grep -oE '[0-9]+' || true)
+
+          echo "E2E trx：total=${total:-0} executed=${executed:-0} passed=${passed:-0} failed=${failed:-0}"
+
+          if [ "${total:-0}" -eq 0 ] || [ "${executed:-0}" -eq 0 ] || [ "${passed:-0}" -eq 0 ]; then
+            echo "::error::E2E 没有真实执行并通过任何用例（可能全部 Skip / 浏览器未启动），拒绝假绿。"
+            exit 1
+          fi
+
+          exit $test_exit
       - name: 上传视觉基线产物
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: e2e-visual-baselines
-          path: tests/SuperBuilder_AI.E2E.Tests/artifacts/visual-baselines/
+          path: |
+            tests/SuperBuilder_AI.E2E.Tests/artifacts/visual-baselines/
+            e2e-tests.log
+            E2EResults/
           if-no-files-found: ignore
       - name: 输出服务日志
         if: always()
@@ -412,3 +507,45 @@ jobs:
           docker rm -f superbuilder-e2e-sqlserver superbuilder-e2e-qdrant || true
           [ -f /tmp/sb-api.pid ] && kill "$(cat /tmp/sb-api.pid)" || true
           [ -f /tmp/sb-web.pid ] && kill "$(cat /tmp/sb-web.pid)" || true
+
+
+  quality-gate:
+    name: 最终质量门禁
+    needs: [build, unit-tests, controller-runtime, e2e]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: 汇总质量结果
+        shell: bash
+        env:
+          BUILD_RESULT: ${{ needs.build.result }}
+          UNIT_RESULT: ${{ needs.unit-tests.result }}
+          RUNTIME_RESULT: ${{ needs.controller-runtime.result }}
+          E2E_RESULT: ${{ needs.e2e.result }}
+        run: |
+          echo "Build:   $BUILD_RESULT"
+          echo "Unit:    $UNIT_RESULT"
+          echo "Runtime: $RUNTIME_RESULT"
+          echo "E2E:     $E2E_RESULT"
+
+          if [ "$BUILD_RESULT" != "success" ]; then
+            echo "::error::Build 未通过"
+            exit 1
+          fi
+
+          if [ "$UNIT_RESULT" != "success" ]; then
+            echo "::error::Unit Tests 未通过"
+            exit 1
+          fi
+
+          case "$RUNTIME_RESULT" in
+            success|skipped) ;;
+            *) echo "::error::Runtime Smoke 未通过"; exit 1 ;;
+          esac
+
+          case "$E2E_RESULT" in
+            success|skipped) ;;
+            *) echo "::error::E2E 未通过"; exit 1 ;;
+          esac
+
+          echo "质量门禁通过。"

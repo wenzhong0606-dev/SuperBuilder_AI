@@ -1,0 +1,53 @@
+name: SuperBuilder AI - Live AI Regression
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  live-ai:
+    name: Live Qwen + Embedding Smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      SB_LIVE_AI: "true"
+      QWEN_API_KEY: ${{ secrets.QWEN_API_KEY }}
+      EMBEDDING_API_KEY: ${{ secrets.EMBEDDING_API_KEY }}
+    steps:
+      - name: 检出源码
+        uses: actions/checkout@v4
+
+      - name: 设置 .NET 环境
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: 检查 Live AI 密钥
+        shell: bash
+        run: |
+          if [ -z "$QWEN_API_KEY" ]; then
+            echo "::error::缺少仓库 Secret: QWEN_API_KEY"
+            exit 1
+          fi
+          if [ -z "$EMBEDDING_API_KEY" ]; then
+            echo "::error::缺少仓库 Secret: EMBEDDING_API_KEY"
+            exit 1
+          fi
+
+      - name: 运行最小 Live AI 回归
+        run: |
+          dotnet test tests/SuperBuilder_AI.LiveAI.Tests/SuperBuilder_AI.LiveAI.Tests.csproj \
+            --configuration Release \
+            --logger "console;verbosity=normal" \
+            --logger "trx;LogFileName=live-ai.trx" \
+            --results-directory "$GITHUB_WORKSPACE/LiveAIResults"
+
+      - name: 上传 Live AI 结果
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-ai-results
+          path: LiveAIResults/
+          if-no-files-found: ignore

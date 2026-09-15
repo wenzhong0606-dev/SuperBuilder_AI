@@ -19,6 +19,9 @@ public interface IDataSourceMetadataReader
 	/// <exception cref="System.Data.Common.DbException">在与数据库通信时出现底层错误时抛出。</exception>
 	Task<List<TableMetadataDto>> GetTablesAsync(string connectionString);
 
+	Task<List<TableMetadataDto>> GetTablesAsync(string connectionString, string? dbType)
+		=> GetTablesAsync(connectionString);
+
 	/// <summary>
 	/// 异步获取指定连接字符串下的列元数据列表。
 	/// </summary>
@@ -27,4 +30,7 @@ public interface IDataSourceMetadataReader
 	/// <exception cref="System.ArgumentException">当 connectionString 为空或无效时抛出。</exception>
 	/// <exception cref="System.Data.Common.DbException">在与数据库通信时出现底层错误时抛出。</exception>
 	Task<List<ColumnMetadataDto>> GetColumnsAsync(string connectionString);
+
+	Task<List<ColumnMetadataDto>> GetColumnsAsync(string connectionString, string? dbType)
+		=> GetColumnsAsync(connectionString);
 }

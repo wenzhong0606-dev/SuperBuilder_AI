@@ -45,8 +45,18 @@ public sealed class PlaywrightFixture : IAsyncLifetime
         }
         catch (Exception ex)
         {
-            // 浏览器不可用（未安装 / 系统依赖缺失 / 驱动不匹配）：降级为跳过，
-            // 避免整组测试报红。封堵 M7-11 契约记载缺口："缺 Chromium 时 Chromium.LaunchAsync() 无兜底，夹具初始化失败"。
+            // 本地开发可降级为 Skip；CI 已明确安装 Chromium，此时启动失败属于基础设施故障，
+            // 必须让 E2E 失败，避免“浏览器根本没启动但流水线仍绿色”的假绿。
+            var isCi = string.Equals(
+                Environment.GetEnvironmentVariable("CI"),
+                "true",
+                StringComparison.OrdinalIgnoreCase);
+
+            if (isCi)
+                throw new InvalidOperationException(
+                    "CI 中 Playwright/Chromium 启动失败，拒绝降级为 Skip。",
+                    ex);
+
             _skip = true;
             _skipReason = $"Playwright 浏览器不可用，已降级跳过：{ex.GetType().Name}: {ex.Message}";
         }

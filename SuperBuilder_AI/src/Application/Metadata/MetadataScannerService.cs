@@ -57,12 +57,12 @@ public class MetadataScannerService
 
         ReportStage(telemetry, progress, "Connecting", "正在连接业务数据库…", 3, "DatabaseConnecting");
 
-        var tables = await _reader.GetTablesAsync(connectionString);
+        var tables = await _reader.GetTablesAsync(connectionString, dataSource.DbType);
         telemetry.Details.TablesDiscovered = tables.Count;
         telemetry.AddEvent("Info", "TablesDiscovered", $"已发现 {tables.Count} 张数据表。", tables.Count, tables.Count);
         ReportStage(telemetry, progress, "DiscoveringColumns", "正在读取字段结构…", 12, "TablesReady");
 
-        var columns = await _reader.GetColumnsAsync(connectionString);
+        var columns = await _reader.GetColumnsAsync(connectionString, dataSource.DbType);
         telemetry.Details.ColumnsDiscovered = columns.Count;
         telemetry.AddEvent("Info", "ColumnsDiscovered", $"已发现 {columns.Count} 个字段。", columns.Count, columns.Count);
         ReportStage(telemetry, progress, "ComparingMetadata", "正在与已有元数据进行比对…", 22, "ColumnsReady");
@@ -301,6 +301,7 @@ public class MetadataScannerService
 		var completedTables = 0;
 		var tallyLock = new object();
 		var vectorFailures = new ConcurrentBag<string>();
+		var progressLock = new object();
 		var tasks = vectorTables
 			.Select(async table =>
 			{
@@ -354,7 +355,14 @@ public class MetadataScannerService
 					}
 
 					var done = Interlocked.Increment(ref completedTables);
-					progress?.Report(ProgressBetween(78, 94, done, Math.Max(1, vectorTables.Count)));
+
+					// IProgress<int> 在后台扫描中会同步持久化同一个 DbContext。
+					// 多表向量任务可并发，但进度落库必须串行，避免 DbContext 并发访问。
+					lock (progressLock)
+					{
+						progress?.Report(
+							ProgressBetween(78, 94, done, Math.Max(1, vectorTables.Count)));
+					}
 				}
 				finally
 				{
