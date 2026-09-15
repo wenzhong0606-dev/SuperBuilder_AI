@@ -605,6 +605,18 @@ public static class ResourceKeys
         public const string DataSourceScanStageVectors = "Content.DataSourceScanStageVectors";
         public const string DataSourceScanStageFinalizing = "Content.DataSourceScanStageFinalizing";
 
+        // 扫描控制（feat/scan-page-ux）
+        public const string DataSourceDeleteMeta = "Content.DataSourceDeleteMeta";
+        public const string DataSourceScanCancel = "Content.DataSourceScanCancel";
+        public const string DataSourceScanFailedItems = "Content.DataSourceScanFailedItems";
+        public const string DataSourceScanCancelled = "Content.DataSourceScanCancelled";
+        public const string DataSourceScanCancelFailed = "Content.DataSourceScanCancelFailed";
+        public const string DataSourceScanCancelling = "Content.DataSourceScanCancelling";
+        public const string DataSourceDeleteMetaConfirm = "Content.DataSourceDeleteMetaConfirm";
+        public const string DataSourceDeleteMetaFailed = "Content.DataSourceDeleteMetaFailed";
+        public const string DataSourceDeleteMetaDone = "Content.DataSourceDeleteMetaDone";
+        public const string DataSourceScanCancelledBanner = "Content.DataSourceScanCancelledBanner";
+
         public const string DataSourceFieldsBadge = "Content.DataSourceFieldsBadge";
         public const string DataSourceColFieldRel = "Content.DataSourceColFieldRel";
         public const string DataSourceColType = "Content.DataSourceColType";
@@ -2382,6 +2394,18 @@ public static class ResourceKeys
         [Content.DataSourceScanStageSemantics] = new("Content", Page: "DataSource", DefaultValue: "AI semantic generation"),
         [Content.DataSourceScanStageVectors] = new("Content", Page: "DataSource", DefaultValue: "Vector indexing"),
         [Content.DataSourceScanStageFinalizing] = new("Content", Page: "DataSource", DefaultValue: "Finalizing"),
+
+        // 扫描控制（feat/scan-page-ux）
+        [Content.DataSourceDeleteMeta] = new("Content", Page: "DataSource", DefaultValue: "Delete scanned metadata"),
+        [Content.DataSourceScanCancel] = new("Content", Page: "DataSource", DefaultValue: "Cancel scan"),
+        [Content.DataSourceScanFailedItems] = new("Content", Page: "DataSource", DefaultValue: "Failed items"),
+        [Content.DataSourceScanCancelled] = new("Content", Page: "DataSource", DefaultValue: "Cancelled"),
+        [Content.DataSourceScanCancelFailed] = new("Content", Page: "DataSource", DefaultValue: "Cancel failed"),
+        [Content.DataSourceScanCancelling] = new("Content", Page: "DataSource", DefaultValue: "Cancelling…"),
+        [Content.DataSourceDeleteMetaConfirm] = new("Content", Page: "DataSource", DefaultValue: "Delete all scanned metadata and associated vectors for this data source? This cannot be undone."),
+        [Content.DataSourceDeleteMetaFailed] = new("Content", Page: "DataSource", DefaultValue: "Delete failed"),
+        [Content.DataSourceDeleteMetaDone] = new("Content", Page: "DataSource", DefaultValue: "Scanned metadata deleted"),
+        [Content.DataSourceScanCancelledBanner] = new("Content", Page: "DataSource", DefaultValue: "Scan cancelled by user."),
 
         [Content.DataSourceFieldsBadge] = new("Content", Page: "DataSource", DefaultValue: "{0} fields"),
         [Content.DataSourceColFieldRel] = new("Content", Page: "DataSource", DefaultValue: "Field / Relation"),

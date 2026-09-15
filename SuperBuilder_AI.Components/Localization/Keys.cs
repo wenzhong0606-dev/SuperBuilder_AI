@@ -494,6 +494,18 @@ public static class Keys
         public const string DataSourcesConnClickhouse = "Content.DataSourcesConnClickhouse";
         public const string DataSourcesConnMongodb = "Content.DataSourcesConnMongodb";
         public const string DataSourcesFieldName = "Content.DataSourcesFieldName";
+
+        // 扫描控制（feat/scan-page-ux）：中断 / 删除 / 失败重试 / 重入续显
+        public const string DataSourceDeleteMeta = "Content.DataSourceDeleteMeta";
+        public const string DataSourceScanCancel = "Content.DataSourceScanCancel";
+        public const string DataSourceScanFailedItems = "Content.DataSourceScanFailedItems";
+        public const string DataSourceScanCancelled = "Content.DataSourceScanCancelled";
+        public const string DataSourceScanCancelFailed = "Content.DataSourceScanCancelFailed";
+        public const string DataSourceScanCancelling = "Content.DataSourceScanCancelling";
+        public const string DataSourceDeleteMetaConfirm = "Content.DataSourceDeleteMetaConfirm";
+        public const string DataSourceDeleteMetaFailed = "Content.DataSourceDeleteMetaFailed";
+        public const string DataSourceDeleteMetaDone = "Content.DataSourceDeleteMetaDone";
+        public const string DataSourceScanCancelledBanner = "Content.DataSourceScanCancelledBanner";
         public const string DataSourcesFieldNameHint = "Content.DataSourcesFieldNameHint";
         public const string DataSourcesFieldNamePlaceholder = "Content.DataSourcesFieldNamePlaceholder";
         public const string DataSourcesFieldType = "Content.DataSourcesFieldType";

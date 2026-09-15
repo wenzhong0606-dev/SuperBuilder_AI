@@ -107,4 +107,13 @@ public interface IApiClient
 
     /// <summary>M4-05 轮询扫描任务状态（进度/计数/脱敏错误）。</summary>
     Task<(ScanJobView? Job, int Status, string? Error, string? Code)> GetScanJobAsync(long dataSourceId, long jobId, CancellationToken ct = default);
+
+    /// <summary>feat/scan-page-ux：获取该数据源最近一次扫描任务（重入续显）。</summary>
+    Task<(ScanJobView? Job, int Status, string? Error, string? Code)> GetLatestScanJobAsync(long dataSourceId, CancellationToken ct = default);
+
+    /// <summary>feat/scan-page-ux：请求中断正在运行/排队的扫描任务。</summary>
+    Task<(bool Ok, int Status, string? Error, string? Code)> CancelScanAsync(long dataSourceId, long jobId, CancellationToken ct = default);
+
+    /// <summary>feat/scan-page-ux：删除该数据源已扫描的元数据及关联 Qdrant 向量。</summary>
+    Task<(bool Ok, int Status, string? Error, string? Code)> DeleteMetadataAsync(long dataSourceId, CancellationToken ct = default);
 }

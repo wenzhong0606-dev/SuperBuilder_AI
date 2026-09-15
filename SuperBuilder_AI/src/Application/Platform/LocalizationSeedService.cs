@@ -267,6 +267,18 @@ public sealed class LocalizationSeedService : ILocalizationSeedService
         ["Page.Desc.MetadataEntityDetail"] = "查看元数据实体的实际数据、所属对象及向量索引关系。",
         ["Page.Desc.DataSource"] = "数据源的授权清单与行级安全策略（RLS）。",
 
+        // 扫描控制（feat/scan-page-ux）zh-CN 默认值
+        ["Content.DataSourceDeleteMeta"] = "删除扫描数据",
+        ["Content.DataSourceScanCancel"] = "中断扫描",
+        ["Content.DataSourceScanFailedItems"] = "失败项",
+        ["Content.DataSourceScanCancelled"] = "已中断",
+        ["Content.DataSourceScanCancelFailed"] = "中断失败",
+        ["Content.DataSourceScanCancelling"] = "正在中断…",
+        ["Content.DataSourceDeleteMetaConfirm"] = "确认删除该数据源已扫描的元数据及其关联向量？此操作不可撤销。",
+        ["Content.DataSourceDeleteMetaFailed"] = "删除失败",
+        ["Content.DataSourceDeleteMetaDone"] = "已删除扫描数据",
+        ["Content.DataSourceScanCancelledBanner"] = "扫描已被用户中断。",
+
         ["Empty.NoData"] = "暂无数据。",
 
         ["Action.New"] = "新建", ["Action.Create"] = "创建", ["Action.Save"] = "保存", ["Action.Cancel"] = "取消",

@@ -8,7 +8,6 @@ using SuperBuilder_AI.Data;
 using SuperBuilder_AI.Interfaces.Identity;
 using SuperBuilder_AI.Models.Metadata;
 using SuperBuilder_AI.Api.Diagnostics;
-using SuperBuilder_AI.Application.Ports;
 using SuperBuilder_AI.Api.Background;
 
 
