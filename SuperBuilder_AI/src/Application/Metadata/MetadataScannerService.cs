@@ -299,6 +299,7 @@ public class MetadataScannerService
 			new SemaphoreSlim(maxVectorConcurrency, maxVectorConcurrency);
 		var completedTables = 0;
 		var tallyLock = new object();
+		var progressLock = new object();
 		var tasks = vectorTables
 			.Select(async table =>
 			{
@@ -340,7 +341,14 @@ public class MetadataScannerService
 					}
 
 					var done = Interlocked.Increment(ref completedTables);
-					progress?.Report(ProgressBetween(78, 94, done, Math.Max(1, vectorTables.Count)));
+
+					// IProgress<int> 在后台扫描中会同步持久化同一个 DbContext。
+					// 多表向量任务可并发，但进度落库必须串行，避免 DbContext 并发访问。
+					lock (progressLock)
+					{
+						progress?.Report(
+							ProgressBetween(78, 94, done, Math.Max(1, vectorTables.Count)));
+					}
 				}
 				finally
 				{
