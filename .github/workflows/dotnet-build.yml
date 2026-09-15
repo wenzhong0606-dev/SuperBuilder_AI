@@ -222,7 +222,7 @@ jobs:
       - name: 初始化 CI Metadata 数据库
         env:
           ASPNETCORE_ENVIRONMENT: Development
-          ConnectionStrings__DefaultConnection: "Server=127.0.0.1,1433;Database=SuperBuilder_C13_3;User Id=sa;Password=${{ env.TEST_SQL_PASSWORD }};TrustServerCertificate=True;"
+          ConnectionStrings__DefaultConnection: "Server=127.0.0.1,1433;Database=SuperBuilder_C13_3;User Id=sa;Password=${{ env.TEST_SQL_PASSWORD }};TrustServerCertificate=True;Persist Security Info=True;"
         run: |
           dotnet ef database update --project SuperBuilder_AI/SuperBuilder_AI.csproj --startup-project SuperBuilder_AI/SuperBuilder_AI.csproj --configuration Release
       - name: Release 编译 Runtime 应用
@@ -230,7 +230,7 @@ jobs:
       - name: 启动 Web API
         env:
           ASPNETCORE_ENVIRONMENT: Development
-          ConnectionStrings__DefaultConnection: "Server=127.0.0.1,1433;Database=SuperBuilder_C13_3;User Id=sa;Password=${{ env.TEST_SQL_PASSWORD }};TrustServerCertificate=True;"
+          ConnectionStrings__DefaultConnection: "Server=127.0.0.1,1433;Database=SuperBuilder_C13_3;User Id=sa;Password=${{ env.TEST_SQL_PASSWORD }};TrustServerCertificate=True;Persist Security Info=True;"
           Qdrant__Host: 127.0.0.1
           Qdrant__Port: 6334
           # V2.6 修复：/api/metadata-vector/rebuild 受 DiagnosticsAccessPolicy 保护，需 platform:diagnostics:manage。
@@ -385,12 +385,12 @@ jobs:
       - name: 初始化 CI 元数据库
         env:
           ASPNETCORE_ENVIRONMENT: Development
-          ConnectionStrings__DefaultConnection: "Server=127.0.0.1,1433;Database=SuperBuilder_C13_3;User Id=sa;Password=${{ env.TEST_SQL_PASSWORD }};TrustServerCertificate=True;"
+          ConnectionStrings__DefaultConnection: "Server=127.0.0.1,1433;Database=SuperBuilder_C13_3;User Id=sa;Password=${{ env.TEST_SQL_PASSWORD }};TrustServerCertificate=True;Persist Security Info=True;"
         run: dotnet ef database update --project SuperBuilder_AI/SuperBuilder_AI.csproj --startup-project SuperBuilder_AI/SuperBuilder_AI.csproj --configuration Release
       - name: 启动 Web API (5050)
         env:
           ASPNETCORE_ENVIRONMENT: Development
-          ConnectionStrings__DefaultConnection: "Server=127.0.0.1,1433;Database=SuperBuilder_C13_3;User Id=sa;Password=${{ env.TEST_SQL_PASSWORD }};TrustServerCertificate=True;"
+          ConnectionStrings__DefaultConnection: "Server=127.0.0.1,1433;Database=SuperBuilder_C13_3;User Id=sa;Password=${{ env.TEST_SQL_PASSWORD }};TrustServerCertificate=True;Persist Security Info=True;"
           Qdrant__Host: 127.0.0.1
           Qdrant__Port: 6334
           ASPNETCORE_URLS: http://127.0.0.1:5050
@@ -412,7 +412,7 @@ jobs:
       - name: 启动 Web (Blazor Server, 5080)
         env:
           ASPNETCORE_ENVIRONMENT: Development
-          ConnectionStrings__DefaultConnection: "Server=127.0.0.1,1433;Database=SuperBuilder_C13_3;User Id=sa;Password=${{ env.TEST_SQL_PASSWORD }};TrustServerCertificate=True;"
+          ConnectionStrings__DefaultConnection: "Server=127.0.0.1,1433;Database=SuperBuilder_C13_3;User Id=sa;Password=${{ env.TEST_SQL_PASSWORD }};TrustServerCertificate=True;Persist Security Info=True;"
           ApiBaseUrl: http://127.0.0.1:5050
           ASPNETCORE_URLS: http://127.0.0.1:5080
         run: |
