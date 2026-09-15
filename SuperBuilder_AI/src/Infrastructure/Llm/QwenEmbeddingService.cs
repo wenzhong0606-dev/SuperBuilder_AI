@@ -5,6 +5,7 @@ using Microsoft.Extensions.Options;
 using SuperBuilder_AI.Application.Common.Options;
 using SuperBuilder_AI.Interfaces;
 using System.Collections.Generic;
+using System.Threading;
 
 namespace SuperBuilder_AI.Services;
 
@@ -33,17 +34,20 @@ public class QwenEmbeddingService : IEmbeddingService
 
     public async Task<float[]> GenerateAsync(
         string text,
-        string textType = "document")
+        string textType = "document",
+        CancellationToken ct = default)
     {
         var vectors = await GenerateBatchAsync(
             new[] { text },
-            textType);
+            textType,
+            ct);
         return vectors[0];
     }
 
     public async Task<IReadOnlyList<float[]>> GenerateBatchAsync(
         IEnumerable<string> texts,
-        string textType = "document")
+        string textType = "document",
+        CancellationToken ct = default)
     {
         var list = texts?.ToList() ?? new List<string>();
         if (list.Count == 0)
@@ -76,9 +80,10 @@ public class QwenEmbeddingService : IEmbeddingService
 
         for (var start = 0; start < list.Count; start += batchSize)
         {
+            ct.ThrowIfCancellationRequested();
             var count = Math.Min(batchSize, list.Count - start);
             var slice = list.GetRange(start, count);
-            var sliceVectors = await GenerateSliceWithRetryAsync(slice);
+            var sliceVectors = await GenerateSliceWithRetryAsync(slice, ct);
             results.AddRange(sliceVectors);
         }
 
@@ -87,10 +92,13 @@ public class QwenEmbeddingService : IEmbeddingService
 
     /// <summary>
     /// 对单一切片做带退避重试的 embedding 调用。
-    /// 仅对可重试错误（限流 429 / 服务端 5xx）重试，最多 3 次。
+    /// 仅对可重试错误（限流 429 / 服务端 5xx / 单请求超时）重试，最多 3 次。
+    /// 超时（HttpClient 超时或远端无响应）抛出的 OperationCanceledException
+    /// 若非 job 取消则纳入重试，使「被吞的请求」能快速失败而非永久挂起。
     /// </summary>
     private async Task<IReadOnlyList<float[]>> GenerateSliceWithRetryAsync(
-        List<string> slice)
+        List<string> slice,
+        CancellationToken ct = default)
     {
         const int maxAttempts = 3;
         var delayMs = 300;
@@ -100,7 +108,7 @@ public class QwenEmbeddingService : IEmbeddingService
         {
             try
             {
-                return await GenerateSliceAsync(slice);
+                return await GenerateSliceAsync(slice, ct);
             }
             catch (InvalidOperationException ex)
                 when (attempt < maxAttempts
@@ -108,7 +116,15 @@ public class QwenEmbeddingService : IEmbeddingService
                         || ex.Message.StartsWith("EMB_HTTP_5")))
             {
                 lastError = ex;
-                await Task.Delay(delayMs);
+                await Task.Delay(delayMs, ct);
+                delayMs = Math.Min(delayMs * 2, 5000);
+            }
+            catch (OperationCanceledException ex)
+                when (attempt < maxAttempts && !ct.IsCancellationRequested)
+            {
+                // 单请求超时（HttpClient 超时 / 远端无响应）但 job 未取消：可重试。
+                lastError = ex;
+                await Task.Delay(delayMs, ct);
                 delayMs = Math.Min(delayMs * 2, 5000);
             }
         }
@@ -122,9 +138,11 @@ public class QwenEmbeddingService : IEmbeddingService
     /// <summary>
     /// 单次切片 embedding 调用。失败时抛出以 EMB_ 短码前缀的
     /// InvalidOperationException，便于上层在 VectorErrorCode 内诊断。
+    /// 透传 CancellationToken，使 job 取消能中断挂起的请求。
     /// </summary>
     private async Task<IReadOnlyList<float[]>> GenerateSliceAsync(
-        List<string> slice)
+        List<string> slice,
+        CancellationToken ct = default)
     {
         var requestBody = new
         {
@@ -149,8 +167,8 @@ public class QwenEmbeddingService : IEmbeddingService
             Encoding.UTF8,
             "application/json");
 
-        using var response = await _httpClient.SendAsync(request);
-        var responseBody = await response.Content.ReadAsStringAsync();
+        using var response = await _httpClient.SendAsync(request, ct);
+        var responseBody = await response.Content.ReadAsStringAsync(ct);
 
         if (!response.IsSuccessStatusCode)
         {

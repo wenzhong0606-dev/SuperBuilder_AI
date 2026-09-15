@@ -1,6 +1,7 @@
 using System;
 using System.Security.Cryptography;
 using System.Text;
+using System.Threading;
 using SuperBuilder_AI.Interfaces;
 using SuperBuilder_AI.Models.AI;
 using SuperBuilder_AI.Models.Metadata;
@@ -55,7 +56,8 @@ public class MetadataVectorService
 	/// </summary>
 	public async Task<MetadataVectorIndexResult>
 		IndexAsync(
-			MetadataTable metadataTable)
+			MetadataTable metadataTable,
+			CancellationToken ct = default)
 	{
 		var result =
 			new MetadataVectorIndexResult();
@@ -213,7 +215,8 @@ public class MetadataVectorService
 			var vectors =
 				(await _embedding.GenerateBatchAsync(
 					texts,
-					"document"))
+					"document",
+					ct))
 				.ToList();
 
 			var points =

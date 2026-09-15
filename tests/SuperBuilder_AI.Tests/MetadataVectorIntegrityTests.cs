@@ -307,7 +307,7 @@ public class MetadataVectorIntegrityTests
 
 		public int Dimension => 4;
 		public string ModelName => "fake";
-		public Task<float[]> GenerateAsync(string text, string textType = "document")
+		public Task<float[]> GenerateAsync(string text, string textType = "document", CancellationToken ct = default)
 		{
 			if (_throw)
 			{
@@ -326,7 +326,7 @@ public class MetadataVectorIntegrityTests
 		public Task CreateCollectionAsync() => Task.CompletedTask;
 		public Task<bool> ExistsAsync() => Task.FromResult(true);
 		public Task RecreateCollectionAsync() => Task.CompletedTask;
-		public Task UpsertAsync(string id, float[] vector, Dictionary<string, object> payload)
+		public Task UpsertAsync(string id, float[] vector, Dictionary<string, object> payload, CancellationToken ct = default)
 		{
 			Upserted.Add(id);
 			return Task.CompletedTask;

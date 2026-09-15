@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using System.Collections.Concurrent;
 using System.Threading;
 using SuperBuilder_AI.Data;
 using SuperBuilder_AI.Interfaces;
@@ -299,6 +300,7 @@ public class MetadataScannerService
 			new SemaphoreSlim(maxVectorConcurrency, maxVectorConcurrency);
 		var completedTables = 0;
 		var tallyLock = new object();
+		var vectorFailures = new ConcurrentBag<string>();
 		var tasks = vectorTables
 			.Select(async table =>
 			{
@@ -308,11 +310,22 @@ public class MetadataScannerService
 					ct.ThrowIfCancellationRequested();
 					telemetry.SetCurrent("Table", table.TableName);
 
-					var result = await _vectorService.IndexAsync(table);
+					var result = await _vectorService.IndexAsync(table, ct);
 
 					// 单表向量索引失败（如 Qwen 瞬时限流/5xx）重试一次。
 					if (table.VectorStatus == "Failed")
-						result = await _vectorService.IndexAsync(table);
+						result = await _vectorService.IndexAsync(table, ct);
+
+					if (table.VectorStatus == "Failed")
+					{
+						var tableName = string.IsNullOrWhiteSpace(table.TableName)
+							? $"MetadataTable:{table.Id}"
+							: table.TableName;
+						var errorCode = string.IsNullOrWhiteSpace(table.VectorErrorCode)
+							? "Unknown"
+							: table.VectorErrorCode;
+						vectorFailures.Add($"{tableName}({errorCode})");
+					}
 
 					if (!string.IsNullOrWhiteSpace(result.TableVectorId))
 						table.VectorId = result.TableVectorId;
@@ -331,12 +344,13 @@ public class MetadataScannerService
 						+ result.ColumnVectors.Count
 						+ result.SemanticVectors.Count;
 
-					int processedTotal;
+					if (table.VectorStatus == "Failed")
+						indexed = ExpectedVectorCount(table);
+
 					lock (tallyLock)
 					{
 						telemetry.Details.VectorsProcessed += indexed;
 						telemetry.Details.VectorsIndexed += indexed;
-						processedTotal = telemetry.Details.VectorsProcessed;
 					}
 
 					var done = Interlocked.Increment(ref completedTables);
@@ -350,6 +364,24 @@ public class MetadataScannerService
 			.ToList();
 
 		await Task.WhenAll(tasks);
+
+		if (!vectorFailures.IsEmpty)
+		{
+			var failures = vectorFailures
+				.OrderBy(x => x, StringComparer.Ordinal)
+				.ToList();
+			var sample = string.Join("，", failures.Take(5));
+			var message = failures.Count == 1
+				? $"向量索引失败：{sample}。"
+				: $"向量索引失败 {failures.Count} 张表：{sample}{(failures.Count > 5 ? "…" : string.Empty)}。";
+			telemetry.AddEvent(
+				"Error",
+				"VectorIndexFailed",
+				message,
+				telemetry.Details.VectorsProcessed,
+				telemetry.Details.VectorsTotal);
+			throw new InvalidOperationException(message);
+		}
 
         telemetry.SetCurrent(null, null);
         telemetry.AddEvent(

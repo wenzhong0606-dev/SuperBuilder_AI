@@ -126,7 +126,8 @@ public class QdrantService
 	public async Task UpsertAsync(
 		string id,
 		float[] vector,
-		Dictionary<string, object> payload)
+		Dictionary<string, object> payload,
+		CancellationToken ct = default)
 	{
 		if (vector == null ||
 			vector.Length == 0)
@@ -176,7 +177,8 @@ public class QdrantService
 					new[]
 					{
 						point
-					});
+					},
+				cancellationToken: ct);
 	}
 
 	/// <summary>
@@ -184,7 +186,8 @@ public class QdrantService
 	/// 维度校验与单条一致；空 points 直接返回。
 	/// </summary>
 	public async Task UpsertBatchAsync(
-		IEnumerable<(string Id, float[] VectorData, IReadOnlyDictionary<string, object> Payload)> points)
+		IEnumerable<(string Id, float[] VectorData, IReadOnlyDictionary<string, object> Payload)> points,
+		CancellationToken ct = default)
 	{
 		var list = points?.ToList()
 			?? new List<(string, float[], IReadOnlyDictionary<string, object>)>();
@@ -240,7 +243,8 @@ public class QdrantService
 				collectionName:
 					_options.CollectionName,
 
-				points: structs);
+				points: structs,
+				cancellationToken: ct);
 	}
 
 	/// <summary>

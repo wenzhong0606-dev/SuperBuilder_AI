@@ -45,9 +45,10 @@ public class EmbeddingOptions
 	public int Dimensions { get; set; } = 1024;
 
 	/// <summary>
-	/// HTTP 请求超时时间。
+	/// HTTP 请求超时时间（秒）。单请求上限，避免远端无响应时永久挂起。
+	/// 调小以降低「大表 embedding 请求被吞」时的恢复时间。
 	/// </summary>
-	public int TimeoutSeconds { get; set; } = 120;
+	public int TimeoutSeconds { get; set; } = 45;
 
 	/// <summary>
 	/// 单次批量 Embedding 请求的最大文本条数。

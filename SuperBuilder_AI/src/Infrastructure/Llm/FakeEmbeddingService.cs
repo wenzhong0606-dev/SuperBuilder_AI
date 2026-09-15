@@ -62,7 +62,8 @@ public class FakeEmbeddingService
 	/// </param>
 	public Task<float[]> GenerateAsync(
 		string text,
-		string textType = "document")
+		string textType = "document",
+		CancellationToken ct = default)
 	{
 		if (string.IsNullOrWhiteSpace(text))
 		{
