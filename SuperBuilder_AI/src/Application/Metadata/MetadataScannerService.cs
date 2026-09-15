@@ -56,12 +56,12 @@ public class MetadataScannerService
 
         ReportStage(telemetry, progress, "Connecting", "正在连接业务数据库…", 3, "DatabaseConnecting");
 
-        var tables = await _reader.GetTablesAsync(connectionString);
+        var tables = await _reader.GetTablesAsync(connectionString, dataSource.DbType);
         telemetry.Details.TablesDiscovered = tables.Count;
         telemetry.AddEvent("Info", "TablesDiscovered", $"已发现 {tables.Count} 张数据表。", tables.Count, tables.Count);
         ReportStage(telemetry, progress, "DiscoveringColumns", "正在读取字段结构…", 12, "TablesReady");
 
-        var columns = await _reader.GetColumnsAsync(connectionString);
+        var columns = await _reader.GetColumnsAsync(connectionString, dataSource.DbType);
         telemetry.Details.ColumnsDiscovered = columns.Count;
         telemetry.AddEvent("Info", "ColumnsDiscovered", $"已发现 {columns.Count} 个字段。", columns.Count, columns.Count);
         ReportStage(telemetry, progress, "ComparingMetadata", "正在与已有元数据进行比对…", 22, "ColumnsReady");
