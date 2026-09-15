@@ -140,21 +140,26 @@ builder.Services.AddScoped<ISemanticLabelService, SemanticLabelService>();
 // P5.3：多语言标签召回服务（非默认语言时提升检索排序；默认语言路径完全不参与）
 builder.Services.AddScoped<ISemanticLabelRecallService, SemanticLabelRecallService>();
 
-if (string.Equals(
-        Environment.GetEnvironmentVariable("CI"),
-        "true",
-        StringComparison.OrdinalIgnoreCase))
+var isCi = string.Equals(
+    Environment.GetEnvironmentVariable("CI"),
+    "true",
+    StringComparison.OrdinalIgnoreCase);
+
+if (isCi)
 {
+    // 普通 CI 必须保持确定性且零真实 AI Token：
+    // Embedding 使用 Fake；Qwen 直接阻断，任何意外 Live LLM 调用都会让测试明确失败。
     builder.Services.AddScoped<IEmbeddingService, FakeEmbeddingService>();
+    builder.Services.AddScoped<IQwenService, CiBlockedQwenService>();
 }
 else
 {
     builder.Services.AddHttpClient<QwenEmbeddingService>();
     builder.Services.AddScoped<IEmbeddingService>(sp => sp.GetRequiredService<QwenEmbeddingService>());
-}
 
-builder.Services.AddScoped<QwenService>();
-builder.Services.AddScoped<IQwenService>(sp => sp.GetRequiredService<QwenService>());
+    builder.Services.AddScoped<QwenService>();
+    builder.Services.AddScoped<IQwenService>(sp => sp.GetRequiredService<QwenService>());
+}
 builder.Services.AddScoped<MetadataSemanticService>();
 builder.Services.AddScoped<IMetadataSemanticService>(sp => sp.GetRequiredService<MetadataSemanticService>());
 builder.Services.AddScoped<QdrantService>();
