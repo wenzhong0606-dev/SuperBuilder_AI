@@ -25,8 +25,28 @@ public sealed class DataSourceScanE2ETests
             "true",
             StringComparison.OrdinalIgnoreCase);
 
-    private static string? ScanConnection => Environment.GetEnvironmentVariable("SB_E2E_SCAN_CONNECTION");
-    private static string ScanDbType => Environment.GetEnvironmentVariable("SB_E2E_SCAN_DB_TYPE") ?? "SQLSERVER";
+    private static string? ScanConnection
+    {
+        get
+        {
+            var explicitConnection = Environment.GetEnvironmentVariable("SB_E2E_SCAN_CONNECTION");
+            if (!string.IsNullOrWhiteSpace(explicitConnection))
+                return explicitConnection;
+
+            if (!IsCi)
+                return null;
+
+            var sqlPassword = Environment.GetEnvironmentVariable("TEST_SQL_PASSWORD");
+            if (string.IsNullOrWhiteSpace(sqlPassword))
+                return null;
+
+            return $"Server=127.0.0.1,1433;Database=SuperBuilder_E2E_Business;User Id=sa;Password={sqlPassword};TrustServerCertificate=True;";
+        }
+    }
+
+    private static string ScanDbType =>
+        Environment.GetEnvironmentVariable("SB_E2E_SCAN_DB_TYPE")
+        ?? (IsCi ? "SQLSERVER" : "SQLSERVER");
 
     /// <summary>数据源创建 + 元数据扫描 → 任务 Succeeded 且 tablesScanned &gt; 0。</summary>
     [SkippableFact]
@@ -96,6 +116,8 @@ public sealed class DataSourceScanE2ETests
         }
 
         Assert.Equal("Succeeded", status);
-        Assert.True(tablesScanned > 0, $"扫描成功但 tablesScanned=0（job：{status}）。");
+        Assert.True(
+            tablesScanned >= 3,
+            $"扫描成功但 tablesScanned={tablesScanned}，CI 业务 Fixture 预期至少 3 张表（job：{status}）。");
     }
 }
