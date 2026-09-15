@@ -2,6 +2,8 @@
 @inject IApiClient Api
 @inject NavigationManager Nav
 @inject ToastService Toast
+@inject IJSRuntime JS
+@inject AppState State
 @using System.Text.Json
 @using SuperBuilder_AI.Components.Shared
 @implements IDisposable
@@ -17,6 +19,10 @@
             <SbToolbar>
                 <Right>
                     <button class="btn btn-primary btn-sm" @onclick="ScanMetadata" disabled="@_scanPolling">@ScanButtonLabel</button>
+                    @if (!_scanPolling && (_metadata.Count > 0 || _scanJob is not null))
+                    {
+                        <button class="btn btn-outline-danger btn-sm" @onclick="DeleteMetadata">@L10n.T(Keys.Content.DataSourceDeleteMeta, "删除扫描数据")</button>
+                    }
                     <button class="btn btn-outline-secondary btn-sm" @onclick="LoadMetadata">@L10n.T(Keys.Action.Refresh, "刷新")</button>
                 </Right>
             </SbToolbar>
@@ -27,6 +33,7 @@
                 var tablesDone = scan.TablesProcessed > 0 ? scan.TablesProcessed : _scanJob.TablesScanned;
                 var columnsTotal = scan.ColumnsDiscovered > 0 ? scan.ColumnsDiscovered : _scanJob.ColumnsScanned;
                 var columnsDone = scan.ColumnsProcessed > 0 ? scan.ColumnsProcessed : _scanJob.ColumnsScanned;
+                var isActive = _scanJob.Status is "Running" or "Queued";
 
                 <div class="scan-job scan-monitor @ScanStatusClass(_scanJob.Status)">
                     <div class="scan-job-head">
@@ -42,11 +49,22 @@
                             }
                             <span>@_scanJob.ProgressPercent%</span>
                         </div>
-                        @if (_scanJob.Status == "Failed")
-                        {
-                            <button class="btn btn-sm btn-outline-secondary ms-auto" @onclick="RetryScan">@L10n.T(Keys.Content.DataSourceScanRetry, "重试")</button>
-                        }
+                        <div class="scan-job-actions">
+                            @if (isActive)
+                            {
+                                <button class="btn btn-warning btn-sm" @onclick="CancelScan">@L10n.T(Keys.Content.DataSourceScanCancel, "中断扫描")</button>
+                            }
+                            @if (_scanJob.Status is "Failed" or "Cancelled")
+                            {
+                                <button class="btn btn-sm btn-outline-secondary" @onclick="RetryScan">@L10n.T(Keys.Content.DataSourceScanRetry, "重试")</button>
+                            }
+                        </div>
                     </div>
+
+                    @if (!string.IsNullOrWhiteSpace(scan.StageMessage))
+                    {
+                        <div class="scan-monitor-stagemsg">@scan.StageMessage</div>
+                    }
 
                     <div class="progress scan-monitor-progress"><span style="@($"width:{_scanJob.ProgressPercent}%")"></span></div>
 
@@ -99,9 +117,9 @@
                                 }
                                 else
                                 {
-                                    @foreach (var evt in scan.Events.OrderByDescending(x => x.TimestampUtc).Take(8))
+                                    @foreach (var evt in scan.Events.OrderByDescending(x => x.TimestampUtc).Take(15))
                                     {
-                                        <div class="scan-event @(evt.Level == "Warning" ? "is-warning" : "")">
+                                        <div class="scan-event @ScanEventClass(evt.Level)">
                                             <time>@evt.TimestampUtc.ToLocalTime().ToString("HH:mm:ss")</time>
                                             <span>@evt.Message</span>
                                         </div>
@@ -111,10 +129,30 @@
                         </section>
                     </div>
 
-                    @if (_scanJob.Status == "Failed" && !string.IsNullOrWhiteSpace(_scanJob.ErrorCode))
+                    @if ((_scanJob.Status is "Failed" or "Cancelled") && !string.IsNullOrWhiteSpace(_scanJob.ErrorCode))
                     {
                         <div class="scan-job-error">
                             <strong>@_scanJob.ErrorCode</strong>@(string.IsNullOrWhiteSpace(_scanJob.ErrorMessage) ? "" : $"：{_scanJob.ErrorMessage}")
+                        </div>
+                    }
+
+                    @if ((_scanJob.Status is "Failed" or "Cancelled") && scan.FailedItems.Count > 0)
+                    {
+                        <div class="scan-failed-items">
+                            <div class="scan-monitor-section-title">@L10n.T(Keys.Content.DataSourceScanFailedItems, "失败数据清单")</div>
+                            <ul>
+                                @foreach (var fi in scan.FailedItems)
+                                {
+                                    <li>
+                                        <span class="scan-failed-scope">@fi.Scope</span>
+                                        <strong>@fi.Name</strong>
+                                        @if (!string.IsNullOrWhiteSpace(fi.Message))
+                                        {
+                                            <span>：@fi.Message</span>
+                                        }
+                                    </li>
+                                }
+                            </ul>
                         </div>
                     }
                 </div>
@@ -282,6 +320,8 @@
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (!firstRender) return;
+        // 先等会话自举（localStorage 令牌还原进内存）再发起首个带鉴权请求，消除 F5 后"未授权"伪错误。
+        await State.WhenSessionRestoredAsync();
         await Load();
     }
 
@@ -290,7 +330,20 @@
         await LoadMetadata();
         await LoadGrants();
         await LoadPolicies();
+        await ResumeScanIfActiveAsync();
         StateHasChanged();
+    }
+
+    /// <summary>
+    /// 重入页面（或 F5）时若仍有进行中的扫描，自动恢复进度轮询；否则不展示陈旧结果卡。
+    /// </summary>
+    private async Task ResumeScanIfActiveAsync()
+    {
+        if (_scanPolling) return;
+        var (job, _, _, _) = await Api.GetLatestScanJobAsync(Id);
+        if (job is null) return;
+        if (job.Status is "Running" or "Queued")
+            await PollScanAsync(job.JobId);
     }
 
     private async Task LoadMetadata()
@@ -340,7 +393,7 @@
                 }
                 _scanJob = job;
                 StateHasChanged();
-                if (job.Status == "Succeeded" || job.Status == "Failed") break;
+                if (job.Status is "Succeeded" or "Failed" or "Cancelled") break;
                 await Task.Delay(1500, ct);
             }
         }
@@ -359,10 +412,44 @@
             Toast.Success(L10n.T(Keys.Content.DataSourceScanDone, "元数据扫描完成。"));
             await LoadMetadata();
         }
+        else if (_scanJob?.Status == "Cancelled")
+        {
+            Toast.Warning(L10n.T(Keys.Content.DataSourceScanCancelled, "扫描已中断。"));
+        }
         else if (_scanJob?.Status == "Failed")
         {
             Toast.Error(L10n.T(Keys.Content.DataSourceScanFailed, "元数据扫描失败。"));
         }
+    }
+
+    private async Task CancelScan()
+    {
+        if (_scanJob is null) return;
+        var (ok, _, err, _) = await Api.CancelScanAsync(Id, _scanJob.JobId);
+        if (!ok)
+        {
+            Toast.Error(err ?? L10n.T(Keys.Content.DataSourceScanCancelFailed, "中断扫描失败。"));
+            return;
+        }
+        // 不停止本地轮询：PollScanAsync 会在状态变为 Cancelled 后自动停止并展示结果。
+        Toast.Warning(L10n.T(Keys.Content.DataSourceScanCancelling, "已发送中断请求，正在停止扫描…"));
+    }
+
+    private async Task DeleteMetadata()
+    {
+        if (_scanPolling) return;
+        var confirmed = await JS.InvokeAsync<bool>("confirm",
+            L10n.T(Keys.Content.DataSourceDeleteMetaConfirm, "确认删除该数据源已扫描的全部元数据（表/字段/语义及其向量）？此操作不可撤销。"));
+        if (!confirmed) return;
+        var (ok, _, err, _) = await Api.DeleteMetadataAsync(Id);
+        if (!ok)
+        {
+            Toast.Error(err ?? L10n.T(Keys.Content.DataSourceDeleteMetaFailed, "删除扫描数据失败。"));
+            return;
+        }
+        Toast.Success(L10n.T(Keys.Content.DataSourceDeleteMetaDone, "已删除扫描数据。"));
+        _scanJob = null;
+        await LoadMetadata();
     }
 
     public void Dispose() => _scanCts?.Cancel();
@@ -396,6 +483,7 @@
     {
         "Succeeded" => "is-ok",
         "Failed" => "is-fail",
+        "Cancelled" => "is-cancel",
         _ => "is-running"
     };
 
@@ -403,6 +491,7 @@
     {
         "Succeeded" => "badge-success",
         "Failed" => "badge-danger",
+        "Cancelled" => "badge-warning",
         _ => "badge-primary"
     };
 
@@ -412,7 +501,16 @@
         "Running" => L10n.T(Keys.Content.DataSourceScanRunning, "正在扫描元数据…"),
         "Succeeded" => L10n.T(Keys.Content.DataSourceScanSucceededBanner, "扫描完成"),
         "Failed" => L10n.T(Keys.Content.DataSourceScanFailedBanner, "扫描失败"),
+        "Cancelled" => L10n.T(Keys.Content.DataSourceScanCancelledBanner, "已中断"),
         _ => status
+    };
+
+    private static string ScanEventClass(string level) => level switch
+    {
+        "Warning" => "is-warning",
+        "Error" => "is-error",
+        "Success" => "is-success",
+        _ => "is-info"
     };
 
     private static string ScanTimeLabel(ScanJobView job)

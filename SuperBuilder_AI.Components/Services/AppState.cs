@@ -40,6 +40,26 @@ public sealed class AppState
         SessionRestoredChanged?.Invoke();
     }
 
+    /// <summary>
+    /// 等待会话自举完成（localStorage 还原进内存）。用于消除首帧数据加载与自举的竞态：
+    /// 在令牌可用之后再发起首个带鉴权的请求，避免 F5 后出现"未授权"伪错误。
+    /// 若已还原则立即返回；否则订阅 <see cref="SessionRestoredChanged"/> 一次性完成。
+    /// </summary>
+    public Task WhenSessionRestoredAsync()
+    {
+        if (SessionRestored) return Task.CompletedTask;
+        var tcs = new System.Threading.Tasks.TaskCompletionSource<bool>(
+            System.Threading.Tasks.TaskCreationOptions.RunContinuationsAsynchronously);
+        Action? handler = null;
+        handler = () =>
+        {
+            SessionRestoredChanged -= handler;
+            tcs.TrySetResult(true);
+        };
+        SessionRestoredChanged += handler;
+        return tcs.Task;
+    }
+
     /// <summary>清空本地会话态（不触碰持久化存储；存储清理由 <see cref="AuthStore"/> 负责）。
     /// 注意：不重置 <see cref="SessionRestored"/>——该标志仅表示"本电路生命周期内是否已检查过 localStorage 自举"，
     /// 一旦置位应保持 true，否则 F5 后 ValidateAsync 触发 401→ClearAsync 会把它复位为 false，

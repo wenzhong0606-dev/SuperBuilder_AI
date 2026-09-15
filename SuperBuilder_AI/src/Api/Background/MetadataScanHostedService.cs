@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
@@ -14,15 +15,27 @@ using SuperBuilder_AI.Api.Diagnostics;
 namespace SuperBuilder_AI.Api.Background;
 
 /// <summary>
+/// 允许外部（API 端点）请求中断某个正在运行的扫描任务。
+/// </summary>
+public interface IMetadataScanCancellation
+{
+    /// <summary>请求取消指定 jobId 的扫描。返回 true 表示该 job 当前可被取消（运行中）。</summary>
+    bool RequestCancel(long jobId);
+}
+
+/// <summary>
 /// 元数据扫描后台处理器（M4-05）。从队列取出扫描任务，在独立作用域内执行扫描，
 /// 并将状态 / 进度 / 计数 / 脱敏错误回写到 <see cref="MetadataScanJob"/>。
 /// </summary>
-public sealed class MetadataScanHostedService : BackgroundService
+public sealed class MetadataScanHostedService : BackgroundService, IMetadataScanCancellation
 {
     private readonly IMetadataScanQueue _queue;
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<MetadataScanHostedService> _logger;
     private readonly ScanBacklogGauge _backlog;
+
+    /// <summary>运行中任务的取消源：jobId → 该次扫描专属的 CancellationTokenSource。</summary>
+    private readonly ConcurrentDictionary<long, CancellationTokenSource> _jobCts = new();
 
     public MetadataScanHostedService(
         IMetadataScanQueue queue,
@@ -97,6 +110,11 @@ public sealed class MetadataScanHostedService : BackgroundService
         job.Stage = "Connecting";
         await context.SaveChangesAsync(stoppingToken);
 
+        // 每任务专属取消源，与宿主停止信号链接：用户取消或宿主关闭都会中断本次扫描。
+        var jobCts = new CancellationTokenSource();
+        _jobCts[jobId] = jobCts;
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken, jobCts.Token);
+
         var telemetry = new ScanTelemetry();
         var progress = new JobProgress(job, telemetry, async ct =>
         {
@@ -119,12 +137,24 @@ public sealed class MetadataScanHostedService : BackgroundService
                 progress,
                 telemetry,
                 cleanupOrphans: true,
-                ct: stoppingToken);
+                ct: linked.Token);
+        }
+        catch (OperationCanceledException) when (jobCts.IsCancellationRequested)
+        {
+            // 用户主动中断：标记 Cancelled 而非 Failed。
+            telemetry.AddEvent("Warning", "ScanCancelled", "扫描已被用户中断。");
+            await CancelJobAsync(context, job, stoppingToken);
+            return;
         }
         catch (Exception ex)
         {
             await FailJobAsync(context, job, ex, stoppingToken);
             return;
+        }
+        finally
+        {
+            _jobCts.TryRemove(jobId, out _);
+            jobCts.Dispose();
         }
 
         // 成功：回写数据源最后扫描时间，并落盘最终计数。
@@ -160,6 +190,28 @@ public sealed class MetadataScanHostedService : BackgroundService
         job.ErrorMessage = message.Length > 2000 ? message[..2000] : message;
         await context.SaveChangesAsync(ct);
         _backlog.Decrement();
+    }
+
+    private async Task CancelJobAsync(SuperBIContext context, MetadataScanJob job, CancellationToken ct)
+    {
+        job.Status = MetadataScanJobStatus.Cancelled;
+        job.FinishedAt = DateTime.UtcNow;
+        job.Stage = "Cancelled";
+        job.ErrorCode = "UserCancelled";
+        job.ErrorMessage = "扫描已被用户中断。";
+        await context.SaveChangesAsync(ct);
+        _backlog.Decrement();
+    }
+
+    /// <inheritdoc />
+    public bool RequestCancel(long jobId)
+    {
+        if (_jobCts.TryGetValue(jobId, out var cts))
+        {
+            cts.Cancel();
+            return true;
+        }
+        return false;
     }
 
     /// <summary>

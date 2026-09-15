@@ -60,4 +60,32 @@ public sealed class DataSourceApiClient : ApiClientBase, IDataSourceApiClient
             return (null, status, "解析扫描任务失败：" + ex.Message, code);
         }
     }
+
+    /// <summary>获取数据源最近一次扫描任务（按 Id 倒序）。</summary>
+    public async Task<(ScanJobView? Job, int Status, string? Error, string? Code)> GetLatestScanJobAsync(long dataSourceId, CancellationToken ct = default)
+    {
+        var (data, status, err, code) = await GetJsonAsync($"api/data-sources/{dataSourceId}/metadata/scan/latest", ct);
+        if (data is null) return (null, status, err, code);
+        try
+        {
+            var job = JsonSerializer.Deserialize<ScanJobView>(data.Value.GetRawText(), new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            return (job, status, null, null);
+        }
+        catch (Exception ex)
+        {
+            return (null, status, "解析扫描任务失败：" + ex.Message, code);
+        }
+    }
+
+    /// <summary>请求中断指定扫描任务。</summary>
+    public async Task<(bool Ok, int Status, string? Error, string? Code)> CancelScanAsync(long dataSourceId, long jobId, CancellationToken ct = default)
+    {
+        return await PostAsync($"api/data-sources/{dataSourceId}/metadata/scan/{jobId}/cancel", null, ct);
+    }
+
+    /// <summary>删除该数据源已扫描的元数据。</summary>
+    public async Task<(bool Ok, int Status, string? Error, string? Code)> DeleteMetadataAsync(long dataSourceId, CancellationToken ct = default)
+    {
+        return await DeleteAsync($"api/data-sources/{dataSourceId}/metadata", ct);
+    }
 }

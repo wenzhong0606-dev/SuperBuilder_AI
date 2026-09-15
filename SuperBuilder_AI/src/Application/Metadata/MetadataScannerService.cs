@@ -263,6 +263,13 @@ public class MetadataScannerService
 
             if (generated.Count < semanticColumns.Count)
             {
+                var generatedIds = new System.Collections.Generic.HashSet<long>(generated.Select(g => g.Id));
+                foreach (var col in semanticColumns)
+                {
+                    if (!generatedIds.Contains(col.Id))
+                        telemetry.AddFailure("Column", col.ColumnName, "Semantic", "业务语义未生成成功");
+                }
+
                 telemetry.AddWarning(
                     "SemanticPartial",
                     $"业务语义已生成 {generated.Count}/{semanticColumns.Count}，部分字段未生成成功，可在扫描后继续完善。");
@@ -326,6 +333,7 @@ public class MetadataScannerService
 							? "Unknown"
 							: table.VectorErrorCode;
 						vectorFailures.Add($"{tableName}({errorCode})");
+						telemetry.AddFailure("Table", tableName, errorCode, "向量索引未成功");
 					}
 
 					if (!string.IsNullOrWhiteSpace(result.TableVectorId))

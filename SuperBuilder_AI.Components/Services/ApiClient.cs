@@ -137,6 +137,15 @@ public sealed class ApiClient : IApiClient
 
     public Task<(ScanJobView? Job, int Status, string? Error, string? Code)> GetScanJobAsync(long dataSourceId, long jobId, CancellationToken ct = default)
         => _dataSource.GetScanJobAsync(dataSourceId, jobId, ct);
+
+    public Task<(ScanJobView? Job, int Status, string? Error, string? Code)> GetLatestScanJobAsync(long dataSourceId, CancellationToken ct = default)
+        => _dataSource.GetLatestScanJobAsync(dataSourceId, ct);
+
+    public Task<(bool Ok, int Status, string? Error, string? Code)> CancelScanAsync(long dataSourceId, long jobId, CancellationToken ct = default)
+        => _dataSource.CancelScanAsync(dataSourceId, jobId, ct);
+
+    public Task<(bool Ok, int Status, string? Error, string? Code)> DeleteMetadataAsync(long dataSourceId, CancellationToken ct = default)
+        => _dataSource.DeleteMetadataAsync(dataSourceId, ct);
 }
 
 /// <summary>
@@ -191,9 +200,18 @@ public sealed class ScanProgressDetailsView
     public int VectorsIndexed { get; set; }
     public int OrphansRemoved { get; set; }
     public int WarningsCount { get; set; }
+    public List<ScanFailedItemView> FailedItems { get; set; } = new();
     public long ElapsedMs { get; set; }
     public long? EstimatedRemainingMs { get; set; }
     public List<ScanProgressEventView> Events { get; set; } = new();
+}
+
+public sealed class ScanFailedItemView
+{
+    public string Scope { get; set; } = "";
+    public string Name { get; set; } = "";
+    public string? ErrorCode { get; set; }
+    public string? Message { get; set; }
 }
 
 public sealed class ScanProgressEventView

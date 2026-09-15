@@ -52,6 +52,26 @@ public class ScanTelemetry
         AddEvent("Warning", eventCode, message);
     }
 
+    /// <summary>
+    /// 记录一条结构化失败项（表/字段级），同时追加一条 Error 级业务事件，
+    /// 供前端"失败数据清单"精确展示哪张表/哪个字段未成功处理。
+    /// </summary>
+    public void AddFailure(string scope, string name, string? errorCode, string? message)
+    {
+        Details.FailedItems.Add(new ScanFailedItem
+        {
+            Scope = scope,
+            Name = name,
+            ErrorCode = errorCode,
+            Message = message
+        });
+        Details.WarningsCount++;
+        AddEvent(
+            "Error",
+            "ItemFailed:" + scope,
+            $"{scope}「{name}」失败" + (string.IsNullOrWhiteSpace(message) ? "" : $"：{message}"));
+    }
+
     public void AddEvent(string level, string eventCode, string message, int? current = null, int? total = null)
     {
         Details.Events.Add(new ScanProgressEvent
@@ -64,7 +84,7 @@ public class ScanTelemetry
             Total = total
         });
 
-        const int maxEvents = 20;
+        const int maxEvents = 60;
         if (Details.Events.Count > maxEvents)
             Details.Events.RemoveRange(0, Details.Events.Count - maxEvents);
     }
@@ -133,10 +153,26 @@ public sealed class ScanProgressDetails
     public int OrphansRemoved { get; set; }
     public int WarningsCount { get; set; }
 
+    /// <summary>结构化失败项清单（表/字段级），供前端展示未成功处理的数据。</summary>
+    public List<ScanFailedItem> FailedItems { get; set; } = new();
+
     public long ElapsedMs { get; set; }
     public long? EstimatedRemainingMs { get; set; }
 
     public List<ScanProgressEvent> Events { get; set; } = new();
+}
+
+/// <summary>一条结构化失败项：标识哪类对象（表/字段）的哪一项处理未成功。</summary>
+public sealed class ScanFailedItem
+{
+    /// <summary>失败对象类别：Table / Column。</summary>
+    public string Scope { get; set; } = string.Empty;
+    /// <summary>失败对象名称（表名 / 字段名）。</summary>
+    public string Name { get; set; } = string.Empty;
+    /// <summary>脱敏后的错误码（异常类型名或阶段标识）。</summary>
+    public string? ErrorCode { get; set; }
+    /// <summary>可读的失败原因（已脱敏，绝不含有连接串）。</summary>
+    public string? Message { get; set; }
 }
 
 /// <summary>面向用户的扫描业务事件，不包含连接串、SQL 或密钥。</summary>

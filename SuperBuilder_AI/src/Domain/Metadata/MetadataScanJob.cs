@@ -69,5 +69,8 @@ public enum MetadataScanJobStatus
     Succeeded,
 
     /// <summary>失败。</summary>
-    Failed
+    Failed,
+
+    /// <summary>被用户主动中断（取消）。</summary>
+    Cancelled
 }
