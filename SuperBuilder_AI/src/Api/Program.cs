@@ -148,9 +148,10 @@ var isCi = string.Equals(
 if (isCi)
 {
     // 普通 CI 必须保持确定性且零真实 AI Token：
-    // Embedding 使用 Fake；Qwen 直接阻断，任何意外 Live LLM 调用都会让测试明确失败。
+    // Embedding 使用 Fake；Qwen 直接阻断；元数据语义使用确定性 Fake 以跑通 Scan E2E。
     builder.Services.AddScoped<IEmbeddingService, FakeEmbeddingService>();
     builder.Services.AddScoped<IQwenService, CiBlockedQwenService>();
+    builder.Services.AddScoped<IMetadataSemanticService, CiFakeMetadataSemanticService>();
 }
 else
 {
@@ -159,9 +160,10 @@ else
 
     builder.Services.AddScoped<QwenService>();
     builder.Services.AddScoped<IQwenService>(sp => sp.GetRequiredService<QwenService>());
+
+    builder.Services.AddScoped<MetadataSemanticService>();
+    builder.Services.AddScoped<IMetadataSemanticService>(sp => sp.GetRequiredService<MetadataSemanticService>());
 }
-builder.Services.AddScoped<MetadataSemanticService>();
-builder.Services.AddScoped<IMetadataSemanticService>(sp => sp.GetRequiredService<MetadataSemanticService>());
 builder.Services.AddScoped<QdrantService>();
 builder.Services.AddScoped<IQdrantService>(sp => sp.GetRequiredService<QdrantService>());
 builder.Services.AddScoped<MetadataVectorService>();
