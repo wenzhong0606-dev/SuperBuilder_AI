@@ -34,6 +34,7 @@ jobs:
     outputs:
       runtime: ${{ steps.scope.outputs.runtime }}
       e2e: ${{ steps.scope.outputs.e2e }}
+      e2e_filter: ${{ steps.scope.outputs.e2e_filter }}
     steps:
       - name: 检出源码
         uses: actions/checkout@v4
@@ -48,6 +49,7 @@ jobs:
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "runtime=true" >> "$GITHUB_OUTPUT"
             echo "e2e=true" >> "$GITHUB_OUTPUT"
+            echo "e2e_filter=FullyQualifiedName~E2ETests" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
@@ -63,6 +65,7 @@ jobs:
 
           files=$(git diff --name-only "$BASE" "$GITHUB_SHA" || true)
           printf '%s\n' "$files"
+          printf '%s\n' "$files" > /tmp/changed-files.txt
 
           runtime=false
           e2e=false
@@ -71,14 +74,17 @@ jobs:
             runtime=true
           fi
 
-          if printf '%s\n' "$files" | grep -Eq '^(SuperBuilder_AI\.Web/|SuperBuilder_AI\.Components/|SuperBuilder_AI/src/(Api|Application|Domain|Infrastructure)/|tests/SuperBuilder_AI\.E2E\.Tests/|SuperBuilder_AI/appsettings|\.github/workflows/dotnet-build\.yml)'; then
+          e2e_filter=$(bash scripts/ci/e2e-scope.sh /tmp/changed-files.txt)
+          if [ -n "$e2e_filter" ]; then
             e2e=true
           fi
 
           echo "runtime=$runtime" >> "$GITHUB_OUTPUT"
           echo "e2e=$e2e" >> "$GITHUB_OUTPUT"
+          echo "e2e_filter=$e2e_filter" >> "$GITHUB_OUTPUT"
           echo "Runtime Smoke: $runtime"
           echo "Web E2E: $e2e"
+          echo "E2E Filter: ${e2e_filter:-n/a}"
 
   build:
     name: 编译检查
@@ -454,7 +460,7 @@ jobs:
           mkdir -p "$GITHUB_WORKSPACE/E2EResults"
           dotnet test tests/SuperBuilder_AI.E2E.Tests/SuperBuilder_AI.E2E.Tests.csproj \
             --configuration Release \
-            --filter "FullyQualifiedName~E2ETests" \
+            --filter "${{ needs.changes.outputs.e2e_filter }}" \
             --logger "console;verbosity=normal" \
             --logger "trx;LogFileName=e2e-tests.trx" \
             --results-directory "$GITHUB_WORKSPACE/E2EResults" 2>&1 | tee e2e-tests.log
