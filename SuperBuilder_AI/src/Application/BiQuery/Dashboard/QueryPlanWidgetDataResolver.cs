@@ -73,29 +73,10 @@ public sealed class QueryPlanWidgetDataResolver : IWidgetDataResolver
 			return result;
 		}
 
-		// 1. 构造意图：优先自然语言问句；否则由显式指标/维度合成问句交给理解服务解析。
-		QueryIntent intent;
-		if (!string.IsNullOrWhiteSpace(query.Question))
-		{
-			intent = await _understanding.UnderstandAsync(query.Question, context);
-		}
-		else
-		{
-			intent = await _understanding.UnderstandAsync(BuildQuestion(query), context);
-		}
-
-		// 2. 全局/组件级筛选器下推到意图（P6.3 下推语义）。
-		foreach (var f in effectiveFilters)
-		{
-			intent.Filters.Add(new QueryFilter
-			{
-				SemanticText = f.Field,
-				Field = f.Field,
-				Operator = f.Operator,
-				Value = f.Value ?? string.Empty,
-			});
-		}
-
+		// 1. 解析允许的数据源集合（P0）。
+		//    必须早于「查询理解」：理解阶段的 Metadata 上下文按该作用域收敛，
+		//    否则全局 top-K 召回会把其他数据源的列写进提示词，污染维度解析。
+		//    同时把「无授权 / 无执行身份」的阻断提前到 LLM 调用之前，省掉一次无效推理。
 		IReadOnlyCollection<long>? allowedSources = null;
 		var caller = _executionIdentity?.Current;
 		if (_dataSourceAuthorization is not null)
@@ -115,7 +96,30 @@ public sealed class QueryPlanWidgetDataResolver : IWidgetDataResolver
 			}
 		}
 
-		// 3. 过 QueryPlanPipeline（语义验证 + 自动修复 + Confidence + Decision Gate）。
+		// 2. 构造意图：优先自然语言问句；否则由显式指标/维度合成问句交给理解服务解析。
+		QueryIntent intent;
+		if (!string.IsNullOrWhiteSpace(query.Question))
+		{
+			intent = await _understanding.UnderstandAsync(query.Question, context, allowedSources);
+		}
+		else
+		{
+			intent = await _understanding.UnderstandAsync(BuildQuestion(query), context, allowedSources);
+		}
+
+		// 3. 全局/组件级筛选器下推到意图（P6.3 下推语义）。
+		foreach (var f in effectiveFilters)
+		{
+			intent.Filters.Add(new QueryFilter
+			{
+				SemanticText = f.Field,
+				Field = f.Field,
+				Operator = f.Operator,
+				Value = f.Value ?? string.Empty,
+			});
+		}
+
+		// 4. 过 QueryPlanPipeline（语义验证 + 自动修复 + Confidence + Decision Gate）。
 		var pipelineResult = await _pipeline.RunAsync(intent.OriginalQuestion, intent, authorizedDataSourceIds: allowedSources);
 		if (pipelineResult.EarlyResponse is not null)
 		{
@@ -134,7 +138,7 @@ public sealed class QueryPlanWidgetDataResolver : IWidgetDataResolver
 				await _securityGate.ValidateAsync(plan, context.Tenant.TenantId, caller.UserId, cancellationToken);
 		}
 
-		// 4. 数据源 → 方言 → SQL → 执行。
+		// 5. 数据源 → 方言 → SQL → 执行。
 		try
 		{
 			var dataSource = await _db.DataSources

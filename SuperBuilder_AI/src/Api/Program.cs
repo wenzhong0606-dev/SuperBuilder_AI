@@ -298,6 +298,11 @@ builder.Services.AddScoped<IBIConversationService>(sp => sp.GetRequiredService<B
 // M7-11：Ask 查询快照存储（可选依赖；未注册时 BIConversationService 跳过写入，零回归）
 builder.Services.AddScoped<IAskQuerySnapshotStore, AskQuerySnapshotStore>();
 
+// Phase 2/3：结果字段译码（code→text）与自主学习纠错（显式纠正落库 + 下次自动回放）
+builder.Services.AddSingleton<DisplayResolutionOptions>();
+builder.Services.AddScoped<IDisplayResolutionService, DisplayResolutionService>();
+builder.Services.AddScoped<ICorrectionLearningService, CorrectionLearningService>();
+
 // M7-11 C1：Ask 快照 → 应用取数绑定导出器（from-ask）
 builder.Services.AddScoped<IAppQueryBindingExporter, AppQueryBindingExporter>();
 

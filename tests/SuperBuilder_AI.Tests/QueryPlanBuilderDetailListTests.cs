@@ -513,6 +513,13 @@ public class QueryPlanBuilderDetailListTests
 		var softDelete = Assert.Single(plan.Filters, f => string.Equals(f.Field, "del_flag", StringComparison.OrdinalIgnoreCase));
 		Assert.Equal("=", softDelete.Operator);
 		Assert.Equal("0", softDelete.Value);
+		// 必须绑定列归属：多表（JOIN）时只给 Field 会让 SQL 退化为裸列名，
+		// 事实表与明细表都含 del_flag => MySQL "in where clause is ambiguous"。
+		Assert.Equal(table.Id, softDelete.MetadataTableId);
+		Assert.Equal(table.TableName, softDelete.TableName);
+		Assert.Equal(
+			table.Columns.Single(c => c.ColumnName == "del_flag").Id,
+			softDelete.MetadataColumnId);
 
 		var query = await new SqlQueryBuilder().BuildAsync(plan, new MySqlDialect());
 		Assert.Contains("`code`", query.Sql, StringComparison.Ordinal);

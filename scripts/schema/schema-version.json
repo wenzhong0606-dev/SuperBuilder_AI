@@ -1,8 +1,8 @@
 {
   "artifact": "SuperBuilder_AI.SchemaVersionManifest",
-  "schemaVersion": "20260914062000_M13_MetadataScanRichProgress",
-  "migrationCount": 47,
-  "generatedUtc": "2026-09-14T04:55:00Z",
+  "schemaVersion": "20260916052918_M13_DictionaryActiveFilter",
+  "migrationCount": 49,
+  "generatedUtc": "2026-09-16T05:34:07Z",
   "generator": "dotnet ef migrations list --no-build",
   "note": "schemaVersion = 最新（序号最大）迁移 ID；环境已应用迁移集合须与本清单前缀一致。",
   "migrations": [
@@ -52,6 +52,8 @@
     "20260911143327_M12_17_IdentityOrganizationUnits",
     "20260911231209_M12_18_MetricDimensionExpression",
     "20260912103000_M13_03_DataSourceConnectionStringEncryption",
-    "20260914062000_M13_MetadataScanRichProgress"
+    "20260914062000_M13_MetadataScanRichProgress",
+    "20260916044128_M13_FieldDecodingAndCorrectionLearning",
+    "20260916052918_M13_DictionaryActiveFilter"
   ]
 }

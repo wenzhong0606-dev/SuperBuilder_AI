@@ -108,6 +108,8 @@ public class SuperBIContext : DbContext
     public DbSet<MetadataSemantic> MetadataSemantics { get; set; }
     public DbSet<MetadataLearningRecord> LearningRecords { get; set; }
     public DbSet<MetadataScanJob> MetadataScanJobs { get; set; }
+    public DbSet<MetadataDictionaryConfig> MetadataDictionaryConfigs { get; set; }
+    public DbSet<QueryCorrectionRule> QueryCorrectionRules { get; set; }
     #endregion
 
     #region P5 Localization
@@ -311,6 +313,15 @@ public class SuperBIContext : DbContext
         builder.Entity<MetadataColumn>().ToTable(tb => tb.HasComment("元数据字段"));
         builder.Entity<MetadataColumn>().HasIndex(x => new { x.MetadataTableId, x.ColumnName }).IsUnique();
         builder.Entity<MetadataColumn>().Property(x => x.ColumnName).IsRequired().HasMaxLength(128).HasComment("列名");
+        // 跨源字典译码：列→字典配置（声明/学习绑定；扫描自动发现字典表本身在 MetadataDictionaryConfig）。
+        builder.Entity<MetadataColumn>().Property(x => x.ReferencedTable).HasMaxLength(128).HasComment("外键目标表");
+        builder.Entity<MetadataColumn>().Property(x => x.ReferencedColumn).HasMaxLength(128).HasComment("外键目标列");
+        builder.Entity<MetadataColumn>().Property(x => x.ReferencedDisplayColumn).HasMaxLength(128).HasComment("外键展示列");
+        builder.Entity<MetadataColumn>().Property(x => x.ValueMapJson).HasComment("码值映射JSON");
+        builder.Entity<MetadataColumn>().Property(x => x.IsDictBacked).IsRequired().HasDefaultValue(false).HasComment("是否跨源字典译码");
+        builder.Entity<MetadataColumn>().Property(x => x.DictConfigId).HasComment("关联字典配置Id");
+        builder.Entity<MetadataColumn>().Property(x => x.DictCategoryValue).HasMaxLength(128).HasComment("字典分类值");
+        // 注：DictConfigId 为软引用（不建外键）—— 避免 DataSources→MetadataColumns 的多重级联路径（SQL Server 1785）。
         builder.Entity<MetadataColumn>().Property(x => x.Ordinal).HasDefaultValue(0).HasComment("列序号");
         builder.Entity<MetadataColumn>().Property(x => x.NativeType).HasMaxLength(64).HasComment("原生类型");
         builder.Entity<MetadataColumn>().Property(x => x.Precision).HasComment("精度");
@@ -323,6 +334,36 @@ public class SuperBIContext : DbContext
         builder.Entity<MetadataColumn>().Property(x => x.VectorSyncTime).HasComment("向量同步时间(UTC)");
         builder.Entity<MetadataColumn>().Property(x => x.VectorStatus).HasMaxLength(16).HasComment("向量状态");
         builder.Entity<MetadataColumn>().Property(x => x.VectorErrorCode).HasMaxLength(64).HasComment("向量错误码");
+        #endregion
+
+        #region MetadataDictionaryConfig
+        builder.Entity<MetadataDictionaryConfig>().HasOne(x => x.Tenant).WithMany().HasForeignKey(x => x.TenantId).IsRequired().OnDelete(DeleteBehavior.Restrict);
+        builder.Entity<MetadataDictionaryConfig>().HasOne(x => x.DataSource).WithMany().HasForeignKey(x => x.DataSourceId).IsRequired().OnDelete(DeleteBehavior.Cascade);
+        builder.Entity<MetadataDictionaryConfig>().ToTable(tb => tb.HasComment("跨源字典表配置"));
+        builder.Entity<MetadataDictionaryConfig>().HasIndex(x => new { x.TenantId, x.DataSourceId, x.TableName }).IsUnique()
+            .HasDatabaseName("IX_MetadataDictionaryConfigs_Tenant_DataSource_Table");
+        builder.Entity<MetadataDictionaryConfig>().HasIndex(x => x.DataSourceId)
+            .HasDatabaseName("IX_MetadataDictionaryConfigs_DataSourceId");
+        builder.Entity<MetadataDictionaryConfig>().Property(x => x.TableName).IsRequired().HasMaxLength(128).HasComment("字典表名");
+        builder.Entity<MetadataDictionaryConfig>().Property(x => x.CodeColumn).IsRequired().HasMaxLength(128).HasComment("角色:码值列");
+        builder.Entity<MetadataDictionaryConfig>().Property(x => x.NameColumn).IsRequired().HasMaxLength(128).HasComment("角色:名称列");
+        builder.Entity<MetadataDictionaryConfig>().Property(x => x.TypeColumn).HasMaxLength(128).HasComment("角色:分类列(可选)");
+        builder.Entity<MetadataDictionaryConfig>().Property(x => x.ActiveFilterColumn).HasMaxLength(128).HasComment("角色:有效行过滤列(可选)");
+        builder.Entity<MetadataDictionaryConfig>().Property(x => x.ActiveFilterValue).HasMaxLength(128).HasComment("有效行过滤值(默认0)");
+        builder.Entity<MetadataDictionaryConfig>().Property(x => x.IsEnabled).IsRequired().HasDefaultValue(true).HasComment("是否启用");
+        #endregion
+
+        #region QueryCorrectionRule
+        builder.Entity<QueryCorrectionRule>().ToTable(tb => tb.HasComment("自主学习纠错规则"));
+        builder.Entity<QueryCorrectionRule>().HasIndex(x => new { x.TenantId, x.UserId, x.TriggerPattern }).IsUnique()
+            .HasDatabaseName("IX_QueryCorrectionRules_Tenant_User_Trigger");
+        builder.Entity<QueryCorrectionRule>().HasIndex(x => x.TenantId).HasDatabaseName("IX_QueryCorrectionRules_TenantId");
+        builder.Entity<QueryCorrectionRule>().HasIndex(x => x.UserId).HasDatabaseName("IX_QueryCorrectionRules_UserId");
+        builder.Entity<QueryCorrectionRule>().Property(x => x.DataSourceId).HasComment("作用数据源(可选)");
+        builder.Entity<QueryCorrectionRule>().Property(x => x.TriggerPattern).IsRequired().HasMaxLength(256).HasComment("触发模式(归一化问句子串)");
+        builder.Entity<QueryCorrectionRule>().Property(x => x.PayloadJson).IsRequired().HasComment("规则载荷JSON");
+        builder.Entity<QueryCorrectionRule>().Property(x => x.HitCount).HasDefaultValue(0).HasComment("命中次数");
+        builder.Entity<QueryCorrectionRule>().Property(x => x.Kind).HasConversion<int>().IsRequired().HasComment("规则类型(CorrectionKind)");
         #endregion
 
         #region MetadataSemantic
@@ -919,6 +960,10 @@ public class SuperBIContext : DbContext
         builder.Entity<UserGroupMember>().HasQueryFilter(e => !_tenantFilterEnabled || e.TenantId == _scopedTenantId);
         builder.Entity<UserGroupRole>().HasQueryFilter(e => !_tenantFilterEnabled || e.TenantId == _scopedTenantId);
         builder.Entity<UserDepartmentMember>().HasQueryFilter(e => !_tenantFilterEnabled || e.TenantId == _scopedTenantId);
+
+        // 跨源字典配置 + 自主学习纠错规则：均租户专属，不放行 TenantId == 0。
+        builder.Entity<MetadataDictionaryConfig>().HasQueryFilter(e => !_tenantFilterEnabled || e.TenantId == _scopedTenantId);
+        builder.Entity<QueryCorrectionRule>().HasQueryFilter(e => !_tenantFilterEnabled || e.TenantId == _scopedTenantId);
         #endregion
 
         // Phase 3.1：Business Entity 只持久化到 SuperBuilder Metadata DB。

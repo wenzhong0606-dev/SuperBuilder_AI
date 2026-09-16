@@ -3,6 +3,7 @@ using SuperBuilder_AI.Data;
 using SuperBuilder_AI.Interfaces;
 using SuperBuilder_AI.Interfaces.Platform;
 using SuperBuilder_AI.Models.AI;
+using SuperBuilder_AI.Models.Metadata;
 using SuperBuilder_AI.Models.Organization;
 
 
@@ -48,6 +49,20 @@ public class MetadataSemanticSearchService
 	private const double LabelRecallBoostFactor = 0.15;
 
 
+	/// <summary>
+	/// 数据源作用域下的向量过采样倍数。
+	///
+	/// 数据源过滤只能发生在「向量召回 → 全量落库读回」之后（Qdrant payload 未写入
+	/// dataSourceId，且写入侧不保证与元库同步），因此按 topK 原样召回时，
+	/// 跨源候选会挤占名额，使作用域内候选不足。
+	/// </summary>
+	private const int ScopeOversampleFactor = 5;
+
+
+	/// <summary>数据源作用域下的过采样上限，避免极窄作用域把召回量放大到无谓的规模。</summary>
+	private const int ScopeOversampleCeiling = 200;
+
+
 	private readonly IEmbeddingService _embedding;
 
 
@@ -87,11 +102,95 @@ public class MetadataSemanticSearchService
 	/// <summary>
 	/// Metadata语义搜索
 	/// </summary>
-	public async Task<List<MetadataSemanticSearchResult>>
+	public Task<List<MetadataSemanticSearchResult>>
 		SearchAsync(
 			string question,
 			int topK = 10,
 			LocaleContext? locale = null)
+		=> SearchCoreAsync(
+			question,
+			topK,
+			locale);
+
+
+	/// <summary>
+	/// Metadata语义搜索（数据源作用域内）。
+	///
+	/// 作用于「查询理解」阶段：把喂给 LLM 的 Metadata 上下文收敛到
+	/// 当前用户已授权 / 已显式请求的数据源，避免跨源同名列污染
+	/// Metric / Dimension 解析（详见接口注释）。
+	///
+	/// 过滤点是**落库读回之后**按 <c>MetadataTable.DataSourceId</c> 判定，
+	/// 即以元数据库为准（向量 payload 仅用于定位主键，不用于判归属），
+	/// 因此不受索引新旧影响。
+	/// </summary>
+	public async Task<List<MetadataSemanticSearchResult>>
+		SearchAsync(
+			string question,
+			int topK,
+			LocaleContext? locale,
+			IReadOnlyCollection<long>? dataSourceIds)
+	{
+		// null = 不限定作用域 => 与三参重载逐字节同路径（Golden / 评估器零回归）。
+		if (dataSourceIds is null)
+		{
+			return await SearchCoreAsync(
+				question,
+				topK,
+				locale);
+		}
+
+		var scope =
+			dataSourceIds
+				.Where(id => id > 0)
+				.ToHashSet();
+
+		// 空集合：无任何允许的数据源 => 无候选（不抛异常，处置权交调用方）。
+		if (scope.Count == 0)
+		{
+			return new List<MetadataSemanticSearchResult>();
+		}
+
+		if (topK <= 0)
+		{
+			return new List<MetadataSemanticSearchResult>();
+		}
+
+		// 过采样：过滤在全量召回之后进行，须多召回一些才能保证作用域内凑满 topK。
+		var oversample =
+			Math.Clamp(
+				topK * ScopeOversampleFactor,
+				topK,
+				Math.Max(topK, ScopeOversampleCeiling));
+
+		var candidates =
+			await SearchCoreAsync(
+				question,
+				oversample,
+				locale);
+
+		return candidates
+			.Where(r =>
+				r.Table is not null
+				&& scope.Contains(r.Table.DataSourceId))
+			.Take(topK)
+			.ToList();
+	}
+
+
+
+
+	/// <summary>
+	/// 语义检索主流程（向量召回 + 落库读回 + 排序），不含数据源过滤。
+	///
+	/// 两个公开重载都汇聚到这里，保证「限定作用域」与「不限定作用域」
+	/// 共用同一套召回 / 评分 / 语言提升逻辑。
+	/// </summary>
+	private async Task<List<MetadataSemanticSearchResult>>
+		SearchCoreAsync(
+			string question,
+			int topK,
+			LocaleContext? locale)
 	{
 
 
@@ -347,6 +446,42 @@ public class MetadataSemanticSearchService
 
 	private static string Normalize(string? value) =>
 		(value ?? string.Empty).Trim().Replace(" ", string.Empty, StringComparison.Ordinal).ToLowerInvariant();
+
+	/// <summary>
+	/// 按物理表名在（已授权）元数据库目录中确定性解析目标表。
+	/// 仅用于多轮表纠正：当 ScopeAsync 已把目标表所在数据源收敛掉时，
+	/// 仍能在“全部已授权数据源”范围内按表名找回，强制作为主表。
+	/// 表名大小写不敏感（依赖 SQL Server 默认 CI 排序规则）。
+	/// </summary>
+	public async Task<MetadataTable?> ResolveTableByNameAsync(
+		string tableName,
+		IReadOnlyCollection<long>? authorizedDataSourceIds = null)
+	{
+		if (string.IsNullOrWhiteSpace(tableName))
+		{
+			return null;
+		}
+
+		var name = tableName.Trim();
+
+		var query =
+			_context
+				.MetadataTables
+				.Include(t => t.Columns)
+				.AsNoTracking();
+
+		if (authorizedDataSourceIds is { Count: > 0 })
+		{
+			query =
+				query.Where(
+					t => authorizedDataSourceIds.Contains(
+						t.DataSourceId));
+		}
+
+		return await query
+			.FirstOrDefaultAsync(
+				t => t.TableName == name);
+	}
 
 
 

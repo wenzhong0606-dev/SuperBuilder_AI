@@ -295,7 +295,8 @@ public partial class QueryPlanBuilder : IQueryPlanBuilder
 			SelectBestTable(
 				metadataResults,
 				businessTerms,
-				intent);
+				intent,
+				authorizedDataSourceIds);
 
 
 
@@ -1570,6 +1571,13 @@ public partial class QueryPlanBuilder : IQueryPlanBuilder
 		plan.Filters.Add(new QueryFilter
 		{
 			SemanticText = "未删除",
+			// 必须绑定列归属：多表（JOIN）场景下若只给 Field，SqlQueryBuilder 无法解析
+			// 表名，会退化为裸列名 `del_flag`；而事实表与明细表普遍都有 del_flag，
+			// MySQL 会抛 "Column 'del_flag' in where clause is ambiguous"。
+			// 口径与 DetailQueryProjectionPolicy.ApplySoftDelete 保持一致。
+			MetadataTableId = table.Id,
+			TableName = table.TableName,
+			MetadataColumnId = column.Id,
 			Field = column.ColumnName,
 			DataType = column.DataType,
 			Operator = "=",

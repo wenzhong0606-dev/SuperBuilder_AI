@@ -62,7 +62,8 @@ public sealed class TableSelector
 		SelectBestTable(
 			List<MetadataSemanticSearchResult> results,
 			List<BusinessTerm> businessTerms,
-			QueryIntent? intent = null)
+			QueryIntent? intent = null,
+			Func<string, MetadataTable?>? tableResolver = null)
 	{
 		if (results == null || results.Count == 0)
 		{
@@ -92,7 +93,8 @@ public sealed class TableSelector
 		var explicitTable =
 			ResolveExplicitTableOverride(
 				intent,
-				groupedCandidates.Select(x => x.Table));
+				groupedCandidates.Select(x => x.Table),
+				tableResolver);
 
 		if (explicitTable is not null)
 		{
@@ -144,7 +146,8 @@ public sealed class TableSelector
 
 	private static MetadataTable? ResolveExplicitTableOverride(
 		QueryIntent? intent,
-		IEnumerable<MetadataTable> candidates)
+		IEnumerable<MetadataTable> candidates,
+		Func<string, MetadataTable?>? tableResolver = null)
 	{
 		var question =
 			intent?.OriginalQuestion;
@@ -171,11 +174,67 @@ public sealed class TableSelector
 			return null;
 		}
 
-		return candidates
-			.Where(t => !string.IsNullOrWhiteSpace(t.TableName))
-			.Where(t => question.Contains(t.TableName!, StringComparison.OrdinalIgnoreCase))
-			.OrderByDescending(t => t.TableName!.Length)
-			.FirstOrDefault();
+		// 1) 优先在收敛后的候选里按表名匹配（历史行为，零额外 IO）。
+		var byCandidate =
+			candidates
+				.Where(t => !string.IsNullOrWhiteSpace(t.TableName))
+				.Where(t => question.Contains(t.TableName!, StringComparison.OrdinalIgnoreCase))
+				.OrderByDescending(t => t.TableName!.Length)
+				.FirstOrDefault();
+
+		if (byCandidate is not null)
+		{
+			return byCandidate;
+		}
+
+		// 2) 候选里没有（典型场景：ScopeAsync 已把目标表所在数据源收敛掉）：
+		//    从全部已授权数据源按表名确定性找回，强制作为主表。
+		//    仅当 resolver 返回非空时才生效，避免引入检索候选之外的不可信表。
+		if (tableResolver is not null)
+		{
+			var correctedName = ExtractCorrectedTableName(question);
+			if (!string.IsNullOrWhiteSpace(correctedName))
+			{
+				var resolved = tableResolver(correctedName);
+				if (resolved is not null)
+				{
+					return resolved;
+				}
+			}
+		}
+
+		return null;
+	}
+
+	/// <summary>
+	/// 从纠正句中提取用户显式指定的物理表名。
+	/// 合成问题形如「…查询物理表必须使用 wms_storage_receipt…」，
+	/// 原始问题本身不含物理表名，因此取问题中首个含下划线的英文表名 token 即目标表。
+	/// </summary>
+	private static readonly System.Text.RegularExpressions.Regex
+		PhysicalTableNameRegex =
+			new(
+				@"(?<![A-Za-z0-9_])(?<table>[A-Za-z][A-Za-z0-9_]{2,})(?![A-Za-z0-9_])",
+				System.Text.RegularExpressions.RegexOptions.Compiled
+				| System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+
+	private static string? ExtractCorrectedTableName(string question)
+	{
+		foreach (System.Text.RegularExpressions.Match m in
+			PhysicalTableNameRegex.Matches(question))
+		{
+			var value = m.Groups["table"].Value;
+			if (value.Contains('_', StringComparison.Ordinal)
+				&& !string.Equals(
+					value,
+					"QueryPlan",
+					StringComparison.OrdinalIgnoreCase))
+			{
+				return value;
+			}
+		}
+
+		return null;
 	}
 
 	/// <summary>

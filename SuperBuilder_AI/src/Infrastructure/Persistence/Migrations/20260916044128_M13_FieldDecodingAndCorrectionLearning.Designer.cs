@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using SuperBuilder_AI.Data;
 
@@ -11,9 +12,11 @@ using SuperBuilder_AI.Data;
 namespace SuperBuilder_AI.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(SuperBIContext))]
-    partial class SuperBIContextModelSnapshot : ModelSnapshot
+    [Migration("20260916044128_M13_FieldDecodingAndCorrectionLearning")]
+    partial class M13_FieldDecodingAndCorrectionLearning
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -2893,16 +2896,6 @@ namespace SuperBuilder_AI.Infrastructure.Persistence.Migrations
                         .HasComment("主键");
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
-
-                    b.Property<string>("ActiveFilterColumn")
-                        .HasMaxLength(128)
-                        .HasColumnType("nvarchar(128)")
-                        .HasComment("角色:有效行过滤列(可选)");
-
-                    b.Property<string>("ActiveFilterValue")
-                        .HasMaxLength(128)
-                        .HasColumnType("nvarchar(128)")
-                        .HasComment("有效行过滤值(默认0)");
 
                     b.Property<string>("CodeColumn")
                         .IsRequired()
