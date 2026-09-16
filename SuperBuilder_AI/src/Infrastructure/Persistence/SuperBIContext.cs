@@ -685,7 +685,13 @@ public class SuperBIContext : DbContext
 		builder.Entity<DataSourceAccessGrant>().HasIndex(x => new { x.TenantId, x.SubjectType, x.SubjectId });
 		builder.Entity<DataSourceAccessGrant>().HasOne<DataSource>().WithMany().HasForeignKey(x => x.DataSourceId).OnDelete(DeleteBehavior.Cascade);
 		builder.Entity<DataSourceAccessGrant>().HasOne<Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Cascade);
-		builder.Entity<RowLevelSecurityPolicy>().ToTable("RowLevelSecurityPolicies");
+		builder.Entity<RowLevelSecurityPolicy>().ToTable("RowLevelSecurityPolicies", tb =>
+		{
+			tb.HasCheckConstraint("CK_RlsPolicies_SubjectConsistency",
+				"([SubjectType] = 0 AND [SubjectId] IS NULL AND [SubjectKey] IS NULL) OR ([SubjectType] = 1 AND [SubjectId] IS NOT NULL) OR ([SubjectType] = 2 AND [SubjectId] IS NOT NULL) OR ([SubjectType] = 3 AND [SubjectKey] IS NOT NULL) OR ([SubjectType] NOT IN (0,1,2,3))");
+			tb.HasCheckConstraint("CK_RlsPolicies_Operator",
+				"[Operator] IN ('=', '!=', '>', '>=', '<', '<=', 'LIKE', 'IN', 'IS NULL', 'IS NOT NULL')");
+		});
 		builder.Entity<RowLevelSecurityPolicy>().HasIndex(x => new { x.TenantId, x.DataSourceId, x.MetadataTableId, x.Enabled });
 		builder.Entity<RowLevelSecurityPolicy>().HasIndex(x => new { x.TenantId, x.SubjectType, x.SubjectId });
 		builder.Entity<RowLevelSecurityPolicy>().Property(x => x.Operator).HasMaxLength(16).IsRequired();
@@ -695,13 +701,6 @@ public class SuperBIContext : DbContext
 		builder.Entity<RowLevelSecurityPolicy>().HasOne<DataSource>().WithMany().HasForeignKey(x => x.DataSourceId).OnDelete(DeleteBehavior.Restrict);
 		builder.Entity<RowLevelSecurityPolicy>().HasOne<MetadataTable>().WithMany().HasForeignKey(x => x.MetadataTableId).OnDelete(DeleteBehavior.Cascade);
 		builder.Entity<RowLevelSecurityPolicy>().HasOne<MetadataColumn>().WithMany().HasForeignKey(x => x.MetadataColumnId).OnDelete(DeleteBehavior.Restrict);
-		// M1-06 防御性 CHECK：明确 Everyone 类型（SubjectId/SubjectKey 均空），User/Role 必须指定 SubjectId，Attribute 必须指定 SubjectKey。
-		builder.Entity<RowLevelSecurityPolicy>().HasCheckConstraint("CK_RlsPolicies_SubjectConsistency",
-			"([SubjectType] = 0 AND [SubjectId] IS NULL AND [SubjectKey] IS NULL) OR ([SubjectType] = 1 AND [SubjectId] IS NOT NULL) OR ([SubjectType] = 2 AND [SubjectId] IS NOT NULL) OR ([SubjectType] = 3 AND [SubjectKey] IS NOT NULL) OR ([SubjectType] NOT IN (0,1,2,3))");
-		// M1-06 防御性 CHECK：Operator 仅允许受控词表（与 RlsVocabularyValidator.AllowedOperators 对齐）。
-		builder.Entity<RowLevelSecurityPolicy>().HasCheckConstraint("CK_RlsPolicies_Operator",
-			"[Operator] IN ('=', '!=', '>', '>=', '<', '<=', 'LIKE', 'IN', 'IS NULL', 'IS NOT NULL')");
-
 		#endregion
 
 		#region M2-02 PlatformAdminTenantScope
@@ -787,7 +786,8 @@ public class SuperBIContext : DbContext
 		#endregion
 
 		#region PhysicalBinding (M1-06)
-		builder.Entity<PhysicalBinding>().ToTable("PhysicalBindings");
+		builder.Entity<PhysicalBinding>().ToTable("PhysicalBindings", tb =>
+			tb.HasCheckConstraint("CK_PhysicalBindings_PriorityNonNeg", "[Priority] >= 0"));
 		builder.Entity<PhysicalBinding>().HasIndex(x => new { x.DataSourceId, x.MetadataTableId, x.MetadataColumnId });
 		builder.Entity<PhysicalBinding>().HasIndex(x => new { x.BusinessEntityKeyId, x.BusinessEntityAttributeId, x.BusinessEntityMetricId, x.BusinessEntityRelationshipId });
 		builder.Entity<PhysicalBinding>().HasOne(x => x.DataSource).WithMany().HasForeignKey(x => x.DataSourceId).OnDelete(DeleteBehavior.Restrict);
@@ -799,7 +799,6 @@ public class SuperBIContext : DbContext
 		builder.Entity<PhysicalBinding>().HasOne(x => x.BusinessEntityRelationship).WithMany().HasForeignKey(x => x.BusinessEntityRelationshipId).OnDelete(DeleteBehavior.Restrict);
 		// Priority 非负由 CHECK 与写入路径(BusinessEntityService.ValidateBindingsAsync)双重保证。
 		// 「恰好一个 Owner」为跨列业务规则，因既有种子(0 owner)存在，按 M1-02/03/04 约定仅在写入路径强制，不加硬 CHECK。
-		builder.Entity<PhysicalBinding>().HasCheckConstraint("CK_PhysicalBindings_PriorityNonNeg", "[Priority] >= 0");
         #endregion
 
 		#region M1-06 BusinessDomain / MetadataSemantic 收敛

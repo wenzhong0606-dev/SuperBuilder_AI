@@ -19,10 +19,12 @@ public sealed class PhysicalBindingResolver(SuperBIContext db) : IPhysicalBindin
             .AsNoTracking()
             .Where(x => x.DataSourceId == dataSourceId && x.IsActive)
             .Where(x => x.DataSource != null && x.DataSource.TenantId == tenantId)
-            .Where(x => x.BusinessEntityKey != null && x.BusinessEntityKey.BusinessEntityId == businessEntityId && x.BusinessEntityKey.BusinessEntity.TenantId == tenantId
-                     || x.BusinessEntityAttribute != null && x.BusinessEntityAttribute.BusinessEntityId == businessEntityId && x.BusinessEntityAttribute.BusinessEntity.TenantId == tenantId
-                     || x.BusinessEntityMetric != null && x.BusinessEntityMetric.BusinessEntityId == businessEntityId && x.BusinessEntityMetric.BusinessEntity.TenantId == tenantId
+            .Where(x => x.BusinessEntityKey != null && x.BusinessEntityKey.BusinessEntity != null && x.BusinessEntityKey.BusinessEntityId == businessEntityId && x.BusinessEntityKey.BusinessEntity.TenantId == tenantId
+                     || x.BusinessEntityAttribute != null && x.BusinessEntityAttribute.BusinessEntity != null && x.BusinessEntityAttribute.BusinessEntityId == businessEntityId && x.BusinessEntityAttribute.BusinessEntity.TenantId == tenantId
+                     || x.BusinessEntityMetric != null && x.BusinessEntityMetric.BusinessEntity != null && x.BusinessEntityMetric.BusinessEntityId == businessEntityId && x.BusinessEntityMetric.BusinessEntity.TenantId == tenantId
                      || x.BusinessEntityRelationship != null && (x.BusinessEntityRelationship.SourceEntityId == businessEntityId || x.BusinessEntityRelationship.TargetEntityId == businessEntityId)
+                        && x.BusinessEntityRelationship.SourceEntity != null
+                        && x.BusinessEntityRelationship.TargetEntity != null
                         && x.BusinessEntityRelationship.SourceEntity.TenantId == tenantId
                         && x.BusinessEntityRelationship.TargetEntity.TenantId == tenantId)
             .OrderBy(x => x.Priority)

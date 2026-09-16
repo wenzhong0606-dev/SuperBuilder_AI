@@ -147,8 +147,8 @@ public sealed class MetadataCsvFixtureService : IMetadataCsvFixtureService
             {
                 TenantId = tenant.Id,
                 DataSourceId = dataSource.Id,
-                TableName = Null(row, 3),
-                TableComment = Null(row, 4),
+                TableName = Null(row, 3) ?? string.Empty,
+                TableComment = Null(row, 4) ?? string.Empty,
                 BusinessDomain = null,
                 SearchText = Null(row, 6),
                 VectorId = Null(row, 7),
@@ -167,15 +167,15 @@ public sealed class MetadataCsvFixtureService : IMetadataCsvFixtureService
             if (!tableMap.TryGetValue(sourceTableId, out var table))
                 throw new InvalidOperationException($"column.csv 引用了不存在的 table.csv Id={sourceTableId}。");
 
-            var columnName = Null(row, 2);
+            var columnName = Null(row, 2) ?? string.Empty;
             var column = new MetadataColumn
             {
                 MetadataTableId = table.Id,
                 MetadataTable = table,
                 BusinessKey = $"{dataSource.Id}.{table.TableName}.{columnName}",
                 ColumnName = columnName,
-                ColumnComment = Null(row, 3),
-                DataType = Null(row, 4),
+                ColumnComment = Null(row, 3) ?? string.Empty,
+                DataType = Null(row, 4) ?? string.Empty,
                 Length = NullableLong(row, 5),
                 IsNullable = NullableBool(row, 6),
                 IsPrimaryKey = NullableBool(row, 7),

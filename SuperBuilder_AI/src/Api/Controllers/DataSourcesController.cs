@@ -350,6 +350,11 @@ public sealed class DataSourcesController : ControllerBase
 			using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
 			using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
 			var plainConnectionString = _secrets.ResolvePlaintext(source.ConnectionString);
+			if (string.IsNullOrWhiteSpace(plainConnectionString))
+			{
+				await RecordLastTestAsync(id, "Failed", "EmptyConnectionString", cancellationToken);
+				return Ok(new { status = "Failed", elapsedMs = sw.ElapsedMilliseconds, errorCode = "EmptyConnectionString" });
+			}
 			await using var connection = CreateConnection(new DataSource { DbType = source.DbType, ConnectionString = plainConnectionString });
 			await connection.OpenAsync(linked.Token);
 			await using var command = connection.CreateCommand();

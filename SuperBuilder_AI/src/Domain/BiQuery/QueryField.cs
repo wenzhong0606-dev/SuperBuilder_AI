@@ -21,6 +21,26 @@ public class QueryField
 		set;
 	}
 
+	/// <summary>
+	/// 字段所属 MetadataTable Id。
+	/// 多表 JOIN 中用于生成限定列名，避免同名字段歧义。
+	/// </summary>
+	public long MetadataTableId
+	{
+		get;
+		set;
+	}
+
+	/// <summary>
+	/// 字段所属物理表名。
+	/// 仅作为 SQL 生成期的运行时绑定，不参与语义推理。
+	/// </summary>
+	public string? TableName
+	{
+		get;
+		set;
+	}
+
 
 
 	/// <summary>

@@ -173,6 +173,8 @@ public sealed class AppQueryExecutor : IAppQueryExecutor
 		foreach (var f in plan.Fields)
 		{
 			f.MetadataColumnId = columnIdByName[f.ColumnName!];
+			f.MetadataTableId = lockedTable.MetadataTableId;
+			f.TableName = lockedTable.TableName;
 		}
 
 		// 4. 以 binding 为权威回写排序（binding 的字段名来自导出时的真实计划）。
@@ -183,6 +185,8 @@ public sealed class AppQueryExecutor : IAppQueryExecutor
 			{
 				plan.Orders[0].Field = bo.Field;
 				plan.Orders[0].MetadataColumnId = sortColId;
+				plan.Orders[0].MetadataTableId = lockedTable.MetadataTableId;
+				plan.Orders[0].TableName = lockedTable.TableName;
 				plan.Orders[0].Direction = string.Equals(bo.Direction, "DESC", StringComparison.OrdinalIgnoreCase) ? "DESC" : "ASC";
 			}
 		}
@@ -224,16 +228,20 @@ public sealed class AppQueryExecutor : IAppQueryExecutor
 	/// <summary>由 binding 构造结构化 QueryIntent（绕过 NLU）。</summary>
 	private static QueryIntent BuildIntent(AppDataSourceBinding binding)
 	{
+		var entity = binding.Entity ?? string.Empty;
 		var intent = new QueryIntent
 		{
-			OriginalQuestion = binding.Entity,
+			OriginalQuestion = entity,
 			IntentType = binding.Metrics.Count > 0 ? "Aggregate" : "Detail",
 			Limit = binding.Limit,
 		};
 
-		intent.BusinessEntityHints.Add(new BusinessEntityHint { Name = binding.Entity, Confidence = 1 });
+		intent.BusinessEntityHints.Add(new BusinessEntityHint { Name = entity, Confidence = 1 });
 		foreach (var m in binding.Metrics)
-			intent.Metrics.Add(new QueryMetric { Name = m.Field, Field = m.Field, Aggregation = ToQueryAggregation(m.Aggregation) });
+		{
+			var field = m.Field ?? string.Empty;
+			intent.Metrics.Add(new QueryMetric { Name = field, Field = field, Aggregation = ToQueryAggregation(m.Aggregation) });
+		}
 		foreach (var d in binding.Dimensions)
 			intent.Dimensions.Add(d);
 		foreach (var f in binding.Filters)

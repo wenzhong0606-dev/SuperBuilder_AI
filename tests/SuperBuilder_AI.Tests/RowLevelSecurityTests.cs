@@ -111,7 +111,7 @@ public sealed class RowLevelSecurityTests
 		});
 
 		var query = await new SqlQueryBuilder().BuildAsync(plan, new SqlServerDialect());
-		Assert.Contains("[region] = @p0 AND ([sales].[region] = @p100000 OR [sales].[region] = @p100001) AND NOT ([sales].[region] = @p100002)", query.Sql);
+		Assert.Contains("[sales].[region] = @p0 AND ([sales].[region] = @p100000 OR [sales].[region] = @p100001) AND NOT ([sales].[region] = @p100002)", query.Sql);
 		Assert.DoesNotContain("OR 1=1", query.Sql);
 		Assert.Equal("east' OR 1=1--", query.Parameters["@p100000"]);
 	}

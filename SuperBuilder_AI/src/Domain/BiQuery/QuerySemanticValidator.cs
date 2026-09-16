@@ -163,10 +163,11 @@ public class QuerySemanticValidator
 
             if (!CanAggregate(null, column, field.Aggregation))
             {
+                var columnName = field.ColumnName ?? string.Empty;
                 result.AddError(
                     "InvalidFieldAggregation",
-                    field.ColumnName,
-                    $"字段{field.ColumnName}不能执行聚合:{field.Aggregation}",
+                    columnName,
+                    $"字段{columnName}不能执行聚合:{field.Aggregation}",
                     column.Id,
                     column.MetadataTableId);
             }

@@ -8,6 +8,8 @@
 public class QueryDimension
 {
     public long MetadataColumnId { get; set; }
+    public long MetadataTableId { get; set; }
+    public string? TableName { get; set; }
     public string SemanticText { get; set; } = string.Empty;
     public string ColumnName { get; set; } = string.Empty;
     public string? Alias { get; set; }

@@ -711,7 +711,7 @@ public partial class QueryPlanBuilder : IQueryPlanBuilder
 							var more =
 								GetFallbackDisplayColumns(
 									table,
-									plan.Fields.Select(f => f.ColumnName))
+									plan.Fields.Select(f => f.ColumnName).Where(n => !string.IsNullOrWhiteSpace(n))!)
 									.Take(need)
 									.ToList();
 
@@ -727,8 +727,9 @@ public partial class QueryPlanBuilder : IQueryPlanBuilder
 						// 极端兜底：如果首选列全空，至少保证有一个字段。
 						if (plan.Fields.Count == 0)
 						{
+							var columns = table.Columns;
 							var lastResort =
-								table.Columns.FirstOrDefault();
+								columns?.FirstOrDefault();
 
 							if (lastResort != null)
 							{
@@ -810,7 +811,7 @@ public partial class QueryPlanBuilder : IQueryPlanBuilder
 					var more =
 						GetFallbackDisplayColumns(
 							table,
-							plan.Fields.Select(f => f.ColumnName))
+							plan.Fields.Select(f => f.ColumnName).Where(n => !string.IsNullOrWhiteSpace(n))!)
 							.Take(need)
 							.ToList();
 
@@ -826,8 +827,9 @@ public partial class QueryPlanBuilder : IQueryPlanBuilder
 				// 极端兜底：如果首选列全空，至少保证有一个字段。
 				if (plan.Fields.Count == 0)
 				{
+					var columns = table.Columns;
 					var lastResort =
-						table.Columns.FirstOrDefault();
+						columns?.FirstOrDefault();
 
 					if (lastResort != null)
 					{
@@ -1027,6 +1029,18 @@ public partial class QueryPlanBuilder : IQueryPlanBuilder
 			resolvedFilters.Add(
 				new QueryFilter
 				{
+					SemanticText =
+						filter.SemanticText,
+
+					MetadataTableId =
+						column.MetadataTableId,
+
+					TableName =
+						table.TableName,
+
+					MetadataColumnId =
+						column.Id,
+
 					Field =
 						column.ColumnName ?? string.Empty,
 
@@ -1147,6 +1161,8 @@ public partial class QueryPlanBuilder : IQueryPlanBuilder
 					new QueryDimension
 					{
 						MetadataColumnId = column.Id,
+						MetadataTableId = column.MetadataTableId,
+						TableName = table.TableName,
 						ColumnName = column.ColumnName ?? string.Empty,
 						Alias = dimension,
 						SemanticType = "Dimension"
@@ -1234,6 +1250,8 @@ public partial class QueryPlanBuilder : IQueryPlanBuilder
 						new QueryOrder
 						{
 							MetadataColumnId = orderColumn.Id,
+							MetadataTableId = orderColumn.MetadataTableId,
+							TableName = table.TableName,
 							Field = orderColumn.ColumnName ?? string.Empty,
 							Direction = orderDirection,
 							IsMetric = orderingMetric != null,
@@ -1249,6 +1267,8 @@ public partial class QueryPlanBuilder : IQueryPlanBuilder
 				{
 					existingOrder.Direction = orderDirection;
 					existingOrder.MetadataColumnId = orderColumn.Id;
+					existingOrder.MetadataTableId = orderColumn.MetadataTableId;
+					existingOrder.TableName = table.TableName;
 
 					if (orderingMetric != null)
 					{
@@ -1375,13 +1395,9 @@ public partial class QueryPlanBuilder : IQueryPlanBuilder
 			&& plan.Fields.Count > 0
 			&& plan.Fields.Count < FallbackTargetColumnCount;
 
-		var shouldExpandFields =
-			(isDetailList || fieldExpansionRequested)
-			&& table != null
-			&& table.Columns != null
-			&& plan.Fields.Count < FallbackTargetColumnCount;
-
-		if (shouldExpandFields)
+		if ((isDetailList || fieldExpansionRequested)
+			&& table is { Columns: not null } expansionTable
+			&& plan.Fields.Count < FallbackTargetColumnCount)
 		{
 			/*
 			 * 合法明细列表（目标表已解析 + 含 Limit/Order + 非聚合 + 无指标/维度）
@@ -1401,7 +1417,7 @@ public partial class QueryPlanBuilder : IQueryPlanBuilder
 			 * refine「显示更多字段」仍能稳定输出该表的多个核心列。
 			 */
 			var preferred =
-				GetPreferredDisplayColumns(table)
+				GetPreferredDisplayColumns(expansionTable)
 					.Take(FallbackTargetColumnCount)
 					.ToList();
 
@@ -1421,10 +1437,10 @@ public partial class QueryPlanBuilder : IQueryPlanBuilder
 				var need =
 					FallbackTargetColumnCount - plan.Fields.Count;
 
-				var more =
-					GetFallbackDisplayColumns(
-						table,
-						plan.Fields.Select(f => f.ColumnName))
+					var more =
+						GetFallbackDisplayColumns(
+						expansionTable,
+						plan.Fields.Select(f => f.ColumnName).Where(n => !string.IsNullOrWhiteSpace(n))!)
 						.Take(need)
 						.ToList();
 

@@ -13,6 +13,16 @@ public class QueryOrder
 	public long MetadataColumnId { get; set; }
 
 	/// <summary>
+	/// MetadataTable Id。
+	/// </summary>
+	public long MetadataTableId { get; set; }
+
+	/// <summary>
+	/// 物理表名。
+	/// </summary>
+	public string? TableName { get; set; }
+
+	/// <summary>
 	/// 实际字段名称。
 	/// </summary>
 	public string Field { get; set; } = string.Empty;

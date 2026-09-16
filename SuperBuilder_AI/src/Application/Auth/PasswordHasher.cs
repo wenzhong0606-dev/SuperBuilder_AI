@@ -74,8 +74,11 @@ public sealed class PasswordHasher : IPasswordHasher
 
 	private static byte[] Derive(byte[] salt, string plainPassword, int iterations = Iterations)
 	{
-		using var pbkdf2 = new Rfc2898DeriveBytes(
-			Encoding.UTF8.GetBytes(plainPassword), salt, iterations, HashAlgorithmName.SHA256);
-		return pbkdf2.GetBytes(KeyBytes);
+		return Rfc2898DeriveBytes.Pbkdf2(
+			Encoding.UTF8.GetBytes(plainPassword),
+			salt,
+			iterations,
+			HashAlgorithmName.SHA256,
+			KeyBytes);
 	}
 }

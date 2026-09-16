@@ -89,6 +89,16 @@ public sealed class TableSelector
 			return null;
 		}
 
+		var explicitTable =
+			ResolveExplicitTableOverride(
+				intent,
+				groupedCandidates.Select(x => x.Table));
+
+		if (explicitTable is not null)
+		{
+			return explicitTable;
+		}
+
 		/*
          * 只保留有字段命中的候选表。
          */
@@ -130,6 +140,42 @@ public sealed class TableSelector
 		return scoredCandidates
 			.FirstOrDefault()
 			?.Table;
+	}
+
+	private static MetadataTable? ResolveExplicitTableOverride(
+		QueryIntent? intent,
+		IEnumerable<MetadataTable> candidates)
+	{
+		var question =
+			intent?.OriginalQuestion;
+
+		if (string.IsNullOrWhiteSpace(question))
+		{
+			return null;
+		}
+
+		var correctionContext =
+			question.Contains("物理表必须使用", StringComparison.OrdinalIgnoreCase)
+			|| question.Contains("查询表必须使用", StringComparison.OrdinalIgnoreCase)
+			|| question.Contains("查询表错误", StringComparison.OrdinalIgnoreCase)
+			|| question.Contains("表错", StringComparison.OrdinalIgnoreCase)
+			|| question.Contains("错表", StringComparison.OrdinalIgnoreCase)
+			|| question.Contains("表不对", StringComparison.OrdinalIgnoreCase)
+			|| question.Contains("应该是", StringComparison.OrdinalIgnoreCase)
+			|| question.Contains("应为", StringComparison.OrdinalIgnoreCase)
+			|| question.Contains("改成", StringComparison.OrdinalIgnoreCase)
+			|| question.Contains("改为", StringComparison.OrdinalIgnoreCase);
+
+		if (!correctionContext)
+		{
+			return null;
+		}
+
+		return candidates
+			.Where(t => !string.IsNullOrWhiteSpace(t.TableName))
+			.Where(t => question.Contains(t.TableName!, StringComparison.OrdinalIgnoreCase))
+			.OrderByDescending(t => t.TableName!.Length)
+			.FirstOrDefault();
 	}
 
 	/// <summary>

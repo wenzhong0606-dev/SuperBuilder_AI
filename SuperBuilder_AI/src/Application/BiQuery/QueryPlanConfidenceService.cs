@@ -357,7 +357,9 @@ public sealed class QueryPlanConfidenceService
 		 *
 		 * 目标实体已解析（Tables 含有效 MetadataTableId）
 		 * 且非聚合
-		 * 且无指标/维度（明细列表不需要聚合语义）
+		 * 且无指标（明细列表不需要聚合语义）
+		 * 允许 Dimensions 承载明细展示字段，避免 LLM 将
+		 * 「入库凭证/状态」等列表列放入 Dimensions 后被误判为分组查询。
 		 * 且含 Limit 或 OrderBy（明确的列表/排序意图）
 		 * 且无校验错误、无 Repair 异常。
 		 *
@@ -371,8 +373,6 @@ public sealed class QueryPlanConfidenceService
 			!plan.IsAggregate
 			&&
 			plan.Metrics.Count == 0
-			&&
-			plan.Dimensions.Count == 0
 			&&
 			(plan.Limit.HasValue
 				|| plan.Orders.Count > 0)

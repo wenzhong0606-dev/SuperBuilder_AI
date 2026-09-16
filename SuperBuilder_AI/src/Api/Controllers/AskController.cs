@@ -5,6 +5,7 @@ using System.Globalization;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
@@ -354,10 +355,48 @@ public sealed class AskController : ControllerBase
 		"显示全部字段", "全部字段", "详细字段", "更多字段", "多显示", "显示详细信息"
 	};
 
+	private static readonly Regex PhysicalTableNameRegex =
+		new(@"(?<![A-Za-z0-9_])(?<table>[A-Za-z][A-Za-z0-9_]{2,})(?![A-Za-z0-9_])",
+			RegexOptions.Compiled | RegexOptions.CultureInvariant);
+
 	private static bool IsFieldExpansionInstruction(string? instruction)
 	{
 		if (string.IsNullOrWhiteSpace(instruction)) return false;
 		return FieldExpansionMarkers.Any(m => instruction.Contains(m, StringComparison.OrdinalIgnoreCase));
+	}
+
+	private static bool TryExtractTableCorrection(string? instruction, out string tableName)
+	{
+		tableName = string.Empty;
+		if (string.IsNullOrWhiteSpace(instruction)) return false;
+
+		var text = instruction.Trim();
+		var correctionContext =
+			text.Contains("查询表", StringComparison.OrdinalIgnoreCase)
+			|| text.Contains("表错", StringComparison.OrdinalIgnoreCase)
+			|| text.Contains("错表", StringComparison.OrdinalIgnoreCase)
+			|| text.Contains("表不对", StringComparison.OrdinalIgnoreCase)
+			|| text.Contains("应该是", StringComparison.OrdinalIgnoreCase)
+			|| text.Contains("应为", StringComparison.OrdinalIgnoreCase)
+			|| text.Contains("改成", StringComparison.OrdinalIgnoreCase)
+			|| text.Contains("改为", StringComparison.OrdinalIgnoreCase)
+			|| text.Contains("使用表", StringComparison.OrdinalIgnoreCase)
+			|| text.Contains("用表", StringComparison.OrdinalIgnoreCase);
+
+		if (!correctionContext) return false;
+
+		var matches =
+			PhysicalTableNameRegex
+				.Matches(text)
+				.Cast<Match>()
+				.Select(m => m.Groups["table"].Value)
+				.Where(v => v.Contains('_', StringComparison.Ordinal))
+				.Where(v => !string.Equals(v, "QueryPlan", StringComparison.OrdinalIgnoreCase))
+				.ToList();
+
+		if (matches.Count == 0) return false;
+		tableName = matches[^1];
+		return true;
 	}
 
 	private static string ComposeRefinedQuestion(AskRefineRequest request)
@@ -384,6 +423,11 @@ public sealed class AskController : ControllerBase
 		}
 
 		Add(request.Instruction);
+
+		if (TryExtractTableCorrection(request.Instruction, out var correctedTable))
+		{
+			Add($"保持原查询意图，查询物理表必须使用 {correctedTable}，不要再使用上一轮选错的表");
+		}
 
 		// 当用户明确要求“显示更多字段”时，强化合成问题，避免 LLM 仍然只选时间字段。
 		if (IsFieldExpansionInstruction(request.Instruction))

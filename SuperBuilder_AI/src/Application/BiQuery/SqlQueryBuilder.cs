@@ -59,9 +59,9 @@ public class SqlQueryBuilder : ISqlQueryBuilder
             sql.Append(dialect.EscapeIdentifier(join.RightColumnName!));
         }
 
-        BuildWhere(sql, parameters, plan, dialect);
-        BuildGroupBy(sql, plan, dialect, joins);
-        BuildOrderBy(sql, plan, dialect, joins);
+        BuildWhere(sql, parameters, plan, dialect, joins, validTables);
+        BuildGroupBy(sql, plan, dialect, joins, validTables);
+        BuildOrderBy(sql, plan, dialect, joins, validTables);
 
         var finalSql = sql.ToString();
         var limit = ResolveLimit(plan);
@@ -145,9 +145,12 @@ public class SqlQueryBuilder : ISqlQueryBuilder
                 continue;
 
             var column = QualifyColumn(
+                field.MetadataTableId,
+                field.TableName,
                 field.MetadataColumnId,
                 field.ColumnName,
                 joins,
+                tables,
                 dialect);
 
             var aggregation = NormalizeAggregation(field.Aggregation);
@@ -167,11 +170,26 @@ public class SqlQueryBuilder : ISqlQueryBuilder
     }
 
     private static string QualifyColumn(
+        long metadataTableId,
+        string? tableName,
         long metadataColumnId,
         string columnName,
         List<QueryJoin> joins,
+        List<QueryTable> tables,
         ISqlDialect dialect)
     {
+        var resolvedTableName =
+            ResolveTableName(
+                metadataTableId,
+                tableName,
+                tables);
+
+        if (!string.IsNullOrWhiteSpace(resolvedTableName))
+        {
+            return dialect.EscapeIdentifier(resolvedTableName) + "." +
+                   dialect.EscapeIdentifier(columnName);
+        }
+
         foreach (var join in joins)
         {
             if (join.LeftColumnId == metadataColumnId &&
@@ -188,11 +206,35 @@ public class SqlQueryBuilder : ISqlQueryBuilder
         return dialect.EscapeIdentifier(columnName);
     }
 
+    private static string? ResolveTableName(
+        long metadataTableId,
+        string? tableName,
+        List<QueryTable> tables)
+    {
+        if (!string.IsNullOrWhiteSpace(tableName))
+            return tableName;
+
+        if (metadataTableId > 0)
+        {
+            var table = tables.FirstOrDefault(
+                t => t.MetadataTableId == metadataTableId);
+
+            if (!string.IsNullOrWhiteSpace(table?.TableName))
+                return table.TableName;
+        }
+
+        return tables.Count == 1
+            ? tables[0].TableName
+            : null;
+    }
+
     private static void BuildWhere(
         StringBuilder sql,
         Dictionary<string, object?> parameters,
         QueryPlan plan,
-        ISqlDialect dialect)
+        ISqlDialect dialect,
+        List<QueryJoin> joins,
+        List<QueryTable> tables)
     {
         if (plan.Filters.Count == 0 && plan.MandatoryRowFilters.Count == 0)
             return;
@@ -204,7 +246,14 @@ public class SqlQueryBuilder : ISqlQueryBuilder
             if (string.IsNullOrWhiteSpace(filter.Field))
                 continue;
 
-            var field = dialect.EscapeIdentifier(filter.Field);
+            var field = QualifyColumn(
+                filter.MetadataTableId,
+                filter.TableName,
+                filter.MetadataColumnId,
+                filter.Field,
+                joins,
+                tables,
+                dialect);
             var operation = NormalizeOperator(filter.Operator);
 
             if (operation == "IS NULL" || operation == "IS NOT NULL")
@@ -303,7 +352,8 @@ public class SqlQueryBuilder : ISqlQueryBuilder
         StringBuilder sql,
         QueryPlan plan,
         ISqlDialect dialect,
-        List<QueryJoin> joins)
+        List<QueryJoin> joins,
+        List<QueryTable> tables)
     {
         var groups = new List<string>();
 
@@ -321,9 +371,12 @@ public class SqlQueryBuilder : ISqlQueryBuilder
                 : dimension.ColumnName;
 
             groups.Add(QualifyColumn(
+                dimension.MetadataTableId,
+                dimension.TableName,
                 groupColumnId,
                 groupColumnName,
                 joins,
+                tables,
                 dialect));
         }
 
@@ -345,7 +398,8 @@ public class SqlQueryBuilder : ISqlQueryBuilder
         StringBuilder sql,
         QueryPlan plan,
         ISqlDialect dialect,
-        List<QueryJoin> joins)
+        List<QueryJoin> joins,
+        List<QueryTable> tables)
     {
         var expressions = new List<string>();
         foreach (var order in plan.Orders)
@@ -354,7 +408,14 @@ public class SqlQueryBuilder : ISqlQueryBuilder
                 continue;
 
             var direction = NormalizeOrderDirection(order.Direction);
-            var field = dialect.EscapeIdentifier(order.Field);
+            var field = QualifyColumn(
+                order.MetadataTableId,
+                order.TableName,
+                order.MetadataColumnId,
+                order.Field,
+                joins,
+                tables,
+                dialect);
 
             if (order.IsMetric && order.Aggregation != QueryAggregation.None)
             {

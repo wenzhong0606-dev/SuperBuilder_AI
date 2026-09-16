@@ -213,6 +213,9 @@ public partial class QueryPlanBuilder
                 plan.Filters.Add(new QueryFilter
                 {
                     SemanticText = b.SemanticText,
+                    MetadataTableId = b.TableId,
+                    TableName = b.Table,
+                    MetadataColumnId = b.ColumnId,
                     Field = b.Column,
                     Operator = ">=",
                     Value = $"{year:D4}-01-01"
@@ -252,6 +255,9 @@ public partial class QueryPlanBuilder
             ValidateColumn(b.ColumnId, b.Column, $"Filter[{i}]");
             EnsureTable(plan, b.TableId, b.DataSourceId, b.Table, $"Filter[{i}]");
             plan.Filters[i].SemanticText = b.SemanticText;
+            plan.Filters[i].MetadataTableId = b.TableId;
+            plan.Filters[i].TableName = b.Table;
+            plan.Filters[i].MetadataColumnId = b.ColumnId;
             plan.Filters[i].Field = b.Column;
         }
 
@@ -389,6 +395,8 @@ public partial class QueryPlanBuilder
             if (b.MasterTableId.HasValue || b.MasterKeyColumnId.HasValue || b.DimensionLabelColumnId.HasValue && !string.IsNullOrWhiteSpace(b.DimensionLabelColumn))
                 throw new InvalidOperationException($"DirectKey Dimension 不应携带 Master Binding：SemanticText={b.SemanticText}。");
             runtime.MetadataColumnId = b.DimensionKeyColumnId.Value;
+            runtime.MetadataTableId = b.TableId;
+            runtime.TableName = b.Table;
             runtime.ColumnName = b.DimensionKeyColumn!;
             runtime.DimensionLabelColumnId = null;
             runtime.DimensionLabelColumnName = null;
@@ -410,6 +418,8 @@ public partial class QueryPlanBuilder
         // Dimension Key Binding）。展示/GROUP BY 用 Label 列（DimensionLabelColumnName），
         // 由 SqlQueryBuilder 消费，两者职责分离。
         runtime.MetadataColumnId = b.DimensionKeyColumnId.Value;
+        runtime.MetadataTableId = b.TableId;
+        runtime.TableName = b.Table;
         runtime.ColumnName = b.DimensionKeyColumn!;
         runtime.DimensionLabelColumnId = b.DimensionLabelColumnId;
         runtime.DimensionLabelColumnName = b.DimensionLabelColumn;
@@ -436,7 +446,7 @@ public partial class QueryPlanBuilder
     {
         if (bindings.Count == 0) return;
         if (plan.Orders.Count != bindings.Count) throw new InvalidOperationException($"QueryPlan Semantic Binding Drift：Order 数量不一致，Resolution={bindings.Count}，Runtime={plan.Orders.Count}。");
-        for (var i = 0; i < bindings.Count; i++) { var b = bindings[i]; ValidateColumn(b.ColumnId, b.Column, $"Order[{i}]"); EnsureTable(plan, b.TableId, b.DataSourceId, b.Table, $"Order[{i}]"); plan.Orders[i].MetadataColumnId = b.ColumnId; plan.Orders[i].Field = b.Column; }
+        for (var i = 0; i < bindings.Count; i++) { var b = bindings[i]; ValidateColumn(b.ColumnId, b.Column, $"Order[{i}]"); EnsureTable(plan, b.TableId, b.DataSourceId, b.Table, $"Order[{i}]"); plan.Orders[i].MetadataColumnId = b.ColumnId; plan.Orders[i].MetadataTableId = b.TableId; plan.Orders[i].TableName = b.Table; plan.Orders[i].Field = b.Column; }
     }
 
     private static void EnsureTable(QueryPlan plan, long tableId, long dataSourceId, string tableName, string bindingType)

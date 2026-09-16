@@ -43,11 +43,22 @@ using SuperBuilder_AI.Interfaces.Seed;
 using SuperBuilder_AI.Services.Seed;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.OpenApi;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.Configuration;
 using SuperBuilder_AI.Api.OpenApi;
 using System.Net;
 
 var builder = WebApplication.CreateBuilder(args);
+
+if (builder.Environment.IsDevelopment())
+{
+    builder.Logging.ClearProviders();
+    builder.Logging.AddConsole();
+    builder.Logging.AddDebug();
+    builder.Services.AddDataProtection()
+        .PersistKeysToFileSystem(new DirectoryInfo(
+            Path.Combine(builder.Environment.ContentRootPath, ".aspnet-data-protection-keys")));
+}
 
 // M0-01：支持本地未提交覆盖文件（appsettings.Local.json），用于存放开发/本地密钥，禁止提交。
 // 该文件已被 .gitignore 忽略；生产环境应通过环境变量（如 ConnectionStrings__WmsMySql / Qwen__ApiKey）注入。

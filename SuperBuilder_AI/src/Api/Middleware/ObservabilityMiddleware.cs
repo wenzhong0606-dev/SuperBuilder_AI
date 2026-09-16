@@ -95,7 +95,7 @@ public sealed class ObservabilityMiddleware
         }
     }
 
-    private static void TryLog(ILogger logger, LogLevel level, string template, params object[] args)
+    private static void TryLog(ILogger logger, LogLevel level, string template, params object?[] args)
     {
         try
         {

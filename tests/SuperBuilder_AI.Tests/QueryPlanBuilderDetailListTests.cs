@@ -434,6 +434,42 @@ public class QueryPlanBuilderDetailListTests
 		Assert.True(plan.Fields.Count >= 6, $"场景A 期望至少 6 个字段，实际 {plan.Fields.Count}：{cols}");
 	}
 
+	[Fact]
+	public async Task Refine_table_correction_overrides_higher_scored_candidate()
+	{
+		var wms = MakeRealStorageReceiptTable(id: 458);
+		var pms = MakeRealStorageReceiptTable(id: 459);
+		pms.TableName = "pms_complete_storage";
+		foreach (var column in pms.Columns)
+			column.Id += 1000;
+
+		var ctx = CreateContext(out var connection);
+		await using var _ = connection;
+		await using var __ = ctx;
+		await SeedAsync(ctx, wms, pms);
+
+		var search = new FakeSearch
+		{
+			Results =
+			{
+				TableVector(pms, score: 0.99),
+				TableVector(wms, score: 0.60)
+			}
+		};
+		var builder = BuildBuilder(search, ctx);
+
+		var plan = await builder.BuildAsync(new QueryIntent
+		{
+			OriginalQuestion = "最近十条入库凭证；查询入库凭证应该是wms_storage_receipt；保持原查询意图，查询物理表必须使用 wms_storage_receipt，不要再使用上一轮选错的表",
+			IntentType = "Detail",
+			Limit = 10,
+			OrderBy = "come_time",
+			OrderDirection = "DESC",
+		});
+
+		Assert.Equal("wms_storage_receipt", plan.Tables[0].TableName);
+	}
+
 	/// <summary>
 	/// 场景 B：LLM 顺手返回了一个 Dimension（status），其余同场景 A。
 	/// 期望：仍按明细列表补足业务字段，而不是只剩「时间字段 + status」。
@@ -482,8 +518,8 @@ public class QueryPlanBuilderDetailListTests
 		Assert.Contains("`code`", query.Sql, StringComparison.Ordinal);
 		Assert.Contains("`warehouse_id`", query.Sql, StringComparison.Ordinal);
 		Assert.Contains("`es_supplier_code`", query.Sql, StringComparison.Ordinal);
-		Assert.Contains("WHERE `del_flag` = @p0", query.Sql, StringComparison.Ordinal);
-		Assert.Contains("ORDER BY `come_time` DESC", query.Sql, StringComparison.Ordinal);
+		Assert.Contains("WHERE `wms_storage_receipt`.`del_flag` = @p0", query.Sql, StringComparison.Ordinal);
+		Assert.Contains("ORDER BY `wms_storage_receipt`.`come_time` DESC", query.Sql, StringComparison.Ordinal);
 		Assert.EndsWith("LIMIT 10", query.Sql, StringComparison.Ordinal);
 		Assert.Equal(0L, Convert.ToInt64(query.Parameters["@p0"]));
 	}
@@ -521,8 +557,8 @@ public class QueryPlanBuilderDetailListTests
 		Assert.Single(plan.Filters, f => string.Equals(f.Field, "del_flag", StringComparison.OrdinalIgnoreCase));
 
 		var query = await new SqlQueryBuilder().BuildAsync(plan, new MySqlDialect());
-		Assert.Contains("WHERE `del_flag` = @p0", query.Sql, StringComparison.Ordinal);
-		Assert.Contains("ORDER BY `come_time` DESC", query.Sql, StringComparison.Ordinal);
+		Assert.Contains("WHERE `wms_storage_receipt`.`del_flag` = @p0", query.Sql, StringComparison.Ordinal);
+		Assert.Contains("ORDER BY `wms_storage_receipt`.`come_time` DESC", query.Sql, StringComparison.Ordinal);
 		Assert.EndsWith("LIMIT 10", query.Sql, StringComparison.Ordinal);
 	}
 
@@ -570,7 +606,7 @@ public class QueryPlanBuilderDetailListTests
 		var query = await new SqlQueryBuilder().BuildAsync(plan, new MySqlDialect());
 		Assert.Contains("`code`", query.Sql, StringComparison.Ordinal);
 		Assert.Contains("`warehouse_id`", query.Sql, StringComparison.Ordinal);
-		Assert.Contains("WHERE `del_flag` = @p0", query.Sql, StringComparison.Ordinal);
+		Assert.Contains("WHERE `wms_storage_receipt`.`del_flag` = @p0", query.Sql, StringComparison.Ordinal);
 	}
 
 	/// <summary>

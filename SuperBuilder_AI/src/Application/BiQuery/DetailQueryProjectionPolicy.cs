@@ -55,6 +55,8 @@ public static class DetailQueryProjectionPolicy
 				plan.Fields.Add(new QueryField
 				{
 					MetadataColumnId = column.Id,
+					MetadataTableId = column.MetadataTableId,
+					TableName = main.TableName,
 					ColumnName = column.ColumnName,
 					DataType = column.DataType,
 					Aggregation = "NONE"
@@ -152,6 +154,9 @@ public static class DetailQueryProjectionPolicy
 		plan.Filters.Add(new QueryFilter
 		{
 			SemanticText = "未删除",
+			MetadataTableId = column.MetadataTableId,
+			TableName = plan.Tables.FirstOrDefault(t => t.MetadataTableId == column.MetadataTableId)?.TableName,
+			MetadataColumnId = column.Id,
 			Field = column.ColumnName,
 			DataType = column.DataType,
 			Operator = "=",

@@ -27,10 +27,13 @@ public sealed class FieldResolver
 			MetadataTable table,
 			List<MetadataSemanticSearchResult> results)
 	{
+		if (table is null)
+			return null;
+
 		// 优先处理明确的字段映射：如果 Metric.Field 明确为 id 或者类似主键标识，优先使用主键或 id 字段
 		try
 		{
-			if (!string.IsNullOrWhiteSpace(metric.Field) && table?.Columns != null)
+			if (!string.IsNullOrWhiteSpace(metric.Field) && table.Columns != null)
 			{
 				var rawField = metric.Field.Trim();
 				// M10 修复：使用词边界感知匹配，避免 "paid"/"void" 等被误判为 ID 字段
@@ -695,6 +698,12 @@ public sealed class FieldResolver
 				{
 					MetadataColumnId =
 						column.Id,
+
+					MetadataTableId =
+						column.MetadataTableId,
+
+					TableName =
+						column.MetadataTable?.TableName,
 
 					ColumnName =
 						column.ColumnName,

@@ -151,15 +151,15 @@ public class MetadataScannerService
                 {
                     TenantId = effectiveTenantId,
                     DataSourceId = dataSourceId,
-                    TableName = table.TableName,
-                    TableComment = table.TableComment
+                    TableName = table.TableName ?? string.Empty,
+                    TableComment = table.TableComment ?? string.Empty
                 };
                 _context.MetadataTables.Add(metadataTable);
                 telemetry.Details.AddedTables++;
             }
             else
             {
-                metadataTable.TableComment = table.TableComment;
+                metadataTable.TableComment = table.TableComment ?? string.Empty;
                 telemetry.Details.UpdatedTables++;
             }
 
@@ -176,9 +176,9 @@ public class MetadataScannerService
                 {
                     metadataColumn = new MetadataColumn
                     {
-                        ColumnName = column.ColumnName,
-                        ColumnComment = column.ColumnComment,
-                        DataType = column.DataType,
+                        ColumnName = column.ColumnName ?? string.Empty,
+                        ColumnComment = column.ColumnComment ?? string.Empty,
+                        DataType = column.DataType ?? string.Empty,
                         Length = column.Length,
                         IsNullable = column.IsNullable,
                         IsPrimaryKey = column.IsPrimaryKey

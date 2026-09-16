@@ -6,7 +6,7 @@ namespace SuperBuilder_AI.Tests;
 
 /// <summary>
 /// 决策门回归：M0-09「第一个 Ask 明细对话跑通」。
-/// 重点锁定：合法明细列表（目标实体已解析、含 Limit/Order、无指标/维度）
+/// 重点锁定：合法明细列表（目标实体已解析、含 Limit/Order、无指标）
 /// 在 Medium 置信度下必须直接进入 SQL Builder，不再无限期卡在 Confirmation。
 /// </summary>
 public sealed class QueryPlanDecisionGateTests

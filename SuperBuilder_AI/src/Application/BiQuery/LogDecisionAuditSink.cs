@@ -39,6 +39,8 @@ public sealed class LogDecisionAuditSink : IDecisionAuditSink
 			record.IntentType,
 			record.PlanTableNames.Count,
 			record.Model,
+			record.RepairStatus,
+			record.RepairAttempts,
 			record.Sql is not null,
 			record.CorrelationId);
 

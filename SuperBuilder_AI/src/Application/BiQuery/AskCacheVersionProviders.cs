@@ -101,7 +101,7 @@ public sealed class MetadataVersionProvider : IMetadataVersionProvider
 			.SumAsync(ct);
 
 		var columnRv = await _db.MetadataColumns
-			.Where(c => c.MetadataTable.TenantId == tenantId)
+			.Where(c => c.MetadataTable != null && c.MetadataTable.TenantId == tenantId)
 			.Select(c => c.RowVersion)
 			.SumAsync(ct);
 

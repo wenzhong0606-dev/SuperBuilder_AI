@@ -188,7 +188,7 @@ public sealed class GoldenDatasetRunner
                 Passed = passed,
                 Reason = passed
                     ? "QueryPlan Evaluation、Semantic Evidence、Confidence Decision 均通过。"
-                    : evaluationConfidence.Decision.Reason,
+                    : evaluationConfidence.Decision.Reason ?? string.Empty,
                 ApplicabilityState = applicability.State,
                 QueryPlanEvaluationPassed = evaluationConfidence.Evaluation.Passed,
                 ConfidenceDecision = evaluationConfidence.Decision.Decision.ToString(),

@@ -194,13 +194,14 @@ public sealed class PlatformAdminService : IPlatformAdminService
     public async Task ResetPasswordAsync(long userId, string newPassword, string actor, CancellationToken ct = default)
     {
         var (tenantId, roleId) = await GetPlatformScopeAsync(ct);
-        if ((newPassword ?? string.Empty).Length < 8)
+        var password = newPassword ?? string.Empty;
+        if (password.Length < 8)
             throw new ArgumentException("新口令至少 8 位。");
 
         var user = await _db.Users.FirstOrDefaultAsync(u => u.TenantId == tenantId && u.Id == userId, ct);
         if (user is null) throw new KeyNotFoundException("平台管理员不存在。");
 
-        await _identity.SetPasswordAsync(tenantId, userId, newPassword, ct);
+        await _identity.SetPasswordAsync(tenantId, userId, password, ct);
         // SetPasswordAsync 已轮换安全戳；此处再次确保（幂等）。
         user.SecurityStamp = Guid.NewGuid().ToString("N");
         await _db.SaveChangesAsync(ct);

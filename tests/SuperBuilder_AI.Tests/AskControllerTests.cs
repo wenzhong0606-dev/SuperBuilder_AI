@@ -348,6 +348,27 @@ public class AskControllerTests
 	}
 
 	[Fact]
+	public async Task Ask_Refine_TableCorrection_ReinforcesPhysicalTable()
+	{
+		var ctrl = Build(allow: true, out var bi);
+
+		var result = await ctrl.Refine(new AskRefineRequest
+		{
+			Question = "最近十条入库凭证",
+			Instruction = "查询表错误，应该是wms_storage_receipt",
+			History = new List<AskRefineTurn>
+			{
+				new AskRefineTurn { Role = "user", Content = "最近十条入库凭证" }
+			}
+		});
+
+		Assert.IsType<OkObjectResult>(result);
+		Assert.Contains("最近十条入库凭证", bi.Captured?.Question);
+		Assert.Contains("查询物理表必须使用 wms_storage_receipt", bi.Captured?.Question);
+		Assert.Contains("不要再使用上一轮选错的表", bi.Captured?.Question);
+	}
+
+	[Fact]
 	public async Task Ask_WithVersionProvider_BuildsFullSevenDimensionCacheKey()
 	{
 		var cache = new FakeCache();
