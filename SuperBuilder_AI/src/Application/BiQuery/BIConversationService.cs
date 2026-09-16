@@ -101,6 +101,15 @@ public class BIConversationService
 
 	private readonly IPipelineMetricsSink? _metrics;
 
+	/// <summary>
+	/// 结果字段译码服务（code→text）。可空：未注册时为 no-op，Golden/内部路径零影响。
+	/// </summary>
+	private readonly IDisplayResolutionService? _displayResolution;
+
+	/// <summary>
+	/// 自主学习纠错服务（显式纠正回放）。可空：未注册时为 no-op。
+	/// </summary>
+	private readonly ICorrectionLearningService? _correctionLearning;
 
 	public BIConversationService(
 		IQueryUnderstandingService queryUnderstandingService,
@@ -115,7 +124,9 @@ public class BIConversationService
 		IDataSourceExecutionIdentityAccessor? executionIdentity = null,
 		IQueryPlanSecurityGate? securityGate = null,
 		IAskQuerySnapshotStore? snapshotStore = null,
-		IPipelineMetricsSink? metrics = null)
+		IPipelineMetricsSink? metrics = null,
+		IDisplayResolutionService? displayResolution = null,
+		ICorrectionLearningService? correctionLearning = null)
 	{
 		_queryUnderstandingService =
 			queryUnderstandingService;
@@ -145,6 +156,8 @@ public class BIConversationService
 		_securityGate = securityGate;
 		_snapshotStore = snapshotStore;
 		_metrics = metrics;
+		_displayResolution = displayResolution;
+		_correctionLearning = correctionLearning;
 	}
 
 
@@ -159,6 +172,39 @@ public class BIConversationService
 			tenantId,
 			requestedDataSourceId,
 			authorizedDataSourceIds);
+	}
+
+
+	/// <summary>
+	/// 解析「理解阶段」Metadata 上下文的数据源作用域（P0）。
+	///
+	/// 与下游 <c>QueryPlanBuilder</c> 的候选收敛口径保持一致：
+	///
+	///   - <paramref name="authorizedDataSourceIds"/> 非 <c>null</c>：以授权集合为基；
+	///   - <paramref name="requestedDataSourceId"/> &gt; 0：进一步收敛到该数据源；
+	///   - 两者皆无（Golden / 评估器 / 内部兼容路径）：返回 <c>null</c> —— 不限定作用域，
+	///     语义检索行为与新增本机制之前逐字节一致。
+	///
+	/// 注意：授权集合为空时返回<strong>空集合而非 null</strong>。空集合表示
+	/// 「确实没有可用数据源」，理解阶段据此产出空上下文；随后
+	/// <c>QueryPlanDataSourceScope</c> 会以 403（DataSourceForbidden）终止请求，
+	/// 与既有行为一致。若在此处把空集合降级为 null，反而会让未授权数据源
+	/// 重新进入提示词。
+	/// </summary>
+	private static IReadOnlyCollection<long>? ResolveMetadataSearchScope(
+		long? requestedDataSourceId,
+		IReadOnlyCollection<long>? authorizedDataSourceIds)
+	{
+		var scope = authorizedDataSourceIds;
+
+		if (requestedDataSourceId is { } requestedId && requestedId > 0)
+		{
+			scope = scope is null
+				? new[] { requestedId }
+				: scope.Where(id => id == requestedId).ToArray();
+		}
+
+		return scope;
 	}
 
 
@@ -214,13 +260,58 @@ public class BIConversationService
 		var sw = Stopwatch.StartNew();
 
 		/*
+		 * Step 0.5（自主学习回放）
+		 *
+		 * 若当前用户历史上对该问句做过显式纠正，则自动把纠正合成进问题，
+		 * 使「下次查询按修正后的结果执行」无需用户重复纠正。
+		 * 仅 (tenant, user, 归一化问句) 命中才生效；未命中时 question 逐字节不变。
+		 */
+		CorrectionResolution? learnedCorrections = null;
+		var callerUserId = _executionIdentity?.Current is { } identity && identity.TenantId == tenantId
+			? identity.UserId
+			: (long?)null;
+
+		if (_correctionLearning is not null)
+		{
+			try
+			{
+				learnedCorrections = await _correctionLearning
+					.ResolveAsync(tenantId, callerUserId, question);
+
+				if (learnedCorrections.Any)
+					question = _correctionLearning.ComposeLearnedQuestion(question, learnedCorrections);
+			}
+			catch
+			{
+				// 学习回放是增值能力：任何故障仅降级为「按原问句执行」。
+				learnedCorrections = null;
+			}
+		}
+
+		/*
          * Step 1
          *
          * 用户问题理解
+         *
+         * P0：理解阶段按数据源作用域收敛 Metadata 上下文。
+         * 语义检索是全局 top-K，若不限定作用域，其他数据源的同名列会进提示词，
+         * 把 Metric / Dimension 解析带偏（详见 IMetadataSemanticSearchService 的
+         * 四参重载注释）。作用域与下游 QueryPlanBuilder 的收敛口径保持一致：
+         *   - 显式请求数据源 > 0  => 收敛到该数据源；
+         *   - 否则收敛到「已授权数据源集合」；
+         *   - 两者皆无（Golden / 内部兼容路径）=> null，行为不变。
          */
+		var searchScope =
+			ResolveMetadataSearchScope(
+				requestedDataSourceId,
+				authorizedDataSourceIds);
+
 		var intent =
 			await _queryUnderstandingService
-				.UnderstandAsync(question, platformContext);
+				.UnderstandAsync(
+					question,
+					platformContext,
+					searchScope);
 
 		var metadataUnderstandMs = sw.ElapsedMilliseconds;
 		// M9-05：管线分段延迟埋点（异常静默，不影响主流程）。
@@ -393,6 +484,44 @@ public class BIConversationService
 			}, CancellationToken.None);
 		}
 
+
+		/*
+		 * Step 7.5（结果字段译码）
+		 *
+		 * 对结果逐列做 code→text 富化：跨源字典（PMIS）→ 同源外键 → 学习规则 → 列内嵌值映射。
+		 * 不改用户 SQL、不做跨库 JOIN；未授权/失配一律降级保留原值。
+		 * 译码失败不影响主流程返回。
+		 */
+		if (_displayResolution is not null && data.Success && data.Rows.Count > 0)
+		{
+			try
+			{
+				await _displayResolution.EnrichAsync(
+					plan,
+					data,
+					tenantId,
+					callerUserId,
+					authorizedDataSourceIds,
+					learnedCorrections);
+			}
+			catch
+			{
+				// 译码是增值能力：失败保持原始结果。
+			}
+		}
+
+		// 学习规则命中统计（旁路；失败静默）。
+		if (_correctionLearning is not null && learnedCorrections is { } matched && matched.Any)
+		{
+			try
+			{
+				await _correctionLearning.MarkMatchedAsync(matched);
+			}
+			catch
+			{
+				// 统计回写失败不影响结果。
+			}
+		}
 
 		/*
          * Step 8

@@ -33,4 +33,17 @@ public interface IDataSourceMetadataReader
 
 	Task<List<ColumnMetadataDto>> GetColumnsAsync(string connectionString, string? dbType)
 		=> GetColumnsAsync(connectionString);
+
+	/// <summary>
+	/// 异步获取外键关系列表（本表列 → 引用表列）。
+	/// 用于结果译码时的字段→名称列绑定（同数据源内）。
+	///
+	/// 外键为可选能力：读取器未实现（或该数据源不支持）时返回空集合，
+	/// 由默认实现兜底 —— 不阻断元数据扫描。
+	/// </summary>
+	Task<List<ForeignKeyMetadataDto>> GetForeignKeysAsync(string connectionString)
+		=> Task.FromResult(new List<ForeignKeyMetadataDto>());
+
+	Task<List<ForeignKeyMetadataDto>> GetForeignKeysAsync(string connectionString, string? dbType)
+		=> GetForeignKeysAsync(connectionString);
 }

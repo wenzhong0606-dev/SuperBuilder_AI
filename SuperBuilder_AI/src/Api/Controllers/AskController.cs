@@ -15,6 +15,7 @@ using SuperBuilder_AI.Interfaces.BI;
 using SuperBuilder_AI.Interfaces.Identity;
 using SuperBuilder_AI.Models.BI;
 using SuperBuilder_AI.Models.Identity;
+using SuperBuilder_AI.Models.Metadata;
 using SuperBuilder_AI.Services.BI;
 
 namespace SuperBuilder_AI.Controllers;
@@ -48,6 +49,12 @@ public sealed class AskController : ControllerBase
 	private readonly IAskCacheVersionProvider? _versionProvider;
 	private readonly IAskAuditSink? _askAudit;
 
+	/// <summary>
+	/// 自主学习纠错服务：Refine 中把用户的显式纠正落库，下次同问句自动回放。
+	/// 可空：未注册时 Refine 行为与既有完全一致（零回归）。
+	/// </summary>
+	private readonly ICorrectionLearningService? _correctionLearning;
+
 	public AskController(
 		IBIConversationService bi,
 		IIdentityService identity,
@@ -56,7 +63,8 @@ public sealed class AskController : ControllerBase
 		IRowLevelSecurityService? rowSecurity = null,
 		IAskConversationService? conversations = null,
 		IAskCacheVersionProvider? versionProvider = null,
-		IAskAuditSink? askAudit = null)
+		IAskAuditSink? askAudit = null,
+		ICorrectionLearningService? correctionLearning = null)
 	{
 		_bi = bi;
 		_identity = identity;
@@ -66,6 +74,7 @@ public sealed class AskController : ControllerBase
 		_conversations = conversations ?? new AskConversationService();
 		_versionProvider = versionProvider;
 		_askAudit = askAudit;
+		_correctionLearning = correctionLearning;
 	}
 
 	/// <summary>提交一个自然语言问题并执行 BI 查询。</summary>
@@ -397,6 +406,59 @@ public sealed class AskController : ControllerBase
 		if (matches.Count == 0) return false;
 		tableName = matches[^1];
 		return true;
+	}
+
+	/// <summary>
+	/// 自主学习捕获：把 Refine 中的显式纠正解析为规则并落库。
+	///
+	/// <para>
+	/// 学习键使用「用户本轮原始问题」（而非合成句），这样下次用户问同样的问题即可命中回放。
+	/// 严格 tenant+user 隔离，由 <see cref="ICorrectionLearningService"/> 保证。
+	/// </para>
+	/// </summary>
+	private async Task CaptureCorrectionsSafeAsync(
+		long tenantId,
+		long userId,
+		long? dataSourceId,
+		AskRefineRequest request,
+		CancellationToken cancellationToken)
+	{
+		if (_correctionLearning is null) return;
+
+		try
+		{
+			var learningQuestion = !string.IsNullOrWhiteSpace(request.Question)
+				? request.Question!
+				: request.Instruction!;
+
+			if (TryExtractTableCorrection(request.Instruction, out var correctedTable))
+			{
+				await _correctionLearning.CaptureAsync(
+					tenantId,
+					userId,
+					dataSourceId,
+					learningQuestion,
+					CorrectionKind.TableOverride,
+					new CorrectionPayload { TableName = correctedTable },
+					cancellationToken);
+			}
+
+			foreach (var capture in CorrectionInstructionParser.Parse(request.Instruction))
+			{
+				await _correctionLearning.CaptureAsync(
+					tenantId,
+					userId,
+					dataSourceId,
+					learningQuestion,
+					capture.Kind,
+					capture.Payload,
+					cancellationToken);
+			}
+		}
+		catch
+		{
+			// 学习是增值能力：落库失败绝不影响本轮 Refine 返回。
+		}
 	}
 
 	private static string ComposeRefinedQuestion(AskRefineRequest request)

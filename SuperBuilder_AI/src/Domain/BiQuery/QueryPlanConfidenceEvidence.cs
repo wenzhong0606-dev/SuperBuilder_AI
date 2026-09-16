@@ -143,6 +143,14 @@ public sealed class QueryPlanConfidenceEvidence
     /// </summary>
     public QueryPlanRepairTraceStatus RepairStatus { get; set; }
 
+    /// <summary>
+    /// 用户是否通过多轮纠正显式指定了目标物理表且该表已被采纳为主表。
+    /// 命中时作为强正证据，把置信度保底至 Medium（明细查询可直接进入 SQL Builder），
+    /// 避免“用户已明确纠正”的查询被误判为 Low 而阻断。
+    /// 仅在纠正短语 + 计划主表名同时出现于问题时为真，普通查询恒为 false。
+    /// </summary>
+    public bool TableCorrectionHonored { get; set; }
+
 
     // ============================================================
     // Evidence Availability

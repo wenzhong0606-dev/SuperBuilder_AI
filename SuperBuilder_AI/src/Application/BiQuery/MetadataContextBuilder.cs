@@ -42,16 +42,47 @@ public class MetadataContextBuilder
 
 
 	/// <summary>
+	/// 上下文默认召回条数（保持既有值不变）。
+	/// </summary>
+	private const int TopK = 10;
+
+
+	/// <summary>
 	/// 构建Metadata AI上下文。
 	/// </summary>
-	public async Task<string> BuildAsync(
+	public Task<string> BuildAsync(
 		string question)
+		=> BuildAsync(
+			question,
+			null);
+
+
+
+
+	/// <summary>
+	/// 在指定数据源作用域内构建Metadata AI上下文。
+	///
+	/// <paramref name="dataSourceIds"/> 为 <c>null</c> 时走原三参检索调用，
+	/// 提示词与新增作用域之前完全一致（Golden / 内部兼容路径零回归）。
+	/// </summary>
+	public async Task<string> BuildAsync(
+		string question,
+		IReadOnlyCollection<long>? dataSourceIds)
 	{
 
 
 		var results =
-			await _metadataSearch
-			.SearchAsync(question);
+			dataSourceIds is null
+				? await _metadataSearch
+					.SearchAsync(
+						question,
+						TopK)
+				: await _metadataSearch
+					.SearchAsync(
+						question,
+						TopK,
+						null,
+						dataSourceIds);
 
 
 

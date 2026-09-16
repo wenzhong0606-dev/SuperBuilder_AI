@@ -43,6 +43,21 @@ public class MySqlMetadataReader : IDataSourceMetadataReader
         };
     }
 
+    public Task<List<ForeignKeyMetadataDto>> GetForeignKeysAsync(string connectionString)
+        => GetForeignKeysAsync(connectionString, "MYSQL");
+
+    public async Task<List<ForeignKeyMetadataDto>> GetForeignKeysAsync(
+        string connectionString,
+        string? dbType)
+    {
+        return NormalizeDbType(dbType) switch
+        {
+            "SQLSERVER" => await GetSqlServerForeignKeysAsync(connectionString),
+            "POSTGRESQL" => await GetPostgreSqlForeignKeysAsync(connectionString),
+            _ => await GetMySqlForeignKeysAsync(connectionString)
+        };
+    }
+
     private static string NormalizeDbType(string? dbType)
         => (dbType ?? "MYSQL").Trim().ToUpperInvariant();
 
@@ -199,5 +214,68 @@ public class MySqlMetadataReader : IDataSourceMetadataReader
             """;
 
         return (await conn.QueryAsync<ColumnMetadataDto>(sql)).AsList();
+    }
+
+    private static async Task<List<ForeignKeyMetadataDto>> GetMySqlForeignKeysAsync(string connectionString)
+    {
+        await using var conn = new MySqlConnection(connectionString);
+        await conn.OpenAsync();
+
+        const string sql = """
+            SELECT
+                kcu.TABLE_NAME AS TableName,
+                kcu.COLUMN_NAME AS ColumnName,
+                kcu.REFERENCED_TABLE_NAME AS ReferencedTableName,
+                kcu.REFERENCED_COLUMN_NAME AS ReferencedColumnName
+            FROM information_schema.KEY_COLUMN_USAGE kcu
+            INNER JOIN information_schema.REFERENTIAL_CONSTRAINTS rc
+                ON rc.CONSTRAINT_SCHEMA = kcu.TABLE_SCHEMA
+               AND rc.CONSTRAINT_NAME = kcu.CONSTRAINT_NAME
+            WHERE kcu.TABLE_SCHEMA = DATABASE()
+              AND kcu.REFERENCED_TABLE_NAME IS NOT NULL
+            """;
+        return (await conn.QueryAsync<ForeignKeyMetadataDto>(sql)).AsList();
+    }
+
+    private static async Task<List<ForeignKeyMetadataDto>> GetSqlServerForeignKeysAsync(string connectionString)
+    {
+        await using var conn = new SqlConnection(connectionString);
+        await conn.OpenAsync();
+
+        const string sql = """
+            SELECT
+                tp.name AS TableName,
+                cc.name AS ColumnName,
+                tr.name AS ReferencedTableName,
+                rc.name AS ReferencedColumnName
+            FROM sys.foreign_key_columns fkc
+            INNER JOIN sys.foreign_keys fk ON fk.object_id = fkc.constraint_object_id
+            INNER JOIN sys.tables tp ON tp.object_id = fkc.parent_object_id
+            INNER JOIN sys.columns cc ON cc.object_id = tp.object_id AND cc.column_id = fkc.parent_column_id
+            INNER JOIN sys.tables tr ON tr.object_id = fkc.referenced_object_id
+            INNER JOIN sys.columns rc ON rc.object_id = tr.object_id AND rc.column_id = fkc.referenced_column_id
+            """;
+        return (await conn.QueryAsync<ForeignKeyMetadataDto>(sql)).AsList();
+    }
+
+    private static async Task<List<ForeignKeyMetadataDto>> GetPostgreSqlForeignKeysAsync(string connectionString)
+    {
+        await using var conn = new NpgsqlConnection(connectionString);
+        await conn.OpenAsync();
+
+        const string sql = """
+            SELECT
+                c.relname AS "TableName",
+                a.attname AS "ColumnName",
+                c_r.relname AS "ReferencedTableName",
+                a_r.attname AS "ReferencedColumnName"
+            FROM pg_constraint con
+            JOIN pg_class c ON c.oid = con.conrelid
+            JOIN pg_class c_r ON c_r.oid = con.confrelid
+            JOIN pg_attribute a ON a.attnum = ANY(con.conkey) AND a.attrelid = c.oid
+            JOIN pg_attribute a_r ON a_r.attnum = ANY(con.confkey) AND a_r.attrelid = c_r.oid
+            WHERE con.contype = 'f'
+            """;
+        return (await conn.QueryAsync<ForeignKeyMetadataDto>(sql)).AsList();
     }
 }

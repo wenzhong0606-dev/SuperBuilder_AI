@@ -232,6 +232,13 @@ public sealed class QueryPlanConfidenceService
 				trace,
 				semanticResults);
 
+		// 用户显式表纠正已采纳为主表：强正证据，置信度保底至 Medium。
+		// 仅在“纠正短语 + 计划主表名同时出现于问题”时为真，普通查询恒为 false。
+		evidence.TableCorrectionHonored =
+			IsTableCorrectionHonored(
+				question,
+				plan);
+
 
 		// =========================================================
 		// 4. Override calculated counters with actual pipeline data
@@ -1197,6 +1204,15 @@ public sealed class QueryPlanConfidenceService
 			return QueryPlanConfidenceLevel.Low;
 		}
 
+		// 用户显式表纠正已采纳：强正证据，保底至 Medium（明细查询可进入 SQL Builder）。
+		// 即便向量/字段证据偏弱，也不该把“用户已明确指定目标表”的查询误判为 Low。
+		if (evidence.TableCorrectionHonored)
+		{
+			return score >= HighConfidenceThreshold
+				? QueryPlanConfidenceLevel.High
+				: QueryPlanConfidenceLevel.Medium;
+		}
+
 
 		// ---------------------------------------------------------
 		// Semantic Evidence 不存在时：
@@ -1245,6 +1261,52 @@ public sealed class QueryPlanConfidenceService
 
 
 	// =============================================================
+	// Table Correction Honored Detection
+	// =============================================================
+
+	/// <summary>
+	/// 判定用户是否通过多轮纠正显式指定了目标物理表且该表已被采纳为主表。
+	/// 条件：问题含表纠正短语，且计划主表名出现在问题中。
+	/// </summary>
+	private static bool IsTableCorrectionHonored(
+		string question,
+		QueryPlan plan)
+	{
+		if (string.IsNullOrWhiteSpace(question)
+			|| plan?.Tables is not { Count: > 0 })
+		{
+			return false;
+		}
+
+		var correctionContext =
+			question.Contains("物理表必须使用", StringComparison.OrdinalIgnoreCase)
+			|| question.Contains("查询表必须使用", StringComparison.OrdinalIgnoreCase)
+			|| question.Contains("查询表错误", StringComparison.OrdinalIgnoreCase)
+			|| question.Contains("表错", StringComparison.OrdinalIgnoreCase)
+			|| question.Contains("错表", StringComparison.OrdinalIgnoreCase)
+			|| question.Contains("表不对", StringComparison.OrdinalIgnoreCase)
+			|| question.Contains("应该是", StringComparison.OrdinalIgnoreCase)
+			|| question.Contains("应为", StringComparison.OrdinalIgnoreCase)
+			|| question.Contains("改成", StringComparison.OrdinalIgnoreCase)
+			|| question.Contains("改为", StringComparison.OrdinalIgnoreCase)
+			|| question.Contains("使用表", StringComparison.OrdinalIgnoreCase)
+			|| question.Contains("用表", StringComparison.OrdinalIgnoreCase);
+
+		if (!correctionContext)
+		{
+			return false;
+		}
+
+		var primaryTableName =
+			plan.Tables[0].TableName;
+
+		return !string.IsNullOrWhiteSpace(primaryTableName)
+			&& question.Contains(
+				primaryTableName,
+				StringComparison.OrdinalIgnoreCase);
+	}
+
+	// =============================================================
 	// Reasons
 	// =============================================================
 
@@ -1261,6 +1323,12 @@ public sealed class QueryPlanConfidenceService
 
 		reasons.Add(
 			$"QueryPlan Confidence Score = {score:F3}.");
+
+		if (evidence.TableCorrectionHonored)
+		{
+			reasons.Add(
+				"用户已显式纠正目标物理表且该表已采纳为主表，置信度保底至 Medium。");
+		}
 
 
 		if (evidence.SemanticEvidenceAvailable)

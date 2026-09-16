@@ -186,4 +186,52 @@ public class MetadataColumn : BaseEntity
 	/// </summary>
 	public string? VectorErrorCode { get; set; }
 
+	/// <summary>
+	/// 外键目标表名（同数据源内；跨数据源引用由 QueryCorrectionRules / MetadataDictionaryConfig 承载）。
+	/// </summary>
+	public string? ReferencedTable { get; set; }
+
+	/// <summary>
+	/// 外键目标列名（被引用表的主键列）。
+	/// </summary>
+	public string? ReferencedColumn { get; set; }
+
+	/// <summary>
+	/// 外键目标表的展示列名（结果译码写 {col}_name 用）。
+	/// 扫描阶段启发式优选名称型列，否则取被引用表主键列。
+	/// </summary>
+	public string? ReferencedDisplayColumn { get; set; }
+
+	/// <summary>
+	/// 枚举/码值映射 JSON：{"1":"采购入库","2":"调拨入库"}。
+	/// 来源可为列注释图例解析或学习规则；结果译码时逐行替换单元格为 label。
+	/// </summary>
+	public string? ValueMapJson { get; set; }
+
+	/// <summary>
+	/// 是否由跨数据源字典表（如 PMIS）译码：true 时按 DictConfigId 关联字典配置。
+	/// </summary>
+	public bool IsDictBacked { get; set; }
+
+	/// <summary>
+	/// 关联的跨源字典配置 Id（MetadataDictionaryConfig）。
+	///
+	/// 软引用：不建数据库外键。原因：DataSources 已同时经 MetadataTables（级联）与
+	/// MetadataDictionaryConfigs（级联）到达 MetadataColumns，再加一条外键会构成
+	/// SQL Server 禁止的多重级联路径（错误 1785）。有效性由应用层按租户+数据源校验。
+	/// </summary>
+	public long? DictConfigId { get; set; }
+
+	/// <summary>
+	/// 字典取值分类（对应字典表 TypeColumn 的值，如 "receipt_type"）。
+	///
+	/// <para>
+	/// <b>支持多值</b>，以 <c>, ; |</c>（含全角）分隔，译码时展开为
+	/// <c>dict_type IN (...)</c>。实测必要：WMS 单据表的 <c>type</c> 单列码值同时归属
+	/// warehousing_type / outbound_type / variation_type / Input_output_type / wms_check_type
+	/// 五个分类，单值会漏译大部分码值。
+	/// </para>
+	/// </summary>
+	public string? DictCategoryValue { get; set; }
+
 }

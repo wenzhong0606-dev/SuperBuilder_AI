@@ -17,9 +17,24 @@ public partial class QueryPlanBuilder : IQueryPlanBuilder
 		SelectBestTable(
 			List<MetadataSemanticSearchResult> results,
 			List<BusinessTerm> businessTerms,
-			QueryIntent? intent = null)
+			QueryIntent? intent = null,
+			IReadOnlyCollection<long>? authorizedDataSourceIds = null)
 		=> _tableSelector.SelectBestTable(
 			results,
 			businessTerms,
-			intent);
+			intent,
+			tableResolver: name =>
+			{
+				// 在“全部已授权数据源”范围内按表名找回，守住跨数据源安全。
+				// 同步解析单次目录查询即可（ASP.NET Core 无 SynchronizationContext，无死锁风险）。
+				var resolved =
+					_metadataSearch
+						.ResolveTableByNameAsync(
+							name,
+							authorizedDataSourceIds)
+						.GetAwaiter()
+						.GetResult();
+
+				return resolved;
+			});
 }

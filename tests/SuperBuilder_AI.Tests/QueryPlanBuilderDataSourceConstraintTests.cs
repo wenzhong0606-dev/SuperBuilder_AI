@@ -29,6 +29,13 @@ public class QueryPlanBuilderDataSourceConstraintTests
 	private sealed class FakeSearch : IMetadataSemanticSearchService
 	{
 		public List<MetadataSemanticSearchResult> Results { get; set; } = new();
+
+		/// <summary>
+		/// 模拟 <see cref="IMetadataSemanticSearchService.ResolveTableByNameAsync"/> 的目录查找，
+		/// 用于表纠正锁的跨数据源找回测试。为 null 时退回默认（返回 null）。
+		/// </summary>
+		public Func<string, MetadataTable?>? ResolveTableByName { get; set; }
+
 		public Task<List<MetadataSemanticSearchResult>> SearchAsync(string question, int topK = 10, LocaleContext? locale = null)
 			=> Task.FromResult(Results);
 
@@ -37,6 +44,12 @@ public class QueryPlanBuilderDataSourceConstraintTests
 
 		public Task<List<MetadataSemanticSearchResult>> SearchByKeywordSubstringAsync(string keyword, int limit = 30)
 			=> Task.FromResult(new List<MetadataSemanticSearchResult>());
+
+		public Task<MetadataTable?> ResolveTableByNameAsync(
+			string tableName,
+			IReadOnlyCollection<long>? authorizedDataSourceIds = null)
+			=> Task.FromResult(
+				ResolveTableByName?.Invoke(tableName));
 	}
 
 	private sealed class FakeJoin : IQueryJoinInferenceService
@@ -203,5 +216,56 @@ public class QueryPlanBuilderDataSourceConstraintTests
 
 		Assert.Equal(ErrorCodes.DataSourceForbidden, ex.ErrorCode);
 		Assert.Equal(403, ex.StatusCode);
+	}
+
+	[Fact]
+	public async Task Explicit_table_correction_recovers_table_excluded_by_data_source_scope()
+	{
+		// 复现 M0 跨数据源选表歧义：
+		// 用户纠正到 wms_storage_receipt（ds1），但 authorizedDataSourceIds 只含 ds4，
+		// ScopeAsync 已把 ds1 收敛掉（召回候选里不再有 wms_storage_receipt）。
+		// 修复后，表纠正锁应经 ResolveTableByNameAsync 从“全授权目录”按表名找回该表并采纳为主表，
+		// 而非静默退化到被收敛后的 pms_complete_storage。
+		var receipt = MakeTable(10, 1, "wms_storage_receipt", (100, "id", true), (101, "receipt_no", false));
+		var pms = MakeTable(20, 4, "pms_complete_storage", (200, "id", true), (201, "storage_no", false));
+
+		var search = new FakeSearch
+		{
+			// 召回候选仅含 ds4 的表（模拟 ScopeAsync 收敛后状态）。
+			Results = { TableVector(pms, 0.9) },
+			// 纠正锁的 resolver 调用：按表名从“全授权目录”找回 ds1 的表。
+			ResolveTableByName = name =>
+				string.Equals(name, "wms_storage_receipt", StringComparison.OrdinalIgnoreCase)
+					? receipt
+					: null
+		};
+
+		var ctx = CreateContext(out var connection);
+		await using var _ = connection;
+		await using var __ = ctx;
+		await SeedAsync(ctx, receipt, pms);
+
+		var builder = BuildBuilder(search, ctx);
+
+		var intent = new QueryIntent
+		{
+			OriginalQuestion = "查询物理表必须使用 wms_storage_receipt",
+			Metrics =
+			{
+				new QueryMetric
+				{
+					Name = "入库凭证条数",
+					Field = "receipt_no",
+					Aggregation = "COUNT"
+				}
+			}
+		};
+
+		var plan = await builder.BuildAsync(
+			intent,
+			authorizedDataSourceIds: new[] { 4L });
+
+		Assert.Equal("wms_storage_receipt", plan.Tables[0].TableName);
+		Assert.Equal(1, plan.Tables[0].DataSourceId);
 	}
 }

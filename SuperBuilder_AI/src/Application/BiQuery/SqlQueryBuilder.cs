@@ -176,13 +176,15 @@ public class SqlQueryBuilder : ISqlQueryBuilder
         string columnName,
         List<QueryJoin> joins,
         List<QueryTable> tables,
-        ISqlDialect dialect)
+        ISqlDialect dialect,
+        bool allowMainTableFallback = false)
     {
         var resolvedTableName =
             ResolveTableName(
                 metadataTableId,
                 tableName,
-                tables);
+                tables,
+                allowMainTableFallback);
 
         if (!string.IsNullOrWhiteSpace(resolvedTableName))
         {
@@ -206,10 +208,33 @@ public class SqlQueryBuilder : ISqlQueryBuilder
         return dialect.EscapeIdentifier(columnName);
     }
 
+    /// <summary>
+    /// 解析字段的物理归属表名；无法解析时返回 null（调用方退化为裸列名）。
+    ///
+    /// <para>
+    /// <paramref name="allowMainTableFallback"/> 只在 WHERE / ORDER BY / GROUP BY
+    /// 这类「条件与排序」位置开启。多表（JOIN）场景下无表归属的字段会以裸列名落进 SQL，
+    /// 而 <c>del_flag</c> / <c>create_time</c> / <c>status</c> 这类多表同名列会直接触发
+    /// MySQL "Column 'x' in where clause is ambiguous"（实测 1052，场景：
+    /// pms_complete_storage INNER JOIN pms_complete_storage_info 的软删除过滤）。
+    /// </para>
+    ///
+    /// <para>
+    /// 开启时锚定主表（<c>plan.Tables[0]</c>，即事实表），口径与
+    /// <c>QueryPlanMetadataValidator.FindColumns</c> 的「主表优先」歧义消解规则一致：
+    /// 该规则已用于消解只承载字段名、无 MetadataColumnId 的 QueryFilter / QueryMetric
+    /// 在多表场景下的伪歧义，SqlQueryBuilder 此前未同步该口径。
+    /// </para>
+    ///
+    /// <para>
+    /// SELECT 投影刻意不开启（保持既有契约：无法解析即裸列名），避免改变既有投影行为。
+    /// </para>
+    /// </summary>
     private static string? ResolveTableName(
         long metadataTableId,
         string? tableName,
-        List<QueryTable> tables)
+        List<QueryTable> tables,
+        bool allowMainTableFallback = false)
     {
         if (!string.IsNullOrWhiteSpace(tableName))
             return tableName;
@@ -223,7 +248,10 @@ public class SqlQueryBuilder : ISqlQueryBuilder
                 return table.TableName;
         }
 
-        return tables.Count == 1
+        if (tables.Count == 1)
+            return tables[0].TableName;
+
+        return allowMainTableFallback
             ? tables[0].TableName
             : null;
     }
@@ -253,7 +281,8 @@ public class SqlQueryBuilder : ISqlQueryBuilder
                 filter.Field,
                 joins,
                 tables,
-                dialect);
+                dialect,
+                allowMainTableFallback: true);
             var operation = NormalizeOperator(filter.Operator);
 
             if (operation == "IS NULL" || operation == "IS NOT NULL")
@@ -377,7 +406,8 @@ public class SqlQueryBuilder : ISqlQueryBuilder
                 groupColumnName,
                 joins,
                 tables,
-                dialect));
+                dialect,
+                allowMainTableFallback: true));
         }
 
         if (groups.Count == 0 && plan.Intent?.Dimensions != null)
@@ -385,7 +415,7 @@ public class SqlQueryBuilder : ISqlQueryBuilder
             foreach (var dimension in plan.Intent.Dimensions)
             {
                 if (!string.IsNullOrWhiteSpace(dimension))
-                    groups.Add(dialect.EscapeIdentifier(dimension));
+                    groups.Add(QualifyIntentField(dimension, tables, dialect));
             }
         }
 
@@ -415,7 +445,8 @@ public class SqlQueryBuilder : ISqlQueryBuilder
                 order.Field,
                 joins,
                 tables,
-                dialect);
+                dialect,
+                allowMainTableFallback: true);
 
             if (order.IsMetric && order.Aggregation != QueryAggregation.None)
             {
@@ -443,10 +474,25 @@ public class SqlQueryBuilder : ISqlQueryBuilder
             return;
 
         sql.Append(" ORDER BY ")
-           .Append(dialect.EscapeIdentifier(plan.Intent.OrderBy))
+           .Append(QualifyIntentField(plan.Intent.OrderBy, tables, dialect))
            .Append(' ')
            .Append(NormalizeOrderDirection(plan.Intent.OrderDirection));
     }
+
+    /// <summary>
+    /// Intent 承载的字段（OrderBy / Dimensions）只有名称、无表归属。
+    /// 单表场景保持裸列名不变；多表场景锚定主表，避免 `create_time` / `status`
+    /// 这类多表同名列触发 MySQL "Column ... is ambiguous"。
+    /// 口径与 <see cref="ResolveTableName"/> 的多表兜底一致。
+    /// </summary>
+    private static string QualifyIntentField(
+        string field,
+        List<QueryTable> tables,
+        ISqlDialect dialect)
+        => tables.Count > 1 && !string.IsNullOrWhiteSpace(tables[0].TableName)
+            ? dialect.EscapeIdentifier(tables[0].TableName!) + "." +
+              dialect.EscapeIdentifier(field)
+            : dialect.EscapeIdentifier(field);
 
     private static string NormalizeAggregation(string? aggregation)
     {

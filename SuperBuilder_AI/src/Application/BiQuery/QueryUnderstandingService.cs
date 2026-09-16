@@ -54,7 +54,8 @@ public class QueryUnderstandingService
 	/// </summary>
 	private async Task<QueryIntent> BuildRawIntentAsync(
 		string question,
-		LocaleContext? locale = null)
+		LocaleContext? locale = null,
+		IReadOnlyCollection<long>? dataSourceIds = null)
 	{
 		if (string.IsNullOrWhiteSpace(question))
 		{
@@ -88,12 +89,19 @@ public class QueryUnderstandingService
          * Semantic
          *
          * 从而避免AI凭空创造数据库字段。
+         *
+         * P0：必须传入数据源作用域。语义检索是全局 top-K，不限定作用域时
+         * 会把其他数据源的同名列一并写进提示词（实测：问 WMS 入库单，
+         * 提示词里出现 MES 的 mes_eqp_spare_warehouse_enter.type），
+         * 使 Metric / Dimension 被解析到别的数据源的表上。
          * ============================================================
          */
 
 		var metadataContext =
 			await _contextBuilder
-				.BuildAsync(question);
+				.BuildAsync(
+					question,
+					dataSourceIds);
 
 		/*
          * ============================================================
@@ -722,6 +730,22 @@ public class QueryUnderstandingService
 	public async Task<QueryIntent> UnderstandAsync(
 		string question,
 		PlatformContext platformContext)
+		=> await UnderstandAsync(
+			question,
+			platformContext,
+			null);
+
+
+	/// <summary>
+	/// 在指定数据源作用域内理解用户查询（P0：理解阶段跨源语义污染修复）。
+	///
+	/// <paramref name="dataSourceIds"/> 为 <c>null</c> 时与两参重载完全等价
+	/// （Golden / 评估器 / 内部兼容路径零回归）。
+	/// </summary>
+	public async Task<QueryIntent> UnderstandAsync(
+		string question,
+		PlatformContext platformContext,
+		IReadOnlyCollection<long>? dataSourceIds)
 	{
 		// 空上下文按 System 处理：与既往传入 null 的行为完全等价
 		// （System 的 TenantId=0 且 Locale 为默认语言，归一化与语言指令结果一致）。
@@ -731,7 +755,8 @@ public class QueryUnderstandingService
 		// 默认语言（zh-CN）时指令为空字符串，提示词与 P5 之前完全一致。
 		var intent = await BuildRawIntentAsync(
 			question,
-			context.Locale);
+			context.Locale,
+			dataSourceIds);
 
 		return await _intentNormalizer.NormalizeWithBusinessEntitiesAsync(intent, context);
 	}

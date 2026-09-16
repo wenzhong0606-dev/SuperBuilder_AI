@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Threading;
 using SuperBuilder_AI.Data;
 using SuperBuilder_AI.Interfaces;
+using SuperBuilder_AI.Models.DTO;
 using SuperBuilder_AI.Models.Metadata;
 
 namespace SuperBuilder_AI.Services;
@@ -65,6 +66,26 @@ public class MetadataScannerService
         var columns = await _reader.GetColumnsAsync(connectionString, dataSource.DbType);
         telemetry.Details.ColumnsDiscovered = columns.Count;
         telemetry.AddEvent("Info", "ColumnsDiscovered", $"已发现 {columns.Count} 个字段。", columns.Count, columns.Count);
+
+        // 外键关系（同数据源内）——用于结果译码的字段→名称列绑定。读取失败不阻断扫描。
+        var foreignKeys = await TryLoadForeignKeysAsync(connectionString, dataSource.DbType, telemetry, ct);
+
+        // 按表名分组（大小写不敏感），供外键展示列优选与字典角色解析复用。
+        var columnsByTable = columns
+            .GroupBy(c => c.TableName ?? string.Empty, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.ToList(), StringComparer.OrdinalIgnoreCase);
+
+        var fkByColumn = new Dictionary<string, ForeignKeyMetadataDto>(StringComparer.OrdinalIgnoreCase);
+        foreach (var fk in foreignKeys)
+        {
+            if (string.IsNullOrWhiteSpace(fk.TableName) || string.IsNullOrWhiteSpace(fk.ColumnName))
+                continue;
+            fkByColumn[$"{fk.TableName}.{fk.ColumnName}"] = fk;
+        }
+
+        if (fkByColumn.Count > 0)
+            telemetry.AddEvent("Info", "ForeignKeysDiscovered", $"已发现 {fkByColumn.Count} 条外键关系。", fkByColumn.Count, fkByColumn.Count);
+
         ReportStage(telemetry, progress, "ComparingMetadata", "正在与已有元数据进行比对…", 22, "ColumnsReady");
 
         var existsTables = await _context.MetadataTables
@@ -198,6 +219,28 @@ public class MetadataScannerService
                     column.ColumnName,
                     column.ColumnComment,
                     column.DataType);
+
+                // 注释图例 → 码值映射：实测 WMS 注释普遍自带「0否 1是」「0-已创建 1-执行中」形态，
+                // 是零成本、随租户 schema 自带的译码来源（此前无写入方，该层长期静默）。
+                // 仅在为空时写入 —— 管理侧声明与学习规则优先级更高，绝不覆盖。
+                if (string.IsNullOrWhiteSpace(metadataColumn.ValueMapJson)
+                    && MetadataDiscoveryHeuristics.TryParseValueMapFromComment(
+                        column.ColumnComment, out var legendJson))
+                {
+                    metadataColumn.ValueMapJson = legendJson;
+                }
+
+                // 外键角色：同数据源内 FK 直接落库（引用表 / 引用列 / 展示列）。
+                // 跨数据源引用不在此层处理，由声明/学习规则承载。
+                if (fkByColumn.TryGetValue($"{table.TableName}.{column.ColumnName}", out var fk))
+                {
+                    metadataColumn.ReferencedTable = fk.ReferencedTableName;
+                    metadataColumn.ReferencedColumn = fk.ReferencedColumnName;
+                    metadataColumn.ReferencedDisplayColumn = MetadataDiscoveryHeuristics.PickDisplayColumn(
+                        columnsByTable,
+                        fk.ReferencedTableName,
+                        fk.ReferencedColumnName);
+                }
             }
 
             metadataTable.SearchText = _textBuilder.BuildMetadataText(
@@ -211,6 +254,17 @@ public class MetadataScannerService
         }
 
         telemetry.SetCurrent(null, null);
+
+        // 字典表启发式：识别 code+name(+type) 形态的字典表并记录角色映射（per 数据源）。
+        // 仅描述「本数据源」的字典结构；跨源绑定（如 WMS 列 → PMIS 字典）由声明/学习规则承载。
+        var dictConfigs = await SyncDictionaryConfigsAsync(
+            effectiveTenantId,
+            dataSourceId,
+            columnsByTable,
+            ct);
+        if (dictConfigs > 0)
+            telemetry.AddEvent("Info", "DictionaryDiscovered", $"已识别 {dictConfigs} 张字典表并记录角色映射。");
+
         await _context.SaveChangesAsync(ct);
         telemetry.AddEvent(
             "Info",
@@ -407,6 +461,109 @@ public class MetadataScannerService
         telemetry.SetCurrent(null, null);
         telemetry.SetStage("Succeeded", "扫描处理完成。", "ScanCompleted");
         progress?.Report(100);
+    }
+
+    /// <summary>
+    /// 读取外键关系；失败时记录告警并返回空集合，绝不阻断扫描。
+    /// </summary>
+    private async Task<List<ForeignKeyMetadataDto>> TryLoadForeignKeysAsync(
+        string connectionString,
+        string? dbType,
+        ScanTelemetry telemetry,
+        CancellationToken ct)
+    {
+        try
+        {
+            var fks = await _reader.GetForeignKeysAsync(connectionString, dbType);
+            return fks ?? new List<ForeignKeyMetadataDto>();
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            telemetry.AddWarning(
+                "ForeignKeyReadFailed",
+                $"外键关系读取失败（{ex.GetType().Name}），本次扫描跳过外键角色识别，其余元数据不受影响。");
+            return new List<ForeignKeyMetadataDto>();
+        }
+    }
+
+    /// <summary>
+    /// 识别本数据源内的字典表并 upsert 角色映射配置。
+    /// 匹配键：TenantId + DataSourceId + TableName。返回新增/更新的配置数。
+    /// </summary>
+    private async Task<int> SyncDictionaryConfigsAsync(
+        long tenantId,
+        long dataSourceId,
+        Dictionary<string, List<ColumnMetadataDto>> columnsByTable,
+        CancellationToken ct)
+    {
+        // IgnoreQueryFilters + 显式租户过滤：既避免全局租户过滤器影响，又确保跨租户不串写。
+        var existing = await _context.MetadataDictionaryConfigs
+            .IgnoreQueryFilters()
+            .Where(x => x.TenantId == tenantId && x.DataSourceId == dataSourceId)
+            .ToListAsync(ct);
+        var existingByTable = existing
+            .GroupBy(x => x.TableName, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
+
+        var changed = 0;
+        foreach (var pair in columnsByTable)
+        {
+            var tableName = pair.Key;
+            var columns = pair.Value;
+
+            if (!MetadataDiscoveryHeuristics.IsDictionaryCandidate(tableName))
+                continue;
+
+            // 字典表语义列很少（code/name/type），但真实字典表常带大量 extend_*/审计列。
+            // 有效列宽 + 角色解析都跑在「语义列」上 —— 实测 PMIS.js_sys_dict_data 共 44 列、
+            // 语义列仅 6 列；若按原始列数设限，或直接在原始列上解析角色，都会选中
+            // parent_codes / tree_names 这类噪声列，导致该表永久无法被正确发现。
+            var semanticColumns = MetadataDiscoveryHeuristics.SemanticColumns(columns);
+            if (semanticColumns.Count is < 2 or > 12)
+                continue;
+            // 原始列数绝对兜底：防止异常宽表进入角色解析。
+            if (columns.Count > 256)
+                continue;
+
+            if (!MetadataDiscoveryHeuristics.TryResolveDictionaryRoles(
+                    semanticColumns, out var codeColumn, out var nameColumn, out var typeColumn))
+                continue;
+
+            if (!existingByTable.TryGetValue(tableName, out var config))
+            {
+                config = new MetadataDictionaryConfig
+                {
+                    TenantId = tenantId,
+                    DataSourceId = dataSourceId,
+                    TableName = tableName
+                };
+                _context.MetadataDictionaryConfigs.Add(config);
+                existingByTable[tableName] = config;
+                changed++;
+            }
+            else if (config.CodeColumn == codeColumn
+                && config.NameColumn == nameColumn
+                && config.TypeColumn == typeColumn)
+            {
+                // 角色未变，无需写入。
+                continue;
+            }
+            else
+            {
+                changed++;
+            }
+
+            config.CodeColumn = codeColumn;
+            config.NameColumn = nameColumn;
+            config.TypeColumn = typeColumn;
+            config.IsEnabled = true;
+        }
+
+        return changed;
     }
 
     private static void ReportStage(
