@@ -19,12 +19,14 @@ public sealed class QueryPlanPipelineContext
 		string question,
 		QueryIntent intent,
 		long? requestedDataSourceId,
-		IReadOnlyCollection<long>? authorizedDataSourceIds)
+		IReadOnlyCollection<long>? authorizedDataSourceIds,
+		QueryPlanLearningContext? learning = null)
 	{
 		Question = question;
 		Intent = intent;
 		RequestedDataSourceId = requestedDataSourceId;
 		AuthorizedDataSourceIds = authorizedDataSourceIds;
+		Learning = learning;
 	}
 
 	/// <summary>用户原始问题。</summary>
@@ -38,6 +40,14 @@ public sealed class QueryPlanPipelineContext
 
 	/// <summary>授权数据源集合（透传给 Builder）。</summary>
 	public IReadOnlyCollection<long>? AuthorizedDataSourceIds { get; }
+
+	/// <summary>
+	/// 本次查询命中的学习规则上下文（Phase 4）。
+	///
+	/// 由 BIConversationService 在 Step 0.5 命中学习规则后写入，透传给 Confidence 阶段，
+	/// 使「用了学习规则」成为可审计的置信度正证据。未命中时为 null。
+	/// </summary>
+	public QueryPlanLearningContext? Learning { get; }
 
 	/// <summary>Step 2 构建出的查询计划。</summary>
 	public QueryPlan? Plan { get; set; }

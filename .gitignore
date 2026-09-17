@@ -368,3 +368,6 @@ MigrationBackup/
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
 /nul
+
+# WorkBuddy agent scratch (note: .workbuddy/memory/*.md IS tracked on purpose)
+.workbuddy/tmp/

@@ -34,6 +34,7 @@ public sealed class QueryPlanConfidenceStage : IQueryPlanStage
 				ctx.Plan!,
 				ctx.SemanticValidation!,
 				ctx.SemanticValidation!.RepairTrace,
-				ctx.Question);
+				ctx.Question,
+				ctx.Learning);
 	}
 }

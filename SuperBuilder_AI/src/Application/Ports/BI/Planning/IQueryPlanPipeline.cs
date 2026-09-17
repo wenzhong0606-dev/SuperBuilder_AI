@@ -27,6 +27,9 @@ public interface IQueryPlanPipeline
 	/// <param name="requestedDataSourceId">
 	/// 可选数据源约束，透传给 <see cref="IQueryPlanBuilder"/>。为 null 或 &lt;=0 时保持原有行为。
 	/// </param>
+	/// <param name="authorizedDataSourceIds">
+	/// 已授权数据源集合，透传给 <see cref="IQueryPlanBuilder"/>。为 null 时保持原有行为。
+	/// </param>
 	/// <returns>
 	/// 成功时返回 Plan / Confidence / Decision / Explanation；
 	/// 当验证失败或 Decision Gate 阻断而提前结束时，EarlyResponse 非空，调用方应直接返回它。
@@ -36,6 +39,35 @@ public interface IQueryPlanPipeline
 		QueryIntent intent,
 		long? requestedDataSourceId = null,
 		IReadOnlyCollection<long>? authorizedDataSourceIds = null);
+
+	/// <summary>
+	/// 与四参重载相同，额外接收本次命中的学习规则上下文（Phase 4）。
+	///
+	/// <para>
+	/// 命中时，Confidence 阶段会把 <c>LearningApplied</c> 写进置信度证据并保底 Medium ——
+	/// 与用户当轮显式表纠正同待遇，使「用了学习规则」可见、可审计。
+	/// </para>
+	///
+	/// <para>
+	/// 本重载以默认接口实现提供：默认忽略 <paramref name="learning"/> 并转调四参重载，
+	/// 因此既有实现类与测试替身无需改动即可编译。只有需要真正消费该上下文的实现
+	/// 才重写它。
+	/// </para>
+	/// </summary>
+	/// <param name="learning">
+	/// 本次查询命中的学习规则上下文；为 null 或空集合时行为与四参重载一致。
+	/// </param>
+	Task<QueryPlanPipelineResult> RunAsync(
+		string question,
+		QueryIntent intent,
+		long? requestedDataSourceId,
+		IReadOnlyCollection<long>? authorizedDataSourceIds,
+		QueryPlanLearningContext? learning)
+		=> RunAsync(
+			question,
+			intent,
+			requestedDataSourceId,
+			authorizedDataSourceIds);
 }
 
 /// <summary>

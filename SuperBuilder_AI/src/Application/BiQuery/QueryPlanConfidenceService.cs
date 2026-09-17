@@ -1,7 +1,9 @@
 ﻿using SuperBuilder_AI.Interfaces;
 using SuperBuilder_AI.Interfaces.BI;
+using SuperBuilder_AI.Interfaces.BI.Planning;
 using SuperBuilder_AI.Models.AI;
 using SuperBuilder_AI.Models.BI;
+using SuperBuilder_AI.Models.Metadata;
 
 namespace SuperBuilder_AI.Services.BI;
 
@@ -129,11 +131,46 @@ public sealed class QueryPlanConfidenceService
 	/// <summary>
 	/// 评估 QueryPlan Confidence。
 	/// </summary>
+	public Task<QueryPlanConfidence> EvaluateAsync(
+		QueryPlan plan,
+		QueryPlanValidationPipelineResult validationResult,
+		QueryPlanRepairTrace? repairTrace,
+		string question,
+		CancellationToken cancellationToken = default)
+		=> EvaluateAsync(
+			plan,
+			validationResult,
+			repairTrace,
+			question,
+			null,
+			cancellationToken);
+
+
+	/// <summary>
+	/// 评估 QueryPlan Confidence，并消费本次命中的学习规则上下文（Phase 4）。
+	///
+	/// <para>
+	/// <paramref name="learning"/> 命中时，证据中标记 <c>LearningApplied</c> 等字段，
+	/// 并把置信度保底至 Medium —— 与用户当轮显式表纠正（TableCorrectionHonored）同待遇。
+	/// 区别：该事实由调用方显式传入，不靠问题文本推断，故可审计、可区分
+	/// 「用户当轮纠正」与「系统历史规则回放」，也能覆盖值映射 / 外键 / 列展示类规则。
+	/// </para>
+	///
+	/// <para>
+	/// Hard Safety Block（ValidationError / Repair 异常）优先级高于本保底：
+	/// 学习规则不能把存在硬错误的计划抬进 SQL Builder。
+	/// </para>
+	///
+	/// <para>
+	/// <paramref name="learning"/> 为 null 或空集合时，全流程与四参重载逐字节一致。
+	/// </para>
+	/// </summary>
 	public async Task<QueryPlanConfidence> EvaluateAsync(
 		QueryPlan plan,
 		QueryPlanValidationPipelineResult validationResult,
 		QueryPlanRepairTrace? repairTrace,
 		string question,
+		QueryPlanLearningContext? learning,
 		CancellationToken cancellationToken = default)
 	{
 		ArgumentNullException.ThrowIfNull(plan);
@@ -238,6 +275,23 @@ public sealed class QueryPlanConfidenceService
 			IsTableCorrectionHonored(
 				question,
 				plan);
+
+
+		// Phase 4：本次查询回放了自动化学习规则 —— 由调用方在 Step 0.5 命中后显式传入。
+		// 与 TableCorrectionHonored 的区别：不依赖问题文本里的锁表句式，
+		// 因此能覆盖值映射 / 外键 / 列展示等规则，也能与「用户当轮纠正」区分开（可审计）。
+		// learning 为 null / 空集合时以下四字段恒为默认值，行为与引入前一致。
+		evidence.LearningApplied =
+			learning is { Any: true };
+
+		evidence.LearningRuleCount =
+			learning?.RuleCount ?? 0;
+
+		evidence.LearningRuleKinds =
+			learning?.RuleKinds ?? Array.Empty<CorrectionKind>();
+
+		evidence.LearningTableOverrideApplied =
+			learning is { HasTableOverride: true };
 
 
 		// =========================================================
@@ -1206,7 +1260,11 @@ public sealed class QueryPlanConfidenceService
 
 		// 用户显式表纠正已采纳：强正证据，保底至 Medium（明细查询可进入 SQL Builder）。
 		// 即便向量/字段证据偏弱，也不该把“用户已明确指定目标表”的查询误判为 Low。
-		if (evidence.TableCorrectionHonored)
+		//
+		// Phase 4：回放自动化学习规则（LearningApplied）享受同等待遇 ——
+		// 历史规则同样是“用户曾经明确指定过”的确定性输入，且命中已由调用方显式传入，
+		// 比从问题文本反推更可靠。此处只抬升下限，不封顶：分数达 High 仍为 High。
+		if (evidence.TableCorrectionHonored || evidence.LearningApplied)
 		{
 			return score >= HighConfidenceThreshold
 				? QueryPlanConfidenceLevel.High
@@ -1328,6 +1386,22 @@ public sealed class QueryPlanConfidenceService
 		{
 			reasons.Add(
 				"用户已显式纠正目标物理表且该表已采纳为主表，置信度保底至 Medium。");
+		}
+
+
+		// Phase 4：把「用了学习规则」写进可读原因，便于日志 / 审计回溯是哪类规则抬升了置信度。
+		if (evidence.LearningApplied)
+		{
+			var kinds =
+				evidence.LearningRuleKinds.Count > 0
+					? string.Join(", ", evidence.LearningRuleKinds)
+					: "未标注类型";
+
+			reasons.Add(
+				$"已回放 {evidence.LearningRuleCount} 条学习规则（{kinds}），置信度保底至 Medium。"
+				+ (evidence.LearningTableOverrideApplied
+					? "其中包含表级覆盖，主表由学习规则锁定。"
+					: string.Empty));
 		}
 
 

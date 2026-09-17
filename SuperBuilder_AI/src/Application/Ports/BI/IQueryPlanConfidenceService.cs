@@ -1,4 +1,5 @@
-﻿using SuperBuilder_AI.Models.BI;
+﻿using SuperBuilder_AI.Interfaces.BI.Planning;
+using SuperBuilder_AI.Models.BI;
 
 namespace SuperBuilder_AI.Interfaces.BI;
 
@@ -61,4 +62,34 @@ public interface IQueryPlanConfidenceService
 		QueryPlanRepairTrace? repairTrace,
 		string question,
 		CancellationToken cancellationToken = default);
+
+	/// <summary>
+	/// 对 QueryPlan 进行置信度评估，并带上本次命中的学习规则上下文（Phase 4）。
+	///
+	/// <para>
+	/// 命中学习规则时，实现应在证据中标记 <c>LearningApplied</c> 并把置信度保底至 Medium，
+	/// 使「用了学习规则」可见、可审计 —— 与用户当轮显式表纠正同待遇。
+	/// </para>
+	///
+	/// <para>
+	/// 本重载以默认接口实现提供：默认忽略 <paramref name="learning"/> 并转调四参重载。
+	/// 因此既有实现类与测试替身无需改动即可编译，未重写本方法的实现行为保持不变。
+	/// </para>
+	/// </summary>
+	/// <param name="learning">
+	/// 本次查询命中的学习规则上下文；为 null 或空集合时行为与四参重载一致。
+	/// </param>
+	Task<QueryPlanConfidence> EvaluateAsync(
+		QueryPlan plan,
+		QueryPlanValidationPipelineResult validationResult,
+		QueryPlanRepairTrace? repairTrace,
+		string question,
+		QueryPlanLearningContext? learning,
+		CancellationToken cancellationToken = default)
+		=> EvaluateAsync(
+			plan,
+			validationResult,
+			repairTrace,
+			question,
+			cancellationToken);
 }

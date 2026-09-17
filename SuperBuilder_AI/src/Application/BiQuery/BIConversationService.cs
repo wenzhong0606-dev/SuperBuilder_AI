@@ -267,6 +267,18 @@ public class BIConversationService
 		 * 仅 (tenant, user, 归一化问句) 命中才生效；未命中时 question 逐字节不变。
 		 */
 		CorrectionResolution? learnedCorrections = null;
+
+		/*
+		 * Phase 4：学习规则回放的置信度证据。
+		 *
+		 * 把「本次回放了哪些类型的学习规则」显式传给 Confidence 阶段，使「用了学习规则」
+		 * 在置信度里可见、可审计，并保底至 Medium —— 与用户当轮表纠正同待遇。
+		 * 与 TableCorrectionHonored 不同：这里不靠问题文本里的锁表句式反推，
+		 * 因此能覆盖值映射 / 外键 / 列展示类规则，也能区分「用户当轮纠正」与「历史规则回放」。
+		 * 未命中时保持 null，全链路行为与引入前逐字节一致（Golden 零回归）。
+		 */
+		QueryPlanLearningContext? learningContext = null;
+
 		var callerUserId = _executionIdentity?.Current is { } identity && identity.TenantId == tenantId
 			? identity.UserId
 			: (long?)null;
@@ -279,12 +291,20 @@ public class BIConversationService
 					.ResolveAsync(tenantId, callerUserId, question);
 
 				if (learnedCorrections.Any)
+				{
 					question = _correctionLearning.ComposeLearnedQuestion(question, learnedCorrections);
+
+					learningContext = QueryPlanLearningContext.From(
+						learnedCorrections.Corrections
+							.Select(c => c.Kind)
+							.ToList());
+				}
 			}
 			catch
 			{
 				// 学习回放是增值能力：任何故障仅降级为「按原问句执行」。
 				learnedCorrections = null;
+				learningContext = null;
 			}
 		}
 
@@ -343,7 +363,8 @@ public class BIConversationService
 					question,
 					intent,
 					requestedDataSourceId,
-					authorizedDataSourceIds);
+					authorizedDataSourceIds,
+					learningContext);
 
 		var planMs = sw.ElapsedMilliseconds;
 		// M9-05：管线分段延迟埋点 + 结果分类计数。

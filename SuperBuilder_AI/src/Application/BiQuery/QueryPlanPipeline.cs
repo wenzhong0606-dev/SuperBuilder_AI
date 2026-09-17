@@ -48,11 +48,25 @@ public sealed class QueryPlanPipeline : IQueryPlanPipeline
 	}
 
 	/// <inheritdoc />
-	public async Task<QueryPlanPipelineResult> RunAsync(
+	public Task<QueryPlanPipelineResult> RunAsync(
 		string question,
 		QueryIntent intent,
 		long? requestedDataSourceId = null,
 		IReadOnlyCollection<long>? authorizedDataSourceIds = null)
+		=> RunAsync(
+			question,
+			intent,
+			requestedDataSourceId,
+			authorizedDataSourceIds,
+			null);
+
+	/// <inheritdoc />
+	public async Task<QueryPlanPipelineResult> RunAsync(
+		string question,
+		QueryIntent intent,
+		long? requestedDataSourceId,
+		IReadOnlyCollection<long>? authorizedDataSourceIds,
+		QueryPlanLearningContext? learning)
 	{
 		// 请求级关联标识：同一次用户请求跨多次 Pipeline 运行共享。
 		var correlationId = Guid.NewGuid().ToString();
@@ -66,7 +80,8 @@ public sealed class QueryPlanPipeline : IQueryPlanPipeline
 				question,
 				intent,
 				requestedDataSourceId,
-				authorizedDataSourceIds);
+				authorizedDataSourceIds,
+				learning);
 
 			foreach (var stage in _stages)
 			{

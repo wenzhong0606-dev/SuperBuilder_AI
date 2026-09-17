@@ -1,4 +1,6 @@
-﻿namespace SuperBuilder_AI.Models.BI;
+﻿using SuperBuilder_AI.Models.Metadata;
+
+namespace SuperBuilder_AI.Models.BI;
 
 /// <summary>
 /// QueryPlan Confidence 的可解释证据。
@@ -150,6 +152,34 @@ public sealed class QueryPlanConfidenceEvidence
     /// 仅在纠正短语 + 计划主表名同时出现于问题时为真，普通查询恒为 false。
     /// </summary>
     public bool TableCorrectionHonored { get; set; }
+
+    /// <summary>
+    /// 本次查询是否回放了自动化学习规则（用户历史显式纠正）。
+    ///
+    /// 命中时作为正证据，把置信度保底至 Medium —— 与 <see cref="TableCorrectionHonored"/>
+    /// 同待遇。区别在于：本字段由调用方在 Step 0.5 命中学习规则后显式传入，
+    /// 不依赖问题文本推断，因此可以区分「用户当轮纠正」与「系统历史规则回放」，
+    /// 也可覆盖值映射 / 外键 / 列展示等不含锁表句式的规则类型。
+    /// 未命中学习规则时恒为 false。
+    /// </summary>
+    public bool LearningApplied { get; set; }
+
+    /// <summary>
+    /// 本次命中的学习规则条数（未去重），用于审计与计量。
+    /// </summary>
+    public int LearningRuleCount { get; set; }
+
+    /// <summary>
+    /// 本次命中的学习规则类型（已去重）。空集合表示未命中任何学习规则。
+    /// </summary>
+    public IReadOnlyList<CorrectionKind> LearningRuleKinds { get; set; } =
+        Array.Empty<CorrectionKind>();
+
+    /// <summary>
+    /// 命中的学习规则里是否包含表级覆盖（<see cref="CorrectionKind.TableOverride"/>）。
+    /// 为真表示本次计划主表由学习规则锁定，而非完全由语义检索得出。
+    /// </summary>
+    public bool LearningTableOverrideApplied { get; set; }
 
 
     // ============================================================
