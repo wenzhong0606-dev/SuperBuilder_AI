@@ -29,29 +29,28 @@ public sealed class MetadataLifecycleRealBackendTests
         var oldId = Guid.NewGuid().ToString();
         var newTableId = Guid.NewGuid().ToString();
         var newColumnId = Guid.NewGuid().ToString();
-        await qdrant.UpsertAsync(oldId, Vector(), new Dictionary<string, object>
-        {
-            ["tenant_id"] = 7L, ["data_source_id"] = 1L, ["metadata_version"] = 0, ["metadata_type"] = "table"
-        });
-        context.Tenants.Add(new Tenant { Id = 7, TenantCode = "v10", TenantName = "V10" });
         var source = Source();
         source.VectorsBackfilled = true;
-        context.DataSources.Add(source);
+        await SeedSourceAsync(context, source);
+        await qdrant.UpsertAsync(oldId, Vector(), new Dictionary<string, object>
+        {
+            ["tenant_id"] = source.TenantId, ["data_source_id"] = source.Id, ["metadata_version"] = 0, ["metadata_type"] = "table"
+        });
         context.MetadataTables.Add(new MetadataTable
         {
-            TenantId = 7, DataSourceId = 1, CatalogName = database, SchemaName = "dbo",
+            TenantId = source.TenantId, DataSourceId = source.Id, CatalogName = database, SchemaName = "dbo",
             TableName = "orders", MetadataVersion = 0, VectorId = oldId, VectorStatus = "Synced"
         });
         var staged = new MetadataTable
         {
-            TenantId = 7, DataSourceId = 1, CatalogName = database, SchemaName = "dbo",
+            TenantId = source.TenantId, DataSourceId = source.Id, CatalogName = database, SchemaName = "dbo",
             TableName = "orders", MetadataVersion = 1, VectorId = newTableId, VectorStatus = "Failed",
             Columns = { new MetadataColumn { ColumnName = "id", DataType = "int", MetadataVersion = 1, VectorId = newColumnId, VectorStatus = "Synced" } }
         };
         context.MetadataTables.Add(staged);
         await context.SaveChangesAsync();
 
-        var job = new MetadataScanJob { TenantId = 7, DataSourceId = 1, BatchVersion = 1, SeedVersion = 0 };
+        var job = new MetadataScanJob { TenantId = source.TenantId, DataSourceId = source.Id, BatchVersion = 1, SeedVersion = 0 };
         var scanner = new MetadataScannerService(context, null!, null!, null!, null!,
             new VectorBackfillGate(Options.Create(new Features { MetadataVersionFilterEnabled = true })));
         var blocked = await Assert.ThrowsAsync<MetadataActivationBlockedException>(() => scanner.ActivateAsync(job, source));
@@ -63,11 +62,11 @@ public sealed class MetadataLifecycleRealBackendTests
 
         await qdrant.UpsertAsync(newTableId, Vector(), new Dictionary<string, object>
         {
-            ["tenant_id"] = 7L, ["data_source_id"] = 1L, ["metadata_version"] = 1, ["metadata_type"] = "table"
+            ["tenant_id"] = source.TenantId, ["data_source_id"] = source.Id, ["metadata_version"] = 1, ["metadata_type"] = "table"
         });
         await qdrant.UpsertAsync(newColumnId, Vector(), new Dictionary<string, object>
         {
-            ["tenant_id"] = 7L, ["data_source_id"] = 1L, ["metadata_version"] = 1, ["metadata_type"] = "column"
+            ["tenant_id"] = source.TenantId, ["data_source_id"] = source.Id, ["metadata_version"] = 1, ["metadata_type"] = "column"
         });
         staged.VectorStatus = "Synced";
         await scanner.ActivateAsync(job, source);
@@ -85,20 +84,21 @@ public sealed class MetadataLifecycleRealBackendTests
         await RealBackendConnections.CreateSqlServerDatabaseAsync(database);
         var qdrant = Qdrant("sb_v10_legacy");
         var ids = new[] { Guid.NewGuid().ToString(), Guid.NewGuid().ToString(), Guid.NewGuid().ToString() };
-        foreach (var id in ids)
-            await qdrant.UpsertAsync(id, Vector(), new Dictionary<string, object> { ["tenant_id"] = 7L });
+        long sourceId;
 
         await using (var oldContext = Context(database))
         {
             await oldContext.GetService<IMigrator>().MigrateAsync("20260917064339_M13_VectorGcAndFailureTables");
-            oldContext.Tenants.Add(new Tenant { Id = 7, TenantCode = "v10", TenantName = "V10" });
             var source = Source();
             source.NextMetadataVersion = 0;
             source.VectorsBackfilled = false;
-            oldContext.DataSources.Add(source);
+            await SeedSourceAsync(oldContext, source);
+            sourceId = source.Id;
+            foreach (var id in ids)
+                await qdrant.UpsertAsync(id, Vector(), new Dictionary<string, object> { ["tenant_id"] = source.TenantId });
             oldContext.MetadataTables.Add(new MetadataTable
             {
-                TenantId = 7, DataSourceId = 1, TableName = "legacy_orders", MetadataVersion = 0,
+                TenantId = source.TenantId, DataSourceId = source.Id, TableName = "legacy_orders", MetadataVersion = 0,
                 VectorId = ids[0], Columns = { new MetadataColumn
                 {
                     ColumnName = "id", DataType = "int", MetadataVersion = 0, VectorId = ids[1],
@@ -120,7 +120,7 @@ public sealed class MetadataLifecycleRealBackendTests
         {
             var point = await qdrant.RetrieveVectorAsync(id);
             Assert.NotNull(point);
-            Assert.Equal("1", point.Value.Payload["data_source_id"].ToString());
+            Assert.Equal(sourceId.ToString(), point.Value.Payload["data_source_id"].ToString());
             Assert.Equal("0", point.Value.Payload["metadata_version"].ToString());
         }
     }
@@ -133,23 +133,22 @@ public sealed class MetadataLifecycleRealBackendTests
         await RealBackendConnections.CreateSqlServerDatabaseAsync(database);
         var qdrant = Qdrant("sb_v10_delete_gc");
         var pointId = Guid.NewGuid().ToString();
-        await qdrant.UpsertAsync(pointId, Vector(), new Dictionary<string, object> { ["tenant_id"] = 7L });
-
         await using (var beforeRestart = Context(database))
         {
             await beforeRestart.Database.EnsureCreatedAsync();
-            beforeRestart.Tenants.Add(new Tenant { Id = 7, TenantCode = "v10", TenantName = "V10" });
-            beforeRestart.DataSources.Add(Source());
+            var source = Source();
+            await SeedSourceAsync(beforeRestart, source);
+            await qdrant.UpsertAsync(pointId, Vector(), new Dictionary<string, object> { ["tenant_id"] = source.TenantId });
             beforeRestart.MetadataTables.Add(new MetadataTable
             {
-                TenantId = 7, DataSourceId = 1, TableName = "legacy_orders", VectorId = pointId
+                TenantId = source.TenantId, DataSourceId = source.Id, TableName = "legacy_orders", VectorId = pointId
             });
             await beforeRestart.SaveChangesAsync();
             await using var transaction = await beforeRestart.Database.BeginTransactionAsync();
             beforeRestart.DataSources.Remove(await beforeRestart.DataSources.SingleAsync());
             beforeRestart.MetadataVectorGcRequests.Add(new MetadataVectorGcRequest
             {
-                DataSourceId = 1, TenantId = 7, Reason = "DataSourceDeleted", Status = "Pending",
+                DataSourceId = source.Id, TenantId = source.TenantId, Reason = "DataSourceDeleted", Status = "Pending",
                 PayloadJson = JsonSerializer.Serialize(new[] { pointId })
             });
             await beforeRestart.SaveChangesAsync();
@@ -169,9 +168,19 @@ public sealed class MetadataLifecycleRealBackendTests
     private static SuperBIContext Context(string database) => new(new DbContextOptionsBuilder<SuperBIContext>()
         .UseSqlServer(RealBackendConnections.SqlServer(database)).Options);
 
+    private static async Task SeedSourceAsync(SuperBIContext context, DataSource source)
+    {
+        var tenant = new Tenant { TenantCode = "v10", TenantName = "V10" };
+        context.Tenants.Add(tenant);
+        await context.SaveChangesAsync();
+        source.TenantId = tenant.Id;
+        context.DataSources.Add(source);
+        await context.SaveChangesAsync();
+    }
+
     private static DataSource Source() => new()
     {
-        Id = 1, TenantId = 7, Name = "v10-source", NormalizedName = "v10-source",
+        Name = "v10-source", NormalizedName = "v10-source",
         DbType = "SQLSERVER", ConnectionString = "ci-only"
     };
 
