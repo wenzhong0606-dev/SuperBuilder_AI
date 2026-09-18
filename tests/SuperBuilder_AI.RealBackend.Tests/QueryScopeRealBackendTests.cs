@@ -29,7 +29,7 @@ public sealed class QueryScopeRealBackendTests
                 INSERT INTO schema2.orders VALUES (1, 'right-sql');
                 """);
             var reader = new MySqlMetadataReader();
-            var tables = await reader.GetTablesAsync(sql.ConnectionString, "SQLSERVER");
+            var tables = await reader.GetTablesAsync(RealBackendConnections.SqlServer(database), "SQLSERVER");
             Assert.Contains(tables, t => t.TableName == "orders" && t.SchemaName == "schema1");
             Assert.Contains(tables, t => t.TableName == "orders" && t.SchemaName == "schema2");
             var query = await BuildJoinAsync(new SqlServerDialect(), database, "schema1", database, "schema2");
@@ -49,7 +49,7 @@ public sealed class QueryScopeRealBackendTests
                 INSERT INTO schema2.orders VALUES (1, 'right-pg');
                 """);
             var reader = new MySqlMetadataReader();
-            var tables = await reader.GetTablesAsync(pg.ConnectionString, "POSTGRESQL");
+            var tables = await reader.GetTablesAsync(RealBackendConnections.PostgreSql(database), "POSTGRESQL");
             Assert.Contains(tables, t => t.TableName == "orders" && t.SchemaName == "schema1");
             Assert.Contains(tables, t => t.TableName == "orders" && t.SchemaName == "schema2");
             var query = await BuildJoinAsync(new PostgreSqlDialect(), database, "schema1", database, "schema2");
@@ -75,7 +75,7 @@ public sealed class QueryScopeRealBackendTests
                 INSERT INTO sb_v10_right.orders VALUES (1, 'right-my');
                 """);
             var reader = new MySqlMetadataReader();
-            var databases = await reader.GetDatabasesAsync(mysql.ConnectionString, "MYSQL");
+            var databases = await reader.GetDatabasesAsync(RealBackendConnections.MySql(leftDb), "MYSQL");
             Assert.Contains(leftDb, databases);
             Assert.Contains(rightDb, databases);
             Assert.Contains(await reader.GetTablesAsync(RealBackendConnections.MySql(leftDb), "MYSQL"), t => t.TableName == "orders" && t.CatalogName == leftDb);
@@ -96,7 +96,7 @@ public sealed class QueryScopeRealBackendTests
                 INSERT INTO sb_v10_right.dbo.orders VALUES (1, 'right-sql');
                 """);
             var reader = new MySqlMetadataReader();
-            var databases = await reader.GetDatabasesAsync(sql.ConnectionString, "SQLSERVER");
+            var databases = await reader.GetDatabasesAsync(RealBackendConnections.SqlServer(leftDb), "SQLSERVER");
             Assert.Contains(leftDb, databases);
             Assert.Contains(rightDb, databases);
             Assert.Contains(await reader.GetTablesAsync(RealBackendConnections.SqlServer(rightDb), "SQLSERVER"), t => t.TableName == "orders" && t.CatalogName == rightDb);

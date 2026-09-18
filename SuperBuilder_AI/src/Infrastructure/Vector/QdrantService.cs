@@ -480,7 +480,12 @@ public class QdrantService
 			return null;
 		}
 
-		var vector = p.Vectors.Vector.Data.ToArray();
+		var vectorOutput = p.Vectors.Vector;
+#pragma warning disable CS0612 // Older Qdrant collections can still return the legacy data field.
+		var vector = vectorOutput.GetDenseVector()?.Data.ToArray() ?? vectorOutput.Data.ToArray();
+#pragma warning restore CS0612
+		if (vector.Length == 0)
+			throw new InvalidOperationException($"向量 point {id} 不包含稠密向量，无法安全回填。");
 		var payload = p.Payload.ToDictionary(
 			kv => kv.Key,
 			kv => ConvertPayloadValue(kv.Value));
