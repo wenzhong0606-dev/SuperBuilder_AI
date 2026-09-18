@@ -347,6 +347,10 @@ ASALocalRun/
 # MSBuild Binary and Structured Log
 *.binlog
 
+# Build/test log artifacts (sandbox harness writes logs to disk instead of stdout)
+build_*.txt
+test_*.txt
+
 # NVidia Nsight GPU debugger configuration file
 *.nvuser
 
