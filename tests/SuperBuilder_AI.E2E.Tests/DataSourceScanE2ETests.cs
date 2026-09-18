@@ -103,6 +103,7 @@ public sealed class DataSourceScanE2ETests
 
         // 3) 轮询任务状态直到终态（最多约 90s）
         string? status = null;
+        string? failureDetail = null;
         int tablesScanned = 0;
         for (int i = 0; i < 90; i++)
         {
@@ -112,10 +113,17 @@ public sealed class DataSourceScanE2ETests
             var j = JsonDocument.Parse(job.Body).RootElement;
             status = j.GetProperty("status").GetString();
             tablesScanned = j.TryGetProperty("tablesScanned", out var ts) && ts.ValueKind == JsonValueKind.Number ? ts.GetInt32() : 0;
+            if (status == "Failed")
+            {
+                var reason = j.TryGetProperty("failedReason", out var r) ? r.ToString() : "";
+                var code = j.TryGetProperty("errorCode", out var c) ? c.ToString() : "";
+                var message = j.TryGetProperty("errorMessage", out var m) ? m.ToString() : "";
+                failureDetail = $"reason={reason}; code={code}; message={message}";
+            }
             if (status == "Succeeded" || status == "Failed") break;
         }
 
-        Assert.Equal("Succeeded", status);
+        Assert.True(status == "Succeeded", $"扫描任务状态={status ?? "无响应"}; {failureDetail}");
         Assert.True(
             tablesScanned >= 3,
             $"扫描成功但 tablesScanned={tablesScanned}，CI 业务 Fixture 预期至少 3 张表（job：{status}）。");
