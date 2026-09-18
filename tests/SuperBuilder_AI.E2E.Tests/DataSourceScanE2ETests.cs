@@ -183,7 +183,7 @@ public sealed class DataSourceScanE2ETests
         Assert.True(latest.Ok, $"GET latest 失败（{latest.Status}）：{latest.Body}");
         var lj = JsonDocument.Parse(latest.Body).RootElement;
         Assert.True(
-            lj.TryGetProperty("id", out var lid) && lid.GetInt64() == jobId,
+            lj.TryGetProperty("jobId", out var lid) && lid.GetInt64() == jobId,
             "latest 返回任务 id 与启动任务不一致");
         Assert.True(lj.TryGetProperty("status", out var lst) && !string.IsNullOrEmpty(lst.GetString()), "latest 缺少 status");
     }
