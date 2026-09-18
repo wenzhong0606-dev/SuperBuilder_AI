@@ -249,9 +249,9 @@ public class MySqlMetadataReader : IDataSourceMetadataReader
                 END AS Length,
                 c.is_nullable AS IsNullable,
                 CASE WHEN pk.column_id IS NULL THEN 0 ELSE 1 END AS IsPrimaryKey
-            FROM (SELECT object_id, schema_id, name, type FROM sys.tables
+            FROM (SELECT object_id, schema_id, name, type, is_ms_shipped FROM sys.tables
                   UNION ALL
-                  SELECT object_id, schema_id, name, type FROM sys.views) o
+                  SELECT object_id, schema_id, name, type, is_ms_shipped FROM sys.views) o
             INNER JOIN sys.columns c ON c.object_id = o.object_id
             INNER JOIN sys.types ty ON ty.user_type_id = c.user_type_id
             LEFT JOIN sys.extended_properties ep

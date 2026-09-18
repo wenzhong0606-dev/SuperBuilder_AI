@@ -32,6 +32,9 @@ public sealed class QueryScopeRealBackendTests
             var tables = await reader.GetTablesAsync(RealBackendConnections.SqlServer(database), "SQLSERVER");
             Assert.Contains(tables, t => t.TableName == "orders" && t.SchemaName == "schema1");
             Assert.Contains(tables, t => t.TableName == "orders" && t.SchemaName == "schema2");
+            var columns = await reader.GetColumnsAsync(RealBackendConnections.SqlServer(database), "SQLSERVER");
+            Assert.Contains(columns, c => c.TableName == "orders" && c.ColumnName == "label" && c.CatalogName == database && c.SchemaName == "schema1");
+            Assert.Contains(columns, c => c.TableName == "orders" && c.ColumnName == "label" && c.CatalogName == database && c.SchemaName == "schema2");
             var query = await BuildJoinAsync(new SqlServerDialect(), database, "schema1", database, "schema2");
             Assert.Equal(("left-sql", "right-sql"), await RealBackendConnections.ReadPairAsync(sql, query));
         }
