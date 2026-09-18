@@ -149,7 +149,7 @@
 | # | 签署条件 | 状态 | 证据 |
 |---|---|---|---|
 | ① | 四组关键跨系统路径真实后端验证全过 | ✅ **已满足** | CI 13/13/0（§2 四组 + CleanupEndpoint 1 + QueryScope 2） |
-| ② | 关键页面流程 E2E 各 1 条（取消 / 续显 / 删除确认 / 失败项重扫） | 🟡 **已著 4 条 E2E（CI 业务库缺口已补，待推送跑绿）** | `DataSourceScanE2ETests` 新增 4 方法；`dotnet-build.yml` e2e job 已加「初始化 E2E 业务库 SuperBuilder_E2E_Business + 4 表」步骤，对接 CI 下 ScanConnection 回退串，无需本地部署即可在 CI 执行 |
+| ② | 关键页面流程 E2E 各 1 条（取消 / 续显 / 删除确认 / 失败项重扫） | 🟢 **已在 CI 实际运行**：5 条 DataSourceScan E2E 中 4 条通过、1 条（ResumeScan 续显）因误读 latest 响应字段名（id→应为 jobId）失败，已修复 `d71baea`，待重跑确认全绿 | CI run 35357990661「Web/Blazor E2E」步骤18 实测：业务库建表成功、E2E 编译 0 错、PopulatesMetadata 端到端贯通（建源→扫描→tablesScanned≥3→Succeeded）；仅 ResumeScan 读 `id` 应为 `jobId` 致 1 失败（汇总 28 测试：22 过/1 败/5 跳） |
 | ③ | C1–C11/§L.8 在矩阵中逐项映射到已有证据或人工记录 | ✅ **已完成（§7 逐项映射）** | §7.1（C1–C11）+ §7.2（§L.1–§L.8/L-场景）+ §7.3 结论，逐条标注 ✅/🟡/❌ 与测试类.方法 |
 | ④ | 全部 CI 通过 | ✅ **已满足** | 真实后端 CI 全绿；常规 CI 此前已绿 |
 
@@ -160,7 +160,7 @@
 - **仍建议补的测试缺口（§7.3 🟡/❌）**：C4 重启对账（硬缺口）、C11 页面形态、C2 范围排除前缀/视图开关、C8 disable/409 依赖、C9 审计内容、§L.1 并发分配、§L.8 场景 3/7/8/9/10 专门断言。
 
 ### 剩余动作清单
-1. 🟡 关键页面流程 E2E ×4 已著（`DataSourceScanE2ETests`）；`dotnet-build.yml` 已补业务库步骤，待推送触发 CI e2e job 跑绿验证。
+1. 🟢 关键页面流程 E2E ×4 + 续显 已著（`DataSourceScanE2ETests` 5 方法）并在 CI 实际运行（run 35357990661）；ResumeScan 读 latest 字段名 bug（id→jobId）已修复 `d71baea`，待推送重跑确认全绿。
 2. ✅ C1–C11/§L.8 证据映射已完成（§7）。
 3. ⬜ C10 视觉人工证据、Ask 在线模型验收（独立于 CI）。
 4. ⬜ 建议补测试：C4 重启对账、C11 页面、§L.1 并发分配、§L.8 场景 3/7/8/9/10（详见 §7.3）。
