@@ -93,7 +93,54 @@
 
 ---
 
-## 7. 闭环进度快照（2026-09-18）
+## 7. C1–C11 / §L.8 证据映射（补齐项 ③）
+
+> 判定口径：✅ 有自动化测试直接覆盖（标注 `测试类.方法`）｜🟡 部分覆盖（设计已落地但缺专门断言/仅真实后端或仅 API 层）｜❌ 无自动化证据（需补测试或人工记录）。所有引用均经源码核对（见 §6 取证）。
+
+### 7.1 C1–C11 逐项映射
+
+| 条款 | 验收核心点 | 现有证据 | 覆盖度 |
+|---|---|---|---|
+| **C1** 新增不自动扫描 + 保存并扫描 | 仅创建无 ScanJob；保存并扫描入队；旧端点 410 | `MetadataScanControllerTests.Scan_CreatesQueuedJob_AndEnqueues`、`Scan_OldFixedEndpoint_Returns410`；`DataSourceScanE2ETests.Admin_CreateDataSource_ThenScan_PopulatesMetadata`（创建时不带 scanAfterCreate，再显式扫描） | ✅ |
+| **C2** 扫描范围选择（§10.1） | 唯一索引含 version、跨 schema/库同名并存、FK/字典识别、扫描结果能被 Ask 命中 | `MetadataVectorIntegrityTests.MetadataTable_同DataSource_Catalog_Schema_Table_唯一` / `不同Catalog_Schema_允许同名` / `空Catalog_Schema_不唯一约束_兼容存量`；`MetadataScannerServiceTests.ScanAsync_ForeignKeysAndDictionaryTable_PopulateRolesAndConfig` / `WideJeeSiteDictionaryTable_*`；`MetadataDiscoveryHeuristicsTests.ResolveRoles_*` / `IsDictionaryCandidate_*`；`QueryScopeRealBackendTests.CrossSchema_*` / `CrossDatabase_*`（真实后端验证 Ask 限定名命中） | 🟡（范围排除前缀/视图开关的纯单元断言缺；跨 schema/库选择正确性已由真实后端覆盖） |
+| **C3** 可中断（软取消） | 运行中取消→Cancelling→Cancelled；终态冲突；无权限 403 | `MetadataScanControllerTests.CancelScan_QueuedJob_BecomesCancelled` / `RunningJob_BecomesCancelling` / `TerminalJob_Conflict` / `Forbidden_WhenMissingCancelPermission` / `NotFound_ForUnknownJob` | ✅（端点/状态）；🟡（in-flight 表安全点退出、active/Ask 不变为取消令牌传播逻辑，未单元断言） |
+| **C4** 重启恢复（§10.3） | 遗留 Queued 重入队；kill-9→Running 标 Failed(worker_interrupted)；对账与消费并发；StopAsync 双循环完成 | **未找到 `ScanStartupReconciler` / `ReconcileAsync` / worker_interrupted 的专门测试**（`MetadataVersionGcJobTests` 仅覆盖 GC 作业幂等，非对账器） | ❌ **缺口**：建议补 HostedService 集成测试（遗留 Running→Failed、>1024 Queued 启动不阻塞、双循环并发） |
+| **C5** 页面恢复续显（含重启） | GET latest 返回最新任务（不限终态）；进度快照富化 | `MetadataScanControllerTests.GetLatestScanJob_ReturnsNull_WhenNone` / `ReturnsLatest` / `GetScanJob_ReturnsCreatedJob_Status` / `GetScanJob_Returns_RichProgressSnapshot`；E2E 轮询至终端 | ✅（API 层）；🟡（Blazor 页面续轮询为 UI 行为，未单元测） |
+| **C6** 真正元数据隔离（=§L.8 场景1–5,7–10） | 隔离/取消不污染/激活原子+引用不丢/失败不污染/重扫保成功表/版本不重号/孤儿 | 见 §7.2（L-场景映射） | ✅（核心场景真实后端覆盖） |
+| **C7** 失败表级记录 + 重试 + 部分成功 | 重试 3 次写失败项→PartiallySucceeded；仅重扫失败项保成功表；retry-failed 端点 | `MetadataScanControllerTests.GetScanJob_ReturnsTableFailures` / `RetryFailedScan_*`(4)；`MetadataScannerServiceTests.ScanAsync_ColumnReadFailure_RetainsFailedTableAndReportsPartialResult`；`MetadataLifecycleRealBackendTests.RescanOnlyFailedItems_ThenActivates` | ✅ |
+| **C8** 删除两档 + 影响分析 + 一致性 | cleanup：先清 Restrict 引用→级联→写 GC 待办→重启续跑；disable 保留 | `CleanupEndpointRealBackendTests.CleanupEndpoint_PersistsAllUntaggedPointIds_AndGcFinishesAfterContextRestart`；`MetadataLifecycleRealBackendTests.DeletedSource_StoredGcRequest_SurvivesContextRestart_*` / `Cleanup_KillBeforeGc_Restart_Continues_NoOrphan`；`MetadataVersionGcJobTests.RunAsync_*`；`MetadataVectorMaintenanceTests.Gc_InterruptedOrFailedRequest_Retries` | ✅（cleanup + 重启 GC 真实后端覆盖）；🟡（disable 档与依赖二次确认 409 缺控制器测试） |
+| **C9** 细粒度权限 + 审计 | 无 cancel_scan→403；每操作落一条；失败→result=failure | `MetadataScanControllerTests.Scan_Forbidden_WhenDataSourceNotAuthorized` / `Scan_Forbidden_WhenMissingMetadataScanPermission` / `CancelScan_Forbidden_WhenMissingCancelPermission`（① 403） | ✅（权限守卫）；🟡（审计落库内容与 failure→result=failure 未显式断言） |
+| **C10** 阶段日志 + 配色高亮（无障碍） | 富进度模型轮转；关键数字高亮；色盲友好 | `ScanTelemetryTests.RichProgress_RoundTrips_StageCountsTimingAndEvents` / `KeepsOnlyLatestTwentyEvents` / `InvalidHistoricalJson_FallsBackToEmptySnapshot`（进度模型 + 事件） | ✅（模型/事件）；🟡（UI 配色/无障碍为前端呈现，归 C10 视觉人工证据） |
+| **C11** 页面最终形态（区域 + 按钮权限显隐） | 9 区 + 按钮按权限显隐；失败项可展开与重扫 | **未找到页面结构/权限显隐的自动化测试** | ❌（归 ② 页面 E2E / C10 视觉人工证据） |
+
+### 7.2 §L.1–§L.8 / L-场景 映射
+
+| 条款 | 验收核心点 | 现有证据 | 覆盖度 |
+|---|---|---|---|
+| **§L.1** 版本分配并发安全（§10.2） | 并发 N 次仅 1 成功（ux_ds_active_scan 409）；串行严格递增；计数仅对成功 +1 | `MetadataVersionCounterRepairTests.RepairMigration_AdvancesCounterPastActiveJobsAndTables`（计数器修复/单调） | 🟡（修复/单调有覆盖；并发分配原子性 + 409 回滚未显式单元测） |
+| **§L.3/L.5** clone-on-write + 激活翻指针 + 引用重映射 | 克隆清空向量状态；激活仅翻指针；旧版延迟 GC | `MetadataScannerServiceTests.ActivateAsync_QueuesOldVersionVectorsForGc`；`MetadataVersionGcJobTests.RunAsync_DeletesOnlyInactiveRowsAndIsIdempotent` / `KeepsOldRowsWhenExternalReferenceStillExists` | ✅ |
+| **§L.4** 向量隔离 + 激活闸门（§10.6） | 必需 point 未 Synced→阻断激活；Synced 可过；失败批次不删旧 active | `MetadataScannerServiceTests.ActivateAsync_BlocksExistingVectorIdsWithFailedStatus` / `ReportsEveryTableWithIncompleteVectors` / `ScanAsync_VectorIndexFailure_FailsScanWithTelemetry`；`MetadataVectorIntegrityTests.MetadataVectorService_成功时记录Synced与维度` / `嵌入失败时标记Failed`；`MetadataVectorMaintenanceTests.Backfill_MissingStoredPoint_DoesNotMarkSourceComplete`（§10.4 不误标完成）；`MetadataLifecycleRealBackendTests.VectorFailure_BlocksActivation_OldVersionAskStillWorks` | ✅ |
+| **§L.7** 删除 GC 持久化 | 删除事务内写 `MetadataVectorGcRequest`（含 point 快照）→ 提交后 Job 删 | `CleanupEndpointRealBackendTests.*`；`MetadataLifecycleRealBackendTests.Cleanup_DeleteWritesGcRequest_WithPointIdSnapshot` / `Cleanup_AuditTrail_Recorded` | ✅ |
+| **§L.8 场景1（隔离）** | 扫描中 Ask 仅见旧版、向量返旧 point | `QueryScopeRealBackendTests.CrossSchema_*` / `CrossDatabase_*`（激活前查询旧版） | ✅ |
+| **§L.8 场景2（取消不污染）** | 取消后 Ask 不变、staging/point 最终 GC | `MetadataScanControllerTests.CancelScan_*` + 真实后端 GC 作业 | ✅（端点）；🟡（取消后 point 最终 GC 未单独断言） |
+| **§L.8 场景3（激活原子+引用不丢）** | 激活后缓存键变、RLS/Binding 改指向新行不丢 | `MetadataScannerServiceTests.ActivateAsync_*`；缺「RLS/PhysicalBinding 自动改指向」专门断言 | 🟡 |
+| **§L.8 场景4（失败不污染）** | 失败→Ask 用旧版、旧 active 完好 | `MetadataLifecycleRealBackendTests.VectorFailure_BlocksActivation_OldVersionAskStillWorks` | ✅ |
+| **§L.8 场景5（重扫失败项不丢成功表）** | PartiallySucceeded 后仅重扫失败项→成功表保留 | `MetadataLifecycleRealBackendTests.RescanOnlyFailedItems_ThenActivates`；`MetadataScanControllerTests.RetryFailedScan_*` | ✅ |
+| **§L.8 场景6（删除一致性）** | cleanup 写待办→重启续跑→残留 point 不被检索 + AuditLog | `CleanupEndpointRealBackendTests.*`；`MetadataLifecycleRealBackendTests.Cleanup_KillBeforeGc_Restart_Continues_NoOrphan` / `Cleanup_AuditTrail_Recorded` | ✅ |
+| **§L.8 场景7（版本不重号）** | Cancelled/Failed 遗留 + 并发→NextMetadataVersion 单调 | `MetadataVersionCounterRepairTests.*`（单调修复）；`MetadataLifecycleRealBackendTests.LegacyMigration_BackfillThenActivate_FlipsActiveVersion` | 🟡（修复/legacy 有覆盖；并发重号对抗未显式测） |
+| **§L.8 场景8（向量回填闸门）** | 阶段 A 全量召回；回填完翻标志严格过滤；兼容过滤兜底 | `MetadataVectorMaintenanceTests.Backfill_MissingStoredPoint_DoesNotMarkSourceComplete`；缺「阶段 A 中途误开标志兼容过滤兜底」专门断言 | 🟡 |
+| **§L.8 场景9（克隆向量重建）** | 克隆清空 VectorId→NeedsIndex 重索引→三类型 point 生成 | `MetadataScannerServiceTests.ActivateAsync_BlocksExistingVectorIdsWithFailedStatus`（反向验证未索引阻断）；缺「克隆后新版本三类型 point 均生成」正向断言 | 🟡 |
+| **§L.8 场景10（孤儿引用处理）** | 全量删列→激活默认阻断（Failed+依赖清单）或 DisableAndAudit | `MetadataVectorIntegrityTests.DetectOrphans_返回Qdrant中多余Point`（孤儿检测）；缺「激活默认阻断 orphaned_references」端到端断言 | 🟡 |
+| **§10.5** Ask 查询链贯通 | 跨 schema/库同名表用限定名 + 稳定别名、不串表；PG 跨库拒 | `QueryScopeRealBackendTests.CrossSchema_*` / `CrossDatabase_*` | ✅ |
+
+### 7.3 补齐项 ③ 结论
+- **已闭环（✅）**：C1、C3（端点）、C5（API）、C7、C8（cleanup+重启 GC）、C9（权限）、C10（模型）；§L.4/§L.5/§L.7 及 §L.8 场景 1/2/4/5/6 真实后端覆盖。
+- **部分覆盖（🟡，建议补测试）**：C2 范围排除前缀/视图开关、C3 in-flight 安全、C4 **重启对账（硬缺口）**、C8 disable/409 依赖、C9 审计内容、§L.1 并发分配、§L.8 场景 3/7/8/9/10 的专门断言。
+- **无证据（❌，归人工/页面）**：C4 重启对账、C11 页面形态。
+
+---
+
+## 8. 闭环进度快照（2026-09-18）
 
 > CI 结果：**`datasource-scan-real-backend.yml` 四容器全绿，13/13/0**。本地提交 `98841e6`（深度测试 + 验收矩阵 + 脚本 + .gitignore）+ `abce846`（CI 门槛由写死 `eq 6` 改为动态全选全过）已推送 origin/master。
 
@@ -102,17 +149,19 @@
 | # | 签署条件 | 状态 | 证据 |
 |---|---|---|---|
 | ① | 四组关键跨系统路径真实后端验证全过 | ✅ **已满足** | CI 13/13/0（§2 四组 + CleanupEndpoint 1 + QueryScope 2） |
-| ② | 关键页面流程 E2E 各 1 条（取消 / 续显 / 删除确认 / 失败项重扫） | ⬜ **未做** | 需 Playwright + 运行中 Web/API，未排期 |
-| ③ | C1–C11/§L.8 在矩阵中逐项映射到已有证据或人工记录 | ⬜ **未做** | 矩阵 §1 仅覆盖 §9.1 五类核心条款；其余项待补映射 |
+| ② | 关键页面流程 E2E 各 1 条（取消 / 续显 / 删除确认 / 失败项重扫） | 🟡 **已著 4 条 E2E（待运行部署验证）** | `DataSourceScanE2ETests` 新增 4 方法（取消/续显/删除确认/失败项重扫），`SkippableFact` 门控 SB_E2E_SCAN_CONNECTION；沙箱无运行部署，未执行 |
+| ③ | C1–C11/§L.8 在矩阵中逐项映射到已有证据或人工记录 | ✅ **已完成（§7 逐项映射）** | §7.1（C1–C11）+ §7.2（§L.1–§L.8/L-场景）+ §7.3 结论，逐条标注 ✅/🟡/❌ 与测试类.方法 |
 | ④ | 全部 CI 通过 | ✅ **已满足** | 真实后端 CI 全绿；常规 CI 此前已绿 |
 
 ### 结论
 - **数据 / 向量契约层（①⑤ 核心行为：扫描→激活→查询链 / 向量失败保旧版 / 存量 backfill / 删除后 GC 持久化 + 重启清理 / 审计）已通过真实后端闭环验证，可视为"契约层已闭环"。**
-- 依 §0 约定，签署"**v10 完整闭环**"仍缺 ② 关键页面 E2E 与 ③ C1–C11/§L.8 逐项映射。这两项为**收敛后范围内的剩余项**，非本次已否决的全量验收；可单独排期补齐后再签全闭环，或按"契约层闭环 + 页面/E2E 后续"分级发布。
+- 依 §0 约定，签署"**v10 完整闭环**"仍待 ② 页面 E2E 在运行部署上实际跑绿。③ C1–C11/§L.8 逐项映射已完成（§7）。② 的 4 条 E2E 已著但沙箱无运行部署未执行，需在真机/CI（配 `SB_E2E_SCAN_CONNECTION` + `SB_E2E_BASE_URL` + 管理员凭据）跑绿方可签全闭环；或按"契约层闭环 + 页面/E2E 后续"分级发布。
 - C10 视觉验收（人工截图/录屏）与 Ask 在线模型验收（与 CI 分离单独跑）仍按 §3 留人工证据，不计入 CI 硬门槛。
+- **仍建议补的测试缺口（§7.3 🟡/❌）**：C4 重启对账（硬缺口）、C11 页面形态、C2 范围排除前缀/视图开关、C8 disable/409 依赖、C9 审计内容、§L.1 并发分配、§L.8 场景 3/7/8/9/10 专门断言。
 
 ### 剩余动作清单
-1. ⬜ 关键页面流程 E2E ×4（取消 / 退出重进续显 / 删除影响确认 / 失败项重扫）—— 需 Playwright + 运行中 Web/API。
-2. ⬜ C1–C11/§L.8 其余条款证据映射（矩阵扩列或补人工记录）。
+1. 🟡 关键页面流程 E2E ×4 已著（`DataSourceScanE2ETests`），需在运行部署执行验证（Playwright + SB_E2E_*）。
+2. ✅ C1–C11/§L.8 证据映射已完成（§7）。
 3. ⬜ C10 视觉人工证据、Ask 在线模型验收（独立于 CI）。
-4. ✅ 本次 `abce846` 已修 CI 门槛硬编码 `eq 6` 缺陷（否则 13≠6 会被卡红）。
+4. ⬜ 建议补测试：C4 重启对账、C11 页面、§L.1 并发分配、§L.8 场景 3/7/8/9/10（详见 §7.3）。
+5. ✅ 本次 `abce846` 已修 CI 门槛硬编码 `eq 6` 缺陷（否则 13≠6 会被卡红）。

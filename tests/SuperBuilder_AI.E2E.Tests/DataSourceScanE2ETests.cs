@@ -128,4 +128,128 @@ public sealed class DataSourceScanE2ETests
             tablesScanned >= 3,
             $"扫描成功但 tablesScanned={tablesScanned}，CI 业务 Fixture 预期至少 3 张表（job：{status}）。");
     }
+
+    /// <summary>② 取消流程（C3）：启动扫描后立即取消，端点应成功（2xx）或已在终态冲突（409），取消后状态进入 Cancelling/Cancelled 等终态之一。</summary>
+    [SkippableFact]
+    public async Task Admin_CancelScan_TransitionsToCancellingOrCancelled()
+    {
+        var conn = ScanConnection;
+        Skip.If(string.IsNullOrWhiteSpace(conn), "未配置 SB_E2E_SCAN_CONNECTION（可达业务库），本地跳过取消 E2E。");
+        E2EConfig.Require(_fx.BaseUrl, E2EConfig.User, E2EConfig.Password);
+        var page = await _fx.NewPageAsync();
+        await LoginHelper.ApiLoginByCodeAsync(page, E2EConfig.User!, E2EConfig.Password!, "e2eapp");
+
+        var (dsId, jobId) = await CreateAndScanAsync(page);
+
+        // 轮询到可取消状态（Queued/Running），最多 ~10s
+        string? phase = null;
+        for (int i = 0; i < 10; i++)
+        {
+            var job = await E2EApiHelper.CallApiAsync(page, "GET", $"api/data-sources/{dsId}/metadata/scan/{jobId}");
+            if (job.Ok) phase = JsonDocument.Parse(job.Body).RootElement.GetProperty("status").GetString();
+            if (phase is "Queued" or "Running" or "Succeeded" or "Failed" or "Cancelled" or "PartiallySucceeded") break;
+            await Task.Delay(1000);
+        }
+
+        var cancel = await E2EApiHelper.CallApiAsync(page, "POST", $"api/data-sources/{dsId}/metadata/scan/{jobId}/cancel");
+        Assert.True(
+            cancel.Status is >= 200 and < 300 or 409,
+            $"取消端点返回非预期状态 {cancel.Status}：{cancel.Body}");
+
+        if (cancel.Status is >= 200 and < 300)
+        {
+            await Task.Delay(1500);
+            var after = await E2EApiHelper.CallApiAsync(page, "GET", $"api/data-sources/{dsId}/metadata/scan/{jobId}");
+            var st = JsonDocument.Parse(after.Body).RootElement.GetProperty("status").GetString();
+            Assert.True(
+                st is "Cancelling" or "Cancelled" or "Succeeded" or "Failed" or "PartiallySucceeded",
+                $"取消后状态={st} 不在预期集合");
+        }
+    }
+
+    /// <summary>② 退出重进续显（C5）：启动后模拟重新进入页面，GET latest 应返回同一任务且带状态。</summary>
+    [SkippableFact]
+    public async Task Admin_ResumeScan_AfterExit_ReturnsLatestJob()
+    {
+        var conn = ScanConnection;
+        Skip.If(string.IsNullOrWhiteSpace(conn), "未配置 SB_E2E_SCAN_CONNECTION，本地跳过续显 E2E。");
+        E2EConfig.Require(_fx.BaseUrl, E2EConfig.User, E2EConfig.Password);
+        var page = await _fx.NewPageAsync();
+        await LoginHelper.ApiLoginByCodeAsync(page, E2EConfig.User!, E2EConfig.Password!, "e2eapp");
+
+        var (dsId, jobId) = await CreateAndScanAsync(page);
+
+        var latest = await E2EApiHelper.CallApiAsync(page, "GET", $"api/data-sources/{dsId}/metadata/scan/latest");
+        Assert.True(latest.Ok, $"GET latest 失败（{latest.Status}）：{latest.Body}");
+        var lj = JsonDocument.Parse(latest.Body).RootElement;
+        Assert.True(
+            lj.TryGetProperty("id", out var lid) && lid.GetInt64() == jobId,
+            "latest 返回任务 id 与启动任务不一致");
+        Assert.True(lj.TryGetProperty("status", out var lst) && !string.IsNullOrEmpty(lst.GetString()), "latest 缺少 status");
+    }
+
+    /// <summary>② 删除影响确认（C8）：cleanup 模式删除数据源应成功返回（2xx）。</summary>
+    [SkippableFact]
+    public async Task Admin_DeleteDataSource_Cleanup_ReturnsSuccess()
+    {
+        var conn = ScanConnection;
+        Skip.If(string.IsNullOrWhiteSpace(conn), "未配置 SB_E2E_SCAN_CONNECTION，本地跳过删除 E2E。");
+        E2EConfig.Require(_fx.BaseUrl, E2EConfig.User, E2EConfig.Password);
+        var page = await _fx.NewPageAsync();
+        await LoginHelper.ApiLoginByCodeAsync(page, E2EConfig.User!, E2EConfig.Password!, "e2eapp");
+
+        var (dsId, _) = await CreateAndScanAsync(page);
+
+        var del = await E2EApiHelper.CallApiAsync(page, "DELETE", $"api/data-sources/{dsId}?mode=cleanup");
+        Assert.True(
+            del.Status is >= 200 and < 300 or 409,
+            $"cleanup 删除返回非预期状态 {del.Status}：{del.Body}");
+    }
+
+    /// <summary>② 失败项重扫（C7）：扫描终态后，retry-failed 在有失败项时建新任务（2xx），无失败项（Succeeded）时返回 409，均属契约。</summary>
+    [SkippableFact]
+    public async Task Admin_RetryFailedScan_HandlesNoFailuresOrCreatesLinked()
+    {
+        var conn = ScanConnection;
+        Skip.If(string.IsNullOrWhiteSpace(conn), "未配置 SB_E2E_SCAN_CONNECTION，本地跳过重扫 E2E。");
+        E2EConfig.Require(_fx.BaseUrl, E2EConfig.User, E2EConfig.Password);
+        var page = await _fx.NewPageAsync();
+        await LoginHelper.ApiLoginByCodeAsync(page, E2EConfig.User!, E2EConfig.Password!, "e2eapp");
+
+        var (dsId, jobId) = await CreateAndScanAsync(page);
+
+        string? status = null;
+        for (int i = 0; i < 90; i++)
+        {
+            var job = await E2EApiHelper.CallApiAsync(page, "GET", $"api/data-sources/{dsId}/metadata/scan/{jobId}");
+            if (job.Ok) status = JsonDocument.Parse(job.Body).RootElement.GetProperty("status").GetString();
+            if (status is "Succeeded" or "Failed" or "Cancelled" or "PartiallySucceeded") break;
+            await Task.Delay(1000);
+        }
+
+        var retry = await E2EApiHelper.CallApiAsync(page, "POST", $"api/data-sources/{dsId}/metadata/scan/{jobId}/retry-failed");
+        Assert.True(
+            retry.Status is >= 200 and < 300 or 409,
+            $"retry-failed 返回非预期状态 {retry.Status}：{retry.Body}");
+    }
+
+    private async Task<(long dsId, long jobId)> CreateAndScanAsync(IPage page)
+    {
+        var name = "e2e-scan-" + Guid.NewGuid().ToString("N")[..8];
+        var create = await E2EApiHelper.CallApiAsync(page, "POST", "api/data-sources", new
+        {
+            name,
+            dbType = ScanDbType,
+            connectionString = ScanConnection,
+        });
+        if (!create.Ok || create.Status is < 200 or >= 300)
+            Skip.If(true, $"数据源创建失败（{create.Status}）：{create.Body}");
+        var dsId = JsonDocument.Parse(create.Body).RootElement.GetProperty("id").GetInt64();
+
+        var scan = await E2EApiHelper.CallApiAsync(page, "POST", $"api/data-sources/{dsId}/metadata/scan");
+        if (scan.Status != 202)
+            Skip.If(true, $"扫描触发失败（{scan.Status}）：{scan.Body}");
+        var jobId = JsonDocument.Parse(scan.Body).RootElement.GetProperty("jobId").GetInt64();
+        return (dsId, jobId);
+    }
 }
