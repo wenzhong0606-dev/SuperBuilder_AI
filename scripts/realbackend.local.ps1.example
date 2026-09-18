@@ -1,0 +1,17 @@
+# 复制本文件为 scripts/realbackend.local.ps1 并填入你的远程库连接串。
+# 该文件已被 .gitignore（scripts/realbackend.local.ps1），请勿提交，避免泄露密码。
+
+# 必需：本地 SQL Server（你的机器上）
+#   账号须有 CREATE DATABASE 权限（测试会动态建 sb_v10_* 库，跑完即弃，不碰你的业务库）。
+#   连接串的 Database/InitialCatalog 会被代码按库名覆盖，这里留空或写 master 均可。
+#   本机 SQL Server 实测监听 1434（netstat 确认），故此处用 1434；若你的实例是默认 1433 或命名实例请相应修改。
+$env:SB_REAL_SQLSERVER = "Server=localhost,1434;User Id=live;Password=root;TrustServerCertificate=True"
+
+# 必需：本地 Qdrant（测试会建 sb_v10_* 集合并读写向量 point）
+#   端口 6334 是 gRPC（QdrantService 走 gRPC，非 REST 6333），勿改。
+$env:SB_REAL_QDRANT_HOST = "127.0.0.1"
+$env:SB_REAL_QDRANT_PORT = "6334"
+
+# 仅 -All 模式需要（QueryScopeRealBackendTests 跨库/跨 schema 用 MySQL + Postgres）：
+# $env:SB_REAL_MYSQL    = "Server=<MYSQL_HOST>:3306;User ID=<user>;Password=<pwd>;Database=mysql;CharSet=utf8mb4"
+# $env:SB_REAL_POSTGRES = "Host=<PG_HOST>;Port=5432;Username=<user>;Password=<pwd>;Database=postgres"

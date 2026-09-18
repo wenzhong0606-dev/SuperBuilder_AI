@@ -15,6 +15,7 @@ appsettings.Local.json
 appsettings.*.local.json
 secrets.json
 .aspnet-data-protection-keys/
+scripts/realbackend.local.ps1
 
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
