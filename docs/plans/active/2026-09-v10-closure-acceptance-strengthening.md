@@ -19,15 +19,15 @@
 
 | §9.1 原验收条款 | 现有证据 | 本次补齐 | 剩余风险 |
 |---|---|---|---|
-| ① 跨 schema Ask：扫描两 schema，分别 Ask 并 JOIN，FROM/JOIN 用限定名、字段用表 Id 稳定别名、不串表 | 🟡 `QueryScopeRealBackendTests` 验读取器 + `SqlQueryBuilder` 生成限定名 SQL（未走扫描→激活→Ask） | 🟡 **1.1 跨 schema 激活**：扫描结果进入激活版本、两 schema 同名表按物理键区分不串表（确定性查询链，非自然语言 Ask） | ⚠️ 完整 `POST /scan`→`Succeeded`→Ask 接口闭环建议补 1 条 E2E |
-| ② 跨库 Ask：逐库汇总扫描，同名表各自 Ask / 跨 catalog JOIN；PG 跨库与"连 db1 查 db2"均拒绝 | 🟡 `QueryScopeRealBackendTests.CrossDatabase_*` 验 MySQL/SQL Server 两级名 + PG 拒绝 | 🟡 **1.1 跨库激活**：跨 catalog 结果进入激活版本、PG 拒绝经确定性查询链断言 | ⚠️ 同上，建议 1 条跨库 E2E |
-| ③ 向量单表失败：必需 point 重试耗尽→激活被 `vector_index_incomplete` 阻断、旧版 Ask 仍可用、旧 point 不被 GC；C7 仅重扫失败项后激活成功 | 🟡 `MetadataLifecycleRealBackendTests.IncompleteVector_*` 直接 `ActivateAsync` 验闸门（未验旧版可用 / 未走重扫） | 🟡 **1.2 向量失败保旧版 + 失败项重扫**：必需 point 未 `Synced` 阻断激活；旧 v0 point 仍召回且不被 GC；`retry-failed` 仅重扫失败项后激活成功 | ⚠️ "重试耗尽"为扫描期语义，数据层以"未 Synced 阻断"等价验证；真实 AI 重试计数建议人工/在线确认 |
-| ④ 存量迁移：未升级旧库跑迁移，默认/非默认 schema 唯一候选准确回填；歧义/不可达进入异常清单且不误填/激活；`MetadataVectorBackfillJob` 补齐三类 point `data_source_id`；激活引用重映射 | 🟡 `MetadataLifecycleRealBackendTests.LegacyDatabase_*` 仅 happy-path 计数 + 三类 point | 🟡 **1.3 存量 backfill→activate**：旧库升级后 backfill 补 `data_source_id` + 激活 v0→v1 翻指针无孤儿 | ⚠️ 歧义/不可达为**扫描期守卫**（需真实读取器），建议补 fake-reader 集成测试或人工记录；不在数据层硬测 |
-| ⑤ 删除后重启 GC：cleanup 删源→事务内写 `MetadataVectorGcRequest`（含 point ID 快照）→ kill -9 前已持久→重启后 `MetadataVectorGcJob` 删尽、无孤儿 | 🟡 `MetadataLifecycleRealBackendTests.DeletedSource_*` 手工 `Add` GC 待办后换 DbContext | 🟡 **1.4 真实 cleanup 持久 GC + 重启清理**：经事务写 GC 待办（含 point 快照）→ 跨连接读取持久待办→GC 删尽、无孤儿；审计落 `metadata:vector:gc` | ⚠️ "kill -9"以"待办已提交 DB、跨连接读取"模拟进程退出，非真实进程杀死；cleanup 审计 `metadata:datasource:cleanup` 在 E2E 层验 |
+| ① 跨 schema Ask：扫描两 schema，分别 Ask 并 JOIN，FROM/JOIN 用限定名、字段用表 Id 稳定别名、不串表 | 🟡 `QueryScopeRealBackendTests` 验读取器 + `SqlQueryBuilder` 生成限定名 SQL（未走扫描→激活→Ask） | ✅ **1.1 跨 schema 激活**：扫描结果进入激活版本、两 schema 同名表按物理键区分不串表（确定性查询链，非自然语言 Ask） — CI 13/13/0 已验证 | ⚠️ 完整 `POST /scan`→`Succeeded`→Ask 接口闭环建议补 1 条 E2E |
+| ② 跨库 Ask：逐库汇总扫描，同名表各自 Ask / 跨 catalog JOIN；PG 跨库与"连 db1 查 db2"均拒绝 | 🟡 `QueryScopeRealBackendTests.CrossDatabase_*` 验 MySQL/SQL Server 两级名 + PG 拒绝 | ✅ **1.1 跨库激活**：跨 catalog 结果进入激活版本、PG 拒绝经确定性查询链断言 — CI 13/13/0 已验证 | ⚠️ 同上，建议 1 条跨库 E2E |
+| ③ 向量单表失败：必需 point 重试耗尽→激活被 `vector_index_incomplete` 阻断、旧版 Ask 仍可用、旧 point 不被 GC；C7 仅重扫失败项后激活成功 | 🟡 `MetadataLifecycleRealBackendTests.IncompleteVector_*` 直接 `ActivateAsync` 验闸门（未验旧版可用 / 未走重扫） | ✅ **1.2 向量失败保旧版 + 失败项重扫**：必需 point 未 `Synced` 阻断激活；旧 v0 point 仍召回且不被 GC；`retry-failed` 仅重扫失败项后激活成功 — CI 13/13/0 已验证 | ⚠️ "重试耗尽"为扫描期语义，数据层以"未 Synced 阻断"等价验证；真实 AI 重试计数建议人工/在线确认 |
+| ④ 存量迁移：未升级旧库跑迁移，默认/非默认 schema 唯一候选准确回填；歧义/不可达进入异常清单且不误填/激活；`MetadataVectorBackfillJob` 补齐三类 point `data_source_id`；激活引用重映射 | 🟡 `MetadataLifecycleRealBackendTests.LegacyDatabase_*` 仅 happy-path 计数 + 三类 point | ✅ **1.3 存量 backfill→activate**：旧库升级后 backfill 补 `data_source_id` + 激活 v0→v1 翻指针无孤儿 — CI 13/13/0 已验证 | ⚠️ 歧义/不可达为**扫描期守卫**（需真实读取器），建议补 fake-reader 集成测试或人工记录；不在数据层硬测 |
+| ⑤ 删除后重启 GC：cleanup 删源→事务内写 `MetadataVectorGcRequest`（含 point ID 快照）→ kill -9 前已持久→重启后 `MetadataVectorGcJob` 删尽、无孤儿 | 🟡 `MetadataLifecycleRealBackendTests.DeletedSource_*` 手工 `Add` GC 待办后换 DbContext | ✅ **1.4 真实 cleanup 持久 GC + 重启清理**：经事务写 GC 待办（含 point 快照）→ 跨连接读取持久待办→GC 删尽、无孤儿；审计落 `metadata:vector:gc` — CI 13/13/0 已验证 | ⚠️ "kill -9"以"待办已提交 DB、跨连接读取"模拟进程退出，非真实进程杀死；cleanup 审计 `metadata:datasource:cleanup` 在 E2E 层验 |
 
 ---
 
-## 2. 必须补的四组真实后端验证（数据/向量契约层）
+## 2. 必须补的四组真实后端验证（数据/向量契约层）✅ 已在 CI 验证（2026-09-18，13/13/0）
 
 > 载体：`tests/SuperBuilder_AI.RealBackend.Tests/`，沿用 `[Fact]`+`[Trait("Category","RealBackend")]`；运行依赖 `SB_REAL_*` 指向真实后端（可远程库，需建库权限 + Qdrant 可写）。四组均**复用现有直接实例化模式**（`new MetadataScannerService(context, null, null, null, null, gate)` + `MetadataVectorGcJob` + `QdrantService`），不启动完整 API——完整 API 闭环归 E2E。
 
@@ -78,7 +78,7 @@
 
 ## 5. 执行顺序
 
-1. **落 §2 四组真实后端测试**（方法已写入 `MetadataLifecycleRealBackendTests.cs`，编译验证；未运行——需 `SB_REAL_*` 真实后端）。
+1. ✅ **落 §2 四组真实后端测试**（方法已写入 `MetadataLifecycleRealBackendTests.cs`，编译验证；`98841e6` 提交；CI 四容器（SQL 1433/MySQL 8/Postgres 15/Qdrant 6334）于 2026-09-18 跑出 **13/13/0 全绿**）。
 2. **关键流程 E2E 各 1 条**（需 Playwright + 运行中 Web/API，另行安排）。
 3. **矩阵剩余风险补证据 / 人工记录**（歧义/不可达守卫、C10 视觉、Ask 在线验收）。
 4. **全部 CI 通过后签署 v10 闭环**（不新增硬性测试方法数量门槛）。
@@ -90,3 +90,29 @@
 - 真实后端测试依赖 `SB_REAL_*` 远程库 + 建库权限 + Qdrant 可写（见 final §9.1 与 memory 2026-09-18）。
 - Blazor E2E 需 Playwright Chromium + 运行中 Web/API（`SB_E2E_*`），可指向远程部署或本地 `dotnet run`。
 - 本文件未改动 final 文档正文（§9.1 仅恢复原状，未新增门槛）。
+
+---
+
+## 7. 闭环进度快照（2026-09-18）
+
+> CI 结果：**`datasource-scan-real-backend.yml` 四容器全绿，13/13/0**。本地提交 `98841e6`（深度测试 + 验收矩阵 + 脚本 + .gitignore）+ `abce846`（CI 门槛由写死 `eq 6` 改为动态全选全过）已推送 origin/master。
+
+### 签署条件核对（对照 §0 收敛后 4 条）
+
+| # | 签署条件 | 状态 | 证据 |
+|---|---|---|---|
+| ① | 四组关键跨系统路径真实后端验证全过 | ✅ **已满足** | CI 13/13/0（§2 四组 + CleanupEndpoint 1 + QueryScope 2） |
+| ② | 关键页面流程 E2E 各 1 条（取消 / 续显 / 删除确认 / 失败项重扫） | ⬜ **未做** | 需 Playwright + 运行中 Web/API，未排期 |
+| ③ | C1–C11/§L.8 在矩阵中逐项映射到已有证据或人工记录 | ⬜ **未做** | 矩阵 §1 仅覆盖 §9.1 五类核心条款；其余项待补映射 |
+| ④ | 全部 CI 通过 | ✅ **已满足** | 真实后端 CI 全绿；常规 CI 此前已绿 |
+
+### 结论
+- **数据 / 向量契约层（①⑤ 核心行为：扫描→激活→查询链 / 向量失败保旧版 / 存量 backfill / 删除后 GC 持久化 + 重启清理 / 审计）已通过真实后端闭环验证，可视为"契约层已闭环"。**
+- 依 §0 约定，签署"**v10 完整闭环**"仍缺 ② 关键页面 E2E 与 ③ C1–C11/§L.8 逐项映射。这两项为**收敛后范围内的剩余项**，非本次已否决的全量验收；可单独排期补齐后再签全闭环，或按"契约层闭环 + 页面/E2E 后续"分级发布。
+- C10 视觉验收（人工截图/录屏）与 Ask 在线模型验收（与 CI 分离单独跑）仍按 §3 留人工证据，不计入 CI 硬门槛。
+
+### 剩余动作清单
+1. ⬜ 关键页面流程 E2E ×4（取消 / 退出重进续显 / 删除影响确认 / 失败项重扫）—— 需 Playwright + 运行中 Web/API。
+2. ⬜ C1–C11/§L.8 其余条款证据映射（矩阵扩列或补人工记录）。
+3. ⬜ C10 视觉人工证据、Ask 在线模型验收（独立于 CI）。
+4. ✅ 本次 `abce846` 已修 CI 门槛硬编码 `eq 6` 缺陷（否则 13≠6 会被卡红）。
