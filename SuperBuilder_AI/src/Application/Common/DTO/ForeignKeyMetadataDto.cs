@@ -6,9 +6,17 @@ namespace SuperBuilder_AI.Models.DTO;
 /// </summary>
 public class ForeignKeyMetadataDto
 {
+	public string? CatalogName { get; set; }
+
+	public string? SchemaName { get; set; }
+
 	public string? TableName { get; set; }
 
 	public string? ColumnName { get; set; }
+
+	public string? ReferencedCatalogName { get; set; }
+
+	public string? ReferencedSchemaName { get; set; }
 
 	public string? ReferencedTableName { get; set; }
 

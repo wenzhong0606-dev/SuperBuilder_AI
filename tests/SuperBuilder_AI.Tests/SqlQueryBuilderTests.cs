@@ -95,10 +95,10 @@ public sealed class SqlQueryBuilderTests
 					plan,
 					new MySqlDialect());
 
-		Assert.Contains("`pms_complete_storage`.`unit_id`", query.Sql);
-		Assert.Contains("`pms_complete_storage`.`code`", query.Sql);
-		Assert.Contains("WHERE `pms_complete_storage`.`del_flag` = @p0", query.Sql);
-		Assert.Contains("ORDER BY `pms_complete_storage`.`enter_time` DESC", query.Sql);
+		Assert.Contains("`t0`.`unit_id`", query.Sql);
+		Assert.Contains("`t0`.`code`", query.Sql);
+		Assert.Contains("WHERE `t0`.`del_flag` = @p0", query.Sql);
+		Assert.Contains("ORDER BY `t0`.`enter_time` DESC", query.Sql);
 		Assert.DoesNotContain("SELECT `unit_id`", query.Sql);
 	}
 
@@ -132,7 +132,7 @@ public sealed class SqlQueryBuilderTests
 					new MySqlDialect());
 
 		Assert.Contains(
-			"WHERE `pms_complete_storage`.`del_flag` = @p0",
+			"WHERE `t0`.`del_flag` = @p0",
 			query.Sql,
 			StringComparison.Ordinal);
 		Assert.DoesNotContain(
@@ -165,11 +165,11 @@ public sealed class SqlQueryBuilderTests
 					new MySqlDialect());
 
 		Assert.Contains(
-			"ORDER BY `pms_complete_storage`.`create_time` DESC",
+			"ORDER BY `t0`.`create_time` DESC",
 			query.Sql,
 			StringComparison.Ordinal);
 		Assert.Contains(
-			"GROUP BY `pms_complete_storage`.`status`",
+			"GROUP BY `t0`.`status`",
 			query.Sql,
 			StringComparison.Ordinal);
 	}
@@ -222,7 +222,7 @@ public sealed class SqlQueryBuilderTests
 					new MySqlDialect());
 
 		Assert.Contains(
-			"WHERE `pms_complete_storage`.`del_flag` = @p0",
+			"WHERE `t0`.`del_flag` = @p0",
 			query.Sql,
 			StringComparison.Ordinal);
 	}
@@ -282,5 +282,153 @@ public sealed class SqlQueryBuilderTests
 				}
 			},
 			Limit = 10
+		};
+
+	/// <summary>
+	/// §10.5：单表带 catalog/schema 时，三方言生成正确的物理限定名（含稳定别名 t0）。
+	/// </summary>
+	[Theory]
+	[InlineData("SQLSERVER", "[db1].[dbo].[t] AS t0")]
+	[InlineData("MYSQL", "`db1`.`t` AS t0")]
+	[InlineData("POSTGRESQL", "\"dbo\".\"t\" AS t0")]
+	public async Task BuildAsync_qualifies_catalog_schema_per_dialect(
+		string dialectName,
+		string expectedFrom)
+	{
+		// MySQL 的 schema 必须与 catalog(=数据库) 同义或为空；SQL Server / PostgreSQL 用 "dbo"。
+		var schema = dialectName == "MYSQL" ? null : "dbo";
+
+		var plan = new QueryPlan
+		{
+			Tables =
+			{
+				new QueryTable
+				{
+					MetadataTableId = 1,
+					DataSourceId = 1,
+					CatalogName = "db1",
+					SchemaName = schema,
+					TableName = "t"
+				}
+			},
+			Fields =
+			{
+				new QueryField
+				{
+					MetadataTableId = 1,
+					TableName = "t",
+					MetadataColumnId = 101,
+					ColumnName = "c",
+					Aggregation = "NONE"
+				}
+			},
+			Limit = 10
+		};
+
+		var query = await new SqlQueryBuilder().BuildAsync(plan, ResolveDialect(dialectName));
+
+		Assert.Contains(expectedFrom, query.Sql);
+		var dq = ResolveDialect(dialectName);
+		Assert.Contains(dq.EscapeIdentifier("t0") + "." + dq.EscapeIdentifier("c"), query.Sql);
+		// PostgreSQL 限定名不得静默携带 catalog。
+		if (dialectName == "POSTGRESQL")
+			Assert.DoesNotContain("db1", query.Sql);
+	}
+
+	/// <summary>
+	/// §10.5：同名表跨 schema（SQL Server / PostgreSQL）或跨库（MySQL）JOIN 时，
+	/// FROM/JOIN 物理限定名不同、两侧使用不同别名；字段绑定正确别名，不串表。
+	/// </summary>
+	[Theory]
+	[InlineData("SQLSERVER", "[A].[schema1].[t] AS t0", "[A].[schema2].[t] AS t1")]
+	[InlineData("POSTGRESQL", "\"schema1\".\"t\" AS t0", "\"schema2\".\"t\" AS t1")]
+	[InlineData("MYSQL", "`db1`.`t` AS t0", "`db2`.`t` AS t1")]
+	public async Task BuildAsync_same_name_cross_scope_join_uses_distinct_qualified_names(
+		string dialectName,
+		string expectedLeft,
+		string expectedRight)
+	{
+		(string catalogL, string schemaL, string catalogR, string schemaR) = dialectName switch
+		{
+			"SQLSERVER" => ("A", "schema1", "A", "schema2"),
+			"POSTGRESQL" => ("A", "schema1", "A", "schema2"),
+			_ => ("db1", null!, "db2", null!)
+		};
+
+		var plan = new QueryPlan
+		{
+			Tables =
+			{
+				new QueryTable
+				{
+					MetadataTableId = 1,
+					DataSourceId = 1,
+					CatalogName = catalogL,
+					SchemaName = schemaL,
+					TableName = "t"
+				},
+				new QueryTable
+				{
+					MetadataTableId = 2,
+					DataSourceId = 1,
+					CatalogName = catalogR,
+					SchemaName = schemaR,
+					TableName = "t"
+				}
+			},
+			Fields =
+			{
+				new QueryField
+				{
+					MetadataTableId = 1,
+					TableName = "t",
+					MetadataColumnId = 101,
+					ColumnName = "c",
+					Aggregation = "NONE"
+				}
+			},
+			Joins =
+			{
+				new QueryJoin
+				{
+					LeftTableId = 1,
+					LeftTableName = "t",
+					LeftColumnId = 105,
+					LeftColumnName = "id",
+					RightTableId = 2,
+					RightTableName = "t",
+					RightColumnId = 205,
+					RightColumnName = "tid"
+				}
+			},
+			Limit = 10
+		};
+
+		var query = await new SqlQueryBuilder().BuildAsync(plan, ResolveDialect(dialectName));
+
+		Assert.Contains(expectedLeft, query.Sql);
+		Assert.Contains(expectedRight, query.Sql);
+		var dj = ResolveDialect(dialectName);
+		Assert.Contains(
+			"ON " + dj.EscapeIdentifier("t0") + "." + dj.EscapeIdentifier("id") +
+			" = " + dj.EscapeIdentifier("t1") + "." + dj.EscapeIdentifier("tid"),
+			query.Sql);
+		Assert.Contains(dj.EscapeIdentifier("t0") + "." + dj.EscapeIdentifier("c"), query.Sql);
+	}
+
+	private static ISqlDialect ResolveDialect(string name) =>
+		name switch
+		{
+			"SQLSERVER" => new SqlServerDialect(),
+			"MYSQL" => new MySqlDialect(),
+			_ => new PostgreSqlDialect()
+		};
+
+	private static char DialectQuote(string name) =>
+		name switch
+		{
+			"SQLSERVER" => '[',
+			"MYSQL" => '`',
+			_ => '"'
 		};
 }

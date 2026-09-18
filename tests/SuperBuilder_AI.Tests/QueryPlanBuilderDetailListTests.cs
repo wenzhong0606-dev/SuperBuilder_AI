@@ -525,8 +525,8 @@ public class QueryPlanBuilderDetailListTests
 		Assert.Contains("`code`", query.Sql, StringComparison.Ordinal);
 		Assert.Contains("`warehouse_id`", query.Sql, StringComparison.Ordinal);
 		Assert.Contains("`es_supplier_code`", query.Sql, StringComparison.Ordinal);
-		Assert.Contains("WHERE `wms_storage_receipt`.`del_flag` = @p0", query.Sql, StringComparison.Ordinal);
-		Assert.Contains("ORDER BY `wms_storage_receipt`.`come_time` DESC", query.Sql, StringComparison.Ordinal);
+		Assert.Contains("WHERE `t0`.`del_flag` = @p0", query.Sql, StringComparison.Ordinal);
+		Assert.Contains("ORDER BY `t0`.`come_time` DESC", query.Sql, StringComparison.Ordinal);
 		Assert.EndsWith("LIMIT 10", query.Sql, StringComparison.Ordinal);
 		Assert.Equal(0L, Convert.ToInt64(query.Parameters["@p0"]));
 	}
@@ -564,8 +564,8 @@ public class QueryPlanBuilderDetailListTests
 		Assert.Single(plan.Filters, f => string.Equals(f.Field, "del_flag", StringComparison.OrdinalIgnoreCase));
 
 		var query = await new SqlQueryBuilder().BuildAsync(plan, new MySqlDialect());
-		Assert.Contains("WHERE `wms_storage_receipt`.`del_flag` = @p0", query.Sql, StringComparison.Ordinal);
-		Assert.Contains("ORDER BY `wms_storage_receipt`.`come_time` DESC", query.Sql, StringComparison.Ordinal);
+		Assert.Contains("WHERE `t0`.`del_flag` = @p0", query.Sql, StringComparison.Ordinal);
+		Assert.Contains("ORDER BY `t0`.`come_time` DESC", query.Sql, StringComparison.Ordinal);
 		Assert.EndsWith("LIMIT 10", query.Sql, StringComparison.Ordinal);
 	}
 
@@ -613,7 +613,7 @@ public class QueryPlanBuilderDetailListTests
 		var query = await new SqlQueryBuilder().BuildAsync(plan, new MySqlDialect());
 		Assert.Contains("`code`", query.Sql, StringComparison.Ordinal);
 		Assert.Contains("`warehouse_id`", query.Sql, StringComparison.Ordinal);
-		Assert.Contains("WHERE `wms_storage_receipt`.`del_flag` = @p0", query.Sql, StringComparison.Ordinal);
+		Assert.Contains("WHERE `t0`.`del_flag` = @p0", query.Sql, StringComparison.Ordinal);
 	}
 
 	/// <summary>

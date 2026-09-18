@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using SuperBuilder_AI.Api.Errors;
+using SuperBuilder_AI.Application.Metadata;
 using SuperBuilder_AI.Data;
 using SuperBuilder_AI.Interfaces.BI.Planning;
 using SuperBuilder_AI.Interfaces.Identity;
@@ -45,13 +46,13 @@ public sealed class QueryPlanSecurityGate : IQueryPlanSecurityGate
 		RejectIf(tableIds.Any(x => x <= 0) || tableIds.Distinct().Count() != tableIds.Length ||
 			plan.Tables.Any(x => x.DataSourceId != plan.DataSourceId));
 
-		var metadataTables = await _db.MetadataTables.AsNoTracking()
+		var metadataTables = await _db.MetadataTables.WhereActiveVersion(_db).AsNoTracking()
 			.Where(x => tableIds.Contains(x.Id) && x.TenantId == tenantId && x.DataSourceId == plan.DataSourceId)
 			.ToDictionaryAsync(x => x.Id, ct);
 		RejectIf(metadataTables.Count != tableIds.Length || plan.Tables.Any(x =>
 			!metadataTables.TryGetValue(x.MetadataTableId, out var table) || !Same(x.TableName, table.TableName)));
 
-		var columns = await _db.MetadataColumns.AsNoTracking()
+		var columns = await _db.MetadataColumns.WhereActiveVersion(_db).AsNoTracking()
 			.Where(x => tableIds.Contains(x.MetadataTableId))
 			.ToListAsync(ct);
 		var byId = columns.ToDictionary(x => x.Id);
@@ -97,7 +98,9 @@ public sealed class QueryPlanSecurityGate : IQueryPlanSecurityGate
 			{
 				MetadataTableId = x.MetadataTableId,
 				DataSourceId = x.DataSourceId,
-				TableName = x.TableName
+				TableName = x.TableName,
+				CatalogName = x.CatalogName,
+				SchemaName = x.SchemaName
 			}).ToList()
 		};
 		await _rowSecurity.ApplyAsync(expected, tenantId, userId, ct);

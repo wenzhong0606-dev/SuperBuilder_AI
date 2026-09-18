@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
+using SuperBuilder_AI.Application.Metadata;
 using SuperBuilder_AI.Data;
 using SuperBuilder_AI.Interfaces.Agent.Runtime;
 using SuperBuilder_AI.Models.Agent;
@@ -44,7 +45,7 @@ public sealed class LiveMetadataTool : ITool
 		// 显式施加租户作用域（与主流程共享同一作用域实例，幂等），保证只读当前租户元数据。
 		_db.ApplyTenantScope(context.TenantId);
 
-		var tables = await _db.MetadataTables.AsNoTracking()
+		var tables = await _db.MetadataTables.WhereActiveVersion(_db).AsNoTracking()
 			.Include(t => t.Columns)
 			.OrderBy(t => t.TableName)
 			.ToListAsync(ct);

@@ -108,6 +108,8 @@ public class SuperBIContext : DbContext
     public DbSet<MetadataSemantic> MetadataSemantics { get; set; }
     public DbSet<MetadataLearningRecord> LearningRecords { get; set; }
     public DbSet<MetadataScanJob> MetadataScanJobs { get; set; }
+    public DbSet<MetadataVectorGcRequest> MetadataVectorGcRequests { get; set; }
+    public DbSet<MetadataScanJobFailure> MetadataScanJobFailures { get; set; }
     public DbSet<MetadataDictionaryConfig> MetadataDictionaryConfigs { get; set; }
     public DbSet<QueryCorrectionRule> QueryCorrectionRules { get; set; }
     #endregion
@@ -290,15 +292,17 @@ public class SuperBIContext : DbContext
         // 使用过滤唯一索引：仅当 Catalog/Schema 均非空时才强制唯一，
         // 兼容存量/测试中以 (DataSourceId, TableName) 唯一的历史数据。
         builder.Entity<MetadataTable>()
-            .HasIndex(x => new { x.DataSourceId, x.CatalogName, x.SchemaName, x.TableName })
+            .HasIndex(x => new { x.DataSourceId, x.CatalogName, x.SchemaName, x.TableName, x.MetadataVersion })
             .IsUnique()
             .HasDatabaseName("IX_MetadataTables_DataSourceId_CatalogName_SchemaName_TableName")
             .HasFilter("[CatalogName] IS NOT NULL AND [SchemaName] IS NOT NULL");
         builder.Entity<MetadataTable>().HasIndex(x => x.DataSourceId)
             .HasDatabaseName("IX_MetadataTables_DataSourceId");
         builder.Entity<MetadataTable>().Property(x => x.TableName).IsRequired().HasMaxLength(128).HasComment("表名");
+        builder.Entity<MetadataTable>().Property(x => x.ObjectKind).IsRequired().HasDefaultValue(MetadataObjectKind.Table).HasConversion<int>().HasComment("对象类型(表/视图,§L/§10.1)");
         builder.Entity<MetadataTable>().Property(x => x.CatalogName).HasMaxLength(128).HasComment("目录名");
         builder.Entity<MetadataTable>().Property(x => x.SchemaName).HasMaxLength(128).HasComment("模式名");
+        builder.Entity<MetadataTable>().Property(x => x.MetadataVersion).IsRequired().HasDefaultValue(0).HasComment("元数据版本号(§L 版本生命周期)");
         builder.Entity<MetadataTable>().Property(x => x.SearchText).HasComment("Embedding文本");
         builder.Entity<MetadataTable>().Property(x => x.VectorId).HasComment("Qdrant向量ID");
         builder.Entity<MetadataTable>().Property(x => x.EmbeddingModel).HasMaxLength(128).HasComment("Embedding模型");
@@ -334,6 +338,7 @@ public class SuperBIContext : DbContext
         builder.Entity<MetadataColumn>().Property(x => x.VectorSyncTime).HasComment("向量同步时间(UTC)");
         builder.Entity<MetadataColumn>().Property(x => x.VectorStatus).HasMaxLength(16).HasComment("向量状态");
         builder.Entity<MetadataColumn>().Property(x => x.VectorErrorCode).HasMaxLength(64).HasComment("向量错误码");
+        builder.Entity<MetadataColumn>().Property(x => x.MetadataVersion).IsRequired().HasDefaultValue(0).HasComment("元数据版本号(§L 版本生命周期)");
         #endregion
 
         #region MetadataDictionaryConfig
@@ -393,6 +398,7 @@ public class SuperBIContext : DbContext
         builder.Entity<MetadataSemantic>().Property(x => x.VectorSyncTime).HasComment("向量同步时间(UTC)");
         builder.Entity<MetadataSemantic>().Property(x => x.VectorStatus).HasMaxLength(16).HasComment("向量状态");
         builder.Entity<MetadataSemantic>().Property(x => x.VectorErrorCode).HasMaxLength(64).HasComment("向量错误码");
+        builder.Entity<MetadataSemantic>().Property(x => x.MetadataVersion).IsRequired().HasDefaultValue(0).HasComment("元数据版本号(§L)");
         #endregion
 
         #region Learning
@@ -417,9 +423,32 @@ public class SuperBIContext : DbContext
         builder.Entity<MetadataScanJob>().Property(x => x.TriggeredBy).HasMaxLength(64).HasComment("触发用户标识");
         builder.Entity<MetadataScanJob>().Property(x => x.ErrorCode).HasMaxLength(64).HasComment("错误码(仅异常类型名,脱敏)");
         builder.Entity<MetadataScanJob>().Property(x => x.ErrorMessage).HasMaxLength(2000).HasComment("错误摘要(脱敏,不含连接串)");
-        builder.Entity<MetadataScanJob>().HasIndex(x => x.DataSourceId).HasDatabaseName("IX_MetadataScanJobs_DataSourceId");
+
+        // §L.1 / C3 / C4 / §10.6 新增字段
+        builder.Entity<MetadataScanJob>().Property(x => x.CancelledAt).HasConversion(UtcNullableDateTimeConverter).HasComment("取消时间(UTC)");
+        builder.Entity<MetadataScanJob>().Property(x => x.ScopeJson).HasColumnType(connectionStringType).HasComment("扫描范围JSON(ScanScope)");
+        builder.Entity<MetadataScanJob>().Property(x => x.BatchVersion).IsRequired().HasDefaultValue(0).HasComment("批次版本号(§L.1)");
+        builder.Entity<MetadataScanJob>().Property(x => x.SeedVersion).IsRequired().HasDefaultValue(0).HasComment("种子版本号(§L.6)");
+        builder.Entity<MetadataScanJob>().Property(x => x.OriginalJobId).HasComment("失败项续扫来源任务Id");
+        builder.Entity<MetadataScanJob>().Property(x => x.LastHeartbeatUtc).HasConversion(UtcNullableDateTimeConverter).HasComment("最近心跳(UTC)");
+        builder.Entity<MetadataScanJob>().Property(x => x.ActivatedVersion).HasComment("激活版本号");
+        builder.Entity<MetadataScanJob>().Property(x => x.FailedReason).HasMaxLength(64).HasComment("结构化失败原因(脱敏)");
+        builder.Entity<MetadataScanJob>().HasIndex(x => new { x.DataSourceId, x.Status }).HasDatabaseName("IX_MetadataScanJobs_DataSourceId_Status");
         builder.Entity<MetadataScanJob>().HasIndex(x => x.TenantId).HasDatabaseName("IX_MetadataScanJobs_TenantId");
         builder.Entity<MetadataScanJob>().HasIndex(x => x.Status).HasDatabaseName("IX_MetadataScanJobs_Status");
+        // 同源去重：同一数据源同一时刻仅一个活动扫描（§L.1）。并发创建撞键回滚并返回 409。
+        builder.Entity<MetadataScanJob>().HasIndex(x => x.DataSourceId).IsUnique().HasDatabaseName("ux_ds_active_scan")
+            .HasFilter("[Status] IN ('Queued','Running','Cancelling','Retrying')");
+        #endregion
+
+        #region 向量 GC 待办 / 扫描失败项（§L.4 / §L.7 / C7）
+        builder.Entity<MetadataVectorGcRequest>().ToTable("MetadataVectorGcRequests");
+        builder.Entity<MetadataVectorGcRequest>().HasIndex(x => x.Status).HasDatabaseName("IX_MetadataVectorGcRequests_Status");
+        builder.Entity<MetadataVectorGcRequest>().Property(x => x.Reason).HasMaxLength(32);
+        builder.Entity<MetadataVectorGcRequest>().Property(x => x.Status).HasMaxLength(16);
+
+        builder.Entity<MetadataScanJobFailure>().ToTable("MetadataScanJobFailures");
+        builder.Entity<MetadataScanJobFailure>().HasIndex(x => x.JobId).HasDatabaseName("IX_MetadataScanJobFailures_JobId");
         #endregion
 
         #region P5.2 SemanticLabel

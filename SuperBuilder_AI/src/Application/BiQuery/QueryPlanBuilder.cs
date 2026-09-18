@@ -360,7 +360,13 @@ public partial class QueryPlanBuilder : IQueryPlanBuilder
 					table.TableName,
 
 				TableComment =
-					table.TableComment
+					table.TableComment,
+
+				CatalogName =
+					table.CatalogName,
+
+				SchemaName =
+					table.SchemaName
 			});
 
 
@@ -508,7 +514,13 @@ public partial class QueryPlanBuilder : IQueryPlanBuilder
 						joinedTable.TableName,
 
 					TableComment =
-						joinedTable.TableComment
+						joinedTable.TableComment,
+
+					CatalogName =
+						joinedTable.CatalogName,
+
+					SchemaName =
+						joinedTable.SchemaName
 				});
 		}
 

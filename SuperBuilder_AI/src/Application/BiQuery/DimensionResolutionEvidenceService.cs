@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using SuperBuilder_AI.Application.Metadata;
 using SuperBuilder_AI.Data;
 using SuperBuilder_AI.Interfaces;
 using SuperBuilder_AI.Interfaces.BI;
@@ -34,7 +35,7 @@ public sealed class DimensionResolutionEvidenceService : IDimensionResolutionEvi
     {
         if (factTableId <= 0 || factDataSourceId <= 0 || string.IsNullOrWhiteSpace(dimensionSemanticText)) return null;
 
-        var fact = await _context.MetadataTables
+        var fact = await _context.MetadataTables.WhereActiveVersion(_context)
             .Include(x => x.Columns)
             .Include(x => x.DataSource)
             .AsNoTracking()
@@ -308,7 +309,7 @@ public sealed class DimensionResolutionEvidenceService : IDimensionResolutionEvi
 
     private async Task<MetadataColumn?> FindLabelColumnAsync(long tableId, long keyColumnId, string dimensionSemanticText, CancellationToken cancellationToken)
     {
-        var table = await _context.MetadataTables.Include(x => x.Columns).AsNoTracking().FirstOrDefaultAsync(x => x.Id == tableId, cancellationToken);
+        var table = await _context.MetadataTables.WhereActiveVersion(_context).Include(x => x.Columns).AsNoTracking().FirstOrDefaultAsync(x => x.Id == tableId, cancellationToken);
         if (table?.Columns is null) return null;
         var search = await _semanticSearchService.SearchAsync(dimensionSemanticText, 10);
         var searchedIds = search.Where(x => x.Table?.Id == tableId && x.Column is not null && x.Column.Id != keyColumnId).OrderByDescending(x => x.Score).Select(x => x.Column!.Id).ToHashSet();
@@ -496,7 +497,7 @@ public sealed class DimensionResolutionEvidenceService : IDimensionResolutionEvi
         foreach (var dt in dimensionTables)
         {
             // 2. 获取父表 PK
-            var masterTable = await _context.MetadataTables
+            var masterTable = await _context.MetadataTables.WhereActiveVersion(_context)
                 .Include(x => x.Columns)
                 .AsNoTracking()
                 .FirstOrDefaultAsync(x => x.Id == dt.Table.Id, cancellationToken);

@@ -12,6 +12,9 @@ using SuperBuilder_AI.Models.DTO;
 using SuperBuilder_AI.Models.Metadata;
 using SuperBuilder_AI.Models.Organization;
 using SuperBuilder_AI.Services;
+using SuperBuilder_AI.Application.Metadata;
+using SuperBuilder_AI.Application.Common.Options;
+using Microsoft.Extensions.Options;
 using Xunit;
 
 namespace SuperBuilder_AI.Tests;
@@ -44,9 +47,9 @@ public class MetadataScannerServiceTests
 		await ctx.SaveChangesAsync();
 		var dsId = ctx.DataSources.First().Id;
 
-		var service = new MetadataScannerService(ctx, new FakeReader(), new FakeTextBuilder(), new FakeSemantic(), new FakeVector());
+		var service = new MetadataScannerService(ctx, new FakeReader(), new FakeTextBuilder(), new FakeSemantic(), new FakeVector(), new VectorBackfillGate(Options.Create(new Features())));
 		// 传入的 tenantId(5) 与数据源实际归属租户(7) 不一致 → 必须在写入前拒绝
-		await Assert.ThrowsAsync<System.InvalidOperationException>(() => service.ScanAsync(tenantId: 5, dataSourceId: dsId, "x"));
+		await Assert.ThrowsAsync<System.InvalidOperationException>(() => service.ScanAsync(tenantId: 5, dataSourceId: dsId, "x", batchVersion: 1, seedVersion: 0));
 	}
 
 	[Fact]
@@ -61,10 +64,10 @@ public class MetadataScannerServiceTests
 		await ctx.SaveChangesAsync();
 
 		var telemetry = new ScanTelemetry();
-		var service = new MetadataScannerService(ctx, new FakeReader(), new FakeTextBuilder(), new FakeSemantic(), new FakeVector(fail: true));
+		var service = new MetadataScannerService(ctx, new FakeReader(), new FakeTextBuilder(), new FakeSemantic(), new FakeVector(fail: true), new VectorBackfillGate(Options.Create(new Features())));
 
 		var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
-			service.ScanAsync(tenantId: 7, dataSourceId: 1, "x", telemetry: telemetry));
+			service.ScanAsync(tenantId: 7, dataSourceId: 1, "x", batchVersion: 1, seedVersion: 0, telemetry: telemetry));
 
 		Assert.Contains("向量索引失败", ex.Message);
 		Assert.Equal("Failed", ctx.MetadataTables.Single().VectorStatus);
@@ -82,8 +85,8 @@ public class MetadataScannerServiceTests
 		ctx.DataSources.Add(new DataSource { Id = 1, TenantId = 7, Name = "wms", NormalizedName = "wms", DbType = "MYSQL", ConnectionString = "x" });
 		await ctx.SaveChangesAsync();
 
-		var service = new MetadataScannerService(ctx, new DictFakeReader(), new FakeTextBuilder(), new FakeSemantic(), new FakeVector());
-		await service.ScanAsync(tenantId: 7, dataSourceId: 1, "x");
+		var service = new MetadataScannerService(ctx, new DictFakeReader(), new FakeTextBuilder(), new FakeSemantic(), new FakeVector(), new VectorBackfillGate(Options.Create(new Features())));
+		await service.ScanAsync(tenantId: 7, dataSourceId: 1, "x", batchVersion: 1, seedVersion: 0);
 
 		// 外键角色落库：warehouse_id → wms_warehouse（展示列优选 warehouse_name）。
 		var fkColumn = await ctx.MetadataColumns
@@ -119,8 +122,8 @@ public class MetadataScannerServiceTests
 		ctx.DataSources.Add(new DataSource { Id = 1, TenantId = 7, Name = "pmis", NormalizedName = "pmis", DbType = "MYSQL", ConnectionString = "x" });
 		await ctx.SaveChangesAsync();
 
-		var service = new MetadataScannerService(ctx, new WideDictFakeReader(), new FakeTextBuilder(), new FakeSemantic(), new FakeVector());
-		await service.ScanAsync(tenantId: 7, dataSourceId: 1, "x");
+		var service = new MetadataScannerService(ctx, new WideDictFakeReader(), new FakeTextBuilder(), new FakeSemantic(), new FakeVector(), new VectorBackfillGate(Options.Create(new Features())));
+		await service.ScanAsync(tenantId: 7, dataSourceId: 1, "x", batchVersion: 1, seedVersion: 0);
 
 		var dict = await ctx.MetadataDictionaryConfigs.SingleAsync();
 		Assert.Equal("js_sys_dict_data", dict.TableName);
@@ -133,7 +136,7 @@ public class MetadataScannerServiceTests
 	/// <summary>含外键与字典表的假读取器：验证 FK 角色与字典表发现链路。</summary>
 	private sealed class DictFakeReader : IDataSourceMetadataReader
 	{
-		public Task<List<TableMetadataDto>> GetTablesAsync(string connectionString)
+		public Task<List<TableMetadataDto>> GetTablesAsync(string connectionString, CancellationToken ct = default)
 			=> Task.FromResult(new List<TableMetadataDto>
 			{
 				new() { TableName = "wms_warehouse", TableComment = "仓库" },
@@ -141,7 +144,7 @@ public class MetadataScannerServiceTests
 				new() { TableName = "sys_dict", TableComment = "字典表" }
 			});
 
-		public Task<List<ColumnMetadataDto>> GetColumnsAsync(string connectionString)
+		public Task<List<ColumnMetadataDto>> GetColumnsAsync(string connectionString, CancellationToken ct = default)
 			=> Task.FromResult(new List<ColumnMetadataDto>
 			{
 				new() { TableName = "wms_warehouse", ColumnName = "id", DataType = "int", IsPrimaryKey = true },
@@ -154,7 +157,10 @@ public class MetadataScannerServiceTests
 				new() { TableName = "sys_dict", ColumnName = "dict_type", DataType = "varchar" }
 			});
 
-		public Task<List<ForeignKeyMetadataDto>> GetForeignKeysAsync(string connectionString)
+		public Task<List<ColumnMetadataDto>> GetColumnsAsync(string connectionString, string? dbType, IEnumerable<string> tableNames, CancellationToken ct = default)
+			=> GetColumnsAsync(connectionString, ct);
+
+		public Task<List<ForeignKeyMetadataDto>> GetForeignKeysAsync(string connectionString, CancellationToken ct = default)
 			=> Task.FromResult(new List<ForeignKeyMetadataDto>
 			{
 				new()
@@ -191,13 +197,13 @@ public class MetadataScannerServiceTests
 			"corp_name", "corp_code"
 		};
 
-		public Task<List<TableMetadataDto>> GetTablesAsync(string connectionString)
+		public Task<List<TableMetadataDto>> GetTablesAsync(string connectionString, CancellationToken ct = default)
 			=> Task.FromResult(new List<TableMetadataDto>
 			{
 				new() { TableName = "js_sys_dict_data", TableComment = "字典数据表" }
 			});
 
-		public Task<List<ColumnMetadataDto>> GetColumnsAsync(string connectionString)
+		public Task<List<ColumnMetadataDto>> GetColumnsAsync(string connectionString, CancellationToken ct = default)
 		{
 			var list = new List<ColumnMetadataDto>
 			{
@@ -210,21 +216,27 @@ public class MetadataScannerServiceTests
 
 			return Task.FromResult(list);
 		}
+
+		public Task<List<ColumnMetadataDto>> GetColumnsAsync(string connectionString, string? dbType, IEnumerable<string> tableNames, CancellationToken ct = default)
+			=> GetColumnsAsync(connectionString, ct);
 	}
 
 	private sealed class FakeReader : IDataSourceMetadataReader
 	{
-		public Task<List<TableMetadataDto>> GetTablesAsync(string connectionString)
+		public Task<List<TableMetadataDto>> GetTablesAsync(string connectionString, CancellationToken ct = default)
 			=> Task.FromResult(new List<TableMetadataDto>
 			{
 				new() { TableName = "Orders", TableComment = "orders" }
 			});
 
-		public Task<List<ColumnMetadataDto>> GetColumnsAsync(string connectionString)
+		public Task<List<ColumnMetadataDto>> GetColumnsAsync(string connectionString, CancellationToken ct = default)
 			=> Task.FromResult(new List<ColumnMetadataDto>
 			{
 				new() { TableName = "Orders", ColumnName = "Id", ColumnComment = "id", DataType = "int" }
 			});
+
+		public Task<List<ColumnMetadataDto>> GetColumnsAsync(string connectionString, string? dbType, IEnumerable<string> tableNames, CancellationToken ct = default)
+			=> GetColumnsAsync(connectionString, ct);
 	}	private sealed class FakeTextBuilder : IMetadataSearchTextBuilder
 	{
 		public string BuildTableText(string? tableName, string? tableComment, string? businessDomain) => $"{tableName} {tableComment}";

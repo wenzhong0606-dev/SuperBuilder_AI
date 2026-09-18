@@ -13,6 +13,10 @@ namespace SuperBuilder_AI.Services.BI;
 /// 不根据“物料”“供应商”等业务词硬编码任何表或字段。
 /// Metadata 中不存在可验证关系时，QueryPlan 不应包含 Join，
 /// 此处保持单表 SQL，不主动推断关系。
+///
+/// §10.5：按 MetadataTableId 为每张表分配稳定唯一别名（t0/t1…），FROM/JOIN 使用
+/// 三键物理限定名（<see cref="ISqlDialect.QualifyTable"/>），SELECT/WHERE/GROUP BY/
+/// ORDER BY 字段统一绑定到表别名；同名跨 schema/跨库表以不同 Id 分配不同别名，不串表。
 /// </summary>
 public class SqlQueryBuilder : ISqlQueryBuilder
 {
@@ -31,37 +35,56 @@ public class SqlQueryBuilder : ISqlQueryBuilder
         if (validTables.Count == 0)
             throw new InvalidOperationException("QueryPlan中的TableName不能为空。");
 
+        // 按表在计划中的顺序分配稳定唯一别名（t0, t1, …）。
+        // 别名只由服务端生成，绝不接受模型或用户提供的任意 SQL 片段。
+        var aliasByRef = new Dictionary<QueryTable, string>();
+        for (var i = 0; i < validTables.Count; i++)
+            aliasByRef[validTables[i]] = "t" + i;
+        // 供按 MetadataTableId 的 O(1) 查找（legacy MetadataTableId==0 不入字典，靠表名/索引兜底）。
+        var aliasById = validTables
+            .Where(t => t.MetadataTableId > 0)
+            .ToDictionary(t => t.MetadataTableId, t => aliasByRef[t]);
+
         var joins = NormalizeJoins(plan, validTables, dialect);
         var sql = new StringBuilder("SELECT ");
         var parameters = new Dictionary<string, object?>();
 
-        var selectFields = BuildSelectFields(plan, dialect, joins, validTables);
+        var selectFields = BuildSelectFields(plan, dialect, joins, validTables, aliasById, aliasByRef);
         if (selectFields.Count == 0)
             selectFields.Add("*");
         sql.Append(string.Join(", ", selectFields));
 
+        // FROM：三键物理限定名 + 主表别名。
+        var mainTable = validTables[0];
         sql.Append(" FROM ");
-        sql.Append(dialect.EscapeIdentifier(validTables[0].TableName!));
+        sql.Append(dialect.QualifyTable(mainTable.CatalogName, mainTable.SchemaName, mainTable.TableName!));
+        sql.Append(" AS ");
+        sql.Append(aliasByRef[mainTable]);
 
         foreach (var join in joins)
         {
+            var left = ResolveJoinEndpoint(join.LeftTableId, join.LeftTableName, validTables, aliasById, aliasByRef, "Left");
+            var right = ResolveJoinEndpoint(join.RightTableId, join.RightTableName, validTables, aliasById, aliasByRef, "Right");
+
             sql.Append(' ');
             sql.Append(join.JoinType);
             sql.Append(" JOIN ");
-            sql.Append(dialect.EscapeIdentifier(join.RightTableName!));
+            sql.Append(dialect.QualifyTable(right.CatalogName, right.SchemaName, right.TableName!));
+            sql.Append(" AS ");
+            sql.Append(aliasByRef[right]);
             sql.Append(" ON ");
-            sql.Append(dialect.EscapeIdentifier(join.LeftTableName!));
+            sql.Append(dialect.EscapeIdentifier(aliasByRef[left]));
             sql.Append('.');
             sql.Append(dialect.EscapeIdentifier(join.LeftColumnName!));
             sql.Append(" = ");
-            sql.Append(dialect.EscapeIdentifier(join.RightTableName!));
+            sql.Append(dialect.EscapeIdentifier(aliasByRef[right]));
             sql.Append('.');
             sql.Append(dialect.EscapeIdentifier(join.RightColumnName!));
         }
 
-        BuildWhere(sql, parameters, plan, dialect, joins, validTables);
-        BuildGroupBy(sql, plan, dialect, joins, validTables);
-        BuildOrderBy(sql, plan, dialect, joins, validTables);
+        BuildWhere(sql, parameters, plan, dialect, joins, validTables, aliasById, aliasByRef);
+        BuildGroupBy(sql, plan, dialect, joins, validTables, aliasById, aliasByRef);
+        BuildOrderBy(sql, plan, dialect, joins, validTables, aliasById, aliasByRef);
 
         var finalSql = sql.ToString();
         var limit = ResolveLimit(plan);
@@ -81,7 +104,8 @@ public class SqlQueryBuilder : ISqlQueryBuilder
 
     /// <summary>
     /// 仅接受 QueryPlan 已明确声明、且左右表/字段均存在于本次计划中的 Join。
-    /// 绝不根据业务词或表名自动补 Join。
+    /// 以 MetadataTableId 为主键校验；仅对历史无 Id 的计划在三键唯一时兼容按名解析，
+    /// 三键仍不唯一则拒绝（同名跨 schema 的不同 Id 不误判为同一张表）。
     /// </summary>
     private static List<QueryJoin> NormalizeJoins(
         QueryPlan plan,
@@ -91,31 +115,27 @@ public class SqlQueryBuilder : ISqlQueryBuilder
         if (plan.Joins.Count == 0)
             return new List<QueryJoin>();
 
-        var tableNames = new HashSet<string>(
-            tables.Select(t => t.TableName!),
-            StringComparer.OrdinalIgnoreCase);
-
         var result = new List<QueryJoin>();
         foreach (var join in plan.Joins)
         {
             if (join == null ||
-                string.IsNullOrWhiteSpace(join.LeftTableName) ||
                 string.IsNullOrWhiteSpace(join.LeftColumnName) ||
-                string.IsNullOrWhiteSpace(join.RightTableName) ||
                 string.IsNullOrWhiteSpace(join.RightColumnName))
             {
                 continue;
             }
 
-            if (!tableNames.Contains(join.LeftTableName) ||
-                !tableNames.Contains(join.RightTableName))
+            var left = ResolveJoinEndpoint(join.LeftTableId, join.LeftTableName, tables, null, null, "Left");
+            var right = ResolveJoinEndpoint(join.RightTableId, join.RightTableName, tables, null, null, "Right");
+
+            if (left is null || right is null)
             {
                 throw new InvalidOperationException(
                     "QueryPlan中的JOIN引用了未声明的Metadata表。");
             }
 
-            if (string.Equals(join.LeftTableName, join.RightTableName,
-                StringComparison.OrdinalIgnoreCase))
+            if (left.MetadataTableId == right.MetadataTableId &&
+                string.Equals(left.TableName, right.TableName, StringComparison.OrdinalIgnoreCase))
             {
                 throw new InvalidOperationException(
                     "QueryPlan中的JOIN不能连接同一张表。");
@@ -132,11 +152,59 @@ public class SqlQueryBuilder : ISqlQueryBuilder
         return result;
     }
 
+    /// <summary>
+    /// 解析 JOIN 端点对应的 <see cref="QueryTable"/>。优先按 MetadataTableId；
+    /// legacy（Id==0）按表名解析，名字在计划内不唯一则抛歧义错误。
+    /// <paramref name="aliasById"/> / <paramref name="aliasByRef"/> 为 null 时仅校验存在性（NormalizeJoins 阶段）。
+    /// </summary>
+    private static QueryTable? ResolveJoinEndpoint(
+        long tableId,
+        string? tableName,
+        List<QueryTable> tables,
+        Dictionary<long, string>? aliasById,
+        Dictionary<QueryTable, string>? aliasByRef,
+        string side)
+    {
+        if (tableId > 0)
+        {
+            var byId = tables.FirstOrDefault(t => t.MetadataTableId == tableId);
+            if (byId is not null)
+                return byId;
+            if (!string.IsNullOrWhiteSpace(tableName))
+            {
+                // Id 未命中但给了名字：按名兜底。
+                var byName = tables.Where(t =>
+                    string.Equals(t.TableName, tableName, StringComparison.OrdinalIgnoreCase)).ToList();
+                if (byName.Count == 1)
+                    return byName[0];
+                if (byName.Count == 0)
+                    return null;
+                throw new InvalidOperationException(
+                    $"QueryPlan 中的 JOIN {side} 端表名『{tableName}』在计划内不唯一，存在歧义，无法解析物理表。");
+            }
+            return null;
+        }
+
+        if (string.IsNullOrWhiteSpace(tableName))
+            return null;
+
+        var matches = tables.Where(t =>
+            string.Equals(t.TableName, tableName, StringComparison.OrdinalIgnoreCase)).ToList();
+        if (matches.Count == 1)
+            return matches[0];
+        if (matches.Count == 0)
+            return null;
+        throw new InvalidOperationException(
+            $"QueryPlan 中的 JOIN {side} 端表名『{tableName}』在计划内不唯一，存在歧义，无法解析物理表。");
+    }
+
     private static List<string> BuildSelectFields(
         QueryPlan plan,
         ISqlDialect dialect,
         List<QueryJoin> joins,
-        List<QueryTable> tables)
+        List<QueryTable> tables,
+        Dictionary<long, string> aliasById,
+        Dictionary<QueryTable, string> aliasByRef)
     {
         var result = new List<string>();
         foreach (var field in plan.Fields)
@@ -151,6 +219,8 @@ public class SqlQueryBuilder : ISqlQueryBuilder
                 field.ColumnName,
                 joins,
                 tables,
+                aliasById,
+                aliasByRef,
                 dialect);
 
             var aggregation = NormalizeAggregation(field.Aggregation);
@@ -176,83 +246,73 @@ public class SqlQueryBuilder : ISqlQueryBuilder
         string columnName,
         List<QueryJoin> joins,
         List<QueryTable> tables,
+        Dictionary<long, string> aliasById,
+        Dictionary<QueryTable, string> aliasByRef,
         ISqlDialect dialect,
         bool allowMainTableFallback = false)
     {
-        var resolvedTableName =
-            ResolveTableName(
-                metadataTableId,
-                tableName,
-                tables,
-                allowMainTableFallback);
+        var alias = ResolveAlias(
+            metadataTableId,
+            tableName,
+            metadataColumnId,
+            joins,
+            tables,
+            aliasById,
+            aliasByRef,
+            allowMainTableFallback);
 
-        if (!string.IsNullOrWhiteSpace(resolvedTableName))
-        {
-            return dialect.EscapeIdentifier(resolvedTableName) + "." +
+        if (!string.IsNullOrWhiteSpace(alias))
+            return dialect.EscapeIdentifier(alias) + "." +
                    dialect.EscapeIdentifier(columnName);
-        }
-
-        foreach (var join in joins)
-        {
-            if (join.LeftColumnId == metadataColumnId &&
-                !string.IsNullOrWhiteSpace(join.LeftTableName))
-                return dialect.EscapeIdentifier(join.LeftTableName) + "." +
-                       dialect.EscapeIdentifier(columnName);
-
-            if (join.RightColumnId == metadataColumnId &&
-                !string.IsNullOrWhiteSpace(join.RightTableName))
-                return dialect.EscapeIdentifier(join.RightTableName) + "." +
-                       dialect.EscapeIdentifier(columnName);
-        }
 
         return dialect.EscapeIdentifier(columnName);
     }
 
     /// <summary>
-    /// 解析字段的物理归属表名；无法解析时返回 null（调用方退化为裸列名）。
+    /// 解析字段归属表的别名（§10.5 #3）。
     ///
-    /// <para>
-    /// <paramref name="allowMainTableFallback"/> 只在 WHERE / ORDER BY / GROUP BY
-    /// 这类「条件与排序」位置开启。多表（JOIN）场景下无表归属的字段会以裸列名落进 SQL，
-    /// 而 <c>del_flag</c> / <c>create_time</c> / <c>status</c> 这类多表同名列会直接触发
-    /// MySQL "Column 'x' in where clause is ambiguous"（实测 1052，场景：
-    /// pms_complete_storage INNER JOIN pms_complete_storage_info 的软删除过滤）。
-    /// </para>
-    ///
-    /// <para>
-    /// 开启时锚定主表（<c>plan.Tables[0]</c>，即事实表），口径与
-    /// <c>QueryPlanMetadataValidator.FindColumns</c> 的「主表优先」歧义消解规则一致：
-    /// 该规则已用于消解只承载字段名、无 MetadataColumnId 的 QueryFilter / QueryMetric
-    /// 在多表场景下的伪歧义，SqlQueryBuilder 此前未同步该口径。
-    /// </para>
-    ///
-    /// <para>
-    /// SELECT 投影刻意不开启（保持既有契约：无法解析即裸列名），避免改变既有投影行为。
-    /// </para>
+    /// <para>优先级：MetadataTableId → Join 端点表 Id → 表名（唯一）→ 主表兜底（仅条件/排序位）。
+    /// 存在同名列却无法唯一对应表 Id 时抛歧义错误，不猜测默认 schema。</para>
     /// </summary>
-    private static string? ResolveTableName(
+    private static string? ResolveAlias(
         long metadataTableId,
         string? tableName,
+        long metadataColumnId,
+        List<QueryJoin> joins,
         List<QueryTable> tables,
+        Dictionary<long, string> aliasById,
+        Dictionary<QueryTable, string> aliasByRef,
         bool allowMainTableFallback = false)
     {
-        if (!string.IsNullOrWhiteSpace(tableName))
-            return tableName;
+        if (metadataTableId > 0 && aliasById.TryGetValue(metadataTableId, out var a))
+            return a;
 
-        if (metadataTableId > 0)
+        foreach (var join in joins)
         {
-            var table = tables.FirstOrDefault(
-                t => t.MetadataTableId == metadataTableId);
+            if (join.LeftColumnId == metadataColumnId &&
+                aliasById.TryGetValue(join.LeftTableId, out var la))
+                return la;
+            if (join.RightColumnId == metadataColumnId &&
+                aliasById.TryGetValue(join.RightTableId, out var ra))
+                return ra;
+        }
 
-            if (!string.IsNullOrWhiteSpace(table?.TableName))
-                return table.TableName;
+        if (!string.IsNullOrWhiteSpace(tableName))
+        {
+            var byName = tables.Where(t =>
+                string.Equals(t.TableName, tableName, StringComparison.OrdinalIgnoreCase)).ToList();
+            if (byName.Count == 1)
+                return aliasByRef[byName[0]];
+            if (byName.Count > 1)
+                throw new InvalidOperationException(
+                    $"字段『{tableName}』在计划内存在同名表（跨 schema/跨库），无法唯一确定归属表，已拒绝以避免串表。");
         }
 
         if (tables.Count == 1)
-            return tables[0].TableName;
+            return aliasByRef[tables[0]];
 
         return allowMainTableFallback
-            ? tables[0].TableName
+            ? aliasByRef[tables[0]]
             : null;
     }
 
@@ -262,7 +322,9 @@ public class SqlQueryBuilder : ISqlQueryBuilder
         QueryPlan plan,
         ISqlDialect dialect,
         List<QueryJoin> joins,
-        List<QueryTable> tables)
+        List<QueryTable> tables,
+        Dictionary<long, string> aliasById,
+        Dictionary<QueryTable, string> aliasByRef)
     {
         if (plan.Filters.Count == 0 && plan.MandatoryRowFilters.Count == 0)
             return;
@@ -281,6 +343,8 @@ public class SqlQueryBuilder : ISqlQueryBuilder
                 filter.Field,
                 joins,
                 tables,
+                aliasById,
+                aliasByRef,
                 dialect,
                 allowMainTableFallback: true);
             var operation = NormalizeOperator(filter.Operator);
@@ -327,7 +391,7 @@ public class SqlQueryBuilder : ISqlQueryBuilder
 			var deny = new List<string>();
 			foreach (var filter in group)
 			{
-				var predicate = BuildMandatoryPredicate(filter, dialect, parameters, ref rlsIndex);
+				var predicate = BuildMandatoryPredicate(filter, dialect, parameters, ref rlsIndex, tables, aliasById, aliasByRef);
 				if (filter.Deny) deny.Add($"NOT ({predicate})"); else allow.Add(predicate);
 			}
 			if (allow.Count == 0)
@@ -344,11 +408,16 @@ public class SqlQueryBuilder : ISqlQueryBuilder
 		MandatoryRowFilter filter,
 		ISqlDialect dialect,
 		Dictionary<string, object?> parameters,
-		ref int parameterIndex)
+		ref int parameterIndex,
+		List<QueryTable> tables,
+		Dictionary<long, string> aliasById,
+		Dictionary<QueryTable, string> aliasByRef)
 	{
 		if (string.IsNullOrWhiteSpace(filter.TableName) || string.IsNullOrWhiteSpace(filter.Field))
 			throw new InvalidOperationException("RLS 策略缺少物理表或字段绑定。");
-		var field = dialect.EscapeIdentifier(filter.TableName) + "." + dialect.EscapeIdentifier(filter.Field);
+		var alias = ResolveAlias(filter.MetadataTableId, filter.TableName, 0, new(), tables, aliasById, aliasByRef, allowMainTableFallback: true);
+		var field = (alias is not null ? dialect.EscapeIdentifier(alias) + "." : "") +
+		            dialect.EscapeIdentifier(filter.Field);
 		var operation = NormalizeMandatoryOperator(filter.Operator);
 		if (operation is "IS NULL" or "IS NOT NULL") return $"{field} {operation}";
 		if (operation == "IN")
@@ -382,7 +451,9 @@ public class SqlQueryBuilder : ISqlQueryBuilder
         QueryPlan plan,
         ISqlDialect dialect,
         List<QueryJoin> joins,
-        List<QueryTable> tables)
+        List<QueryTable> tables,
+        Dictionary<long, string> aliasById,
+        Dictionary<QueryTable, string> aliasByRef)
     {
         var groups = new List<string>();
 
@@ -406,6 +477,8 @@ public class SqlQueryBuilder : ISqlQueryBuilder
                 groupColumnName,
                 joins,
                 tables,
+                aliasById,
+                aliasByRef,
                 dialect,
                 allowMainTableFallback: true));
         }
@@ -415,7 +488,7 @@ public class SqlQueryBuilder : ISqlQueryBuilder
             foreach (var dimension in plan.Intent.Dimensions)
             {
                 if (!string.IsNullOrWhiteSpace(dimension))
-                    groups.Add(QualifyIntentField(dimension, tables, dialect));
+                    groups.Add(QualifyIntentField(dimension, tables, aliasByRef, dialect));
             }
         }
 
@@ -429,7 +502,9 @@ public class SqlQueryBuilder : ISqlQueryBuilder
         QueryPlan plan,
         ISqlDialect dialect,
         List<QueryJoin> joins,
-        List<QueryTable> tables)
+        List<QueryTable> tables,
+        Dictionary<long, string> aliasById,
+        Dictionary<QueryTable, string> aliasByRef)
     {
         var expressions = new List<string>();
         foreach (var order in plan.Orders)
@@ -445,6 +520,8 @@ public class SqlQueryBuilder : ISqlQueryBuilder
                 order.Field,
                 joins,
                 tables,
+                aliasById,
+                aliasByRef,
                 dialect,
                 allowMainTableFallback: true);
 
@@ -474,23 +551,24 @@ public class SqlQueryBuilder : ISqlQueryBuilder
             return;
 
         sql.Append(" ORDER BY ")
-           .Append(QualifyIntentField(plan.Intent.OrderBy, tables, dialect))
+           .Append(QualifyIntentField(plan.Intent.OrderBy, tables, aliasByRef, dialect))
            .Append(' ')
            .Append(NormalizeOrderDirection(plan.Intent.OrderDirection));
     }
 
     /// <summary>
     /// Intent 承载的字段（OrderBy / Dimensions）只有名称、无表归属。
-    /// 单表场景保持裸列名不变；多表场景锚定主表，避免 `create_time` / `status`
+    /// 单表场景保持裸列名不变；多表场景锚定主表别名，避免 `create_time` / `status`
     /// 这类多表同名列触发 MySQL "Column ... is ambiguous"。
-    /// 口径与 <see cref="ResolveTableName"/> 的多表兜底一致。
+    /// 口径与 <see cref="ResolveAlias"/> 的多表兜底一致。
     /// </summary>
     private static string QualifyIntentField(
         string field,
         List<QueryTable> tables,
+        Dictionary<QueryTable, string> aliasByRef,
         ISqlDialect dialect)
-        => tables.Count > 1 && !string.IsNullOrWhiteSpace(tables[0].TableName)
-            ? dialect.EscapeIdentifier(tables[0].TableName!) + "." +
+        => tables.Count > 1 && aliasByRef.TryGetValue(tables[0], out var alias)
+            ? dialect.EscapeIdentifier(alias) + "." +
               dialect.EscapeIdentifier(field)
             : dialect.EscapeIdentifier(field);
 

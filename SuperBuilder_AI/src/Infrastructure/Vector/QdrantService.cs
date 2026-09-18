@@ -248,7 +248,7 @@ public class QdrantService
 	}
 
 	/// <summary>
-	/// 搜索 Vector。
+	/// 搜索 Vector（不指定过滤，沿用旧行为全量召回）。
 	/// </summary>
 	public async Task<List<VectorSearchResult>> QueryAsync(
 		float[] vector,
@@ -303,6 +303,218 @@ public class QdrantService
 										x.Value))
 				})
 			.ToList();
+	}
+
+	/// <summary>
+	/// 搜索 Vector（§L.4 版本隔离）：按 tenant_id + (data_source_id, metadata_version) 组合约束召回。
+	/// </summary>
+	public async Task<List<VectorSearchResult>> QueryAsync(
+		float[] vector,
+		int limit,
+		VectorSearchFilter? filter,
+		CancellationToken ct = default)
+	{
+		if (vector == null ||
+			vector.Length == 0)
+		{
+			throw new ArgumentException(
+				"Query Vector不能为空。",
+				nameof(vector));
+		}
+
+		if ((ulong)vector.Length !=
+			_options.VectorSize)
+		{
+			throw new InvalidOperationException(
+				$"Query Vector维度不匹配。" +
+				$"Qdrant配置={_options.VectorSize}。" +
+				$"实际={vector.Length}。");
+		}
+
+		await CreateCollectionAsync();
+
+		// 无过滤：阶段 A 全量召回（与旧行为逐字节一致）。
+		if (filter is null)
+		{
+			return await QueryAsync(vector, limit);
+		}
+
+		var qFilter = BuildFilter(filter);
+
+		var result =
+			await _client.QueryAsync(
+				collectionName:
+					_options.CollectionName,
+
+				query:
+					vector,
+
+				limit:
+					(ulong)limit,
+
+				filter:
+					qFilter,
+
+				cancellationToken:
+					ct);
+
+		return result
+			.Select(x =>
+				new VectorSearchResult
+				{
+					Id =
+						x.Id.Uuid,
+
+					Score =
+						x.Score,
+
+					Payload =
+						x.Payload
+							.ToDictionary(
+								x => x.Key,
+								x =>
+									ConvertPayloadValue(
+										x.Value))
+				})
+			.ToList();
+	}
+
+	/// <summary>
+	/// 构造 Qdrant filter：must tenant_id==T；should [(ds==D AND version==V) ...]；
+	/// 过渡期 IncludeUntagged 时追加「metadata_version 缺字段」分支。
+	/// </summary>
+	private static Filter BuildFilter(VectorSearchFilter filter)
+	{
+		var qFilter = new Filter();
+
+		// TenantId==0 表示不限租户（unscoped 多租户），仅靠 should 的 (ds,version) 组合约束，省略 tenant must。
+		if (filter.TenantId != 0)
+		{
+			qFilter.Must.Add(
+				new Condition
+				{
+					Field = new FieldCondition
+					{
+						Key = "tenant_id",
+						Match = new Match
+						{
+							Integer = filter.TenantId
+						}
+					}
+				});
+		}
+
+		foreach (var (ds, version) in filter.AllowedVersions)
+		{
+			qFilter.Should.Add(
+				new Condition
+				{
+					Filter = new Filter
+					{
+						Must =
+						{
+							new Condition
+							{
+								Field = new FieldCondition
+								{
+									Key = "data_source_id",
+									Match = new Match
+									{
+										Integer = ds
+									}
+								}
+							},
+							new Condition
+							{
+								Field = new FieldCondition
+								{
+									Key = "metadata_version",
+									Match = new Match
+									{
+										Integer = version
+									}
+								}
+							}
+						}
+					}
+				});
+		}
+
+		if (filter.IncludeUntagged)
+		{
+			qFilter.Should.Add(
+				new Condition
+				{
+					IsEmpty = new IsEmptyCondition
+					{
+						Key = "metadata_version"
+					}
+				});
+		}
+
+		return qFilter;
+	}
+
+	/// <summary>
+	/// 取回指定 point 的向量与 payload（§L.4 存量回填用）。不存在返回 null。
+	/// </summary>
+	public async Task<(float[] Vector, IReadOnlyDictionary<string, object> Payload)?> RetrieveVectorAsync(
+		string id,
+		CancellationToken ct = default)
+	{
+		if (!await ExistsAsync())
+		{
+			return null;
+		}
+
+		var points = await _client.RetrieveAsync(
+			collectionName: _options.CollectionName,
+			ids: new[] { new PointId { Uuid = id } },
+			withPayload: true,
+			withVectors: true,
+			cancellationToken: ct);
+
+		var p = points.FirstOrDefault();
+		if (p == null)
+		{
+			return null;
+		}
+
+		var vector = p.Vectors.Vector.Data.ToArray();
+		var payload = p.Payload.ToDictionary(
+			kv => kv.Key,
+			kv => ConvertPayloadValue(kv.Value));
+
+		return (vector, payload);
+	}
+
+	/// <summary>
+	/// 批量删除指定 Vector。
+	/// </summary>
+	public async Task DeleteBatchAsync(
+		IEnumerable<string> ids,
+		CancellationToken ct = default)
+	{
+		var list = ids?.ToList()
+			?? new List<string>();
+		if (list.Count == 0)
+		{
+			return;
+		}
+
+		if (!await ExistsAsync())
+		{
+			return;
+		}
+
+		var pointIds = list
+			.Select(x => new PointId { Uuid = x })
+			.ToArray();
+
+		await _client.DeleteAsync(
+			_options.CollectionName,
+			pointIds,
+			cancellationToken: ct);
 	}
 
 	/// <summary>

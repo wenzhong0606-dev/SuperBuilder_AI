@@ -1,4 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+using SuperBuilder_AI.Application.Common.Options;
+using SuperBuilder_AI.Application.Metadata;
 using SuperBuilder_AI.Data;
 using SuperBuilder_AI.Interfaces;
 using SuperBuilder_AI.Interfaces.Platform;
@@ -77,13 +80,15 @@ public class MetadataSemanticSearchService
 	/// </summary>
 	private readonly ISemanticLabelRecallService? _labelRecall;
 
+	private readonly Features _features;
 
 
 	public MetadataSemanticSearchService(
 		IEmbeddingService embedding,
 		IQdrantService qdrant,
 		SuperBIContext context,
-		ISemanticLabelRecallService? labelRecall = null)
+		ISemanticLabelRecallService? labelRecall = null,
+		IOptions<Features>? features = null)
 	{
 
 		_embedding = embedding;
@@ -93,6 +98,8 @@ public class MetadataSemanticSearchService
 		_context = context;
 
 		_labelRecall = labelRecall;
+
+		_features = features?.Value ?? new Features();
 
 	}
 
@@ -185,12 +192,14 @@ public class MetadataSemanticSearchService
 	///
 	/// 两个公开重载都汇聚到这里，保证「限定作用域」与「不限定作用域」
 	/// 共用同一套召回 / 评分 / 语言提升逻辑。
+	/// <param name="dataSourceIds">作用域数据源（用于 §L.4 向量版本过滤）；null 表示不限（后台维护/诊断）。</param>
 	/// </summary>
 	private async Task<List<MetadataSemanticSearchResult>>
 		SearchCoreAsync(
 			string question,
 			int topK,
-			LocaleContext? locale)
+			LocaleContext? locale,
+			IReadOnlyCollection<long>? dataSourceIds = null)
 	{
 
 
@@ -213,11 +222,14 @@ public class MetadataSemanticSearchService
 		 * Qdrant查询
 		 */
 
+		var filter = await BuildVectorSearchFilterAsync(dataSourceIds);
+
 		var points =
 			await _qdrant
 			.QueryAsync(
 				vector,
-				topK);
+				topK,
+				filter);
 
 
 
@@ -368,6 +380,7 @@ public class MetadataSemanticSearchService
 		if (normalized.Length == 0) return new List<MetadataSemanticSearchResult>();
 
 		var semantics = await _context.MetadataSemantics
+			.WhereActiveVersion(_context)
 			.Include(x => x.MetadataColumn)
 			.ThenInclude(x => x!.MetadataTable)
 			.AsNoTracking()
@@ -411,6 +424,7 @@ public class MetadataSemanticSearchService
 		if (normalized.Length == 0) return new List<MetadataSemanticSearchResult>();
 
 		var semantics = await _context.MetadataSemantics
+			.WhereActiveVersion(_context)
 			.Include(x => x.MetadataColumn)
 			.ThenInclude(x => x!.MetadataTable)
 			.AsNoTracking()
@@ -466,7 +480,7 @@ public class MetadataSemanticSearchService
 
 		var query =
 			_context
-				.MetadataTables
+				.MetadataTables.WhereActiveVersion(_context)
 				.Include(t => t.Columns)
 				.AsNoTracking();
 
@@ -554,7 +568,7 @@ public class MetadataSemanticSearchService
 
 
 		var table =
-			await _context.MetadataTables
+			await _context.MetadataTables.WhereActiveVersion(_context)
 
 			.Include(x =>
 				x.Columns)
@@ -620,7 +634,7 @@ public class MetadataSemanticSearchService
 
 
 		var column =
-			await _context.MetadataColumns
+			await _context.MetadataColumns.WhereActiveVersion(_context)
 
 			.Include(x =>
 				x.MetadataTable)
@@ -697,7 +711,7 @@ public class MetadataSemanticSearchService
 
 
 		var semantic =
-			await _context.MetadataSemantics
+			await _context.MetadataSemantics.WhereActiveVersion(_context)
 
 			.Include(x =>
 				x.MetadataColumn)
@@ -755,6 +769,56 @@ public class MetadataSemanticSearchService
 
 
 
+
+	/// <summary>
+	/// 构造 §L.4 向量版本过滤条件。仅当 Features.MetadataVersionFilterEnabled=true 时返回非 null。
+	/// 解析涉及数据源的 ActiveMetadataVersion；过渡期对未回填源追加「缺 metadata_version」兜底分支。
+	/// 不限作用域（dataSourceIds=null）且多租户时省略 tenant must，仅靠 should 的 (ds,version) 组合约束。
+	/// </summary>
+	private async Task<VectorSearchFilter?> BuildVectorSearchFilterAsync(
+		IReadOnlyCollection<long>? dataSourceIds)
+	{
+		if (!_features.MetadataVersionFilterEnabled)
+		{
+			return null;
+		}
+
+		List<DataSource> dsList;
+		if (dataSourceIds is { Count: > 0 })
+		{
+			var scope = dataSourceIds.Where(id => id > 0).ToHashSet();
+			dsList = await _context.DataSources
+				.Where(d => scope.Contains(d.Id))
+				.AsNoTracking()
+				.ToListAsync();
+		}
+		else
+		{
+			dsList = await _context.DataSources
+				.AsNoTracking()
+				.ToListAsync();
+		}
+
+		if (dsList.Count == 0)
+		{
+			return null;
+		}
+
+		var tenantIds = dsList
+			.Select(d => d.TenantId)
+			.Distinct()
+			.ToList();
+		var tenantId = tenantIds.Count == 1 ? tenantIds[0] : 0;
+
+		var allowed = dsList
+			.Select(d => (d.Id, d.ActiveMetadataVersion))
+			.ToList();
+
+		// 过渡期兼容：任一 ds 尚未回填，则允许缺 metadata_version 的旧 point 仍被召回。
+		var includeUntagged = dsList.Any(d => !d.VectorsBackfilled);
+
+		return new VectorSearchFilter(tenantId, allowed, includeUntagged);
+	}
 
 	/// <summary>
 	/// 获取Qdrant Payload Long值

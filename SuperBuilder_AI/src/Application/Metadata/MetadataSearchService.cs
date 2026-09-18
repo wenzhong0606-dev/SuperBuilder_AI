@@ -1,4 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using SuperBuilder_AI.Application.Metadata;
 using SuperBuilder_AI.Data;
 using SuperBuilder_AI.Interfaces;
 using SuperBuilder_AI.Models.Metadata;
@@ -45,7 +46,7 @@ public class MetadataSearchService
 
 
 		var tables =
-			await _context.MetadataTables
+			await _context.MetadataTables.WhereActiveVersion(_context)
 
 			.Include(x => x.Columns)
 

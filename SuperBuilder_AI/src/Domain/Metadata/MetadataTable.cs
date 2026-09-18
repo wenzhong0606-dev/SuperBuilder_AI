@@ -31,6 +31,17 @@ public class MetadataTable : BaseEntity
 	public string TableName { get; set; } = string.Empty;
 
 	/// <summary>
+	/// 对象类型（表 / 视图）。C2 的 ScanViews 开关据此跳过视图；同名跨 schema/库并存时与 CatalogName/SchemaName 共同定位。
+	/// </summary>
+	public MetadataObjectKind ObjectKind { get; set; } = MetadataObjectKind.Table;
+
+	/// <summary>
+	/// 写入本行的扫描批次号（§L 版本生命周期）；等于 job.BatchVersion。
+	/// Ask 仅读取 == DataSource.ActiveMetadataVersion 的行；激活前 staging 行对 Ask 不可见。
+	/// </summary>
+	public int MetadataVersion { get; set; }
+
+	/// <summary>
 	/// 目录名（如 MySQL 的 database / PostgreSQL 的 catalog）。
 	/// 与 SchemaName、TableName 共同构成租户内唯一键。
 	/// </summary>

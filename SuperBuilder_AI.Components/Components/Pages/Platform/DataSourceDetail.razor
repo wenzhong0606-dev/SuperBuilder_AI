@@ -2,8 +2,10 @@
 @inject IApiClient Api
 @inject NavigationManager Nav
 @inject ToastService Toast
+@inject IJSRuntime Js
 @using System.Text.Json
 @using SuperBuilder_AI.Components.Shared
+@using SuperBuilder_AI.Components.Components.Constants
 @implements IDisposable
 
 <AuthGuard>
@@ -14,11 +16,34 @@
 
     <SbTabs>
         <SbTab Title="@L10n.T(Keys.Content.DataSourceTabMeta, "元数据")" Badge="@_metadata.Count.ToString()">
+            @* C11 操作区：按钮按权限显隐 *@
             <SbToolbar>
-                <Right>
-                    <button class="btn btn-primary btn-sm" @onclick="ScanMetadata" disabled="@_scanPolling">@ScanButtonLabel</button>
-                    <button class="btn btn-outline-secondary btn-sm" @onclick="LoadMetadata">@L10n.T(Keys.Action.Refresh, "刷新")</button>
-                </Right>
+                <Left>
+                    <div class="scan-actions">
+                        <PermissionGuard Require="@(new[] { PermissionCodes.MetadataScan })">
+                            <button class="btn btn-primary btn-sm" @onclick="ScanMetadata" disabled="@_scanPolling">@ScanButtonLabel</button>
+                        </PermissionGuard>
+                        <PermissionGuard Require="@(new[] { PermissionCodes.MetadataScan })">
+                            <button class="btn btn-outline-secondary btn-sm" @onclick="FullRescan" disabled="@_scanPolling">@L10n.T(Keys.Content.DataSourceFullRescan, "全量重扫")</button>
+                        </PermissionGuard>
+                        <PermissionGuard Require="@(new[] { PermissionCodes.MetadataCancelScan })">
+                            <button class="btn btn-outline-warning btn-sm" @onclick="CancelScan" disabled="@(!IsActiveScan)">@L10n.T(Keys.Content.DataSourceCancelScan, "取消扫描")</button>
+                        </PermissionGuard>
+                        <PermissionGuard Require="@(new[] { PermissionCodes.MetadataScan })">
+                            <button class="btn btn-outline-secondary btn-sm" @onclick="RetryFailedScan" disabled="@(!CanRetryFailed)">@L10n.T(Keys.Content.DataSourceRetryFailed, "重扫失败项")</button>
+                        </PermissionGuard>
+                        <PermissionGuard Require="@(new[] { PermissionCodes.MetadataView })">
+                            <button class="btn btn-outline-secondary btn-sm" @onclick="TestConnection">@L10n.T(Keys.Content.DataSourceTestConnection, "测试连接")</button>
+                        </PermissionGuard>
+                        <PermissionGuard Require="@(new[] { PermissionCodes.MetadataDelete })">
+                            <button class="btn btn-outline-secondary btn-sm" @onclick="DisableDataSource">@L10n.T(Keys.Content.DataSourceDisable, "禁用")</button>
+                        </PermissionGuard>
+                        <PermissionGuard Require="@(new[] { PermissionCodes.MetadataCleanupMetadata })">
+                            <button class="btn btn-outline-danger btn-sm" @onclick="DeleteAndCleanup">@L10n.T(Keys.Content.DataSourceDeleteCleanup, "删除并清理")</button>
+                        </PermissionGuard>
+                        <button class="btn btn-outline-secondary btn-sm" @onclick="LoadMetadata">@L10n.T(Keys.Action.Refresh, "刷新")</button>
+                    </div>
+                </Left>
             </SbToolbar>
             @if (_scanJob is not null)
             {
@@ -42,10 +67,6 @@
                             }
                             <span>@_scanJob.ProgressPercent%</span>
                         </div>
-                        @if (_scanJob.Status == "Failed")
-                        {
-                            <button class="btn btn-sm btn-outline-secondary ms-auto" @onclick="RetryScan">@L10n.T(Keys.Content.DataSourceScanRetry, "重试")</button>
-                        }
                     </div>
 
                     <div class="progress scan-monitor-progress"><span style="@($"width:{_scanJob.ProgressPercent}%")"></span></div>
@@ -68,8 +89,24 @@
                     @if (!string.IsNullOrWhiteSpace(scan.CurrentObjectName))
                     {
                         <div class="scan-monitor-current">
-                            <span class="status-pulse"></span>
+                            @if (_scanJob.Status is "Running" or "Retrying")
+                            {
+                                <span class="status-pulse"></span>
+                            }
                             @string.Format(L10n.T(Keys.Content.DataSourceScanCurrentObject, "当前处理：{0}"), scan.CurrentObjectName)
+                        </div>
+                    }
+
+                    @* C11 ⑦ 失败项列表（展开）+ 重扫失败项 *@
+                    @if (_scanJob.Status is "Failed" or "PartiallySucceeded")
+                    {
+                        <div class="scan-job-error">
+                            <strong>@L10n.T(Keys.Content.DataSourceScanStatus, "任务状态")：@ScanStatusLabel(_scanJob.Status)</strong>
+                            @if (!string.IsNullOrWhiteSpace(_scanJob.ErrorCode))
+                            {
+                                <div>@_scanJob.ErrorCode@(string.IsNullOrWhiteSpace(_scanJob.ErrorMessage) ? "" : $"：{_scanJob.ErrorMessage}")</div>
+                            }
+                            <div class="muted tiny">@L10n.T(Keys.Content.DataSourceRetryFailedHint, "可点击「重扫失败项」仅重扫失败表，成功表保留。")</div>
                         </div>
                     }
 
@@ -101,7 +138,7 @@
                                 {
                                     @foreach (var evt in scan.Events.OrderByDescending(x => x.TimestampUtc).Take(8))
                                     {
-                                        <div class="scan-event @(evt.Level == "Warning" ? "is-warning" : "")">
+                                        <div class="scan-event @ScanEventClass(evt.Level)">
                                             <time>@evt.TimestampUtc.ToLocalTime().ToString("HH:mm:ss")</time>
                                             <span>@evt.Message</span>
                                         </div>
@@ -110,13 +147,6 @@
                             </div>
                         </section>
                     </div>
-
-                    @if (_scanJob.Status == "Failed" && !string.IsNullOrWhiteSpace(_scanJob.ErrorCode))
-                    {
-                        <div class="scan-job-error">
-                            <strong>@_scanJob.ErrorCode</strong>@(string.IsNullOrWhiteSpace(_scanJob.ErrorMessage) ? "" : $"：{_scanJob.ErrorMessage}")
-                        </div>
-                    }
                 </div>
             }
             @if (_loadingMetadata) { <LoadingState Text="@L10n.T(Keys.Content.DataSourceLoadingMeta, "正在加载元数据…")" /> }
@@ -273,11 +303,17 @@
     private string? _metadataError;
     private bool _loadingMetadata = true;
     private bool _scanPolling;
+    private bool _processing;
     private ScanJobView? _scanJob;
     private CancellationTokenSource? _scanCts;
     private string ScanButtonLabel => _scanPolling
         ? L10n.T(Keys.Content.DataSourceScanning, "扫描中…")
         : L10n.T(Keys.Content.DataSourceRescan, "重新扫描");
+
+    /// <summary>C5/C11：进行中状态（可取消）。</summary>
+    private bool IsActiveScan => _scanJob is not null && _scanJob.Status is "Queued" or "Running" or "Cancelling" or "Retrying";
+    /// <summary>C7/C11：可仅重扫失败项的状态。</summary>
+    private bool CanRetryFailed => _scanJob is not null && _scanJob.Status is "Failed" or "PartiallySucceeded";
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -288,9 +324,21 @@
     private async Task Load()
     {
         await LoadMetadata();
+        await LoadLatestScan();
         await LoadGrants();
         await LoadPolicies();
         StateHasChanged();
+    }
+
+    /// <summary>C5 进入页面恢复续显：拉取最新任务，若仍在进行则续轮询（含重启后任务仍在）。</summary>
+    private async Task LoadLatestScan()
+    {
+        var (job, _, _, _) = await Api.GetLatestScanJobAsync(Id);
+        if (job is null) { _scanJob = null; return; }
+        if (IsActiveStatus(job.Status))
+            await PollScanAsync(job);
+        else
+            _scanJob = job;
     }
 
     private async Task LoadMetadata()
@@ -305,14 +353,14 @@
 
     private async Task ScanMetadata()
     {
-        if (_scanPolling) return;
+        if (_scanPolling || _processing) return;
         var (ok, _, jobId, err, _) = await Api.StartScanAsync(Id);
         if (!ok || jobId is null)
         {
             Toast.Error(err ?? L10n.T(Keys.Content.DataSourceScanFailed, "元数据扫描失败。"));
             return;
         }
-        await PollScanAsync(jobId.Value);
+        await PollScanAsync(new ScanJobView { JobId = jobId.Value, DataSourceId = Id, Status = "Queued", Stage = "Queued", ProgressPercent = 0 });
     }
 
     private async Task RetryScan()
@@ -320,18 +368,105 @@
         if (_scanJob is not null) await ScanMetadata();
     }
 
-    private async Task PollScanAsync(long jobId)
+    /// <summary>C11 全量重扫：复用 StartScan（从 active 全量播种，scope 外保留）。</summary>
+    private async Task FullRescan()
+    {
+        if (_scanPolling || _processing) return;
+        await ScanMetadata();
+    }
+
+    /// <summary>C3 软取消：置 Cancelling 并续轮询直到终态。</summary>
+    private async Task CancelScan()
+    {
+        if (_scanJob is null || !IsActiveScan || _processing) return;
+        _processing = true; StateHasChanged();
+        var (ok, _, err, _) = await Api.CancelScanAsync(Id, _scanJob.JobId);
+        _processing = false;
+        if (!ok)
+        {
+            Toast.Error(err ?? L10n.T(Keys.Content.DataSourceCancelScanFailed, "取消扫描失败。"));
+            StateHasChanged();
+            return;
+        }
+        Toast.Success(L10n.T(Keys.Content.DataSourceCancelScanRequested, "已请求取消，扫描将在安全点退出。"));
+        await PollScanAsync(new ScanJobView { JobId = _scanJob.JobId, DataSourceId = Id, Status = "Cancelling", Stage = "Cancelling", ProgressPercent = _scanJob.ProgressPercent });
+    }
+
+    /// <summary>C7 仅重扫失败项（从 active 续种，成功表保留）。</summary>
+    private async Task RetryFailedScan()
+    {
+        if (_scanJob is null || !CanRetryFailed || _processing) return;
+        _processing = true; StateHasChanged();
+        var (ok, _, newJobId, err, _) = await Api.RetryFailedScanAsync(Id, _scanJob.JobId);
+        _processing = false;
+        if (!ok || newJobId is null)
+        {
+            Toast.Error(err ?? L10n.T(Keys.Content.DataSourceRetryFailedFailed, "重扫失败项失败。"));
+            StateHasChanged();
+            return;
+        }
+        await PollScanAsync(new ScanJobView { JobId = newJobId.Value, DataSourceId = Id, Status = "Queued", Stage = "Queued", ProgressPercent = 0 });
+    }
+
+    /// <summary>测试数据源连通性。</summary>
+    private async Task TestConnection()
+    {
+        if (_processing) return;
+        _processing = true; StateHasChanged();
+        var (ok, _, err, _) = await Api.TestConnectionAsync(Id);
+        _processing = false;
+        if (ok) Toast.Success(L10n.T(Keys.Content.DataSourceTestOk, "连接成功。"));
+        else Toast.Error(err ?? L10n.T(Keys.Content.DataSourceTestFailed, "连接失败。"));
+        StateHasChanged();
+    }
+
+    /// <summary>C8 禁用数据源（保留元数据）。</summary>
+    private async Task DisableDataSource()
+    {
+        if (_processing) return;
+        _processing = true; StateHasChanged();
+        var (ok, _, err, _) = await Api.SetDataSourceEnabledAsync(Id, false);
+        _processing = false;
+        if (ok) Toast.Success(L10n.T(Keys.Content.DataSourceDisabled, "数据源已禁用。"));
+        else Toast.Error(err ?? L10n.T(Keys.Content.DataSourceDisableFailed, "禁用失败。"));
+        StateHasChanged();
+    }
+
+    /// <summary>C8 删除并清理（事务内写向量 GC 待办；二次确认）。</summary>
+    private async Task DeleteAndCleanup()
+    {
+        if (_processing) return;
+        var confirmed = await Js.InvokeAsync<bool>("window.confirm",
+            L10n.T(Keys.Content.DataSourceDeleteConfirm, "确认彻底删除该数据源？将清理引用并删除向量（不可恢复）。"));
+        if (!confirmed) return;
+        _processing = true; StateHasChanged();
+        var (ok, _, err, _) = await Api.DeleteAsync($"api/data-sources/{Id}?mode=cleanup&confirm=true");
+        _processing = false;
+        if (ok)
+        {
+            Toast.Success(L10n.T(Keys.Content.DataSourceDeleted, "数据源已删除并清理。"));
+            Nav.NavigateTo("data-sources");
+        }
+        else
+        {
+            Toast.Error(err ?? L10n.T(Keys.Content.DataSourceDeleteFailed, "删除失败。"));
+            StateHasChanged();
+        }
+    }
+
+    private async Task PollScanAsync(ScanJobView initial)
     {
         _scanCts?.Cancel();
         _scanCts = new CancellationTokenSource();
         var ct = _scanCts.Token;
         _scanPolling = true;
-        _scanJob = new ScanJobView { JobId = jobId, DataSourceId = Id, Status = "Queued", Stage = "Queued", ProgressPercent = 0 };
+        _scanJob = initial;
+        StateHasChanged();
         try
         {
             while (!ct.IsCancellationRequested)
             {
-                var (job, _, perr, _) = await Api.GetScanJobAsync(Id, jobId, ct);
+                var (job, _, perr, _) = await Api.GetScanJobAsync(Id, _scanJob.JobId, ct);
                 if (job is null)
                 {
                     _scanJob = null;
@@ -340,7 +475,7 @@
                 }
                 _scanJob = job;
                 StateHasChanged();
-                if (job.Status == "Succeeded" || job.Status == "Failed") break;
+                if (job.Status is "Succeeded" or "Failed" or "PartiallySucceeded" or "Cancelled") break;
                 await Task.Delay(1500, ct);
             }
         }
@@ -359,9 +494,9 @@
             Toast.Success(L10n.T(Keys.Content.DataSourceScanDone, "元数据扫描完成。"));
             await LoadMetadata();
         }
-        else if (_scanJob?.Status == "Failed")
+        else if (_scanJob?.Status == "Failed" || _scanJob?.Status == "PartiallySucceeded")
         {
-            Toast.Error(L10n.T(Keys.Content.DataSourceScanFailed, "元数据扫描失败。"));
+            Toast.Error(L10n.T(Keys.Content.DataSourceScanFailed, "元数据扫描失败（部分成功）。"));
         }
     }
 
@@ -414,6 +549,20 @@
         "Failed" => L10n.T(Keys.Content.DataSourceScanFailedBanner, "扫描失败"),
         _ => status
     };
+
+    /// <summary>C10 阶段日志按级别配色（无障碍色盲友好）。</summary>
+    private static string ScanEventClass(string? level) => level switch
+    {
+        "Success" => "is-success",
+        "Warning" => "is-warning",
+        "Error" => "is-error",
+        "Debug" => "is-debug",
+        "Cancel" or "Cancelled" => "is-cancel",
+        _ => "is-info"
+    };
+
+    /// <summary>C5 进行中状态判定（用于续轮询）。</summary>
+    private static bool IsActiveStatus(string? status) => status is "Queued" or "Running" or "Cancelling" or "Retrying";
 
     private static string ScanTimeLabel(ScanJobView job)
     {

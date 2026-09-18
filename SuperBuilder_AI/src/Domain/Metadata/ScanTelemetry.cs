@@ -46,11 +46,19 @@ public class ScanTelemetry
         Details.CurrentObjectName = objectName;
     }
 
-    public void AddWarning(string eventCode, string message)
-    {
-        Details.WarningsCount++;
-        AddEvent("Warning", eventCode, message);
-    }
+	public void AddWarning(string eventCode, string message)
+	{
+		Details.WarningsCount++;
+		AddEvent("Warning", eventCode, message);
+	}
+
+	/// <summary>C10：成功级别事件（绿），用于阶段完成/整体完成摘要。</summary>
+	public void AddSuccess(string eventCode, string message, int? current = null, int? total = null)
+		=> AddEvent("Success", eventCode, message, current, total);
+
+	/// <summary>C10：调试级别事件（灰），用于不影响结论的细粒度进度。</summary>
+	public void AddDebug(string eventCode, string message, int? current = null, int? total = null)
+		=> AddEvent("Debug", eventCode, message, current, total);
 
     public void AddEvent(string level, string eventCode, string message, int? current = null, int? total = null)
     {

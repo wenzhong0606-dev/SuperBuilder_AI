@@ -2646,6 +2646,9 @@ namespace SuperBuilder_AI.Infrastructure.Persistence.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
 
+                    b.Property<int>("ActiveMetadataVersion")
+                        .HasColumnType("int");
+
                     b.Property<string>("ConnectionString")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)")
@@ -2693,6 +2696,9 @@ namespace SuperBuilder_AI.Infrastructure.Persistence.Migrations
                         .HasColumnType("nvarchar(128)")
                         .HasComment("名称（展示用，保留原始大小写）");
 
+                    b.Property<int>("NextMetadataVersion")
+                        .HasColumnType("int");
+
                     b.Property<string>("NormalizedName")
                         .IsRequired()
                         .HasMaxLength(128)
@@ -2714,6 +2720,9 @@ namespace SuperBuilder_AI.Infrastructure.Persistence.Migrations
 
                     b.Property<DateTime?>("UpdatedTime")
                         .HasColumnType("datetime2");
+
+                    b.Property<bool>("VectorsBackfilled")
+                        .HasColumnType("bit");
 
                     b.HasKey("Id");
 
@@ -2796,6 +2805,12 @@ namespace SuperBuilder_AI.Infrastructure.Persistence.Migrations
 
                     b.Property<long>("MetadataTableId")
                         .HasColumnType("bigint");
+
+                    b.Property<int>("MetadataVersion")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0)
+                        .HasComment("元数据版本号(§L 版本生命周期)");
 
                     b.Property<string>("NativeType")
                         .HasMaxLength(64)
@@ -3039,6 +3054,20 @@ namespace SuperBuilder_AI.Infrastructure.Persistence.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
 
+                    b.Property<int?>("ActivatedVersion")
+                        .HasColumnType("int")
+                        .HasComment("激活版本号");
+
+                    b.Property<int>("BatchVersion")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0)
+                        .HasComment("批次版本号(§L.1)");
+
+                    b.Property<DateTime?>("CancelledAt")
+                        .HasColumnType("datetime2")
+                        .HasComment("取消时间(UTC)");
+
                     b.Property<int>("ColumnsScanned")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int")
@@ -3065,9 +3094,22 @@ namespace SuperBuilder_AI.Infrastructure.Persistence.Migrations
                         .HasColumnType("nvarchar(2000)")
                         .HasComment("错误摘要(脱敏,不含连接串)");
 
+                    b.Property<string>("FailedReason")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)")
+                        .HasComment("结构化失败原因(脱敏)");
+
                     b.Property<DateTime?>("FinishedAt")
                         .HasColumnType("datetime2")
                         .HasComment("结束时间(UTC)");
+
+                    b.Property<DateTime?>("LastHeartbeatUtc")
+                        .HasColumnType("datetime2")
+                        .HasComment("最近心跳(UTC)");
+
+                    b.Property<long?>("OriginalJobId")
+                        .HasColumnType("bigint")
+                        .HasComment("失败项续扫来源任务Id");
 
                     b.Property<int>("OrphansDetected")
                         .ValueGeneratedOnAdd()
@@ -3091,6 +3133,16 @@ namespace SuperBuilder_AI.Infrastructure.Persistence.Migrations
                         .HasColumnType("bigint")
                         .HasDefaultValue(1L)
                         .HasComment("乐观并发版本(ETag)，每次更新自增");
+
+                    b.Property<string>("ScopeJson")
+                        .HasColumnType("nvarchar(max)")
+                        .HasComment("扫描范围JSON(ScanScope)");
+
+                    b.Property<int>("SeedVersion")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0)
+                        .HasComment("种子版本号(§L.6)");
 
                     b.Property<string>("Stage")
                         .IsRequired()
@@ -3135,7 +3187,9 @@ namespace SuperBuilder_AI.Infrastructure.Persistence.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("DataSourceId")
-                        .HasDatabaseName("IX_MetadataScanJobs_DataSourceId");
+                        .IsUnique()
+                        .HasDatabaseName("ux_ds_active_scan")
+                        .HasFilter("[Status] IN ('Queued','Running','Cancelling','Retrying')");
 
                     b.HasIndex("Status")
                         .HasDatabaseName("IX_MetadataScanJobs_Status");
@@ -3143,10 +3197,89 @@ namespace SuperBuilder_AI.Infrastructure.Persistence.Migrations
                     b.HasIndex("TenantId")
                         .HasDatabaseName("IX_MetadataScanJobs_TenantId");
 
+                    b.HasIndex("DataSourceId", "Status")
+                        .HasDatabaseName("IX_MetadataScanJobs_DataSourceId_Status");
+
                     b.ToTable("MetadataScanJobs", t =>
                         {
                             t.HasComment("元数据扫描任务");
                         });
+                });
+
+            modelBuilder.Entity("SuperBuilder_AI.Models.Metadata.MetadataScanJobFailure", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasComment("主键");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("CreatedTime")
+                        .HasColumnType("datetime2")
+                        .HasComment("创建时间");
+
+                    b.Property<long>("DataSourceId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Database")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ErrorMessage")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ErrorType")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("FirstFailedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<long>("JobId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime>("LastFailedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<long?>("OriginalJobId")
+                        .HasColumnType("bigint");
+
+                    b.Property<bool>("Resolved")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("RetryCount")
+                        .HasColumnType("int");
+
+                    b.Property<long>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasDefaultValue(1L)
+                        .HasComment("乐观并发版本(ETag)，每次更新自增");
+
+                    b.Property<string>("Schema")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Stage")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("TableName")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("UpdatedTime")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("JobId")
+                        .HasDatabaseName("IX_MetadataScanJobFailures_JobId");
+
+                    b.ToTable("MetadataScanJobFailures", (string)null);
                 });
 
             modelBuilder.Entity("SuperBuilder_AI.Models.Metadata.MetadataSemantic", b =>
@@ -3198,6 +3331,12 @@ namespace SuperBuilder_AI.Infrastructure.Persistence.Migrations
 
                     b.Property<long?>("MetadataColumnId")
                         .HasColumnType("bigint");
+
+                    b.Property<int>("MetadataVersion")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0)
+                        .HasComment("元数据版本号(§L)");
 
                     b.Property<long>("RowVersion")
                         .IsConcurrencyToken()
@@ -3299,6 +3438,18 @@ namespace SuperBuilder_AI.Infrastructure.Persistence.Migrations
                         .HasColumnType("nvarchar(128)")
                         .HasComment("Embedding模型");
 
+                    b.Property<int>("MetadataVersion")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0)
+                        .HasComment("元数据版本号(§L 版本生命周期)");
+
+                    b.Property<int>("ObjectKind")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0)
+                        .HasComment("对象类型(表/视图,§L/§10.1)");
+
                     b.Property<long>("RowVersion")
                         .IsConcurrencyToken()
                         .ValueGeneratedOnAdd()
@@ -3364,7 +3515,7 @@ namespace SuperBuilder_AI.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("DataSourceId", "TenantId");
 
-                    b.HasIndex("DataSourceId", "CatalogName", "SchemaName", "TableName")
+                    b.HasIndex("DataSourceId", "CatalogName", "SchemaName", "TableName", "MetadataVersion")
                         .IsUnique()
                         .HasDatabaseName("IX_MetadataTables_DataSourceId_CatalogName_SchemaName_TableName")
                         .HasFilter("[CatalogName] IS NOT NULL AND [SchemaName] IS NOT NULL");
@@ -3373,6 +3524,74 @@ namespace SuperBuilder_AI.Infrastructure.Persistence.Migrations
                         {
                             t.HasComment("元数据表");
                         });
+                });
+
+            modelBuilder.Entity("SuperBuilder_AI.Models.Metadata.MetadataVectorGcRequest", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasComment("主键");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("CreatedTime")
+                        .HasColumnType("datetime2")
+                        .HasComment("创建时间");
+
+                    b.Property<long?>("DataSourceId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Error")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("LastAttemptAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("OldVersion")
+                        .HasColumnType("int");
+
+                    b.Property<string>("PayloadJson")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<DateTime>("RequestedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<long>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasDefaultValue(1L)
+                        .HasComment("乐观并发版本(ETag)，每次更新自增");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.Property<long>("TenantId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("UpdatedTime")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Status")
+                        .HasDatabaseName("IX_MetadataVectorGcRequests_Status");
+
+                    b.ToTable("MetadataVectorGcRequests", (string)null);
                 });
 
             modelBuilder.Entity("SuperBuilder_AI.Models.Metadata.QueryCorrectionRule", b =>

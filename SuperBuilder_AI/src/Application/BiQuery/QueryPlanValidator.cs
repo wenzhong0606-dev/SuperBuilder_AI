@@ -1,4 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using SuperBuilder_AI.Application.Metadata;
 using SuperBuilder_AI.Data;
 using SuperBuilder_AI.Models.BI;
 using SuperBuilder_AI.Models.Metadata;
@@ -268,7 +269,7 @@ public class QueryPlanValidator
 			return new List<MetadataTable>();
 		}
 
-		return await _context.MetadataTables
+		return await _context.MetadataTables.WhereActiveVersion(_context)
 			.AsNoTracking()
 			.Where(x =>
 				tableIds.Contains(x.Id))
@@ -287,7 +288,7 @@ public class QueryPlanValidator
 			return new List<MetadataColumn>();
 		}
 
-		return await _context.MetadataColumns
+		return await _context.MetadataColumns.WhereActiveVersion(_context)
 			.AsNoTracking()
 			.Where(x =>
 				columnIds.Contains(x.Id))

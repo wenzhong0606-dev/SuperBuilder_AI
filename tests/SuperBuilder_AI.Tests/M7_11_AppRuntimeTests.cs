@@ -9,6 +9,7 @@ using SuperBuilder_AI.Api.Errors;
 using SuperBuilder_AI.Data;
 using SuperBuilder_AI.Infrastructure.Database;
 using SuperBuilder_AI.Infrastructure.Persistence;
+using SuperBuilder_AI.Infrastructure.Security;
 using SuperBuilder_AI.Interfaces.AppBuilder;
 using SuperBuilder_AI.Interfaces.BI;
 using SuperBuilder_AI.Interfaces.BI.Planning;
@@ -325,7 +326,7 @@ public sealed class M7_11_AppRuntimeTests
 		var sqlBuilder = new FakeSqlBuilder();
 		var exec = new FakeExec();
 		accessor ??= new FakeExecutionIdentityAccessor();
-		return new AppQueryExecutor(pipeline, sqlBuilder, resolver, exec, ctx, auth, rls, accessor, gate);
+		return new AppQueryExecutor(pipeline, sqlBuilder, resolver, exec, ctx, auth, rls, accessor, gate, new FakeSecretStore());
 	}
 
 	// ── 桩实现 ───────────────────────────────────────────────────────────
@@ -372,6 +373,21 @@ public sealed class M7_11_AppRuntimeTests
 		public string EscapeIdentifier(string identifier) => "[" + identifier + "]";
 		public string ApplyLimit(string sql, int limit) => sql + " LIMIT " + limit;
 		public string GetParameterName(int index) => "@p" + index;
+		public string QualifyTable(string? catalog, string? schema, string table)
+		{
+			var parts = new List<string>();
+			if (!string.IsNullOrWhiteSpace(catalog)) parts.Add(EscapeIdentifier(catalog));
+			if (!string.IsNullOrWhiteSpace(schema)) parts.Add(EscapeIdentifier(schema));
+			parts.Add(EscapeIdentifier(table));
+			return string.Join(".", parts);
+		}
+		public void AssertCatalogResolvable(string? catalog, string? currentCatalog) { }
+	}
+
+	private sealed class FakeSecretStore : ISecretStore
+	{
+		public string Protect(string plaintext) => plaintext;
+		public string Unprotect(string ciphertext) => ciphertext;
 	}
 
 	private sealed class FakeSqlBuilder : ISqlQueryBuilder

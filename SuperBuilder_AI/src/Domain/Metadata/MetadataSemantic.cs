@@ -205,6 +205,11 @@ public class MetadataSemantic
 	/// </summary>
 	public string? VectorErrorCode { get; set; }
 
+	/// <summary>
+	/// 写入本行的扫描批次号（§L 版本生命周期）；等于 job.BatchVersion。Ask 仅读取 == ActiveMetadataVersion 的行。
+	/// </summary>
+	public int MetadataVersion { get; set; }
+
 
 	#endregion
 

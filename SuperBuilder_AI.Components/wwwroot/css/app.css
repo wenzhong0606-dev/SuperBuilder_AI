@@ -978,6 +978,16 @@ button.mini { padding: 4px 10px; font-size: 12px; border-radius: var(--sb-radius
 .scan-event time { color: var(--sb-muted); font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
 .scan-event span { min-width: 0; word-break: break-word; }
 .scan-event.is-warning span { color: var(--sb-warning, #b7791f); }
+/* C10：阶段日志按级别配色高亮（无障碍色盲友好，配合语义文本色变量）。 */
+.scan-event.is-info span { color: var(--sb-info, #2b6cb0); }
+.scan-event.is-success span { color: var(--sb-success, #2f855a); font-weight: 600; }
+.scan-event.is-debug span { color: var(--sb-muted); }
+.scan-event.is-error span { color: var(--sb-danger, #c53030); font-weight: 600; }
+.scan-event.is-cancel span { color: var(--sb-muted); }
+/* C11：操作区按钮组 */
+.scan-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.scan-actions .btn { display: inline-flex; align-items: center; gap: 6px; }
+.scan-job-error { margin-top: 10px; padding: 8px 10px; border-radius: 8px; background: color-mix(in srgb, var(--sb-danger, #c53030) 10%, transparent); color: var(--sb-danger, #c53030); font-size: 13px; }
 
 @media (max-width: 760px) {
     .scan-monitor-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }

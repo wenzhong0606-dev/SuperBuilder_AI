@@ -68,4 +68,27 @@ public class SqlServerDialect
 	}
 
 
+	public string QualifyTable(
+		string? catalog,
+		string? schema,
+		string table)
+	{
+		var parts = new List<string>();
+		if (!string.IsNullOrWhiteSpace(catalog))
+			parts.Add(EscapeIdentifier(catalog));
+		if (!string.IsNullOrWhiteSpace(schema))
+			parts.Add(EscapeIdentifier(schema));
+		parts.Add(EscapeIdentifier(table));
+		return string.Join(".", parts);
+	}
+
+
+	public void AssertCatalogResolvable(
+		string? catalog,
+		string? currentCatalog)
+	{
+		// SQL Server 支持跨 catalog 限定名（同一实例且具备权限），无需拒绝。
+	}
+
+
 }

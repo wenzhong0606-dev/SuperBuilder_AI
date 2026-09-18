@@ -52,6 +52,30 @@ public class MetadataScanJob : BaseEntity
 
     /// <summary>失败时的错误摘要（脱敏，绝不含有连接串）。成功或排队中为 null。</summary>
     public string? ErrorMessage { get; set; }
+
+    /// <summary>取消时间（UTC），仅 Cancelled 状态填充。</summary>
+    public DateTime? CancelledAt { get; set; }
+
+    /// <summary>扫描范围 JSON（§10.1 ScanScope）：Databases/Schemas/排除项/ScanViews。</summary>
+    public string? ScopeJson { get; set; }
+
+    /// <summary>本次扫描写入的批次版本号（§L.1）；由 DataSource.NextMetadataVersion 事务内原子分配，单调不重号。</summary>
+    public int BatchVersion { get; set; }
+
+    /// <summary>种子版本：本次任务启动时复制自的 active 版本号（§L.6 统一播种规则）。</summary>
+    public int SeedVersion { get; set; }
+
+    /// <summary>失败项续扫来源任务 Id（§L.6 retry-failed）；仅重扫失败项时填充。</summary>
+    public long? OriginalJobId { get; set; }
+
+    /// <summary>最近一次心跳时间（UTC），用于重启恢复超时判定（C4）。</summary>
+    public DateTime? LastHeartbeatUtc { get; set; }
+
+    /// <summary>激活后写入的版本号（成功切换 active 指针时填充）。</summary>
+    public int? ActivatedVersion { get; set; }
+
+    /// <summary>结构化失败原因（脱敏枚举值）：orphaned_references / vector_index_incomplete / worker_interrupted / heartbeat_timeout 等。</summary>
+    public string? FailedReason { get; set; }
 }
 
 /// <summary>
@@ -69,5 +93,17 @@ public enum MetadataScanJobStatus
     Succeeded,
 
     /// <summary>失败。</summary>
-    Failed
+    Failed,
+
+    /// <summary>已请求取消，后台在安全点（阶段/每表边界）退出中。</summary>
+    Cancelling,
+
+    /// <summary>已取消；staging 不可见、active 不变，由 GC 回收。</summary>
+    Cancelled,
+
+    /// <summary>部分表失败，但可用数据已入库并激活（SQL 部分成功且必需向量全 Synced，§10.6）。</summary>
+    PartiallySucceeded,
+
+    /// <summary>失败项重试中（§L.6）。</summary>
+    Retrying
 }

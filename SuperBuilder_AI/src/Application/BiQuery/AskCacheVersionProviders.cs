@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using SuperBuilder_AI.Application.Common.Options;
+using SuperBuilder_AI.Application.Metadata;
 using SuperBuilder_AI.Data;
 using SuperBuilder_AI.Interfaces.BI;
 using SuperBuilder_AI.Interfaces.Identity;
@@ -95,12 +96,12 @@ public sealed class MetadataVersionProvider : IMetadataVersionProvider
 
 	public async Task<string> ResolveAsync(long tenantId, CancellationToken ct = default)
 	{
-		var tableRv = await _db.MetadataTables
+		var tableRv = await _db.MetadataTables.WhereActiveVersion(_db)
 			.Where(t => t.TenantId == tenantId)
 			.Select(t => t.RowVersion)
 			.SumAsync(ct);
 
-		var columnRv = await _db.MetadataColumns
+		var columnRv = await _db.MetadataColumns.WhereActiveVersion(_db)
 			.Where(c => c.MetadataTable != null && c.MetadataTable.TenantId == tenantId)
 			.Select(c => c.RowVersion)
 			.SumAsync(ct);

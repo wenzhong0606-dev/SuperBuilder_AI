@@ -682,6 +682,25 @@ public static class Keys
         public const string DataSourceDeleteFailed = "Content.DataSourceDeleteFailed";
         public const string DataSourceLoadGrantsFailed = "Content.DataSourceLoadGrantsFailed";
 
+        // 扫描管理操作区（C5/C10/C11）
+        public const string DataSourceFullRescan = "Content.DataSourceFullRescan";
+        public const string DataSourceCancelScan = "Content.DataSourceCancelScan";
+        public const string DataSourceRetryFailed = "Content.DataSourceRetryFailed";
+        public const string DataSourceTestConnection = "Content.DataSourceTestConnection";
+        public const string DataSourceDisable = "Content.DataSourceDisable";
+        public const string DataSourceDeleteCleanup = "Content.DataSourceDeleteCleanup";
+        public const string DataSourceCancelScanFailed = "Content.DataSourceCancelScanFailed";
+        public const string DataSourceCancelScanRequested = "Content.DataSourceCancelScanRequested";
+        public const string DataSourceRetryFailedFailed = "Content.DataSourceRetryFailedFailed";
+        public const string DataSourceTestOk = "Content.DataSourceTestOk";
+        public const string DataSourceTestFailed = "Content.DataSourceTestFailed";
+        public const string DataSourceDisabled = "Content.DataSourceDisabled";
+        public const string DataSourceDisableFailed = "Content.DataSourceDisableFailed";
+        public const string DataSourceDeleteConfirm = "Content.DataSourceDeleteConfirm";
+        public const string DataSourceDeleted = "Content.DataSourceDeleted";
+        public const string DataSourceRetryFailedHint = "Content.DataSourceRetryFailedHint";
+        public const string DataSourceScanStatus = "Content.DataSourceScanStatus";
+
         // ModelAccounts（模型与账号 BYO）
         public const string ModelAccountsBound = "Content.ModelAccountsBound";
         public const string ModelAccountsUnbound = "Content.ModelAccountsUnbound";
@@ -2445,6 +2464,24 @@ public static class Keys
         [Content.DataSourcePolicyDeleted] = new("策略已删除。", "Policy deleted."),
         [Content.DataSourceDeleteFailed] = new("删除失败（{0}）。", "Delete failed ({0})."),
         [Content.DataSourceLoadGrantsFailed] = new("加载授权失败（{0}）。", "Failed to load grants ({0})."),
+
+        [Content.DataSourceFullRescan] = new("全量重扫", "Full re-scan"),
+        [Content.DataSourceCancelScan] = new("取消扫描", "Cancel scan"),
+        [Content.DataSourceRetryFailed] = new("重扫失败项", "Retry failed items"),
+        [Content.DataSourceTestConnection] = new("测试连接", "Test connection"),
+        [Content.DataSourceDisable] = new("禁用", "Disable"),
+        [Content.DataSourceDeleteCleanup] = new("删除并清理", "Delete & cleanup"),
+        [Content.DataSourceCancelScanFailed] = new("取消扫描失败。", "Failed to cancel scan."),
+        [Content.DataSourceCancelScanRequested] = new("已请求取消，扫描将在安全点退出。", "Cancel requested; scan will exit at a safe point."),
+        [Content.DataSourceRetryFailedFailed] = new("重扫失败项失败。", "Failed to retry failed items."),
+        [Content.DataSourceTestOk] = new("连接成功。", "Connection succeeded."),
+        [Content.DataSourceTestFailed] = new("连接失败。", "Connection failed."),
+        [Content.DataSourceDisabled] = new("数据源已禁用。", "Data source disabled."),
+        [Content.DataSourceDisableFailed] = new("禁用失败。", "Failed to disable."),
+        [Content.DataSourceDeleteConfirm] = new("确认彻底删除该数据源？将清理引用并删除向量（不可恢复）。", "Permanently delete this data source? References are cleared and vectors removed (irreversible)."),
+        [Content.DataSourceDeleted] = new("数据源已删除并清理。", "Data source deleted and cleaned up."),
+        [Content.DataSourceRetryFailedHint] = new("可点击「重扫失败项」仅重扫失败表，成功表保留。", "Click 'Retry failed items' to re-scan only failed tables; successful tables are kept."),
+        [Content.DataSourceScanStatus] = new("任务状态", "Job status"),
 
         // M3-05 重内容页正文批次（续）：ModelAccounts / SemanticLabel / ComponentGallery / ThemeEditor 补充 / MetadataEntity
         [Content.ModelAccountsBound] = new("已绑定", "Bound"),

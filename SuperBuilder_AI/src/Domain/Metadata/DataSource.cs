@@ -70,6 +70,27 @@ public class DataSource : BaseEntity
 	public DateTime? LastScanAt { get; set; }
 
 
+	/// <summary>
+	/// 当前对 Ask 生效的元数据版本号（§L 版本生命周期）。
+	/// 扫描写入 staging 行使用各自的 BatchVersion，激活时仅翻此指针，Ask 仅读取 == 此值的行。
+	/// </summary>
+	public int ActiveMetadataVersion { get; set; }
+
+
+	/// <summary>
+	/// 单调版本计数器，用于原子分配新批次号（§L.1）。
+	/// 建扫描任务时在事务内以 UPDATE … OUTPUT 自增，不依赖任何元数据行存活，避免重号。
+	/// </summary>
+	public int NextMetadataVersion { get; set; } = 1;
+
+
+	/// <summary>
+	/// 本数据源存量向量是否已补齐 metadata_version payload（§10.4，按数据源判定）。
+	/// 正常重扫不重置；仅检测到缺 payload 旧 point 或 collection 重建后才置 false 并重跑回填。
+	/// </summary>
+	public bool VectorsBackfilled { get; set; }
+
+
 	public ICollection<MetadataTable>? Tables { get; set; }
 
 		= new List<MetadataTable>();

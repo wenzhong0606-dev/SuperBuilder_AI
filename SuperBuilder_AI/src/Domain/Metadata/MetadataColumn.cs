@@ -187,6 +187,11 @@ public class MetadataColumn : BaseEntity
 	public string? VectorErrorCode { get; set; }
 
 	/// <summary>
+	/// 写入本行的扫描批次号（§L 版本生命周期）；等于 job.BatchVersion。Ask 仅读取 == ActiveMetadataVersion 的行。
+	/// </summary>
+	public int MetadataVersion { get; set; }
+
+	/// <summary>
 	/// 外键目标表名（同数据源内；跨数据源引用由 QueryCorrectionRules / MetadataDictionaryConfig 承载）。
 	/// </summary>
 	public string? ReferencedTable { get; set; }

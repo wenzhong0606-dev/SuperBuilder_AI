@@ -1,7 +1,9 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using SuperBuilder_AI.Application.BiQuery;
 using SuperBuilder_AI.Data;
 using SuperBuilder_AI.Infrastructure.Database;
+using SuperBuilder_AI.Infrastructure.Security;
 using SuperBuilder_AI.Interfaces;
 using SuperBuilder_AI.Interfaces.BI;
 using SuperBuilder_AI.Interfaces.Database;
@@ -27,6 +29,7 @@ public class AITestController : ControllerBase
     private readonly IQueryExecutionService _execution;
     private readonly SqlDialectResolver _dialectResolver;
     private readonly SuperBIContext _context;
+    private readonly ISecretStore _secrets;
 
     public AITestController(
         IQueryUnderstandingService queryUnderstanding,
@@ -35,7 +38,8 @@ public class AITestController : ControllerBase
         ISqlQueryBuilder sqlBuilder,
         IQueryExecutionService execution,
         SqlDialectResolver dialectResolver,
-        SuperBIContext context)
+        SuperBIContext context,
+        ISecretStore secrets)
     {
         _queryUnderstanding = queryUnderstanding;
         _metadataSearch = metadataSearch;
@@ -44,6 +48,7 @@ public class AITestController : ControllerBase
         _execution = execution;
         _dialectResolver = dialectResolver;
         _context = context;
+        _secrets = secrets;
     }
 
     [HttpGet("understand")]

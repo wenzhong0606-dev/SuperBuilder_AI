@@ -393,7 +393,7 @@ public class IdentityControllerTests
 		Assert.NotNull(result);
 		var perms = Assert.IsAssignableFrom<IEnumerable<IdentityController.PermissionSummary>>(result!.Value).ToList();
 		// 普通租户目录隐藏 8 项 platform:* 治理权限；新增 localization:* 亦属治理面，对租户不可见。
-		Assert.Equal(26, perms.Count);
+		Assert.Equal(29, perms.Count);
 		Assert.All(perms, p => Assert.Equal(0, p.TenantId));
 		Assert.Contains(perms, p => p.Code == "dashboard:view");
 		Assert.Contains(perms, p => p.Code == "identity:manage");

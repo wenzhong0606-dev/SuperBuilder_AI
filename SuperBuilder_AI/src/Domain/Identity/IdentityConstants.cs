@@ -36,6 +36,9 @@ public static class IdentityPermissions
     public const string MetadataView = "metadata:view";
     public const string MetadataEdit = "metadata:edit";
     public const string MetadataScan = "metadata:scan";
+    public const string MetadataCancelScan = "metadata:cancel_scan";
+    public const string MetadataDelete = "metadata:delete";
+    public const string MetadataCleanupMetadata = "metadata:cleanup_metadata";
 
     public const string AuditView = "audit:view";
 
@@ -92,6 +95,9 @@ public static class IdentityCatalog
         new(IdentityPermissions.MetadataView, "查看元数据", "metadata", "查看业务元数据"),
         new(IdentityPermissions.MetadataEdit, "编辑元数据", "metadata", "编辑业务元数据"),
         new(IdentityPermissions.MetadataScan, "扫描数据源", "metadata", "扫描数据源"),
+        new(IdentityPermissions.MetadataCancelScan, "取消扫描", "metadata", "取消进行中的元数据扫描"),
+        new(IdentityPermissions.MetadataDelete, "删除数据源", "metadata", "停用或删除数据源"),
+        new(IdentityPermissions.MetadataCleanupMetadata, "清理元数据", "metadata", "彻底清理数据源及其元数据与向量"),
 
         new(IdentityPermissions.AuditView, "查看审计", "audit", "查看审计日志"),
 
@@ -132,7 +138,9 @@ public static class IdentityCatalog
             IdentityPermissions.AppPublish, IdentityPermissions.AppDelete,
             IdentityPermissions.AgentView, IdentityPermissions.AgentCreate, IdentityPermissions.AgentManage,
             IdentityPermissions.ThemeView, IdentityPermissions.ThemeEdit, IdentityPermissions.ThemePublish,
-            IdentityPermissions.MetadataView, IdentityPermissions.MetadataEdit, IdentityPermissions.MetadataScan,
+            IdentityPermissions.MetadataView, IdentityPermissions.MetadataEdit, IdentityPermissions.MetadataScan, IdentityPermissions.MetadataCancelScan,
+            IdentityPermissions.MetadataDelete, IdentityPermissions.MetadataCleanupMetadata,
+            IdentityPermissions.MetadataDelete, IdentityPermissions.MetadataCleanupMetadata,
             IdentityPermissions.AuditView, IdentityPermissions.IdentityManage,
             IdentityPermissions.LocalizationView,
         }),

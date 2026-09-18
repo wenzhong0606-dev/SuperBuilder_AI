@@ -255,4 +255,196 @@ public class MetadataScanControllerTests
 		Assert.Equal(60, details.VectorsProcessed);
 		Assert.Contains(details.Events, e => e.EventCode == "VectorIndexStarted");
 	}
+
+	private static long SeedJob(SuperBIContext ctx, long dsId, MetadataScanJobStatus status, long? originalJobId = null)
+	{
+		var job = new MetadataScanJob
+		{
+			TenantId = TenantA,
+			DataSourceId = dsId,
+			Status = status,
+			Stage = status.ToString(),
+			ProgressPercent = 0,
+			OriginalJobId = originalJobId
+		};
+		ctx.MetadataScanJobs.Add(job);
+		ctx.SaveChanges();
+		// 模拟生产独立 scope：detach 避免与控制器 AsNoTracking 查询 + Update 的跟踪冲突。
+		ctx.Entry(job).State = EntityState.Detached;
+		return job.Id;
+	}
+
+	// —— C3 软取消（§L.3）——
+	[Fact]
+	public async Task CancelScan_QueuedJob_BecomesCancelled()
+	{
+		var ctx = CreateContext(out var connection);
+		await using var _ = connection;
+		await using var __ = ctx;
+
+		var dsId = SeedDataSource(ctx, TenantA);
+		var jobId = SeedJob(ctx, dsId, MetadataScanJobStatus.Queued);
+		var (ctrl, _) = Build(ctx, new PermissiveIdentity(), new PermissiveAuth(), TenantA);
+
+		var result = await ctrl.CancelScan(dsId, jobId, CancellationToken.None);
+
+		Assert.Equal(202, Assert.IsType<ObjectResult>(result).StatusCode);
+		var saved = await ctx.MetadataScanJobs.FindAsync(jobId);
+		Assert.Equal(MetadataScanJobStatus.Cancelled, saved!.Status);
+	}
+
+	[Fact]
+	public async Task CancelScan_RunningJob_BecomesCancelling()
+	{
+		var ctx = CreateContext(out var connection);
+		await using var _ = connection;
+		await using var __ = ctx;
+
+		var dsId = SeedDataSource(ctx, TenantA);
+		var jobId = SeedJob(ctx, dsId, MetadataScanJobStatus.Running);
+		var (ctrl, _) = Build(ctx, new PermissiveIdentity(), new PermissiveAuth(), TenantA);
+
+		var result = await ctrl.CancelScan(dsId, jobId, CancellationToken.None);
+
+		Assert.Equal(202, Assert.IsType<ObjectResult>(result).StatusCode);
+		var saved = await ctx.MetadataScanJobs.FindAsync(jobId);
+		Assert.Equal(MetadataScanJobStatus.Cancelling, saved!.Status);
+	}
+
+	[Fact]
+	public async Task CancelScan_TerminalJob_Conflict()
+	{
+		var ctx = CreateContext(out var connection);
+		await using var _ = connection;
+		await using var __ = ctx;
+
+		var dsId = SeedDataSource(ctx, TenantA);
+		var jobId = SeedJob(ctx, dsId, MetadataScanJobStatus.Succeeded);
+		var (ctrl, _) = Build(ctx, new PermissiveIdentity(), new PermissiveAuth(), TenantA);
+
+		var result = await ctrl.CancelScan(dsId, jobId, CancellationToken.None);
+
+		Assert.Equal(409, Assert.IsType<ObjectResult>(result).StatusCode);
+		Assert.Equal(MetadataScanJobStatus.Succeeded, (await ctx.MetadataScanJobs.FindAsync(jobId))!.Status);
+	}
+
+	[Fact]
+	public async Task CancelScan_Forbidden_WhenMissingCancelPermission()
+	{
+		var ctx = CreateContext(out var connection);
+		await using var _ = connection;
+		await using var __ = ctx;
+
+		var dsId = SeedDataSource(ctx, TenantA);
+		var jobId = SeedJob(ctx, dsId, MetadataScanJobStatus.Running);
+		var (ctrl, _) = Build(ctx, new DenyingIdentity(), new PermissiveAuth(), TenantA);
+
+		var result = await ctrl.CancelScan(dsId, jobId, CancellationToken.None);
+
+		Assert.Equal(403, Assert.IsType<ObjectResult>(result).StatusCode);
+	}
+
+	[Fact]
+	public async Task CancelScan_NotFound_ForUnknownJob()
+	{
+		var ctx = CreateContext(out var connection);
+		await using var _ = connection;
+		await using var __ = ctx;
+
+		var dsId = SeedDataSource(ctx, TenantA);
+		var (ctrl, _) = Build(ctx, new PermissiveIdentity(), new PermissiveAuth(), TenantA);
+
+		var result = await ctrl.CancelScan(dsId, 9999, CancellationToken.None);
+
+		Assert.IsType<NotFoundObjectResult>(result);
+	}
+
+	// —— C7 失败项续扫（§L.6）——
+	[Fact]
+	public async Task RetryFailedScan_CreatesOriginalJobLinkedJob()
+	{
+		var ctx = CreateContext(out var connection);
+		await using var _ = connection;
+		await using var __ = ctx;
+
+		var dsId = SeedDataSource(ctx, TenantA);
+		var failedJobId = SeedJob(ctx, dsId, MetadataScanJobStatus.Failed);
+		var (ctrl, queue) = Build(ctx, new PermissiveIdentity(), new PermissiveAuth(), TenantA);
+
+		var result = await ctrl.RetryFailedScan(dsId, failedJobId, CancellationToken.None);
+
+		Assert.Equal(202, Assert.IsType<ObjectResult>(result).StatusCode);
+		var jobs = await ctx.MetadataScanJobs.ToListAsync();
+		Assert.Equal(2, jobs.Count);
+		var newJob = jobs.Single(j => j.Id != failedJobId);
+		Assert.Equal(failedJobId, newJob.OriginalJobId);
+		Assert.Equal(MetadataScanJobStatus.Queued, newJob.Status);
+		Assert.Equal(newJob.Id, queue.Enqueued);
+	}
+
+	[Fact]
+	public async Task RetryFailedScan_DuplicateActive_Conflict()
+	{
+		var ctx = CreateContext(out var connection);
+		await using var _ = connection;
+		await using var __ = ctx;
+
+		var dsId = SeedDataSource(ctx, TenantA);
+		SeedJob(ctx, dsId, MetadataScanJobStatus.Running); // 进行中，触发同源去重 409
+		var failedJobId = SeedJob(ctx, dsId, MetadataScanJobStatus.Failed);
+		var (ctrl, _) = Build(ctx, new PermissiveIdentity(), new PermissiveAuth(), TenantA);
+
+		var result = await ctrl.RetryFailedScan(dsId, failedJobId, CancellationToken.None);
+
+		Assert.Equal(409, Assert.IsType<ObjectResult>(result).StatusCode);
+		Assert.Equal(2, await ctx.MetadataScanJobs.CountAsync());
+	}
+
+	[Fact]
+	public async Task RetryFailedScan_NotFound_ForUnknownOriginal()
+	{
+		var ctx = CreateContext(out var connection);
+		await using var _ = connection;
+		await using var __ = ctx;
+
+		var dsId = SeedDataSource(ctx, TenantA);
+		var (ctrl, _) = Build(ctx, new PermissiveIdentity(), new PermissiveAuth(), TenantA);
+
+		var result = await ctrl.RetryFailedScan(dsId, 9999, CancellationToken.None);
+
+		Assert.IsType<NotFoundObjectResult>(result);
+	}
+
+	// —— C5 进入页面恢复续显（§L.5b）——
+	[Fact]
+	public async Task GetLatestScanJob_ReturnsNull_WhenNone()
+	{
+		var ctx = CreateContext(out var connection);
+		await using var _ = connection;
+		await using var __ = ctx;
+
+		var dsId = SeedDataSource(ctx, TenantA);
+		var (ctrl, _) = Build(ctx, new PermissiveIdentity(), new PermissiveAuth(), TenantA);
+
+		var result = Assert.IsType<OkObjectResult>(await ctrl.GetLatestScanJob(dsId, CancellationToken.None));
+		Assert.Null(result.Value!.GetType().GetProperty("jobId")!.GetValue(result.Value));
+	}
+
+	[Fact]
+	public async Task GetLatestScanJob_ReturnsLatest()
+	{
+		var ctx = CreateContext(out var connection);
+		await using var _ = connection;
+		await using var __ = ctx;
+
+		var dsId = SeedDataSource(ctx, TenantA);
+		var first = SeedJob(ctx, dsId, MetadataScanJobStatus.Succeeded);
+		var second = SeedJob(ctx, dsId, MetadataScanJobStatus.Running);
+		var (ctrl, _) = Build(ctx, new PermissiveIdentity(), new PermissiveAuth(), TenantA);
+
+		var result = Assert.IsType<OkObjectResult>(await ctrl.GetLatestScanJob(dsId, CancellationToken.None));
+		var value = result.Value!;
+		Assert.Equal(second, (long)value.GetType().GetProperty("jobId")!.GetValue(value)!);
+		Assert.Equal("Running", value.GetType().GetProperty("status")!.GetValue(value)!.ToString());
+	}
 }

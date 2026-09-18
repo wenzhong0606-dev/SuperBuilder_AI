@@ -111,7 +111,7 @@ public sealed class RowLevelSecurityTests
 		});
 
 		var query = await new SqlQueryBuilder().BuildAsync(plan, new SqlServerDialect());
-		Assert.Contains("[sales].[region] = @p0 AND ([sales].[region] = @p100000 OR [sales].[region] = @p100001) AND NOT ([sales].[region] = @p100002)", query.Sql);
+		Assert.Contains("[t0].[region] = @p0 AND ([t0].[region] = @p100000 OR [t0].[region] = @p100001) AND NOT ([t0].[region] = @p100002)", query.Sql);
 		Assert.DoesNotContain("OR 1=1", query.Sql);
 		Assert.Equal("east' OR 1=1--", query.Parameters["@p100000"]);
 	}
@@ -132,6 +132,6 @@ public sealed class RowLevelSecurityTests
 		var query = await new SqlQueryBuilder().BuildAsync(plan, new SqlServerDialect());
 		Assert.Contains("COUNT([region])", query.Sql);
 		Assert.Contains("INNER JOIN [customers]", query.Sql);
-		Assert.Contains("([sales].[region] = @p100000) AND ([customers].[segment] = @p100001)", query.Sql);
+		Assert.Contains("([t0].[region] = @p100000) AND ([t1].[segment] = @p100001)", query.Sql);
 	}
 }

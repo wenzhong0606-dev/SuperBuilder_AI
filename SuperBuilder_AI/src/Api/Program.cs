@@ -95,6 +95,7 @@ builder.Services.AddDbContext<SuperBIContext>(options =>
 
 builder.Services.Configure<QdrantOptions>(builder.Configuration.GetSection("Qdrant"));
 builder.Services.Configure<EmbeddingOptions>(builder.Configuration.GetSection("Embedding"));
+builder.Services.Configure<SuperBuilder_AI.Application.Common.Options.Features>(builder.Configuration.GetSection("Features"));
 
 // M7-07：机密存储（AES-256-GCM 信封加密）。主密钥须来自环境变量 SecretStore__MasterKey 或 gitignored 的 appsettings.Local.json；
 // 缺失即解析失败（fail-fast，M9-07）——绝不回退到代码内硬编码密钥。
@@ -113,9 +114,16 @@ builder.Services.Configure<CostGovernanceOptions>(builder.Configuration.GetSecti
 builder.Services.AddScoped<IDataSourceMetadataReader, MySqlMetadataReader>();
 builder.Services.AddScoped<PlatformAdminBootstrapper>();
 builder.Services.AddScoped<MetadataScannerService>();
+builder.Services.AddScoped<SuperBuilder_AI.Application.Metadata.VectorBackfillGate>();
+builder.Services.AddScoped<SuperBuilder_AI.Application.Metadata.MetadataVectorBackfillJob>();
+builder.Services.AddScoped<SuperBuilder_AI.Application.Metadata.MetadataVectorGcJob>();
+builder.Services.Configure<SuperBuilder_AI.Application.Common.Options.ScanRetryPolicy>(builder.Configuration.GetSection("MetadataScan:RetryPolicy"));
+builder.Services.Configure<SuperBuilder_AI.Application.Common.Options.ScanHeartbeatOptions>(builder.Configuration.GetSection("MetadataScan:HeartbeatTimeout"));
+builder.Services.AddScoped<SuperBuilder_AI.Application.Metadata.MetadataScanFailureRecorder>();
 // M4-05：扫描任务队列与后台处理器（Channel + BackgroundService）。
 builder.Services.AddSingleton<IMetadataScanQueue, MetadataScanQueue>();
 builder.Services.AddHostedService<MetadataScanHostedService>();
+builder.Services.AddHostedService<SuperBuilder_AI.Api.Background.MetadataVectorMaintenanceHostedService>();
 // M13-03：启动期一次性存量数据源连接串再加密（AES-256-GCM），确保新旧数据均不明文持久化。
 builder.Services.AddHostedService<DataSourceSecretMigrationHostedService>();
 builder.Services.AddScoped<MetadataSearchTextBuilder>();

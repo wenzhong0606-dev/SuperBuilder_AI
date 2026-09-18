@@ -55,4 +55,7 @@ public static class PermissionCodes
     public const string MetadataView = "metadata:view";
     public const string MetadataEdit = "metadata:edit";
     public const string MetadataScan = "metadata:scan";
+    public const string MetadataCancelScan = "metadata:cancel_scan";
+    public const string MetadataDelete = "metadata:delete";
+    public const string MetadataCleanupMetadata = "metadata:cleanup_metadata";
 }

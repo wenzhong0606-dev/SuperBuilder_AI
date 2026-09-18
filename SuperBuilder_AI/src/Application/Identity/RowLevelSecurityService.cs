@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using Microsoft.EntityFrameworkCore;
 using SuperBuilder_AI.Api.Errors;
+using SuperBuilder_AI.Application.Metadata;
 using SuperBuilder_AI.Data;
 using SuperBuilder_AI.Interfaces.Identity;
 using SuperBuilder_AI.Models.BI;
@@ -58,7 +59,7 @@ public sealed class RowLevelSecurityService : IRowLevelSecurityService
 				throw SuperBuilderException.FromCode(ErrorCodes.RowPolicyForbidden, 403);
 
 			var columnIds = applicable.Select(x => x.MetadataColumnId).Distinct().ToArray();
-			var columns = await _db.MetadataColumns.AsNoTracking()
+			var columns = await _db.MetadataColumns.WhereActiveVersion(_db).AsNoTracking()
 				.Include(x => x.MetadataTable)
 				.Where(x => columnIds.Contains(x.Id) && x.MetadataTableId == table.MetadataTableId &&
 					x.MetadataTable != null && x.MetadataTable.TenantId == tenantId && x.MetadataTable.DataSourceId == plan.DataSourceId)

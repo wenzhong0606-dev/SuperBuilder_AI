@@ -12,10 +12,14 @@ using MySqlConnector;
 using Npgsql;
 using SuperBuilder_AI.Api.Errors;
 using SuperBuilder_AI.Data;
+using SuperBuilder_AI.Interfaces.Audit;
 using SuperBuilder_AI.Interfaces.Identity;
 using SuperBuilder_AI.Models.Identity;
 using SuperBuilder_AI.Infrastructure.Security;
 using SuperBuilder_AI.Models.Metadata;
+using SuperBuilder_AI.Services;
+using SuperBuilder_AI.Models.BI.Entity;
+using System.Text.Json;
 
 namespace SuperBuilder_AI.Controllers;
 
@@ -40,12 +44,16 @@ public sealed class DataSourcesController : ControllerBase
 	private readonly SuperBIContext _db;
 	private readonly IIdentityService _identity;
 	private readonly ISecretStore _secrets;
+	private readonly IMetadataScanQueue _queue;
+	private readonly IAuditLogService? _audit;
 
-	public DataSourcesController(SuperBIContext db, IIdentityService identity, ISecretStore secrets)
+	public DataSourcesController(SuperBIContext db, IIdentityService identity, ISecretStore secrets, IMetadataScanQueue queue, IAuditLogService? audit = null)
 	{
 		_db = db;
 		_identity = identity;
 		_secrets = secrets;
+		_queue = queue;
+		_audit = audit;
 	}
 
 	/// <summary>列出当前用户已授权且启用的数据源（摘要）。</summary>
@@ -251,6 +259,40 @@ public sealed class DataSourcesController : ControllerBase
 		});
 		await _db.SaveChangesAsync(cancellationToken);
 		await transaction.CommitAsync(cancellationToken);
+
+		// C1：保存并扫描。源已创建并授权；入队扫描任务，由后台处理器异步执行。
+		// 入队成功 → 201 + jobId（前端可轮询）；入队失败 → 202 + 源已建 + 可重试 URL，源不回滚。
+		if (request.ScanAfterCreate)
+		{
+			try
+			{
+				var scanJob = new MetadataScanJob
+				{
+					TenantId = tenantId,
+					DataSourceId = source.Id,
+					TriggeredBy = userId.ToString(),
+					Status = MetadataScanJobStatus.Queued,
+					ProgressPercent = 0
+				};
+				_db.MetadataScanJobs.Add(scanJob);
+				await _db.SaveChangesAsync(cancellationToken);
+				await _queue.EnqueueAsync(scanJob.Id, cancellationToken);
+				return CreatedAtAction(
+					nameof(Create),
+					new { id = source.Id },
+					new { id = source.Id, name = source.Name, dbType = source.DbType, jobId = scanJob.Id });
+			}
+			catch (Exception)
+			{
+				return StatusCode(202, new
+				{
+					sourceCreated = true,
+					scanEnqueued = false,
+					retryScanUrl = $"/api/data-sources/{source.Id}/metadata/scan"
+				});
+			}
+		}
+
 		return Ok(new DataSourceSummaryDto(source.Id, source.Name, source.DbType));
 	}
 
@@ -320,6 +362,164 @@ public sealed class DataSourcesController : ControllerBase
 		source.Enabled = enabled;
 		await _db.SaveChangesAsync(cancellationToken);
 		return Ok(new DataSourceSummaryDto(source.Id, source.Name, source.DbType));
+	}
+
+	/// <summary>
+	/// 删除数据源（C8，§L.7 / §10.7）。
+	/// <list type="bullet">
+	///   <item><c>mode=disable</c>：置 <c>Enabled=false</c>，配置与元数据保留（Ask 仍可用旧元数据）。</item>
+	///   <item><c>mode=cleanup</c>：先删 Restrict 引用（RLS / PhysicalBinding / LearningRecord）→ 事务内删源级联 →
+	///   同一事务写 <c>MetadataVectorGcRequest</c>（含待删 point ID 快照，覆盖从未回填、无 <c>data_source_id</c> 的旧 point）。</item>
+	/// </list>
+	/// cleanup 前要求 <c>VectorsBackfilled=true</c>（§10.7 闸门，否则 409）；存在依赖引用时返回清单供二次确认（<c>confirm=true</c> 跳过）。
+	/// </summary>
+	[HttpDelete("{id:long}")]
+	public async Task<IActionResult> Delete(long id, [FromQuery] string mode = "disable", [FromQuery] bool confirm = false, CancellationToken cancellationToken = default)
+	{
+		var tenantId = ResolveTenantId();
+		var userId = ResolveUserId();
+		if (tenantId <= 0 || userId <= 0)
+			return Unauthorized(new ApiError { Code = ErrorCodes.Unauthorized, Message = "未授权：令牌声明缺失。" });
+
+		var source = await _db.DataSources.FirstOrDefaultAsync(x => x.Id == id && x.TenantId == tenantId, cancellationToken);
+		if (source is null)
+			return NotFound(new ApiError { Code = ErrorCodes.BadRequest, Message = "数据源不存在或不属于当前租户。" });
+
+		// disable 模式：仅需 metadata:delete。
+		if (!string.Equals(mode, "cleanup", StringComparison.OrdinalIgnoreCase))
+		{
+			if (!await _identity.HasPermissionAsync(tenantId, userId, IdentityPermissions.MetadataDelete, cancellationToken))
+				return StatusCode(403, new ApiError { Code = ErrorCodes.Forbidden, Message = "禁止：缺少 metadata:delete 权限。" });
+			source.Enabled = false;
+			await _db.SaveChangesAsync(cancellationToken);
+			await AuditAsync(tenantId, userId, "metadata:datasource:disable", id, "success", "停用数据源（配置与元数据保留）。");
+			return Ok(new DataSourceSummaryDto(source.Id, source.Name, source.DbType));
+		}
+
+		// cleanup 模式：需 metadata:cleanup_metadata。
+		if (!await _identity.HasPermissionAsync(tenantId, userId, IdentityPermissions.MetadataCleanupMetadata, cancellationToken))
+			return StatusCode(403, new ApiError { Code = ErrorCodes.Forbidden, Message = "禁止：缺少 metadata:cleanup_metadata 权限。" });
+
+		// §10.7 闸门：未回填则拒绝，避免旧 point 成孤儿。
+		if (!source.VectorsBackfilled)
+			return StatusCode(409, new ApiError
+			{
+				Code = "vector_backfill_required_before_cleanup",
+				Message = "禁止：删除前需先完成存量向量回填（VectorsBackfilled=true），否则旧 point 将成孤儿。"
+			});
+
+		// 影响分析（事务前）：枚举引用供二次确认。
+		var impact = await BuildImpactAsync(id, cancellationToken);
+		var hasDependencies = impact.RowLevelSecurityPolicies > 0 || impact.PhysicalBindings > 0
+			|| impact.AskQuerySnapshots > 0 || impact.QueryCorrectionRules > 0 || impact.LearningRecords > 0;
+		if (hasDependencies && !confirm)
+			return StatusCode(409, new
+			{
+				code = "has_dependencies",
+				message = "删除将影响以下引用，请确认后携带 confirm=true 重试。",
+				impact
+			});
+
+		// 待删 point ID 快照（删源前枚举，覆盖无 data_source_id 的旧 point）。
+		var pointIds = await CollectPointIdsAsync(id, cancellationToken);
+		var gc = new MetadataVectorGcRequest
+		{
+			DataSourceId = id,
+			TenantId = tenantId,
+			Reason = "DataSourceDeleted",
+			Status = "Pending",
+			PayloadJson = pointIds.Count > 0 ? JsonSerializer.Serialize(pointIds) : null,
+			RequestedAt = DateTime.UtcNow
+		};
+
+		// 事务内：先清 Restrict 引用 → 删源级联 → 写 GC 待办。
+		await using var tx = await _db.Database.BeginTransactionAsync(cancellationToken);
+		try
+		{
+			_db.RowLevelSecurityPolicies.RemoveRange(
+				await _db.RowLevelSecurityPolicies.Where(x => x.DataSourceId == id).ToListAsync(cancellationToken));
+			_db.Set<PhysicalBinding>().RemoveRange(
+				await _db.Set<PhysicalBinding>().Where(x => x.DataSourceId == id).ToListAsync(cancellationToken));
+			_db.AskQuerySnapshots.RemoveRange(
+				await _db.AskQuerySnapshots.Where(x => x.DataSourceId == id).ToListAsync(cancellationToken));
+			_db.QueryCorrectionRules.RemoveRange(
+				await _db.QueryCorrectionRules.Where(x => x.DataSourceId == id).ToListAsync(cancellationToken));
+			// LearningRecord（列级，SetNull 保留；显式清本 ds 列的学习记录）。
+			_db.LearningRecords.RemoveRange(
+				await _db.LearningRecords
+					.Where(l => l.MetadataColumn != null && l.MetadataColumn.MetadataTable != null && l.MetadataColumn.MetadataTable.DataSourceId == id)
+					.ToListAsync(cancellationToken));
+
+			// 删源：级联清理 MetadataTables→Columns→Semantics、Jobs、Grants、DictConfigs。
+			_db.DataSources.Remove(source);
+			// 同一事务内写 GC 待办（进程退出不丢，重启后 MetadataVectorGcJob 续跑）。
+			_db.MetadataVectorGcRequests.Add(gc);
+
+			await _db.SaveChangesAsync(cancellationToken);
+			await tx.CommitAsync(cancellationToken);
+		}
+		catch
+		{
+			await tx.RollbackAsync(cancellationToken);
+			throw;
+		}
+
+		await AuditAsync(tenantId, userId, "metadata:datasource:cleanup", id, "success",
+			$"彻底删除数据源，已清引用并写向量 GC 待办（待删 point 数={pointIds.Count}）。");
+		return Ok(new { id, name = source.Name, deleted = true, vectorGcRequestId = gc.Id, impact });
+	}
+
+	private sealed record DeleteImpact(
+		int RowLevelSecurityPolicies,
+		int PhysicalBindings,
+		int AskQuerySnapshots,
+		int QueryCorrectionRules,
+		int LearningRecords);
+
+	private async Task<DeleteImpact> BuildImpactAsync(long dataSourceId, CancellationToken ct)
+	{
+		var rls = await _db.RowLevelSecurityPolicies.CountAsync(x => x.DataSourceId == dataSourceId, ct);
+		var bindings = await _db.Set<PhysicalBinding>().CountAsync(x => x.DataSourceId == dataSourceId, ct);
+		var asks = await _db.AskQuerySnapshots.CountAsync(x => x.DataSourceId == dataSourceId, ct);
+		var corrections = await _db.QueryCorrectionRules.CountAsync(x => x.DataSourceId == dataSourceId, ct);
+		var learning = await _db.LearningRecords
+			.CountAsync(l => l.MetadataColumn != null && l.MetadataColumn.MetadataTable != null && l.MetadataColumn.MetadataTable.DataSourceId == dataSourceId, ct);
+		return new DeleteImpact(rls, bindings, asks, corrections, learning);
+	}
+
+	private async Task<List<string>> CollectPointIdsAsync(long dataSourceId, CancellationToken ct)
+	{
+		var ids = new List<string>();
+		var tables = await _db.MetadataTables.Where(t => t.DataSourceId == dataSourceId && t.VectorId != null).ToListAsync(ct);
+		foreach (var t in tables) ids.Add(t.VectorId!);
+		var columns = await _db.MetadataColumns.Where(c => c.MetadataTable != null && c.MetadataTable.DataSourceId == dataSourceId && c.VectorId != null).ToListAsync(ct);
+		foreach (var c in columns) ids.Add(c.VectorId!);
+		var semantics = await _db.MetadataSemantics
+			.Where(s => s.MetadataColumn != null && s.MetadataColumn.MetadataTable != null && s.MetadataColumn.MetadataTable.DataSourceId == dataSourceId && s.VectorId != null)
+			.ToListAsync(ct);
+		foreach (var s in semantics) ids.Add(s.VectorId!);
+		return ids;
+	}
+
+	private async Task AuditAsync(long tenantId, long userId, string action, long entityId, string result, string message)
+	{
+		if (_audit is null) return;
+		try
+		{
+			await _audit.LogAsync(new AuditLogEntry(
+				TenantId: tenantId,
+				Action: action,
+				EntityType: "DataSource",
+				UserId: userId,
+				Actor: "user",
+				EntityId: entityId.ToString(),
+				Result: result,
+				Message: message), default);
+		}
+		catch
+		{
+			// 审计写入失败不应影响主流程。
+		}
 	}
 
 	/// <summary>
@@ -456,6 +656,10 @@ public sealed class DataSourcesController : ControllerBase
 }
 
 public sealed record TestDataSourceConnectionRequest(string? DbType, string? ConnectionString);
-public sealed record CreateDataSourceRequest(string? Name, string? DbType, string? ConnectionString);
+public sealed record CreateDataSourceRequest(string? Name, string? DbType, string? ConnectionString)
+{
+	/// <summary>C1：创建后立即触发一次元数据扫描（保存并扫描）。默认 false。</summary>
+	public bool ScanAfterCreate { get; init; }
+}
 
 public sealed record UpdateDataSourceRequest(string? Name, string? DbType, string? ConnectionString);

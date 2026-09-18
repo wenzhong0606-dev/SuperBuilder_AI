@@ -1,10 +1,12 @@
 using Microsoft.EntityFrameworkCore;
 using System.Collections.Concurrent;
+using System.Data.Common;
 using System.Threading;
 using SuperBuilder_AI.Data;
 using SuperBuilder_AI.Interfaces;
 using SuperBuilder_AI.Models.DTO;
 using SuperBuilder_AI.Models.Metadata;
+using SuperBuilder_AI.Application.Metadata;
 
 namespace SuperBuilder_AI.Services;
 
@@ -19,28 +21,34 @@ public class MetadataScannerService
     private readonly IMetadataSearchTextBuilder _textBuilder;
     private readonly IMetadataSemanticService _semanticService;
     private readonly IMetadataVectorService _vectorService;
+    private readonly VectorBackfillGate _backfillGate;
 
     public MetadataScannerService(
         SuperBIContext context,
         IDataSourceMetadataReader reader,
         IMetadataSearchTextBuilder textBuilder,
         IMetadataSemanticService semanticService,
-        IMetadataVectorService vectorService)
+        IMetadataVectorService vectorService,
+        VectorBackfillGate backfillGate)
     {
         _context = context;
         _reader = reader;
         _textBuilder = textBuilder;
         _semanticService = semanticService;
         _vectorService = vectorService;
+        _backfillGate = backfillGate;
     }
 
     public async Task ScanAsync(
         long tenantId,
         long dataSourceId,
         string connectionString,
+        int batchVersion,
+        int seedVersion,
         IProgress<int>? progress = null,
         ScanTelemetry? telemetry = null,
         bool cleanupOrphans = false,
+        ScanScope? scope = null,
         CancellationToken ct = default)
     {
         telemetry ??= new ScanTelemetry();
@@ -58,17 +66,13 @@ public class MetadataScannerService
 
         ReportStage(telemetry, progress, "Connecting", "正在连接业务数据库…", 3, "DatabaseConnecting");
 
-        var tables = await _reader.GetTablesAsync(connectionString, dataSource.DbType);
+        // §L.6 / C2：范围扫描先按 scope 发现（可跨库逐库汇总），再在结果上过滤（Databases/Schemas/系统库/前缀/视图/空表）。
+        var (tables, columns, foreignKeys) = await DiscoverScopedAsync(connectionString, dataSource.DbType, scope, telemetry, ct);
         telemetry.Details.TablesDiscovered = tables.Count;
         telemetry.AddEvent("Info", "TablesDiscovered", $"已发现 {tables.Count} 张数据表。", tables.Count, tables.Count);
         ReportStage(telemetry, progress, "DiscoveringColumns", "正在读取字段结构…", 12, "TablesReady");
-
-        var columns = await _reader.GetColumnsAsync(connectionString, dataSource.DbType);
         telemetry.Details.ColumnsDiscovered = columns.Count;
         telemetry.AddEvent("Info", "ColumnsDiscovered", $"已发现 {columns.Count} 个字段。", columns.Count, columns.Count);
-
-        // 外键关系（同数据源内）——用于结果译码的字段→名称列绑定。读取失败不阻断扫描。
-        var foreignKeys = await TryLoadForeignKeysAsync(connectionString, dataSource.DbType, telemetry, ct);
 
         // 按表名分组（大小写不敏感），供外键展示列优选与字典角色解析复用。
         var columnsByTable = columns
@@ -80,7 +84,8 @@ public class MetadataScannerService
         {
             if (string.IsNullOrWhiteSpace(fk.TableName) || string.IsNullOrWhiteSpace(fk.ColumnName))
                 continue;
-            fkByColumn[$"{fk.TableName}.{fk.ColumnName}"] = fk;
+            // §10.1：按三键（catalog/schema/table/column）定位外键归属表，避免同名跨 schema/跨库串表。
+            fkByColumn[PhyColKey(fk.CatalogName, fk.SchemaName, fk.TableName, fk.ColumnName)] = fk;
         }
 
         if (fkByColumn.Count > 0)
@@ -90,7 +95,7 @@ public class MetadataScannerService
 
         var existsTables = await _context.MetadataTables
             .Include(x => x.Columns)
-            .Where(x => x.TenantId == effectiveTenantId && x.DataSourceId == dataSourceId)
+            .Where(x => x.TenantId == effectiveTenantId && x.DataSourceId == dataSourceId && x.MetadataVersion == batchVersion)
             .ToListAsync(ct);
 
         telemetry.AddEvent("Info", "MetadataCompared", $"已加载 {existsTables.Count} 张历史元数据表用于差异比对。");
@@ -165,7 +170,10 @@ public class MetadataScannerService
             var table = tables[tableIndex];
             telemetry.SetCurrent("Table", table.TableName);
 
-            var metadataTable = existsTables.FirstOrDefault(x => x.TableName == table.TableName);
+            var metadataTable = existsTables.FirstOrDefault(x =>
+                x.TableName == table.TableName
+                && (x.CatalogName ?? string.Empty) == (table.CatalogName ?? string.Empty)
+                && (x.SchemaName ?? string.Empty) == (table.SchemaName ?? string.Empty));
             if (metadataTable is null)
             {
                 metadataTable = new MetadataTable
@@ -173,7 +181,11 @@ public class MetadataScannerService
                     TenantId = effectiveTenantId,
                     DataSourceId = dataSourceId,
                     TableName = table.TableName ?? string.Empty,
-                    TableComment = table.TableComment ?? string.Empty
+                    TableComment = table.TableComment ?? string.Empty,
+                    CatalogName = table.CatalogName,
+                    SchemaName = table.SchemaName,
+                    ObjectKind = table.ObjectKind,
+                    MetadataVersion = batchVersion
                 };
                 _context.MetadataTables.Add(metadataTable);
                 telemetry.Details.AddedTables++;
@@ -184,8 +196,10 @@ public class MetadataScannerService
                 telemetry.Details.UpdatedTables++;
             }
 
+            // §10.1：按三键（catalog/schema/table）匹配本表列，避免同名跨 schema/跨库串列。
             var tableColumns = columns
-                .Where(x => x.TableName == table.TableName)
+                .Where(x => PhyTableKey(x.CatalogName, x.SchemaName, x.TableName)
+                         == PhyTableKey(table.CatalogName, table.SchemaName, table.TableName))
                 .ToList();
 
             foreach (var column in tableColumns)
@@ -232,7 +246,7 @@ public class MetadataScannerService
 
                 // 外键角色：同数据源内 FK 直接落库（引用表 / 引用列 / 展示列）。
                 // 跨数据源引用不在此层处理，由声明/学习规则承载。
-                if (fkByColumn.TryGetValue($"{table.TableName}.{column.ColumnName}", out var fk))
+                if (fkByColumn.TryGetValue(PhyColKey(table.CatalogName, table.SchemaName, table.TableName, column.ColumnName), out var fk))
                 {
                     metadataColumn.ReferencedTable = fk.ReferencedTableName;
                     metadataColumn.ReferencedColumn = fk.ReferencedColumnName;
@@ -278,6 +292,7 @@ public class MetadataScannerService
             .Where(x =>
                 x.MetadataTable!.TenantId == effectiveTenantId
                 && x.MetadataTable.DataSourceId == dataSourceId
+                && x.MetadataTable.MetadataVersion == batchVersion
                 && x.Semantic == null)
             .ToListAsync(ct);
 
@@ -331,7 +346,7 @@ public class MetadataScannerService
         var syncTables = await _context.MetadataTables
             .Include(x => x.Columns)
             .ThenInclude(x => x.Semantic)
-            .Where(x => x.TenantId == effectiveTenantId && x.DataSourceId == dataSourceId)
+            .Where(x => x.TenantId == effectiveTenantId && x.DataSourceId == dataSourceId && x.MetadataVersion == batchVersion)
             .ToListAsync(ct);
 
         var vectorTables = syncTables.Where(NeedsIndex).ToList();
@@ -460,6 +475,10 @@ public class MetadataScannerService
 
         telemetry.SetCurrent(null, null);
         telemetry.SetStage("Succeeded", "扫描处理完成。", "ScanCompleted");
+        // C10：成功级别事件（绿），便于页面按级别着色与无障碍高亮。
+        telemetry.AddSuccess("ScanSucceeded",
+            $"扫描全部完成：{telemetry.Details.TablesProcessed} 张表 / {telemetry.Details.ColumnsProcessed} 个字段 / {telemetry.Details.VectorsProcessed} 向量。",
+            telemetry.Details.TablesProcessed, telemetry.Details.TablesDiscovered);
         progress?.Report(100);
     }
 
@@ -488,6 +507,85 @@ public class MetadataScannerService
                 $"外键关系读取失败（{ex.GetType().Name}），本次扫描跳过外键角色识别，其余元数据不受影响。");
             return new List<ForeignKeyMetadataDto>();
         }
+    }
+
+    /// <summary>
+    /// 范围感知的元数据发现（C2 / §10.1 / §L.6）。
+    /// ① 若 scope 指定 <see cref="ScanScope.Databases"/>，则枚举实例下数据库并逐库替换连接串汇总（跨库唯一策略）；
+    /// ② 否则单连接（连接串指定库）发现；
+    /// ③ scope 非空时，在发现结果上按 <see cref="ScanScope.IsTableInScope"/> 过滤表/列/外键，
+    ///    并支持 <see cref="ScanScope.ExcludeEmptyTables"/>（排除无可用列的表）。
+    /// 未指定 scope 时行为与历史单库发现完全一致，不影响既有用例。
+    /// </summary>
+    private async Task<(List<TableMetadataDto> tables, List<ColumnMetadataDto> columns, List<ForeignKeyMetadataDto> foreignKeys)>
+        DiscoverScopedAsync(string connectionString, string dbType, ScanScope? scope, ScanTelemetry telemetry, CancellationToken ct)
+    {
+        var tables = new List<TableMetadataDto>();
+        var columns = new List<ColumnMetadataDto>();
+        var foreignKeys = new List<ForeignKeyMetadataDto>();
+
+        var targets = new List<string>();
+        if (scope is { Databases.Count: > 0 })
+        {
+            var allDatabases = await _reader.GetDatabasesAsync(connectionString, dbType, ct);
+            foreach (var db in allDatabases)
+            {
+                if (scope.IsDatabaseIncluded(db))
+                    targets.Add(WithDatabase(connectionString, db));
+            }
+        }
+        else
+        {
+            targets.Add(connectionString);
+        }
+
+        foreach (var cs in targets)
+        {
+            tables.AddRange(await _reader.GetTablesAsync(cs, dbType, ct));
+            columns.AddRange(await _reader.GetColumnsAsync(cs, dbType, ct));
+            foreignKeys.AddRange(await TryLoadForeignKeysAsync(cs, dbType, telemetry, ct));
+        }
+
+        if (scope is not null)
+        {
+            var inScope = tables.Where(scope.IsTableInScope).ToList();
+
+            // 排除空表：无可用列（被源读取到的列）的表对 Ask 无意义，按 §10.1 备注剔除。
+            if (scope.ExcludeEmptyTables)
+            {
+                var nonEmpty = new HashSet<string>(
+                    columns.Select(c => PhyTableKey(c.CatalogName, c.SchemaName, c.TableName)));
+                inScope = inScope
+                    .Where(t => nonEmpty.Contains(PhyTableKey(t.CatalogName, t.SchemaName, t.TableName)))
+                    .ToList();
+            }
+
+            var keys = new HashSet<string>(
+                inScope.Select(t => PhyTableKey(t.CatalogName, t.SchemaName, t.TableName)));
+            tables = inScope;
+            columns = columns
+                .Where(c => keys.Contains(PhyTableKey(c.CatalogName, c.SchemaName, c.TableName)))
+                .ToList();
+            foreignKeys = foreignKeys
+                .Where(f => keys.Contains(PhyTableKey(f.CatalogName, f.SchemaName, f.TableName)))
+                .ToList();
+        }
+
+        return (tables, columns, foreignKeys);
+    }
+
+    /// <summary>
+    /// 将连接串的当前数据库改写为指定库名（跨库逐库连接，§10.1）。
+    /// SQL Server 用 Initial Catalog，MySQL/PostgreSQL 用 Database；二者皆缺时补 Database。
+    /// </summary>
+    private static string WithDatabase(string connectionString, string database)
+    {
+        var builder = new DbConnectionStringBuilder { ConnectionString = connectionString };
+        if (builder.ContainsKey("Initial Catalog"))
+            builder["Initial Catalog"] = database;
+        else
+            builder["Database"] = database;
+        return builder.ConnectionString;
     }
 
     /// <summary>
@@ -597,4 +695,246 @@ public class MetadataScannerService
 
     private static int ExpectedVectorCount(MetadataTable metadataTable)
         => 1 + metadataTable.Columns.Count + metadataTable.Columns.Count(x => x.Semantic != null);
+
+    /// <summary>
+    /// 版本化 clone-on-write（§L.3）：从种子版本（=当前 active）深拷贝出 staging 行（版本=batchVersion），清空向量状态。
+    /// 新扫描在 staging 上改写，永不修改 active 版本行；激活前对 Ask 不可见。
+    /// </summary>
+    public async Task PrepareStagingAsync(
+        long tenantId,
+        long dataSourceId,
+        int batchVersion,
+        int seedVersion,
+        CancellationToken ct = default)
+    {
+        var seedTables = await _context.MetadataTables
+            .Include(t => t.Columns)
+            .ThenInclude(c => c.Semantic)
+            .Where(t => t.TenantId == tenantId && t.DataSourceId == dataSourceId && t.MetadataVersion == seedVersion)
+            .ToListAsync(ct);
+
+        foreach (var src in seedTables)
+        {
+            var clone = new MetadataTable
+            {
+                TenantId = src.TenantId,
+                DataSourceId = src.DataSourceId,
+                TableName = src.TableName,
+                TableComment = src.TableComment,
+                ObjectKind = src.ObjectKind,
+                CatalogName = src.CatalogName,
+                SchemaName = src.SchemaName,
+                BusinessDomain = src.BusinessDomain,
+                SearchText = src.SearchText,
+                MetadataVersion = batchVersion,
+                // 克隆清空向量状态（§L.3）：逼 NeedsIndex 重索引出新版本 point
+                VectorId = null,
+                VectorStatus = null,
+                VectorSyncTime = null,
+                VectorErrorCode = null,
+                EmbeddingModel = null,
+                VectorDimension = null
+            };
+
+            foreach (var col in src.Columns)
+            {
+                var cClone = new MetadataColumn
+                {
+                    ColumnName = col.ColumnName,
+                    ColumnComment = col.ColumnComment,
+                    DataType = col.DataType,
+                    Length = col.Length,
+                    IsNullable = col.IsNullable,
+                    IsPrimaryKey = col.IsPrimaryKey,
+                    Ordinal = col.Ordinal,
+                    NativeType = col.NativeType,
+                    Precision = col.Precision,
+                    Scale = col.Scale,
+                    SearchText = col.SearchText,
+                    ValueMapJson = col.ValueMapJson,
+                    ReferencedTable = col.ReferencedTable,
+                    ReferencedColumn = col.ReferencedColumn,
+                    ReferencedDisplayColumn = col.ReferencedDisplayColumn,
+                    IsDictBacked = col.IsDictBacked,
+                    DictConfigId = col.DictConfigId,
+                    DictCategoryValue = col.DictCategoryValue,
+                    BusinessKey = col.BusinessKey,
+                    MetadataVersion = batchVersion,
+                    VectorId = null,
+                    VectorStatus = null,
+                    VectorSyncTime = null,
+                    VectorErrorCode = null,
+                    EmbeddingModel = null,
+                    VectorDimension = null
+                };
+
+                if (col.Semantic != null)
+                {
+                    cClone.Semantic = new MetadataSemantic
+                    {
+                        BusinessMeaning = col.Semantic.BusinessMeaning,
+                        Keywords = col.Semantic.Keywords,
+                        Synonyms = col.Semantic.Synonyms,
+                        ExampleQuestions = col.Semantic.ExampleQuestions,
+                        BusinessDomain = col.Semantic.BusinessDomain,
+                        BusinessDomainId = col.Semantic.BusinessDomainId,
+                        Confidence = col.Semantic.Confidence,
+                        Source = col.Semantic.Source,
+                        SearchText = col.Semantic.SearchText,
+                        MetadataVersion = batchVersion,
+                        VectorId = null,
+                        VectorStatus = null,
+                        VectorSyncTime = null,
+                        VectorErrorCode = null,
+                        EmbeddingModel = null,
+                        VectorDimension = null
+                    };
+                }
+
+                clone.Columns.Add(cClone);
+            }
+
+            _context.MetadataTables.Add(clone);
+        }
+
+        await _context.SaveChangesAsync(ct);
+    }
+
+    /// <summary>
+    /// 激活：向量完整性闸门（§10.6）+ 引用重映射（§L.5b）+ 仅翻指针（§L.5）。
+    /// 与翻指针同事务原子；任一闸门失败抛 <see cref="MetadataActivationBlockedException"/>，指针不翻转、active 不变。
+    /// </summary>
+    public async Task ActivateAsync(MetadataScanJob job, DataSource dataSource, CancellationToken ct = default)
+    {
+        var tenantId = job.TenantId;
+        var dsId = job.DataSourceId;
+        var batch = job.BatchVersion;
+        var seed = job.SeedVersion;
+
+        // 0) 向量回填闸门（§10.4 / §L.4）：严格过滤阶段下，未回填源禁止激活（409）。
+        _backfillGate.AssertCanActivate(dataSource);
+
+        // 1) 向量完整性闸门（§10.6）：必需 point 须 VectorId 非空且 VectorStatus=="Synced"。
+        var newTables = await _context.MetadataTables
+            .Include(t => t.Columns).ThenInclude(c => c.Semantic)
+            .Where(t => t.TenantId == tenantId && t.DataSourceId == dsId && t.MetadataVersion == batch)
+            .ToListAsync(ct);
+
+        foreach (var t in newTables)
+        {
+            if (!NeedsIndex(t)) continue;
+            if (string.IsNullOrWhiteSpace(t.VectorId) || t.VectorStatus != "Synced")
+                throw new MetadataActivationBlockedException("vector_index_incomplete");
+            foreach (var c in t.Columns)
+            {
+                if (string.IsNullOrWhiteSpace(c.VectorId) || c.VectorStatus != "Synced")
+                    throw new MetadataActivationBlockedException("vector_index_incomplete");
+                if (c.Semantic != null
+                    && (string.IsNullOrWhiteSpace(c.Semantic.VectorId) || c.Semantic.VectorStatus != "Synced"))
+                    throw new MetadataActivationBlockedException("vector_index_incomplete");
+            }
+        }
+
+        // 2) 引用重映射（§L.5b）：先按物理键建立 旧Id→新Id 映射，孤儿引用先收集、不立即改写。
+        var oldTables = await _context.MetadataTables
+            .Include(t => t.Columns).ThenInclude(c => c.Semantic)
+            .Where(t => t.TenantId == tenantId && t.DataSourceId == dsId && t.MetadataVersion == seed)
+            .ToListAsync(ct);
+
+        var tableMap = new Dictionary<string, long>();
+        var colMap = new Dictionary<string, long>();
+        var oldTableKeyById = new Dictionary<long, string>();
+        var oldColKeyById = new Dictionary<long, string>();
+        foreach (var ot in oldTables)
+        {
+            var tk = PhyTableKey(ot.CatalogName, ot.SchemaName, ot.TableName);
+            oldTableKeyById[ot.Id] = tk;
+            var nt = newTables.FirstOrDefault(n =>
+                (n.CatalogName ?? string.Empty) == (ot.CatalogName ?? string.Empty)
+                && (n.SchemaName ?? string.Empty) == (ot.SchemaName ?? string.Empty)
+                && n.TableName == ot.TableName);
+            if (nt is not null) tableMap[tk] = nt.Id;
+            foreach (var oc in ot.Columns)
+            {
+                var ck = PhyColKey(ot.CatalogName, ot.SchemaName, ot.TableName, oc.ColumnName);
+                oldColKeyById[oc.Id] = ck;
+                var nc = nt?.Columns.FirstOrDefault(x => x.ColumnName == oc.ColumnName);
+                if (nc is not null) colMap[ck] = nc.Id;
+            }
+        }
+
+        var orphans = new List<OrphanReference>();
+
+        // RLS（表级 + 列级，§L.5b 默认 Block；MetadataTableId/MetadataColumnId 为非空 long）
+        var rlsList = await _context.RowLevelSecurityPolicies
+            .Where(p => p.DataSourceId == dsId)
+            .ToListAsync(ct);
+        foreach (var p in rlsList)
+        {
+            if (oldTableKeyById.TryGetValue(p.MetadataTableId, out var tk) && tableMap.TryGetValue(tk, out var nid))
+                p.MetadataTableId = nid;
+            else
+                orphans.Add(new OrphanReference { Kind = "RLS", Id = p.Id, DataSourceId = dsId, Table = TableNameById(oldTables, p.MetadataTableId) });
+
+            if (oldColKeyById.TryGetValue(p.MetadataColumnId, out var ck) && colMap.TryGetValue(ck, out var ncid))
+                p.MetadataColumnId = ncid;
+            else
+                orphans.Add(new OrphanReference { Kind = "RLS", Id = p.Id, DataSourceId = dsId, Column = ColNameById(oldTables, p.MetadataColumnId) });
+        }
+
+        // PhysicalBinding（表级 + 列级，非空 long）
+        var bindings = await _context.PhysicalBindings
+            .Where(b => b.DataSourceId == dsId)
+            .ToListAsync(ct);
+        foreach (var b in bindings)
+        {
+            if (oldTableKeyById.TryGetValue(b.MetadataTableId, out var tk) && tableMap.TryGetValue(tk, out var nid))
+                b.MetadataTableId = nid;
+            else
+                orphans.Add(new OrphanReference { Kind = "BINDING", Id = b.Id, DataSourceId = dsId, Table = TableNameById(oldTables, b.MetadataTableId) });
+
+            if (oldColKeyById.TryGetValue(b.MetadataColumnId, out var ck) && colMap.TryGetValue(ck, out var ncid))
+                b.MetadataColumnId = ncid;
+            else
+                orphans.Add(new OrphanReference { Kind = "BINDING", Id = b.Id, DataSourceId = dsId, Column = ColNameById(oldTables, b.MetadataColumnId) });
+        }
+
+        // LearningRecord（列级，SetNull 保留学习 → 重映射以保留；MetadataColumnId 可空）
+        var records = await _context.LearningRecords
+            .Where(r => r.MetadataColumnId != null)
+            .ToListAsync(ct);
+        foreach (var r in records)
+        {
+            if (r.MetadataColumnId.HasValue && oldColKeyById.TryGetValue(r.MetadataColumnId.Value, out var ck) && colMap.TryGetValue(ck, out var ncid))
+                r.MetadataColumnId = ncid;
+            else if (r.MetadataColumnId.HasValue)
+                orphans.Add(new OrphanReference { Kind = "LEARNING", Id = r.Id, DataSourceId = dsId, Column = ColNameById(oldTables, r.MetadataColumnId.Value) });
+        }
+
+        // 孤儿引用（默认 Block，§0-4 / §8 已确认）：阻断激活，绝不静默丢失安全策略。
+        if (orphans.Count > 0)
+            throw new MetadataActivationBlockedException("orphaned_references", orphans);
+
+        // 3) 仅翻指针（§L.5）：激活前所有检查通过。
+        dataSource.ActiveMetadataVersion = batch;
+        job.ActivatedVersion = batch;
+        await _context.SaveChangesAsync(ct);
+    }
+
+    private static string PhyTableKey(string? catalog, string? schema, string? table)
+        => $"{(catalog ?? string.Empty).ToLowerInvariant()}|{(schema ?? string.Empty).ToLowerInvariant()}|{(table ?? string.Empty).ToLowerInvariant()}";
+
+    private static string PhyColKey(string? catalog, string? schema, string? table, string? column)
+        => $"{PhyTableKey(catalog, schema, table)}|{(column ?? string.Empty).ToLowerInvariant()}";
+
+    private static string? TableNameById(List<MetadataTable> tables, long id)
+        => tables.FirstOrDefault(t => t.Id == id)?.TableName;
+
+    private static string? ColNameById(List<MetadataTable> tables, long colId)
+    {
+        foreach (var t in tables)
+            foreach (var c in t.Columns)
+                if (c.Id == colId) return c.ColumnName;
+        return null;
+    }
 }

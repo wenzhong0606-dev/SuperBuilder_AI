@@ -1,4 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using SuperBuilder_AI.Application.Metadata;
 using SuperBuilder_AI.Data;
 using SuperBuilder_AI.Interfaces.BI;
 using SuperBuilder_AI.Models.BI;
@@ -91,7 +92,7 @@ public class QueryPlanContextBuilder :
 		 * Semantic
 		 */
 		var tables =
-			await _context.MetadataTables
+			await _context.MetadataTables.WhereActiveVersion(_context)
 				.AsNoTracking()
 				.Include(x => x.Columns)
 				.ThenInclude(x => x.Semantic)

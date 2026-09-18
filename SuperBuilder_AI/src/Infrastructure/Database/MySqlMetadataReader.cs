@@ -1,3 +1,6 @@
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 using Dapper;
 using Microsoft.Data.SqlClient;
 using MySqlConnector;
@@ -10,82 +13,135 @@ namespace SuperBuilder_AI.Services;
 /// <summary>
 /// 多数据库元数据读取器。
 /// 保留历史类名以避免大范围 DI/测试改动；实际按 DbType 支持 MySQL / SQL Server / PostgreSQL。
+///
+/// §10.1（数据源扫描优化 v10）：所有读取返回 CatalogName/SchemaName/ObjectKind 三键，
+/// 供同名表跨 schema/跨库并存与 Ask 限定名查询；SQL Server 用 sys.tables UNION sys.views 覆盖视图；
+/// 跨库扫描由 GetDatabasesAsync 枚举后逐库连接汇总。
 /// </summary>
 public class MySqlMetadataReader : IDataSourceMetadataReader
 {
-    public Task<List<TableMetadataDto>> GetTablesAsync(string connectionString)
-        => GetTablesAsync(connectionString, "MYSQL");
+    public Task<List<TableMetadataDto>> GetTablesAsync(string connectionString, CancellationToken ct = default)
+        => GetTablesAsync(connectionString, "MYSQL", ct);
 
-    public Task<List<ColumnMetadataDto>> GetColumnsAsync(string connectionString)
-        => GetColumnsAsync(connectionString, "MYSQL");
+    public Task<List<ColumnMetadataDto>> GetColumnsAsync(string connectionString, CancellationToken ct = default)
+        => GetColumnsAsync(connectionString, "MYSQL", ct);
 
-    public async Task<List<TableMetadataDto>> GetTablesAsync(
+    public Task<List<TableMetadataDto>> GetTablesAsync(
         string connectionString,
-        string? dbType)
+        string? dbType,
+        CancellationToken ct = default)
     {
         return NormalizeDbType(dbType) switch
         {
-            "SQLSERVER" => await GetSqlServerTablesAsync(connectionString),
-            "POSTGRESQL" => await GetPostgreSqlTablesAsync(connectionString),
-            _ => await GetMySqlTablesAsync(connectionString)
+            "SQLSERVER" => GetSqlServerTablesAsync(connectionString, ct),
+            "POSTGRESQL" => GetPostgreSqlTablesAsync(connectionString, ct),
+            _ => GetMySqlTablesAsync(connectionString, ct)
         };
     }
 
-    public async Task<List<ColumnMetadataDto>> GetColumnsAsync(
+    public Task<List<ColumnMetadataDto>> GetColumnsAsync(
         string connectionString,
-        string? dbType)
+        string? dbType,
+        CancellationToken ct = default)
     {
         return NormalizeDbType(dbType) switch
         {
-            "SQLSERVER" => await GetSqlServerColumnsAsync(connectionString),
-            "POSTGRESQL" => await GetPostgreSqlColumnsAsync(connectionString),
-            _ => await GetMySqlColumnsAsync(connectionString)
+            "SQLSERVER" => GetSqlServerColumnsAsync(connectionString, null, ct),
+            "POSTGRESQL" => GetPostgreSqlColumnsAsync(connectionString, null, ct),
+            _ => GetMySqlColumnsAsync(connectionString, null, ct)
         };
     }
 
-    public Task<List<ForeignKeyMetadataDto>> GetForeignKeysAsync(string connectionString)
-        => GetForeignKeysAsync(connectionString, "MYSQL");
-
-    public async Task<List<ForeignKeyMetadataDto>> GetForeignKeysAsync(
+    /// <summary>
+    /// 逐表列读取（§5 + §10.1）。给定表名集合时按表名过滤，单表失败不影响其他表；
+    /// 空集合回退为全表读取。
+    /// </summary>
+    public Task<List<ColumnMetadataDto>> GetColumnsAsync(
         string connectionString,
-        string? dbType)
+        string? dbType,
+        IEnumerable<string> tableNames,
+        CancellationToken ct = default)
+    {
+        var list = tableNames as List<string> ?? new List<string>(tableNames);
+        if (list.Count == 0)
+            return GetColumnsAsync(connectionString, dbType, ct);
+
+        return NormalizeDbType(dbType) switch
+        {
+            "SQLSERVER" => GetSqlServerColumnsAsync(connectionString, list, ct),
+            "POSTGRESQL" => GetPostgreSqlColumnsAsync(connectionString, list, ct),
+            _ => GetMySqlColumnsAsync(connectionString, list, ct)
+        };
+    }
+
+    public Task<List<ForeignKeyMetadataDto>> GetForeignKeysAsync(string connectionString, CancellationToken ct = default)
+        => GetForeignKeysAsync(connectionString, "MYSQL", ct);
+
+    public Task<List<ForeignKeyMetadataDto>> GetForeignKeysAsync(
+        string connectionString,
+        string? dbType,
+        CancellationToken ct = default)
     {
         return NormalizeDbType(dbType) switch
         {
-            "SQLSERVER" => await GetSqlServerForeignKeysAsync(connectionString),
-            "POSTGRESQL" => await GetPostgreSqlForeignKeysAsync(connectionString),
-            _ => await GetMySqlForeignKeysAsync(connectionString)
+            "SQLSERVER" => GetSqlServerForeignKeysAsync(connectionString, ct),
+            "POSTGRESQL" => GetPostgreSqlForeignKeysAsync(connectionString, ct),
+            _ => GetMySqlForeignKeysAsync(connectionString, ct)
+        };
+    }
+
+    /// <summary>
+    /// 枚举目标实例下可扫描的数据库（§10.1 跨库扫描）。排除系统库；
+    /// 单连接默认仅扫连接串指定数据库（调用方用于逐库替换连接串汇总）。
+    /// </summary>
+    public Task<List<string>> GetDatabasesAsync(
+        string connectionString,
+        string? dbType,
+        CancellationToken ct = default)
+    {
+        return NormalizeDbType(dbType) switch
+        {
+            "SQLSERVER" => GetSqlServerDatabasesAsync(connectionString, ct),
+            "POSTGRESQL" => GetPostgreSqlDatabasesAsync(connectionString, ct),
+            _ => GetMySqlDatabasesAsync(connectionString, ct)
         };
     }
 
     private static string NormalizeDbType(string? dbType)
         => (dbType ?? "MYSQL").Trim().ToUpperInvariant();
 
-    private static async Task<List<TableMetadataDto>> GetMySqlTablesAsync(string connectionString)
+    // ---- MySQL ----
+
+    private static async Task<List<TableMetadataDto>> GetMySqlTablesAsync(string connectionString, CancellationToken ct)
     {
         await using var conn = new MySqlConnection(connectionString);
-        await conn.OpenAsync();
+        await conn.OpenAsync(ct);
 
         const string sql = """
             SELECT
+                TABLE_SCHEMA CatalogName,
+                TABLE_SCHEMA SchemaName,
                 TABLE_NAME TableName,
+                CASE TABLE_TYPE WHEN 'VIEW' THEN 1 ELSE 0 END ObjectKind,
                 TABLE_COMMENT TableComment
             FROM information_schema.tables
             WHERE table_schema = DATABASE()
-              AND TABLE_TYPE = 'BASE TABLE'
             ORDER BY TABLE_NAME
             """;
 
         return (await conn.QueryAsync<TableMetadataDto>(sql)).AsList();
     }
 
-    private static async Task<List<ColumnMetadataDto>> GetMySqlColumnsAsync(string connectionString)
+    private static async Task<List<ColumnMetadataDto>> GetMySqlColumnsAsync(
+        string connectionString, IReadOnlyCollection<string>? tableNames, CancellationToken ct)
     {
         await using var conn = new MySqlConnection(connectionString);
-        await conn.OpenAsync();
+        await conn.OpenAsync(ct);
 
-        const string sql = """
+        var sql = """
             SELECT
+                TABLE_SCHEMA CatalogName,
+                TABLE_SCHEMA SchemaName,
                 TABLE_NAME TableName,
                 COLUMN_NAME ColumnName,
                 COLUMN_COMMENT ColumnComment,
@@ -95,41 +151,94 @@ public class MySqlMetadataReader : IDataSourceMetadataReader
                 CASE WHEN COLUMN_KEY='PRI' THEN 1 ELSE 0 END IsPrimaryKey
             FROM information_schema.columns
             WHERE table_schema = DATABASE()
-            ORDER BY TABLE_NAME, ORDINAL_POSITION
             """;
+        object? param = null;
+        if (tableNames is { Count: > 0 })
+        {
+            sql += "\n  AND TABLE_NAME IN @tableNames";
+            param = new { tableNames };
+        }
+        sql += "\nORDER BY TABLE_NAME, ORDINAL_POSITION";
 
-        return (await conn.QueryAsync<ColumnMetadataDto>(sql)).AsList();
+        return (await conn.QueryAsync<ColumnMetadataDto>(sql, param)).AsList();
     }
 
-    private static async Task<List<TableMetadataDto>> GetSqlServerTablesAsync(string connectionString)
+    private static async Task<List<ForeignKeyMetadataDto>> GetMySqlForeignKeysAsync(string connectionString, CancellationToken ct)
     {
-        await using var conn = new SqlConnection(connectionString);
-        await conn.OpenAsync();
+        await using var conn = new MySqlConnection(connectionString);
+        await conn.OpenAsync(ct);
 
         const string sql = """
             SELECT
-                t.name AS TableName,
+                kcu.TABLE_SCHEMA CatalogName,
+                kcu.TABLE_SCHEMA SchemaName,
+                kcu.TABLE_NAME TableName,
+                kcu.COLUMN_NAME ColumnName,
+                kcu.REFERENCED_TABLE_SCHEMA ReferencedCatalogName,
+                kcu.REFERENCED_TABLE_SCHEMA ReferencedSchemaName,
+                kcu.REFERENCED_TABLE_NAME ReferencedTableName,
+                kcu.REFERENCED_COLUMN_NAME ReferencedColumnName
+            FROM information_schema.KEY_COLUMN_USAGE kcu
+            INNER JOIN information_schema.REFERENTIAL_CONSTRAINTS rc
+                ON rc.CONSTRAINT_SCHEMA = kcu.TABLE_SCHEMA
+               AND rc.CONSTRAINT_NAME = kcu.CONSTRAINT_NAME
+            WHERE kcu.TABLE_SCHEMA = DATABASE()
+              AND kcu.REFERENCED_TABLE_NAME IS NOT NULL
+            """;
+        return (await conn.QueryAsync<ForeignKeyMetadataDto>(sql)).AsList();
+    }
+
+    private static async Task<List<string>> GetMySqlDatabasesAsync(string connectionString, CancellationToken ct)
+    {
+        await using var conn = new MySqlConnection(connectionString);
+        await conn.OpenAsync(ct);
+        const string sql = """
+            SELECT SCHEMA_NAME FROM information_schema.schemata
+            WHERE SCHEMA_NAME NOT IN ('information_schema','mysql','performance_schema','sys')
+            ORDER BY SCHEMA_NAME
+            """;
+        return (await conn.QueryAsync<string>(sql)).AsList();
+    }
+
+    // ---- SQL Server ----
+
+    private static async Task<List<TableMetadataDto>> GetSqlServerTablesAsync(string connectionString, CancellationToken ct)
+    {
+        await using var conn = new SqlConnection(connectionString);
+        await conn.OpenAsync(ct);
+
+        const string sql = """
+            SELECT
+                DB_NAME() CatalogName,
+                SCHEMA_NAME(o.schema_id) SchemaName,
+                o.name AS TableName,
+                CASE WHEN o.type = 'V' THEN 1 ELSE 0 END ObjectKind,
                 CAST(ep.value AS nvarchar(4000)) AS TableComment
-            FROM sys.tables t
+            FROM (SELECT object_id, schema_id, name, type, is_ms_shipped FROM sys.tables
+                  UNION ALL
+                  SELECT object_id, schema_id, name, type, is_ms_shipped FROM sys.views) o
             LEFT JOIN sys.extended_properties ep
-              ON ep.major_id = t.object_id
+              ON ep.major_id = o.object_id
              AND ep.minor_id = 0
              AND ep.name = 'MS_Description'
-            WHERE t.is_ms_shipped = 0
-            ORDER BY t.name
+            WHERE o.is_ms_shipped = 0
+            ORDER BY o.name
             """;
 
         return (await conn.QueryAsync<TableMetadataDto>(sql)).AsList();
     }
 
-    private static async Task<List<ColumnMetadataDto>> GetSqlServerColumnsAsync(string connectionString)
+    private static async Task<List<ColumnMetadataDto>> GetSqlServerColumnsAsync(
+        string connectionString, IReadOnlyCollection<string>? tableNames, CancellationToken ct)
     {
         await using var conn = new SqlConnection(connectionString);
-        await conn.OpenAsync();
+        await conn.OpenAsync(ct);
 
-        const string sql = """
+        var sql = """
             SELECT
-                t.name AS TableName,
+                DB_NAME() CatalogName,
+                SCHEMA_NAME(o.schema_id) SchemaName,
+                o.name AS TableName,
                 c.name AS ColumnName,
                 CAST(ep.value AS nvarchar(4000)) AS ColumnComment,
                 ty.name AS DataType,
@@ -140,8 +249,10 @@ public class MySqlMetadataReader : IDataSourceMetadataReader
                 END AS Length,
                 c.is_nullable AS IsNullable,
                 CASE WHEN pk.column_id IS NULL THEN 0 ELSE 1 END AS IsPrimaryKey
-            FROM sys.tables t
-            INNER JOIN sys.columns c ON c.object_id = t.object_id
+            FROM (SELECT object_id, schema_id, name, type FROM sys.tables
+                  UNION ALL
+                  SELECT object_id, schema_id, name, type FROM sys.views) o
+            INNER JOIN sys.columns c ON c.object_id = o.object_id
             INNER JOIN sys.types ty ON ty.user_type_id = c.user_type_id
             LEFT JOIN sys.extended_properties ep
               ON ep.major_id = c.object_id
@@ -157,17 +268,63 @@ public class MySqlMetadataReader : IDataSourceMetadataReader
             ) pk
               ON pk.object_id = c.object_id
              AND pk.column_id = c.column_id
-            WHERE t.is_ms_shipped = 0
-            ORDER BY t.name, c.column_id
+            WHERE o.is_ms_shipped = 0
             """;
+        object? param = null;
+        if (tableNames is { Count: > 0 })
+        {
+            sql += "\n  AND o.name IN @tableNames";
+            param = new { tableNames };
+        }
+        sql += "\nORDER BY o.name, c.column_id";
 
-        return (await conn.QueryAsync<ColumnMetadataDto>(sql)).AsList();
+        return (await conn.QueryAsync<ColumnMetadataDto>(sql, param)).AsList();
     }
 
-    private static async Task<List<TableMetadataDto>> GetPostgreSqlTablesAsync(string connectionString)
+    private static async Task<List<ForeignKeyMetadataDto>> GetSqlServerForeignKeysAsync(string connectionString, CancellationToken ct)
+    {
+        await using var conn = new SqlConnection(connectionString);
+        await conn.OpenAsync(ct);
+
+        const string sql = """
+            SELECT
+                DB_NAME() CatalogName,
+                SCHEMA_NAME(tp.schema_id) SchemaName,
+                tp.name AS TableName,
+                cc.name AS ColumnName,
+                DB_NAME() ReferencedCatalogName,
+                SCHEMA_NAME(tr.schema_id) ReferencedSchemaName,
+                tr.name AS ReferencedTableName,
+                rc.name AS ReferencedColumnName
+            FROM sys.foreign_key_columns fkc
+            INNER JOIN sys.foreign_keys fk ON fk.object_id = fkc.constraint_object_id
+            INNER JOIN sys.tables tp ON tp.object_id = fkc.parent_object_id
+            INNER JOIN sys.columns cc ON cc.object_id = tp.object_id AND cc.column_id = fkc.parent_column_id
+            INNER JOIN sys.tables tr ON tr.object_id = fkc.referenced_object_id
+            INNER JOIN sys.columns rc ON rc.object_id = tr.object_id AND rc.column_id = fkc.referenced_column_id
+            """;
+        return (await conn.QueryAsync<ForeignKeyMetadataDto>(sql)).AsList();
+    }
+
+    private static async Task<List<string>> GetSqlServerDatabasesAsync(string connectionString, CancellationToken ct)
+    {
+        await using var conn = new SqlConnection(connectionString);
+        await conn.OpenAsync(ct);
+        const string sql = """
+            SELECT name FROM sys.databases
+            WHERE name NOT IN ('master','tempdb','model','msdb')
+              AND state_desc = 'ONLINE'
+            ORDER BY name
+            """;
+        return (await conn.QueryAsync<string>(sql)).AsList();
+    }
+
+    // ---- PostgreSQL ----
+
+    private static async Task<List<TableMetadataDto>> GetPostgreSqlTablesAsync(string connectionString, CancellationToken ct)
     {
         await using var conn = new NpgsqlConnection(connectionString);
-        await conn.OpenAsync();
+        await conn.OpenAsync(ct);
 
         const string sql = """
             SELECT
@@ -183,12 +340,13 @@ public class MySqlMetadataReader : IDataSourceMetadataReader
         return (await conn.QueryAsync<TableMetadataDto>(sql)).AsList();
     }
 
-    private static async Task<List<ColumnMetadataDto>> GetPostgreSqlColumnsAsync(string connectionString)
+    private static async Task<List<ColumnMetadataDto>> GetPostgreSqlColumnsAsync(
+        string connectionString, IReadOnlyCollection<string>? tableNames, CancellationToken ct)
     {
         await using var conn = new NpgsqlConnection(connectionString);
-        await conn.OpenAsync();
+        await conn.OpenAsync(ct);
 
-        const string sql = """
+        var sql = """
             SELECT
                 cls.relname AS "TableName",
                 a.attname AS "ColumnName",
@@ -210,58 +368,22 @@ public class MySqlMetadataReader : IDataSourceMetadataReader
               AND NOT a.attisdropped
               AND cls.relkind = 'r'
               AND n.nspname NOT IN ('pg_catalog', 'information_schema')
-            ORDER BY cls.relname, a.attnum
             """;
+        object? param = null;
+        if (tableNames is { Count: > 0 })
+        {
+            sql += "\n  AND cls.relname IN @tableNames";
+            param = new { tableNames };
+        }
+        sql += "\nORDER BY cls.relname, a.attnum";
 
-        return (await conn.QueryAsync<ColumnMetadataDto>(sql)).AsList();
+        return (await conn.QueryAsync<ColumnMetadataDto>(sql, param)).AsList();
     }
 
-    private static async Task<List<ForeignKeyMetadataDto>> GetMySqlForeignKeysAsync(string connectionString)
-    {
-        await using var conn = new MySqlConnection(connectionString);
-        await conn.OpenAsync();
-
-        const string sql = """
-            SELECT
-                kcu.TABLE_NAME AS TableName,
-                kcu.COLUMN_NAME AS ColumnName,
-                kcu.REFERENCED_TABLE_NAME AS ReferencedTableName,
-                kcu.REFERENCED_COLUMN_NAME AS ReferencedColumnName
-            FROM information_schema.KEY_COLUMN_USAGE kcu
-            INNER JOIN information_schema.REFERENTIAL_CONSTRAINTS rc
-                ON rc.CONSTRAINT_SCHEMA = kcu.TABLE_SCHEMA
-               AND rc.CONSTRAINT_NAME = kcu.CONSTRAINT_NAME
-            WHERE kcu.TABLE_SCHEMA = DATABASE()
-              AND kcu.REFERENCED_TABLE_NAME IS NOT NULL
-            """;
-        return (await conn.QueryAsync<ForeignKeyMetadataDto>(sql)).AsList();
-    }
-
-    private static async Task<List<ForeignKeyMetadataDto>> GetSqlServerForeignKeysAsync(string connectionString)
-    {
-        await using var conn = new SqlConnection(connectionString);
-        await conn.OpenAsync();
-
-        const string sql = """
-            SELECT
-                tp.name AS TableName,
-                cc.name AS ColumnName,
-                tr.name AS ReferencedTableName,
-                rc.name AS ReferencedColumnName
-            FROM sys.foreign_key_columns fkc
-            INNER JOIN sys.foreign_keys fk ON fk.object_id = fkc.constraint_object_id
-            INNER JOIN sys.tables tp ON tp.object_id = fkc.parent_object_id
-            INNER JOIN sys.columns cc ON cc.object_id = tp.object_id AND cc.column_id = fkc.parent_column_id
-            INNER JOIN sys.tables tr ON tr.object_id = fkc.referenced_object_id
-            INNER JOIN sys.columns rc ON rc.object_id = tr.object_id AND rc.column_id = fkc.referenced_column_id
-            """;
-        return (await conn.QueryAsync<ForeignKeyMetadataDto>(sql)).AsList();
-    }
-
-    private static async Task<List<ForeignKeyMetadataDto>> GetPostgreSqlForeignKeysAsync(string connectionString)
+    private static async Task<List<ForeignKeyMetadataDto>> GetPostgreSqlForeignKeysAsync(string connectionString, CancellationToken ct)
     {
         await using var conn = new NpgsqlConnection(connectionString);
-        await conn.OpenAsync();
+        await conn.OpenAsync(ct);
 
         const string sql = """
             SELECT
@@ -277,5 +399,19 @@ public class MySqlMetadataReader : IDataSourceMetadataReader
             WHERE con.contype = 'f'
             """;
         return (await conn.QueryAsync<ForeignKeyMetadataDto>(sql)).AsList();
+    }
+
+    private static async Task<List<string>> GetPostgreSqlDatabasesAsync(string connectionString, CancellationToken ct)
+    {
+        await using var conn = new NpgsqlConnection(connectionString);
+        await conn.OpenAsync(ct);
+        const string sql = """
+            SELECT datname FROM pg_database
+            WHERE datistemplate = false
+              AND datallowconn = true
+              AND datname NOT IN ('postgres', 'template0', 'template1')
+            ORDER BY datname
+            """;
+        return (await conn.QueryAsync<string>(sql)).AsList();
     }
 }

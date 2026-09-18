@@ -647,6 +647,25 @@ public static class ResourceKeys
         public const string DataSourceDeleteFailed = "Content.DataSourceDeleteFailed";
         public const string DataSourceLoadGrantsFailed = "Content.DataSourceLoadGrantsFailed";
 
+        // 扫描管理操作区（C5/C10/C11）
+        public const string DataSourceFullRescan = "Content.DataSourceFullRescan";
+        public const string DataSourceCancelScan = "Content.DataSourceCancelScan";
+        public const string DataSourceRetryFailed = "Content.DataSourceRetryFailed";
+        public const string DataSourceTestConnection = "Content.DataSourceTestConnection";
+        public const string DataSourceDisable = "Content.DataSourceDisable";
+        public const string DataSourceDeleteCleanup = "Content.DataSourceDeleteCleanup";
+        public const string DataSourceCancelScanFailed = "Content.DataSourceCancelScanFailed";
+        public const string DataSourceCancelScanRequested = "Content.DataSourceCancelScanRequested";
+        public const string DataSourceRetryFailedFailed = "Content.DataSourceRetryFailedFailed";
+        public const string DataSourceTestOk = "Content.DataSourceTestOk";
+        public const string DataSourceTestFailed = "Content.DataSourceTestFailed";
+        public const string DataSourceDisabled = "Content.DataSourceDisabled";
+        public const string DataSourceDisableFailed = "Content.DataSourceDisableFailed";
+        public const string DataSourceDeleteConfirm = "Content.DataSourceDeleteConfirm";
+        public const string DataSourceDeleted = "Content.DataSourceDeleted";
+        public const string DataSourceRetryFailedHint = "Content.DataSourceRetryFailedHint";
+        public const string DataSourceScanStatus = "Content.DataSourceScanStatus";
+
         // ModelAccounts（模型与账号 BYO）
         public const string ModelAccountsBound = "Content.ModelAccountsBound";
         public const string ModelAccountsUnbound = "Content.ModelAccountsUnbound";
@@ -2424,6 +2443,24 @@ public static class ResourceKeys
         [Content.DataSourcePolicyDeleted] = new("Content", Page: "DataSource", DefaultValue: "Policy deleted."),
         [Content.DataSourceDeleteFailed] = new("Content", Page: "DataSource", DefaultValue: "Delete failed ({0})."),
         [Content.DataSourceLoadGrantsFailed] = new("Content", Page: "DataSource", DefaultValue: "Failed to load grants ({0})."),
+
+        [Content.DataSourceFullRescan] = new("Content", Page: "DataSource", DefaultValue: "Full re-scan"),
+        [Content.DataSourceCancelScan] = new("Content", Page: "DataSource", DefaultValue: "Cancel scan"),
+        [Content.DataSourceRetryFailed] = new("Content", Page: "DataSource", DefaultValue: "Retry failed items"),
+        [Content.DataSourceTestConnection] = new("Content", Page: "DataSource", DefaultValue: "Test connection"),
+        [Content.DataSourceDisable] = new("Content", Page: "DataSource", DefaultValue: "Disable"),
+        [Content.DataSourceDeleteCleanup] = new("Content", Page: "DataSource", DefaultValue: "Delete & cleanup"),
+        [Content.DataSourceCancelScanFailed] = new("Content", Page: "DataSource", DefaultValue: "Failed to cancel scan."),
+        [Content.DataSourceCancelScanRequested] = new("Content", Page: "DataSource", DefaultValue: "Cancel requested; scan will exit at a safe point."),
+        [Content.DataSourceRetryFailedFailed] = new("Content", Page: "DataSource", DefaultValue: "Failed to retry failed items."),
+        [Content.DataSourceTestOk] = new("Content", Page: "DataSource", DefaultValue: "Connection succeeded."),
+        [Content.DataSourceTestFailed] = new("Content", Page: "DataSource", DefaultValue: "Connection failed."),
+        [Content.DataSourceDisabled] = new("Content", Page: "DataSource", DefaultValue: "Data source disabled."),
+        [Content.DataSourceDisableFailed] = new("Content", Page: "DataSource", DefaultValue: "Failed to disable."),
+        [Content.DataSourceDeleteConfirm] = new("Content", Page: "DataSource", DefaultValue: "Permanently delete this data source? References are cleared and vectors removed (irreversible)."),
+        [Content.DataSourceDeleted] = new("Content", Page: "DataSource", DefaultValue: "Data source deleted and cleaned up."),
+        [Content.DataSourceRetryFailedHint] = new("Content", Page: "DataSource", DefaultValue: "Click 'Retry failed items' to re-scan only failed tables; successful tables are kept."),
+        [Content.DataSourceScanStatus] = new("Content", Page: "DataSource", DefaultValue: "Job status"),
 
         [Nav.Home] = new("Nav", Page: "Home", DefaultValue: "Home"),
         [Nav.Ask] = new("Nav", Page: "Ask", DefaultValue: "Ask BI"),

@@ -15,6 +15,7 @@ using SuperBuilder_AI.Interfaces.Identity;
 using SuperBuilder_AI.Models.Identity;
 using SuperBuilder_AI.Models.Metadata;
 using SuperBuilder_AI.Models.Organization;
+using SuperBuilder_AI.Services;
 using Xunit;
 
 namespace SuperBuilder_AI.Tests;
@@ -48,6 +49,12 @@ public class DataSourcesControllerTests
 		public Task<bool> HasPermissionAsync(long tenantId, long userId, string permissionCode, CancellationToken ct = default) => Task.FromResult(allowed);
 	}
 
+	private sealed class NoopScanQueue : IMetadataScanQueue
+	{
+		public ValueTask EnqueueAsync(long jobId, CancellationToken ct = default) => ValueTask.CompletedTask;
+		public ValueTask<long> DequeueAsync(CancellationToken ct = default) => ValueTask.FromResult(0L);
+	}
+
 	private static SuperBIContext CreateContext(out SqliteConnection connection)
 	{
 		connection = new SqliteConnection("DataSource=:memory:");
@@ -65,7 +72,7 @@ public class DataSourcesControllerTests
 
 	private static DataSourcesController Build(SuperBIContext db, long tid, long uid = 1)
 	{
-		var controller = new DataSourcesController(db, new PermissiveIdentity(), new AesGcmSecretStore(new byte[32]));
+		var controller = new DataSourcesController(db, new PermissiveIdentity(), new AesGcmSecretStore(new byte[32]), new NoopScanQueue());
 		controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext { User = AsTenant(tid, uid) } };
 		return controller;
 	}
@@ -308,7 +315,7 @@ public class DataSourcesControllerTests
 		await using var ctx = CreateContext(out var connection);
 		await using var lease = connection;
 		Assert.IsType<UnauthorizedObjectResult>(await Build(ctx, 0).TestConnectionString(new("MYSQL", "x"), CancellationToken.None));
-		var ctrl = new DataSourcesController(ctx, new PermissiveIdentity(false), new AesGcmSecretStore(new byte[32]));
+		var ctrl = new DataSourcesController(ctx, new PermissiveIdentity(false), new AesGcmSecretStore(new byte[32]), new NoopScanQueue());
 		ctrl.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext { User = AsTenant(TenantA) } };
 		var denied = Assert.IsType<ObjectResult>(await ctrl.TestConnectionString(new("MYSQL", "x"), CancellationToken.None));
 		Assert.Equal(403, denied.StatusCode);
@@ -319,5 +326,103 @@ public class DataSourcesControllerTests
 		if (result is not OkObjectResult ok || ok.Value is null) return null;
 		var prop = ok.Value.GetType().GetProperty("status");
 		return prop?.GetValue(ok.Value)?.ToString();
+	}
+
+	private static long SeedDataSourceRow(SuperBIContext ctx, long tid, bool vectorsBackfilled = false)
+	{
+		var ds = new DataSource
+		{
+			TenantId = tid,
+			Name = "ToDelete",
+			NormalizedName = "todelete",
+			DbType = "MYSQL",
+			ConnectionString = "Server=127.0.0.1;",
+			Enabled = true,
+			VectorsBackfilled = vectorsBackfilled
+		};
+		ctx.DataSources.Add(ds);
+		ctx.SaveChanges();
+		return ds.Id;
+	}
+
+	// —— C1 保存并扫描（§L.6）——
+	[Fact]
+	public async Task Create_WithScanAfterCreate_EnqueuesScanJob()
+	{
+		var ctx = CreateContext(out var connection);
+		await using var _ = connection;
+		await using var __ = ctx;
+
+		var ctrl = Build(ctx, TenantA);
+		var result = await ctrl.Create(new CreateDataSourceRequest("Sales", "MYSQL", "Server=127.0.0.1;") { ScanAfterCreate = true }, CancellationToken.None);
+
+		var created = Assert.IsType<CreatedAtActionResult>(result);
+		Assert.Equal(201, created.StatusCode);
+		var job = await ctx.MetadataScanJobs.SingleAsync();
+		var dsId = await ctx.DataSources.Select(x => x.Id).FirstAsync();
+		Assert.Equal(dsId, job.DataSourceId);
+		Assert.Equal(MetadataScanJobStatus.Queued, job.Status);
+	}
+
+	[Fact]
+	public async Task Create_WithoutScanAfterCreate_NoScanJob()
+	{
+		var ctx = CreateContext(out var connection);
+		await using var _ = connection;
+		await using var __ = ctx;
+
+		var ctrl = Build(ctx, TenantA);
+		Assert.IsType<OkObjectResult>(await ctrl.Create(new CreateDataSourceRequest("Sales", "MYSQL", "Server=127.0.0.1;"), CancellationToken.None));
+		Assert.Equal(0, await ctx.MetadataScanJobs.CountAsync());
+	}
+
+	// —— C8 删除两档（§L.7 / §10.7）——
+	[Fact]
+	public async Task Delete_Disable_RequiresMetadataDeletePermission()
+	{
+		var ctx = CreateContext(out var connection);
+		await using var _ = connection;
+		await using var __ = ctx;
+		var id = SeedDataSourceRow(ctx, TenantA);
+
+		var denied = new DataSourcesController(ctx, new PermissiveIdentity(false), new AesGcmSecretStore(new byte[32]), new NoopScanQueue());
+		denied.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext { User = AsTenant(TenantA) } };
+		Assert.Equal(403, Assert.IsType<ObjectResult>(await denied.Delete(id, "disable", false, CancellationToken.None)).StatusCode);
+
+		var ok = Build(ctx, TenantA);
+		Assert.IsType<OkObjectResult>(await ok.Delete(id, "disable", false, CancellationToken.None));
+		Assert.False((await ctx.DataSources.FindAsync(id))!.Enabled);
+	}
+
+	[Fact]
+	public async Task Delete_Cleanup_RequiresBackfill()
+	{
+		var ctx = CreateContext(out var connection);
+		await using var _ = connection;
+		await using var __ = ctx;
+		var id = SeedDataSourceRow(ctx, TenantA, vectorsBackfilled: false);
+		var ctrl = Build(ctx, TenantA);
+
+		var result = await ctrl.Delete(id, "cleanup", true, CancellationToken.None);
+		var obj = Assert.IsType<ObjectResult>(result);
+		Assert.Equal(409, obj.StatusCode);
+		Assert.Equal("vector_backfill_required_before_cleanup", obj.Value!.GetType().GetProperty("Code")!.GetValue(obj.Value)!.ToString());
+	}
+
+	[Fact]
+	public async Task Delete_Cleanup_RemovesSource_And_WritesGcRequest()
+	{
+		var ctx = CreateContext(out var connection);
+		await using var _ = connection;
+		await using var __ = ctx;
+		var id = SeedDataSourceRow(ctx, TenantA, vectorsBackfilled: true);
+		var ctrl = Build(ctx, TenantA);
+
+		var result = await ctrl.Delete(id, "cleanup", true, CancellationToken.None);
+		Assert.IsType<OkObjectResult>(result);
+		Assert.Null(await ctx.DataSources.FindAsync(id));
+		var gc = await ctx.MetadataVectorGcRequests.SingleAsync();
+		Assert.Equal("DataSourceDeleted", gc.Reason);
+		Assert.Equal(id, gc.DataSourceId);
 	}
 }

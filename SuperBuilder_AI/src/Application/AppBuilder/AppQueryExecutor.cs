@@ -1,13 +1,16 @@
 using Microsoft.EntityFrameworkCore;
 using SuperBuilder_AI.Api.Errors;
+using SuperBuilder_AI.Application.Metadata;
 using SuperBuilder_AI.Data;
 using SuperBuilder_AI.Interfaces.AppBuilder;
 using SuperBuilder_AI.Interfaces.BI;
 using SuperBuilder_AI.Interfaces.BI.Planning;
 using SuperBuilder_AI.Interfaces.Database;
 using SuperBuilder_AI.Interfaces.Identity;
+using SuperBuilder_AI.Application.BiQuery;
 using SuperBuilder_AI.Models.AppBuilder;
 using SuperBuilder_AI.Models.BI;
+using SuperBuilder_AI.Infrastructure.Security;
 
 namespace SuperBuilder_AI.Services.AppBuilder;
 
@@ -38,6 +41,7 @@ public sealed class AppQueryExecutor : IAppQueryExecutor
 	private readonly IRowLevelSecurityService _rowSecurity;
 	private readonly IDataSourceExecutionIdentityAccessor _executionIdentity;
 	private readonly IQueryPlanSecurityGate _securityGate;
+	private readonly ISecretStore _secrets;
 
 	public AppQueryExecutor(
 		IQueryPlanPipeline queryPlanPipeline,
@@ -48,7 +52,8 @@ public sealed class AppQueryExecutor : IAppQueryExecutor
 		IDataSourceAuthorizationService dataSourceAuth,
 		IRowLevelSecurityService rowSecurity,
 		IDataSourceExecutionIdentityAccessor executionIdentity,
-		IQueryPlanSecurityGate securityGate)
+		IQueryPlanSecurityGate securityGate,
+		ISecretStore secrets)
 	{
 		_queryPlanPipeline = queryPlanPipeline;
 		_sqlQueryBuilder = sqlQueryBuilder;
@@ -59,6 +64,7 @@ public sealed class AppQueryExecutor : IAppQueryExecutor
 		_rowSecurity = rowSecurity;
 		_executionIdentity = executionIdentity;
 		_securityGate = securityGate;
+		_secrets = secrets;
 	}
 
 	public async Task<AppComponentRender> ExecuteComponentAsync(
@@ -109,6 +115,8 @@ public sealed class AppQueryExecutor : IAppQueryExecutor
 		var dataSource = await _db.DataSources
 			.FirstAsync(x => x.Id == plan.DataSourceId && x.TenantId == tenantId && x.Enabled == true, cancellationToken);
 		var dialect = _sqlDialectResolver.Resolve(dataSource.DbType);
+		// §10.5 #5：PostgreSQL 执行前逐表核对 catalog 是否等于当前连接库，跨 catalog 直接拒绝。
+		QueryCatalogGuard.Assert(plan, dialect, _secrets.ResolvePlaintext(dataSource.ConnectionString));
 		var sql = await _sqlQueryBuilder.BuildAsync(plan, dialect);
 		var data = await _queryExecutionService.ExecuteAsync(sql, plan.DataSourceId);
 
@@ -137,7 +145,7 @@ public sealed class AppQueryExecutor : IAppQueryExecutor
 		if (lockedTable is null)
 		{
 			// plan 里没有该表：从元数据补齐（导出时已校验其属于绑定数据源）。
-			var meta = await _db.MetadataTables.AsNoTracking()
+			var meta = await _db.MetadataTables.WhereActiveVersion(_db).AsNoTracking()
 				.FirstOrDefaultAsync(t => t.Id == tableId, cancellationToken);
 			if (meta is null)
 				throw SuperBuilderException.FromCode(ErrorCodes.AppBindingNotSupported, 422);
@@ -148,6 +156,8 @@ public sealed class AppQueryExecutor : IAppQueryExecutor
 				DataSourceId = meta.DataSourceId,
 				TableName = meta.TableName,
 				TableComment = meta.TableComment,
+				CatalogName = meta.CatalogName,
+				SchemaName = meta.SchemaName,
 			};
 		}
 
@@ -158,7 +168,7 @@ public sealed class AppQueryExecutor : IAppQueryExecutor
 		plan.DataSourceId = lockedTable.DataSourceId > 0 ? lockedTable.DataSourceId : plan.DataSourceId;
 
 		// 2. 锁定表的列名 → 列 Id 映射。
-		var lockedColumns = await _db.MetadataColumns.AsNoTracking()
+		var lockedColumns = await _db.MetadataColumns.WhereActiveVersion(_db).AsNoTracking()
 			.Where(c => c.MetadataTableId == tableId)
 			.Select(c => new { c.Id, c.ColumnName })
 			.ToListAsync(cancellationToken);

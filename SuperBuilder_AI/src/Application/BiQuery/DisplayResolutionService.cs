@@ -4,6 +4,7 @@ using System.Text.RegularExpressions;
 using Dapper;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using SuperBuilder_AI.Application.Metadata;
 using SuperBuilder_AI.Data;
 using SuperBuilder_AI.Interfaces.BI;
 using SuperBuilder_AI.Interfaces.Database;
@@ -296,7 +297,7 @@ public class DisplayResolutionService : IDisplayResolutionService
 		string tableName,
 		CancellationToken cancellationToken)
 	{
-		var columns = await _context.MetadataColumns
+		var columns = await _context.MetadataColumns.WhereActiveVersion(_context)
 			.AsNoTracking()
 			.Where(c => c.MetadataTable != null
 				&& c.MetadataTable.DataSourceId == dataSourceId

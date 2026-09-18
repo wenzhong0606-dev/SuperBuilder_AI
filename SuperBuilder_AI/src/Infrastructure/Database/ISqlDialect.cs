@@ -85,5 +85,33 @@ public interface ISqlDialect
 		int index);
 
 
+	/// <summary>
+	/// 构造三键物理限定名（catalog.schema.table）。
+	///
+	/// 各方言规则（§10.5 #2）：
+	/// - SQL Server：catalog 非空 → [catalog].[schema].[table]；否则 [schema].[table]。
+	/// - MySQL：catalog(=数据库) 非空 → `catalog`.`table`；DTO 的 schema 必须为空或等于 catalog，
+	///   不一致视为无效物理键并拒绝。
+	/// - PostgreSQL：仅 "schema"."table"（catalog 不进入限定名，跨 catalog 由
+	///   <see cref="AssertCatalogResolvable"/> 在执行层拒绝）。
+	/// </summary>
+	string QualifyTable(
+		string? catalog,
+		string? schema,
+		string table);
+
+
+	/// <summary>
+	/// PostgreSQL 跨 catalog 执行层校验（§10.5 #5）。
+	///
+	/// <paramref name="catalog"/> 非空且不等于当前执行连接库 <paramref name="currentCatalog"/>
+	/// 时拒绝（PostgreSQL 无法在同一连接内跨数据库查询）。SQL Server / MySQL 支持跨 catalog
+	/// 限定名，本方法为空操作。
+	/// </summary>
+	void AssertCatalogResolvable(
+		string? catalog,
+		string? currentCatalog);
+
+
 
 }

@@ -233,6 +233,13 @@ public class MetadataVectorService
 
 				entry.ApplyVectorId(entry.StableId);
 
+				// §L.4 payload 隔离字段：tenant_id / data_source_id / metadata_version / metadata_type。
+				// 三类 point 均经 entry.Table 归属（table/column/semantic 的父表），可直接取租户/源/版本。
+				entry.Payload["tenant_id"] = entry.Table.TenantId;
+				entry.Payload["data_source_id"] = entry.Table.DataSourceId;
+				entry.Payload["metadata_version"] = entry.Table.MetadataVersion;
+				entry.Payload["metadata_type"] = entry.Kind;
+
 				switch (entry.Kind)
 				{
 					case "table":

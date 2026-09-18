@@ -650,6 +650,18 @@ public sealed class LocalizationSeedService : ILocalizationSeedService
         ["Content.DataSourcePolicyDeleted"] = "策略已删除。", ["Content.DataSourceDeleteFailed"] = "删除失败（{0}）。",
         ["Content.DataSourceLoadGrantsFailed"] = "加载授权失败（{0}）。",
 
+        // 扫描管理操作区（C5/C10/C11）
+        ["Content.DataSourceFullRescan"] = "全量重扫", ["Content.DataSourceCancelScan"] = "取消扫描",
+        ["Content.DataSourceRetryFailed"] = "重扫失败项", ["Content.DataSourceTestConnection"] = "测试连接",
+        ["Content.DataSourceDisable"] = "禁用", ["Content.DataSourceDeleteCleanup"] = "删除并清理",
+        ["Content.DataSourceCancelScanFailed"] = "取消扫描失败。", ["Content.DataSourceCancelScanRequested"] = "已请求取消，扫描将在安全点退出。",
+        ["Content.DataSourceRetryFailedFailed"] = "重扫失败项失败。", ["Content.DataSourceTestOk"] = "连接成功。",
+        ["Content.DataSourceTestFailed"] = "连接失败。", ["Content.DataSourceDisabled"] = "数据源已禁用。",
+        ["Content.DataSourceDisableFailed"] = "禁用失败。", ["Content.DataSourceDeleteConfirm"] = "确认彻底删除该数据源？将清理引用并删除向量（不可恢复）。",
+        ["Content.DataSourceDeleted"] = "数据源已删除并清理。",
+        ["Content.DataSourceRetryFailedHint"] = "可点击「重扫失败项」仅重扫失败表，成功表保留。",
+        ["Content.DataSourceScanStatus"] = "任务状态",
+
         // M3-05 重内容页正文批次（续）：ModelAccounts / SemanticLabel / ComponentGallery / ThemeEditor 补充 / MetadataEntity
         ["Content.ModelAccountsBound"] = "已绑定", ["Content.ModelAccountsUnbound"] = "未绑定",
         ["Content.ModelAccountsDefault"] = "默认", ["Content.ModelAccountsSetDefault"] = "设为默认",

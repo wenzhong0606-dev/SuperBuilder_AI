@@ -7,9 +7,11 @@ using SuperBuilder_AI.Interfaces.BI.Dashboard;
 using SuperBuilder_AI.Interfaces.BI.Planning;
 using SuperBuilder_AI.Interfaces.Database;
 using SuperBuilder_AI.Interfaces.Identity;
+using SuperBuilder_AI.Application.BiQuery;
 using SuperBuilder_AI.Models.BI;
 using SuperBuilder_AI.Models.Dashboard;
 using SuperBuilder_AI.Models.Organization;
+using SuperBuilder_AI.Infrastructure.Security;
 
 namespace SuperBuilder_AI.Services.BI.Dashboard;
 
@@ -33,6 +35,7 @@ public sealed class QueryPlanWidgetDataResolver : IWidgetDataResolver
 	private readonly IRowLevelSecurityService? _rowSecurity;
 	private readonly IDataSourceExecutionIdentityAccessor? _executionIdentity;
 	private readonly IQueryPlanSecurityGate? _securityGate;
+	private readonly ISecretStore? _secrets;
 
 	public QueryPlanWidgetDataResolver(
 		IQueryUnderstandingService understanding,
@@ -44,7 +47,8 @@ public sealed class QueryPlanWidgetDataResolver : IWidgetDataResolver
 		IDataSourceAuthorizationService? dataSourceAuthorization = null,
 		IRowLevelSecurityService? rowSecurity = null,
 		IDataSourceExecutionIdentityAccessor? executionIdentity = null,
-		IQueryPlanSecurityGate? securityGate = null)
+		IQueryPlanSecurityGate? securityGate = null,
+		ISecretStore? secrets = null)
 	{
 		_understanding = understanding ?? throw new ArgumentNullException(nameof(understanding));
 		_pipeline = pipeline ?? throw new ArgumentNullException(nameof(pipeline));
@@ -56,6 +60,7 @@ public sealed class QueryPlanWidgetDataResolver : IWidgetDataResolver
 		_rowSecurity = rowSecurity;
 		_executionIdentity = executionIdentity;
 		_securityGate = securityGate;
+		_secrets = secrets;
 	}
 
 	/// <inheritdoc />
@@ -145,6 +150,9 @@ public sealed class QueryPlanWidgetDataResolver : IWidgetDataResolver
 				.FirstAsync(x => x.Id == plan.DataSourceId &&
 					(allowedSources == null || (x.TenantId == context.Tenant.TenantId && x.Enabled == true)), cancellationToken);
 			var dialect = _dialectResolver.Resolve(dataSource.DbType ?? "sqlserver");
+			// §10.5 #5：执行前跨 catalog 守卫（仅 PostgreSQL 生效；连接串无法解析时跳过）。
+			if (_secrets is not null)
+				QueryCatalogGuard.Assert(plan, dialect, _secrets.ResolvePlaintext(dataSource.ConnectionString));
 			var sql = await _sqlBuilder.BuildAsync(plan, dialect);
 			var data = await _exec.ExecuteAsync(sql, plan.DataSourceId);
 
