@@ -328,6 +328,8 @@ public class MySqlMetadataReader : IDataSourceMetadataReader
 
         const string sql = """
             SELECT
+                current_database() AS "CatalogName",
+                n.nspname AS "SchemaName",
                 c.relname AS "TableName",
                 obj_description(c.oid, 'pg_class') AS "TableComment"
             FROM pg_class c
@@ -348,6 +350,8 @@ public class MySqlMetadataReader : IDataSourceMetadataReader
 
         var sql = """
             SELECT
+                current_database() AS "CatalogName",
+                n.nspname AS "SchemaName",
                 cls.relname AS "TableName",
                 a.attname AS "ColumnName",
                 col_description(a.attrelid, a.attnum) AS "ColumnComment",
@@ -387,13 +391,19 @@ public class MySqlMetadataReader : IDataSourceMetadataReader
 
         const string sql = """
             SELECT
+                current_database() AS "CatalogName",
+                n.nspname AS "SchemaName",
                 c.relname AS "TableName",
                 a.attname AS "ColumnName",
+                current_database() AS "ReferencedCatalogName",
+                n_r.nspname AS "ReferencedSchemaName",
                 c_r.relname AS "ReferencedTableName",
                 a_r.attname AS "ReferencedColumnName"
             FROM pg_constraint con
             JOIN pg_class c ON c.oid = con.conrelid
             JOIN pg_class c_r ON c_r.oid = con.confrelid
+            JOIN pg_namespace n ON n.oid = c.relnamespace
+            JOIN pg_namespace n_r ON n_r.oid = c_r.relnamespace
             JOIN pg_attribute a ON a.attnum = ANY(con.conkey) AND a.attrelid = c.oid
             JOIN pg_attribute a_r ON a_r.attnum = ANY(con.confkey) AND a_r.attrelid = c_r.oid
             WHERE con.contype = 'f'

@@ -52,6 +52,9 @@ public sealed class QueryScopeRealBackendTests
             var tables = await reader.GetTablesAsync(RealBackendConnections.PostgreSql(database), "POSTGRESQL");
             Assert.Contains(tables, t => t.TableName == "orders" && t.SchemaName == "schema1");
             Assert.Contains(tables, t => t.TableName == "orders" && t.SchemaName == "schema2");
+            var columns = await reader.GetColumnsAsync(RealBackendConnections.PostgreSql(database), "POSTGRESQL");
+            Assert.Contains(columns, c => c.TableName == "orders" && c.ColumnName == "label" && c.CatalogName == database && c.SchemaName == "schema1");
+            Assert.Contains(columns, c => c.TableName == "orders" && c.ColumnName == "label" && c.CatalogName == database && c.SchemaName == "schema2");
             var query = await BuildJoinAsync(new PostgreSqlDialect(), database, "schema1", database, "schema2");
             Assert.Equal(("left-pg", "right-pg"), await RealBackendConnections.ReadPairAsync(pg, query));
         }
