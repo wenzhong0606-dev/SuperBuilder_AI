@@ -371,6 +371,17 @@ jobs:
             sleep 2
           done
           docker logs superbuilder-e2e-sqlserver; exit 1
+      - name: 初始化 E2E 业务库（供 DataSourceScan 摄取）
+        # M13-09：DataSourceScanE2ETests.ScanConnection 在 CI 下回退到 SuperBuilder_E2E_Business
+        # （见 tests/.../DataSourceScanE2ETests.cs）。若不建此库并塞 ≥3 张表，扫描会因连不上库
+        # 或扫到 0 表失败（Assert.Fail，CI 拒绝降级为 Skip，见 PlaywrightFixture）→ e2e job 红。
+        # 此处用同一 SQL 容器 + TEST_SQL_PASSWORD 建最小业务库，匹配 tablesScanned>=3 断言。
+        run: |
+          set -euo pipefail
+          PW="${{ env.TEST_SQL_PASSWORD }}"
+          docker exec superbuilder-e2e-sqlserver /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P "$PW" -Q "CREATE DATABASE [SuperBuilder_E2E_Business];"
+          docker exec superbuilder-e2e-sqlserver /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P "$PW" -Q "USE [SuperBuilder_E2E_Business]; CREATE TABLE dbo.customers (id INT IDENTITY(1,1) PRIMARY KEY, name NVARCHAR(100), email NVARCHAR(100)); CREATE TABLE dbo.orders (id INT IDENTITY(1,1) PRIMARY KEY, customer_id INT, amount DECIMAL(10,2), order_date DATETIME); CREATE TABLE dbo.products (id INT IDENTITY(1,1) PRIMARY KEY, title NVARCHAR(200), price DECIMAL(10,2)); CREATE TABLE dbo.order_items (id INT IDENTITY(1,1) PRIMARY KEY, order_id INT, product_id INT, qty INT);"
+          echo "E2E 业务库 SuperBuilder_E2E_Business 已就绪（4 张表）。"
       - name: 等待 Qdrant Ready
         run: |
           for i in $(seq 1 30); do
