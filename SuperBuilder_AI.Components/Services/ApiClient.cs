@@ -181,8 +181,20 @@ public sealed class ScanJobView
     public int OrphansDetected { get; set; }
     public string? ErrorCode { get; set; }
     public string? ErrorMessage { get; set; }
+    public List<ScanFailureView> Failures { get; set; } = new();
     public DateTime? StartedAt { get; set; }
     public DateTime? FinishedAt { get; set; }
+}
+
+public sealed class ScanFailureView
+{
+    public string? Database { get; set; }
+    public string? Schema { get; set; }
+    public string? TableName { get; set; }
+    public string? Stage { get; set; }
+    public string? ErrorType { get; set; }
+    public string? ErrorMessage { get; set; }
+    public int RetryCount { get; set; }
 }
 
 public sealed class ScanProgressDetailsView

@@ -14,13 +14,20 @@ public sealed class MetadataActivationBlockedException : Exception
     /// <summary>阻断时附带的依赖清单（孤儿引用）。</summary>
     public IReadOnlyList<OrphanReference> Orphans { get; }
 
-    public MetadataActivationBlockedException(string reason, IReadOnlyList<OrphanReference>? orphans = null)
+    /// <summary>必需向量未同步的物理表；可用于展示与仅重扫失败项。</summary>
+    public IReadOnlyList<IncompleteVectorTable> IncompleteVectorTables { get; }
+
+    public MetadataActivationBlockedException(string reason, IReadOnlyList<OrphanReference>? orphans = null,
+        IReadOnlyList<IncompleteVectorTable>? incompleteVectorTables = null)
         : base($"元数据激活被阻断：{reason}")
     {
         Reason = reason;
         Orphans = orphans ?? Array.Empty<OrphanReference>();
+        IncompleteVectorTables = incompleteVectorTables ?? Array.Empty<IncompleteVectorTable>();
     }
 }
+
+public sealed record IncompleteVectorTable(string? CatalogName, string? SchemaName, string TableName);
 
 /// <summary>
 /// 激活阻断时的孤儿引用条目（§L.5b），供前端展示依赖清单与处理入口。

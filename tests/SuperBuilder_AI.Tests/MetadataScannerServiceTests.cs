@@ -53,6 +53,131 @@ public class MetadataScannerServiceTests
 	}
 
 	[Fact]
+	public async Task ActivateAsync_QueuesOldVersionVectorsForGc()
+	{
+		var ctx = CreateContext(out var connection);
+		await using var _ = connection;
+		await using var __ = ctx;
+		ctx.Tenants.Add(new Tenant { Id = 7, TenantCode = "t7", TenantName = "Tenant 7" });
+		var source = new DataSource { Id = 1, TenantId = 7, Name = "ds", NormalizedName = "ds", DbType = "SQLSERVER", ConnectionString = "x", ActiveMetadataVersion = 0, VectorsBackfilled = true };
+		ctx.DataSources.Add(source);
+		ctx.MetadataTables.Add(new MetadataTable { TenantId = 7, DataSourceId = 1, TableName = "orders", MetadataVersion = 0, VectorId = "old-table", Columns = { new MetadataColumn { ColumnName = "id", DataType = "int", MetadataVersion = 0, VectorId = "old-column" } } });
+		ctx.MetadataTables.Add(new MetadataTable { TenantId = 7, DataSourceId = 1, TableName = "orders", MetadataVersion = 1, VectorId = "new-table", VectorStatus = "Synced", Columns = { new MetadataColumn { ColumnName = "id", DataType = "int", MetadataVersion = 1, VectorId = "new-column", VectorStatus = "Synced" } } });
+		await ctx.SaveChangesAsync();
+
+		var job = new MetadataScanJob { TenantId = 7, DataSourceId = 1, BatchVersion = 1, SeedVersion = 0 };
+		var scanner = new MetadataScannerService(ctx, new FakeReader(), new FakeTextBuilder(), new FakeSemantic(), new FakeVector(), new VectorBackfillGate(Options.Create(new Features())));
+		await scanner.ActivateAsync(job, source);
+
+		Assert.Equal(1, source.ActiveMetadataVersion);
+		var request = Assert.Single(ctx.MetadataVectorGcRequests);
+		Assert.Equal("StagingGc", request.Reason);
+		Assert.Equal(0, request.OldVersion);
+		var ids = System.Text.Json.JsonSerializer.Deserialize<List<string>>(request.PayloadJson!);
+		Assert.Equal(new[] { "old-table", "old-column" }, ids);
+	}
+
+	[Fact]
+	public async Task ActivateAsync_BlocksExistingVectorIdsWithFailedStatus()
+	{
+		var ctx = CreateContext(out var connection);
+		await using var _ = connection;
+		await using var __ = ctx;
+
+		ctx.Tenants.Add(new Tenant { Id = 7, TenantCode = "t7", TenantName = "Tenant 7" });
+		var source = new DataSource { Id = 1, TenantId = 7, Name = "ds", NormalizedName = "ds", DbType = "SQLSERVER", ConnectionString = "x", ActiveMetadataVersion = 0, VectorsBackfilled = true };
+		ctx.DataSources.Add(source);
+		ctx.MetadataTables.Add(new MetadataTable
+		{
+			TenantId = 7, DataSourceId = 1, TableName = "orders", CatalogName = "db", SchemaName = "dbo",
+			MetadataVersion = 1, VectorId = "table-vector", VectorStatus = "Failed",
+			Columns = { new MetadataColumn { ColumnName = "id", DataType = "int", MetadataVersion = 1, VectorId = "column-vector", VectorStatus = "Synced" } }
+		});
+		await ctx.SaveChangesAsync();
+
+		var job = new MetadataScanJob { TenantId = 7, DataSourceId = 1, BatchVersion = 1, SeedVersion = 0 };
+		var scanner = new MetadataScannerService(ctx, new FakeReader(), new FakeTextBuilder(), new FakeSemantic(), new FakeVector(), new VectorBackfillGate(Options.Create(new Features())));
+		var error = await Assert.ThrowsAsync<MetadataActivationBlockedException>(() => scanner.ActivateAsync(job, source));
+		Assert.Equal("vector_index_incomplete", error.Reason);
+		var failedTable = Assert.Single(error.IncompleteVectorTables);
+		Assert.Equal("db", failedTable.CatalogName);
+		Assert.Equal("dbo", failedTable.SchemaName);
+		Assert.Equal("orders", failedTable.TableName);
+		Assert.Equal(0, source.ActiveMetadataVersion);
+	}
+
+	[Fact]
+	public async Task ActivateAsync_ReportsEveryTableWithIncompleteVectors()
+	{
+		var ctx = CreateContext(out var connection);
+		await using var _ = connection;
+		await using var __ = ctx;
+		ctx.Tenants.Add(new Tenant { Id = 7, TenantCode = "t7", TenantName = "Tenant 7" });
+		var source = new DataSource { Id = 1, TenantId = 7, Name = "ds", NormalizedName = "ds", DbType = "SQLSERVER", ConnectionString = "x", VectorsBackfilled = true };
+		ctx.DataSources.Add(source);
+		foreach (var schema in new[] { "a", "b" })
+			ctx.MetadataTables.Add(new MetadataTable { TenantId = 7, DataSourceId = 1, CatalogName = "db", SchemaName = schema, TableName = "orders", MetadataVersion = 1, VectorId = "table-" + schema, VectorStatus = "Synced", Columns = { new MetadataColumn { ColumnName = "id", DataType = "int", MetadataVersion = 1, VectorStatus = "Failed" } } });
+		await ctx.SaveChangesAsync();
+		var scanner = new MetadataScannerService(ctx, new FakeReader(), new FakeTextBuilder(), new FakeSemantic(), new FakeVector(), new VectorBackfillGate(Options.Create(new Features())));
+		var error = await Assert.ThrowsAsync<MetadataActivationBlockedException>(() => scanner.ActivateAsync(new MetadataScanJob { TenantId = 7, DataSourceId = 1, BatchVersion = 1 }, source));
+		Assert.Equal(new[] { "a", "b" }, error.IncompleteVectorTables.Select(t => t.SchemaName).OrderBy(x => x));
+		Assert.Equal(0, source.ActiveMetadataVersion);
+	}
+
+	[Fact]
+	public async Task ScanAsync_ColumnReadFailure_RetainsFailedTableAndReportsPartialResult()
+	{
+		var ctx = CreateContext(out var connection);
+		await using var _ = connection;
+		await using var __ = ctx;
+		ctx.Tenants.Add(new Tenant { Id = 7, TenantCode = "t7", TenantName = "Tenant 7" });
+		ctx.DataSources.Add(new DataSource { Id = 1, TenantId = 7, Name = "ds", NormalizedName = "ds", DbType = "SQLSERVER", ConnectionString = "x" });
+		ctx.MetadataTables.Add(new MetadataTable
+		{
+			TenantId = 7, DataSourceId = 1, TableName = "broken", CatalogName = "db", SchemaName = "dbo",
+			Columns = { new MetadataColumn { ColumnName = "old_column", DataType = "int" } }
+		});
+		await ctx.SaveChangesAsync();
+
+		var reader = new PartiallyFailingReader();
+		var scanner = new MetadataScannerService(ctx, reader, new FakeTextBuilder(), new FakeSemantic(), new FakeVector(), new VectorBackfillGate(Options.Create(new Features())));
+		await scanner.PrepareStagingAsync(7, 1, 1, 0);
+		var failures = new List<ScanTableFailure>();
+		await scanner.ScanAsync(7, 1, "x", 1, 0, cleanupOrphans: true, failedTables: failures);
+
+		var failure = Assert.Single(failures);
+		Assert.Equal("broken", failure.TableName);
+		Assert.Equal(3, failure.Attempts);
+		Assert.Equal(3, reader.BrokenAttempts);
+		var staged = await ctx.MetadataTables.Include(t => t.Columns).Where(t => t.MetadataVersion == 1).ToListAsync();
+		Assert.Contains(staged, t => t.TableName == "broken" && t.Columns.Any(c => c.ColumnName == "old_column"));
+		Assert.Contains(staged, t => t.TableName == "healthy");
+		Assert.Equal(1, staged.Single(t => t.TableName == "healthy").Columns.Single().MetadataVersion);
+	}
+
+	private sealed class PartiallyFailingReader : IDataSourceMetadataReader
+	{
+		public int BrokenAttempts { get; private set; }
+		public Task<List<TableMetadataDto>> GetTablesAsync(string connectionString, CancellationToken ct = default)
+			=> Task.FromResult(new List<TableMetadataDto>
+			{
+				new() { CatalogName = "db", SchemaName = "dbo", TableName = "broken" },
+				new() { CatalogName = "db", SchemaName = "dbo", TableName = "healthy" }
+			});
+		public Task<List<ColumnMetadataDto>> GetColumnsAsync(string connectionString, CancellationToken ct = default)
+			=> throw new InvalidOperationException("Full column read must not be used.");
+		public Task<List<ColumnMetadataDto>> GetColumnsAsync(string connectionString, string? dbType, IEnumerable<string> tableNames, CancellationToken ct = default)
+		{
+			if (tableNames.Single() == "broken")
+			{
+				BrokenAttempts++;
+				throw new InvalidOperationException("Column read failed.");
+			}
+			return Task.FromResult(new List<ColumnMetadataDto> { new() { CatalogName = "db", SchemaName = "dbo", TableName = "healthy", ColumnName = "id", DataType = "int" } });
+		}
+	}
+
+	[Fact]
 	public async Task ScanAsync_VectorIndexFailure_FailsScanWithTelemetry()
 	{
 		var ctx = CreateContext(out var connection);

@@ -653,6 +653,7 @@ public sealed class LocalizationSeedService : ILocalizationSeedService
         // 扫描管理操作区（C5/C10/C11）
         ["Content.DataSourceFullRescan"] = "全量重扫", ["Content.DataSourceCancelScan"] = "取消扫描",
         ["Content.DataSourceRetryFailed"] = "重扫失败项", ["Content.DataSourceTestConnection"] = "测试连接",
+        ["Content.DataSourceScanFailureItems"] = "失败项（{0}）", ["Content.DataSourceScanRetryCount"] = "重试 {0} 次",
         ["Content.DataSourceDisable"] = "禁用", ["Content.DataSourceDeleteCleanup"] = "删除并清理",
         ["Content.DataSourceCancelScanFailed"] = "取消扫描失败。", ["Content.DataSourceCancelScanRequested"] = "已请求取消，扫描将在安全点退出。",
         ["Content.DataSourceRetryFailedFailed"] = "重扫失败项失败。", ["Content.DataSourceTestOk"] = "连接成功。",

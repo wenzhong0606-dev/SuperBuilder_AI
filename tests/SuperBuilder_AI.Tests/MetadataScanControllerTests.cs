@@ -212,6 +212,29 @@ public class MetadataScanControllerTests
 	}
 
 	[Fact]
+	public async Task GetScanJob_ReturnsTableFailures()
+	{
+		var ctx = CreateContext(out var connection);
+		await using var _ = connection;
+		await using var __ = ctx;
+		var dsId = SeedDataSource(ctx, TenantA);
+		var jobId = SeedJob(ctx, dsId, MetadataScanJobStatus.Failed);
+		ctx.MetadataScanJobFailures.Add(new MetadataScanJobFailure
+		{
+			JobId = jobId, DataSourceId = dsId, Database = "db", Schema = "dbo",
+			TableName = "orders", Stage = "VectorIndex", ErrorType = "VectorIndexIncomplete",
+			ErrorMessage = "必需向量未同步", RetryCount = 3
+		});
+		await ctx.SaveChangesAsync();
+		var (ctrl, _) = Build(ctx, new PermissiveIdentity(), new PermissiveAuth(), TenantA);
+		var result = Assert.IsType<OkObjectResult>(await ctrl.GetScanJob(dsId, jobId, CancellationToken.None));
+		var failures = result.Value!.GetType().GetProperty("failures")!.GetValue(result.Value);
+		var json = System.Text.Json.JsonSerializer.Serialize(failures);
+		Assert.Contains("orders", json);
+		Assert.Contains("VectorIndex", json);
+	}
+
+	[Fact]
 	public async Task GetScanJob_Returns_RichProgressSnapshot()
 	{
 		var ctx = CreateContext(out var connection);
@@ -369,6 +392,12 @@ public class MetadataScanControllerTests
 
 		var dsId = SeedDataSource(ctx, TenantA);
 		var failedJobId = SeedJob(ctx, dsId, MetadataScanJobStatus.Failed);
+		ctx.MetadataScanJobFailures.Add(new MetadataScanJobFailure
+		{
+			JobId = failedJobId, DataSourceId = dsId, Database = "db", Schema = "dbo",
+			TableName = "orders", Stage = "DiscoveringColumns", ErrorType = "TimeoutException"
+		});
+		await ctx.SaveChangesAsync();
 		var (ctrl, queue) = Build(ctx, new PermissiveIdentity(), new PermissiveAuth(), TenantA);
 
 		var result = await ctrl.RetryFailedScan(dsId, failedJobId, CancellationToken.None);
@@ -380,6 +409,22 @@ public class MetadataScanControllerTests
 		Assert.Equal(failedJobId, newJob.OriginalJobId);
 		Assert.Equal(MetadataScanJobStatus.Queued, newJob.Status);
 		Assert.Equal(newJob.Id, queue.Enqueued);
+	}
+
+	[Fact]
+	public async Task RetryFailedScan_RejectsJobWithoutTableFailures()
+	{
+		var ctx = CreateContext(out var connection);
+		await using var _ = connection;
+		await using var __ = ctx;
+		var dsId = SeedDataSource(ctx, TenantA);
+		var failedJobId = SeedJob(ctx, dsId, MetadataScanJobStatus.Failed);
+		var (ctrl, _) = Build(ctx, new PermissiveIdentity(), new PermissiveAuth(), TenantA);
+
+		var result = await ctrl.RetryFailedScan(dsId, failedJobId, CancellationToken.None);
+
+		Assert.Equal(409, Assert.IsType<ObjectResult>(result).StatusCode);
+		Assert.Single(await ctx.MetadataScanJobs.ToListAsync());
 	}
 
 	[Fact]

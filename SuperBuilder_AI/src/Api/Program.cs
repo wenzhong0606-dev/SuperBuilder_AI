@@ -117,6 +117,7 @@ builder.Services.AddScoped<MetadataScannerService>();
 builder.Services.AddScoped<SuperBuilder_AI.Application.Metadata.VectorBackfillGate>();
 builder.Services.AddScoped<SuperBuilder_AI.Application.Metadata.MetadataVectorBackfillJob>();
 builder.Services.AddScoped<SuperBuilder_AI.Application.Metadata.MetadataVectorGcJob>();
+builder.Services.AddScoped<SuperBuilder_AI.Application.Metadata.MetadataVersionGcJob>();
 builder.Services.Configure<SuperBuilder_AI.Application.Common.Options.ScanRetryPolicy>(builder.Configuration.GetSection("MetadataScan:RetryPolicy"));
 builder.Services.Configure<SuperBuilder_AI.Application.Common.Options.ScanHeartbeatOptions>(builder.Configuration.GetSection("MetadataScan:HeartbeatTimeout"));
 builder.Services.AddScoped<SuperBuilder_AI.Application.Metadata.MetadataScanFailureRecorder>();

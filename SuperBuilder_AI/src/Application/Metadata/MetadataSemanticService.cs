@@ -270,6 +270,7 @@ public class MetadataSemanticService
 
 						MetadataColumnId =
 							column.Id,
+						MetadataVersion = column.MetadataVersion,
 
 
 					Source =

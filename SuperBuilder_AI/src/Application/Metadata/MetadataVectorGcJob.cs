@@ -34,14 +34,19 @@ public sealed class MetadataVectorGcJob
 
 	public async Task RunAsync(CancellationToken ct = default)
 	{
+		var retryAfter = System.DateTime.UtcNow.AddMinutes(-5);
+		var abandonedAfter = System.DateTime.UtcNow.AddMinutes(-10);
 		var pending = await _context.MetadataVectorGcRequests
-			.Where(r => r.Status == "Pending")
+			.Where(r => r.Status == "Pending"
+				|| (r.Status == "Failed" && (r.LastAttemptAt == null || r.LastAttemptAt < retryAfter))
+				|| (r.Status == "Running" && (r.LastAttemptAt == null || r.LastAttemptAt < abandonedAfter)))
 			.ToListAsync(ct);
 
 		var failed = 0;
 		foreach (var req in pending)
 		{
 			req.Status = "Running";
+			req.Error = null;
 			req.LastAttemptAt = System.DateTime.UtcNow;
 			await _context.SaveChangesAsync(ct);
 
@@ -96,7 +101,7 @@ public sealed class MetadataVectorGcJob
 
 			var payload = retrieved.Value.Payload;
 			if (!payload.TryGetValue("data_source_id", out var dsVal)) continue;
-			if (!Equals(dsVal, dsId)) continue;
+			if (!long.TryParse(dsVal?.ToString(), out var pointSourceId) || pointSourceId != dsId) continue;
 
 			// 删除数据源：删该 ds 全部 point。
 			if (req.Reason == "DataSourceDeleted")

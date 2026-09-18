@@ -106,6 +106,25 @@
                             {
                                 <div>@_scanJob.ErrorCode@(string.IsNullOrWhiteSpace(_scanJob.ErrorMessage) ? "" : $"：{_scanJob.ErrorMessage}")</div>
                             }
+                            @if (_scanJob.Failures.Count > 0)
+                            {
+                                <details>
+                                    <summary>@string.Format(L10n.T(Keys.Content.DataSourceScanFailureItems, "失败项（{0}）"), _scanJob.Failures.Count)</summary>
+                                    <ul>
+                                        @foreach (var failure in _scanJob.Failures)
+                                        {
+                                            <li>
+                                                <strong>@FailureLocation(failure)</strong>
+                                                <span> · @failure.Stage · @failure.ErrorType · @string.Format(L10n.T(Keys.Content.DataSourceScanRetryCount, "重试 {0} 次"), failure.RetryCount)</span>
+                                                @if (!string.IsNullOrWhiteSpace(failure.ErrorMessage))
+                                                {
+                                                    <div>@failure.ErrorMessage</div>
+                                                }
+                                            </li>
+                                        }
+                                    </ul>
+                                </details>
+                            }
                             <div class="muted tiny">@L10n.T(Keys.Content.DataSourceRetryFailedHint, "可点击「重扫失败项」仅重扫失败表，成功表保留。")</div>
                         </div>
                     }
@@ -313,7 +332,13 @@
     /// <summary>C5/C11：进行中状态（可取消）。</summary>
     private bool IsActiveScan => _scanJob is not null && _scanJob.Status is "Queued" or "Running" or "Cancelling" or "Retrying";
     /// <summary>C7/C11：可仅重扫失败项的状态。</summary>
-    private bool CanRetryFailed => _scanJob is not null && _scanJob.Status is "Failed" or "PartiallySucceeded";
+    private bool CanRetryFailed => _scanJob is not null
+        && _scanJob.Status is "Failed" or "PartiallySucceeded"
+        && _scanJob.Failures.Any(f => !string.IsNullOrWhiteSpace(f.TableName));
+
+    private static string FailureLocation(ScanFailureView failure)
+        => string.Join(".", new[] { failure.Database, failure.Schema, failure.TableName }
+            .Where(part => !string.IsNullOrWhiteSpace(part)));
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {

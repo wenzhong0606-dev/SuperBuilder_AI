@@ -686,6 +686,8 @@ public static class Keys
         public const string DataSourceFullRescan = "Content.DataSourceFullRescan";
         public const string DataSourceCancelScan = "Content.DataSourceCancelScan";
         public const string DataSourceRetryFailed = "Content.DataSourceRetryFailed";
+        public const string DataSourceScanFailureItems = "Content.DataSourceScanFailureItems";
+        public const string DataSourceScanRetryCount = "Content.DataSourceScanRetryCount";
         public const string DataSourceTestConnection = "Content.DataSourceTestConnection";
         public const string DataSourceDisable = "Content.DataSourceDisable";
         public const string DataSourceDeleteCleanup = "Content.DataSourceDeleteCleanup";
@@ -2468,6 +2470,8 @@ public static class Keys
         [Content.DataSourceFullRescan] = new("全量重扫", "Full re-scan"),
         [Content.DataSourceCancelScan] = new("取消扫描", "Cancel scan"),
         [Content.DataSourceRetryFailed] = new("重扫失败项", "Retry failed items"),
+        [Content.DataSourceScanFailureItems] = new("失败项（{0}）", "Failed items ({0})"),
+        [Content.DataSourceScanRetryCount] = new("重试 {0} 次", "Retried {0} times"),
         [Content.DataSourceTestConnection] = new("测试连接", "Test connection"),
         [Content.DataSourceDisable] = new("禁用", "Disable"),
         [Content.DataSourceDeleteCleanup] = new("删除并清理", "Delete & cleanup"),

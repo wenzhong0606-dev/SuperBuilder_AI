@@ -254,6 +254,10 @@ public class MetadataController : Controller
 			.FirstOrDefaultAsync(j => j.Id == jobId && j.DataSourceId == dataSourceId && j.TenantId == tenantId, cancellationToken);
 		if (source is null)
 			return NotFound(new ApiError { Code = ErrorCodes.NotFound, Message = "原扫描任务不存在。" });
+		if (source.Status is not (MetadataScanJobStatus.Failed or MetadataScanJobStatus.PartiallySucceeded)
+			|| !await _db.MetadataScanJobFailures.AnyAsync(f => f.JobId == jobId
+				&& f.DataSourceId == dataSourceId && !f.Resolved && f.TableName != null, cancellationToken))
+			return StatusCode(409, new ApiError { Code = ErrorCodes.Conflict, Message = "原任务没有可单独重扫的失败表；请使用全量扫描。" });
 
 		// §L.6：从 active 续扫失败项——新建任务（OriginalJobId 指向失败任务），
 		// ProcessJobAsync 重分配 BatchVersion 并从 active 重播（成功表保留，仅重扫失败项）。
@@ -263,6 +267,7 @@ public class MetadataController : Controller
 			DataSourceId = dataSourceId,
 			TriggeredBy = userValue,
 			OriginalJobId = jobId,
+			ScopeJson = source.ScopeJson,
 			Status = MetadataScanJobStatus.Queued,
 			ProgressPercent = 0
 		};
@@ -308,6 +313,8 @@ public class MetadataController : Controller
 		if (job is null)
 			return Ok(new { jobId = (long?)null, dataSourceId, status = (string?)null });
 
+		var failures = await GetScanFailuresAsync(job.Id, dataSourceId, cancellationToken);
+
 		return Ok(new
 		{
 			jobId = job.Id,
@@ -321,6 +328,7 @@ public class MetadataController : Controller
 			orphansDetected = job.OrphansDetected,
 			errorCode = job.ErrorCode,
 			errorMessage = job.ErrorMessage,
+			failures,
 			startedAt = job.StartedAt,
 			finishedAt = job.FinishedAt
 		});
@@ -348,6 +356,8 @@ public class MetadataController : Controller
 		if (job is null)
 			return NotFound(new ApiError { Code = ErrorCodes.NotFound, Message = "扫描任务不存在。" });
 
+		var failures = await GetScanFailuresAsync(job.Id, dataSourceId, cancellationToken);
+
 		return Ok(new
 		{
 			jobId = job.Id,
@@ -361,10 +371,22 @@ public class MetadataController : Controller
 			orphansDetected = job.OrphansDetected,
 			errorCode = job.ErrorCode,
 			errorMessage = job.ErrorMessage,
+			failures,
 			startedAt = job.StartedAt,
 			finishedAt = job.FinishedAt
 		});
 	}
+
+	private sealed record ScanFailureItem(string? Database, string? Schema, string? TableName,
+		string? Stage, string? ErrorType, string? ErrorMessage, int RetryCount);
+
+	private Task<List<ScanFailureItem>> GetScanFailuresAsync(long jobId, long dataSourceId, CancellationToken ct)
+		=> _db!.MetadataScanJobFailures.AsNoTracking()
+			.Where(f => f.JobId == jobId && f.DataSourceId == dataSourceId && !f.Resolved)
+			.OrderBy(f => f.Database).ThenBy(f => f.Schema).ThenBy(f => f.TableName)
+			.Select(f => new ScanFailureItem(f.Database, f.Schema, f.TableName,
+				f.Stage, f.ErrorType, f.ErrorMessage, f.RetryCount))
+			.ToListAsync(ct);
 
 	[HttpGet("Prompt")]
 	public async Task<IActionResult> Prompt(string question)

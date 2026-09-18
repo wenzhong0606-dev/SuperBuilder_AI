@@ -129,7 +129,7 @@ public class MySqlMetadataReader : IDataSourceMetadataReader
             ORDER BY TABLE_NAME
             """;
 
-        return (await conn.QueryAsync<TableMetadataDto>(sql)).AsList();
+        return (await conn.QueryAsync<TableMetadataDto>(new CommandDefinition(sql, cancellationToken: ct))).AsList();
     }
 
     private static async Task<List<ColumnMetadataDto>> GetMySqlColumnsAsync(
@@ -160,7 +160,7 @@ public class MySqlMetadataReader : IDataSourceMetadataReader
         }
         sql += "\nORDER BY TABLE_NAME, ORDINAL_POSITION";
 
-        return (await conn.QueryAsync<ColumnMetadataDto>(sql, param)).AsList();
+        return (await conn.QueryAsync<ColumnMetadataDto>(new CommandDefinition(sql, param, cancellationToken: ct))).AsList();
     }
 
     private static async Task<List<ForeignKeyMetadataDto>> GetMySqlForeignKeysAsync(string connectionString, CancellationToken ct)
@@ -185,7 +185,7 @@ public class MySqlMetadataReader : IDataSourceMetadataReader
             WHERE kcu.TABLE_SCHEMA = DATABASE()
               AND kcu.REFERENCED_TABLE_NAME IS NOT NULL
             """;
-        return (await conn.QueryAsync<ForeignKeyMetadataDto>(sql)).AsList();
+        return (await conn.QueryAsync<ForeignKeyMetadataDto>(new CommandDefinition(sql, cancellationToken: ct))).AsList();
     }
 
     private static async Task<List<string>> GetMySqlDatabasesAsync(string connectionString, CancellationToken ct)
@@ -197,7 +197,7 @@ public class MySqlMetadataReader : IDataSourceMetadataReader
             WHERE SCHEMA_NAME NOT IN ('information_schema','mysql','performance_schema','sys')
             ORDER BY SCHEMA_NAME
             """;
-        return (await conn.QueryAsync<string>(sql)).AsList();
+        return (await conn.QueryAsync<string>(new CommandDefinition(sql, cancellationToken: ct))).AsList();
     }
 
     // ---- SQL Server ----
@@ -225,7 +225,7 @@ public class MySqlMetadataReader : IDataSourceMetadataReader
             ORDER BY o.name
             """;
 
-        return (await conn.QueryAsync<TableMetadataDto>(sql)).AsList();
+        return (await conn.QueryAsync<TableMetadataDto>(new CommandDefinition(sql, cancellationToken: ct))).AsList();
     }
 
     private static async Task<List<ColumnMetadataDto>> GetSqlServerColumnsAsync(
@@ -278,7 +278,7 @@ public class MySqlMetadataReader : IDataSourceMetadataReader
         }
         sql += "\nORDER BY o.name, c.column_id";
 
-        return (await conn.QueryAsync<ColumnMetadataDto>(sql, param)).AsList();
+        return (await conn.QueryAsync<ColumnMetadataDto>(new CommandDefinition(sql, param, cancellationToken: ct))).AsList();
     }
 
     private static async Task<List<ForeignKeyMetadataDto>> GetSqlServerForeignKeysAsync(string connectionString, CancellationToken ct)
@@ -303,7 +303,7 @@ public class MySqlMetadataReader : IDataSourceMetadataReader
             INNER JOIN sys.tables tr ON tr.object_id = fkc.referenced_object_id
             INNER JOIN sys.columns rc ON rc.object_id = tr.object_id AND rc.column_id = fkc.referenced_column_id
             """;
-        return (await conn.QueryAsync<ForeignKeyMetadataDto>(sql)).AsList();
+        return (await conn.QueryAsync<ForeignKeyMetadataDto>(new CommandDefinition(sql, cancellationToken: ct))).AsList();
     }
 
     private static async Task<List<string>> GetSqlServerDatabasesAsync(string connectionString, CancellationToken ct)
@@ -316,7 +316,7 @@ public class MySqlMetadataReader : IDataSourceMetadataReader
               AND state_desc = 'ONLINE'
             ORDER BY name
             """;
-        return (await conn.QueryAsync<string>(sql)).AsList();
+        return (await conn.QueryAsync<string>(new CommandDefinition(sql, cancellationToken: ct))).AsList();
     }
 
     // ---- PostgreSQL ----
@@ -337,7 +337,7 @@ public class MySqlMetadataReader : IDataSourceMetadataReader
             ORDER BY c.relname
             """;
 
-        return (await conn.QueryAsync<TableMetadataDto>(sql)).AsList();
+        return (await conn.QueryAsync<TableMetadataDto>(new CommandDefinition(sql, cancellationToken: ct))).AsList();
     }
 
     private static async Task<List<ColumnMetadataDto>> GetPostgreSqlColumnsAsync(
@@ -377,7 +377,7 @@ public class MySqlMetadataReader : IDataSourceMetadataReader
         }
         sql += "\nORDER BY cls.relname, a.attnum";
 
-        return (await conn.QueryAsync<ColumnMetadataDto>(sql, param)).AsList();
+        return (await conn.QueryAsync<ColumnMetadataDto>(new CommandDefinition(sql, param, cancellationToken: ct))).AsList();
     }
 
     private static async Task<List<ForeignKeyMetadataDto>> GetPostgreSqlForeignKeysAsync(string connectionString, CancellationToken ct)
@@ -398,7 +398,7 @@ public class MySqlMetadataReader : IDataSourceMetadataReader
             JOIN pg_attribute a_r ON a_r.attnum = ANY(con.confkey) AND a_r.attrelid = c_r.oid
             WHERE con.contype = 'f'
             """;
-        return (await conn.QueryAsync<ForeignKeyMetadataDto>(sql)).AsList();
+        return (await conn.QueryAsync<ForeignKeyMetadataDto>(new CommandDefinition(sql, cancellationToken: ct))).AsList();
     }
 
     private static async Task<List<string>> GetPostgreSqlDatabasesAsync(string connectionString, CancellationToken ct)
@@ -412,6 +412,6 @@ public class MySqlMetadataReader : IDataSourceMetadataReader
               AND datname NOT IN ('postgres', 'template0', 'template1')
             ORDER BY datname
             """;
-        return (await conn.QueryAsync<string>(sql)).AsList();
+        return (await conn.QueryAsync<string>(new CommandDefinition(sql, cancellationToken: ct))).AsList();
     }
 }

@@ -43,15 +43,31 @@ public sealed class MetadataVectorMaintenanceHostedService : BackgroundService
 			try
 			{
 				using var scope = _scopeFactory.CreateScope();
-				var backfill = scope.ServiceProvider.GetRequiredService<MetadataVectorBackfillJob>();
-				var gc = scope.ServiceProvider.GetRequiredService<MetadataVectorGcJob>();
-				await backfill.RunAsync(stoppingToken);
-				await gc.RunAsync(stoppingToken);
+				await scope.ServiceProvider.GetRequiredService<MetadataVectorBackfillJob>().RunAsync(stoppingToken);
 			}
-			catch (Exception ex)
+			catch (Exception ex) when (ex is not OperationCanceledException)
 			{
-				// 单个维护周期异常不应拖垮循环。
-				_logger.LogError(ex, "向量维护周期发生异常。");
+				_logger.LogError(ex, "向量回填周期发生异常。");
+			}
+
+			try
+			{
+				using var scope = _scopeFactory.CreateScope();
+				await scope.ServiceProvider.GetRequiredService<MetadataVectorGcJob>().RunAsync(stoppingToken);
+			}
+			catch (Exception ex) when (ex is not OperationCanceledException)
+			{
+				_logger.LogError(ex, "向量 GC 周期发生异常。");
+			}
+
+			try
+			{
+				using var scope = _scopeFactory.CreateScope();
+				await scope.ServiceProvider.GetRequiredService<MetadataVersionGcJob>().RunAsync(stoppingToken);
+			}
+			catch (Exception ex) when (ex is not OperationCanceledException)
+			{
+				_logger.LogError(ex, "旧版元数据 GC 周期发生异常。");
 			}
 		}
 	}

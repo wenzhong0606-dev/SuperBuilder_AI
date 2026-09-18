@@ -1,0 +1,104 @@
+name: Data source scan real-backend acceptance
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'SuperBuilder_AI/**'
+      - 'SuperBuilder_AI.Components/**'
+      - 'tests/SuperBuilder_AI.RealBackend.Tests/**'
+      - '.github/workflows/datasource-scan-real-backend.yml'
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  TEST_SQL_PASSWORD: "V10_Sql_${{ github.run_id }}!Aa"
+  TEST_MYSQL_PASSWORD: "V10_My_${{ github.run_id }}!Aa"
+  TEST_POSTGRES_PASSWORD: "V10_Pg_${{ github.run_id }}!Aa"
+
+jobs:
+  real-backend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Start four isolated services
+        run: |
+          docker run -d --name sb-v10-sql -e ACCEPT_EULA=Y -e MSSQL_SA_PASSWORD="${TEST_SQL_PASSWORD}" -p 1433:1433 mcr.microsoft.com/mssql/server:2022-latest
+          docker run -d --name sb-v10-mysql -e MYSQL_ROOT_PASSWORD="${TEST_MYSQL_PASSWORD}" -p 3306:3306 mysql:8.0
+          docker run -d --name sb-v10-postgres -e POSTGRES_PASSWORD="${TEST_POSTGRES_PASSWORD}" -p 5432:5432 postgres:15
+          docker run -d --name sb-v10-qdrant -p 6333:6333 -p 6334:6334 qdrant/qdrant:v1.19.0
+
+      - name: Wait for all backends
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 90); do
+            if docker exec sb-v10-sql /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P "${TEST_SQL_PASSWORD}" -Q "SELECT 1" -b -o /dev/null >/dev/null 2>&1; then break; fi
+            if [ "$i" -eq 90 ]; then docker logs sb-v10-sql; exit 1; fi
+            sleep 2
+          done
+          for i in $(seq 1 90); do
+            if docker exec sb-v10-mysql mysqladmin ping -h 127.0.0.1 -uroot -p"${TEST_MYSQL_PASSWORD}" --silent >/dev/null 2>&1; then break; fi
+            if [ "$i" -eq 90 ]; then docker logs sb-v10-mysql; exit 1; fi
+            sleep 2
+          done
+          for i in $(seq 1 60); do
+            if docker exec sb-v10-postgres pg_isready -U postgres >/dev/null 2>&1; then break; fi
+            if [ "$i" -eq 60 ]; then docker logs sb-v10-postgres; exit 1; fi
+            sleep 2
+          done
+          for i in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:6333/healthz >/dev/null; then break; fi
+            if [ "$i" -eq 60 ]; then docker logs sb-v10-qdrant; exit 1; fi
+            sleep 2
+          done
+
+      - name: Run all five real-backend scenarios
+        env:
+          SB_REAL_SQLSERVER: "Server=127.0.0.1,1433;Database=master;User Id=sa;Password=${{ env.TEST_SQL_PASSWORD }};TrustServerCertificate=True;"
+          SB_REAL_MYSQL: "Server=127.0.0.1;Port=3306;Database=mysql;User ID=root;Password=${{ env.TEST_MYSQL_PASSWORD }};"
+          SB_REAL_POSTGRES: "Host=127.0.0.1;Port=5432;Database=postgres;Username=postgres;Password=${{ env.TEST_POSTGRES_PASSWORD }};"
+          SB_REAL_QDRANT_HOST: "127.0.0.1"
+          SB_REAL_QDRANT_PORT: "6334"
+        run: |
+          set -euo pipefail
+          mkdir -p RealBackendResults
+          dotnet test tests/SuperBuilder_AI.RealBackend.Tests/SuperBuilder_AI.RealBackend.Tests.csproj \
+            --configuration Release \
+            --filter 'Category=RealBackend' \
+            --logger 'trx;LogFileName=real-backend.trx' \
+            --results-directory "$GITHUB_WORKSPACE/RealBackendResults"
+          trx="$GITHUB_WORKSPACE/RealBackendResults/real-backend.trx"
+          test -f "$trx"
+          counters=$(grep -oE '<Counters[^>]*>' "$trx" | head -1)
+          total=$(printf '%s\n' "$counters" | grep -oE '\btotal="[0-9]+"' | grep -oE '[0-9]+')
+          passed=$(printf '%s\n' "$counters" | grep -oE '\bpassed="[0-9]+"' | grep -oE '[0-9]+')
+          failed=$(printf '%s\n' "$counters" | grep -oE '\bfailed="[0-9]+"' | grep -oE '[0-9]+')
+          echo "RealBackend: total=$total passed=$passed failed=$failed"
+          test "$total" -eq 5
+          test "$passed" -eq 5
+          test "$failed" -eq 0
+
+      - name: Upload acceptance results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: datasource-scan-real-backend
+          path: RealBackendResults/
+          if-no-files-found: ignore
+
+      - name: Container logs on failure
+        if: failure()
+        run: |
+          docker logs sb-v10-sql || true
+          docker logs sb-v10-mysql || true
+          docker logs sb-v10-postgres || true
+          docker logs sb-v10-qdrant || true

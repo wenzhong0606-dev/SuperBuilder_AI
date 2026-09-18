@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading;
@@ -187,29 +188,53 @@ public sealed class MetadataScanHostedService : BackgroundService
             return;
         }
 
+        IReadOnlyCollection<MetadataScanJobFailure>? retryFailures = null;
+        if (job.OriginalJobId is { } originalJobId)
+        {
+            retryFailures = await context.MetadataScanJobFailures.AsNoTracking()
+                .Where(f => f.JobId == originalJobId && f.DataSourceId == job.DataSourceId
+                    && !f.Resolved && f.TableName != null)
+                .ToListAsync(stoppingToken);
+            if (retryFailures.Count == 0)
+            {
+                await FailJobAsync(context, job, "no_failed_tables", "原任务没有可单独重扫的失败表。", stoppingToken);
+                return;
+            }
+        }
+
         // C3/C4：链接 stoppingToken + 本任务 CTS，便于取消端点中断（阶段/每表边界抛 OCE）。
         var jobCts = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
         _jobCts[jobId] = jobCts;
 
+        // 状态、版本分配和种子版本一起提交，避免崩溃后留下 Running 但没有批次号的任务。
+        try
+        {
+            await using var allocationTx = await context.Database.BeginTransactionAsync(jobCts.Token);
+            job.Status = MetadataScanJobStatus.Running;
+            job.StartedAt = DateTime.UtcNow;
+            job.LastHeartbeatUtc = DateTime.UtcNow;
+            job.ProgressPercent = 0;
+            job.Stage = "Connecting";
+            var allocated = (await context.Database
+                .SqlQuery<int>($"UPDATE DataSources SET NextMetadataVersion = NextMetadataVersion + 1 OUTPUT DELETED.NextMetadataVersion WHERE Id = {dataSource.Id}")
+                .ToListAsync(jobCts.Token)).First();
+            job.BatchVersion = allocated;
+            job.SeedVersion = dataSource.ActiveMetadataVersion;
+            await context.SaveChangesAsync(jobCts.Token);
+            await allocationTx.CommitAsync(jobCts.Token);
+        }
+        catch
+        {
+            _jobCts.TryRemove(jobId, out _);
+            jobCts.Dispose();
+            throw;
+        }
+
         // 心跳循环使用独立 scope 的定点 UPDATE，避免与扫描主 DbContext 并发 SaveChanges。
         var heartbeatTask = HeartbeatLoopAsync(job.Id, jobCts.Token);
 
-        job.Status = MetadataScanJobStatus.Running;
-        job.StartedAt = DateTime.UtcNow;
-        job.LastHeartbeatUtc = DateTime.UtcNow;
-        job.ProgressPercent = 0;
-        job.Stage = "Connecting";
-        await context.SaveChangesAsync(jobCts.Token);
-
-        // §L.1 版本分配：原子 UPDATE … OUTPUT 自增 NextMetadataVersion，取旧值作为本次 BatchVersion。
-        var allocated = (await context.Database
-            .SqlQuery<int>($"UPDATE DataSources SET NextMetadataVersion = NextMetadataVersion + 1 OUTPUT DELETED.NextMetadataVersion WHERE Id = {dataSource.Id}")
-            .ToListAsync(jobCts.Token)).First();
-        job.BatchVersion = allocated;
-        job.SeedVersion = dataSource.ActiveMetadataVersion;
-        await context.SaveChangesAsync(jobCts.Token);
-
         var telemetry = new ScanTelemetry();
+        var tableFailures = new List<ScanTableFailure>();
         var progress = new JobProgress(job, telemetry, async ct =>
         {
             try
@@ -238,7 +263,17 @@ public sealed class MetadataScanHostedService : BackgroundService
                 telemetry,
                 cleanupOrphans: true,
                 scope: scanScope,
+                retryFailures: retryFailures,
+                failedTables: tableFailures,
                 ct: jobCts.Token);
+
+            foreach (var failure in tableFailures)
+            {
+                for (var attempt = 0; attempt < failure.Attempts; attempt++)
+                    await recorder.RecordTableFailureAsync(job.Id, job.DataSourceId, job.OriginalJobId,
+                        failure.CatalogName, failure.SchemaName, failure.TableName, failure.Stage,
+                        failure.ErrorType, failure.ErrorMessage, jobCts.Token);
+            }
 
             // C4 防激活：激活前复查状态（心跳超时可能已标记 Failed），迟到 worker 不得激活。
             await context.Entry(job).ReloadAsync(jobCts.Token);
@@ -255,10 +290,14 @@ public sealed class MetadataScanHostedService : BackgroundService
         {
             cancelled = true;
             // 重新加载以读取取消端点写入的 Cancelling 状态（决定是否记为 Cancelled）。
-            await context.Entry(job).ReloadAsync(jobCts.Token);
+            await context.Entry(job).ReloadAsync(CancellationToken.None);
         }
         catch (MetadataActivationBlockedException actEx)
         {
+            foreach (var table in actEx.IncompleteVectorTables)
+                await recorder.RecordTableFailureAsync(job.Id, job.DataSourceId, job.OriginalJobId,
+                    table.CatalogName, table.SchemaName, table.TableName, "VectorIndex",
+                    "VectorIndexIncomplete", "必需的表、列或语义向量未同步。", jobCts.Token);
             job.FailedReason = actEx.Reason;
             await FailJobAsync(context, job, actEx.Reason, "激活被阻断：" + actEx.Reason, jobCts.Token);
             await AuditScanAsync(audit, job, "failure", "激活被阻断：" + actEx.Reason);
@@ -346,20 +385,21 @@ public sealed class MetadataScanHostedService : BackgroundService
         }
 
         // 成功：回写数据源最后扫描时间，并落盘最终计数。
-        job.Status = MetadataScanJobStatus.Succeeded;
+        job.Status = tableFailures.Count == 0 ? MetadataScanJobStatus.Succeeded : MetadataScanJobStatus.PartiallySucceeded;
         job.FinishedAt = DateTime.UtcNow;
         job.ProgressPercent = 100;
         job.TablesScanned = telemetry.TablesScanned;
         job.ColumnsScanned = telemetry.ColumnsScanned;
         job.OrphansDetected = telemetry.OrphansDetected;
-        job.Stage = "Succeeded";
+        job.Stage = job.Status.ToString();
         telemetry.UpdateTiming(job.StartedAt, 100);
         job.ProgressDetailsJson = telemetry.ToJson();
         job.ErrorCode = null;
         job.ErrorMessage = null;
         dataSource.LastScanAt = DateTime.UtcNow;
         await context.SaveChangesAsync(stoppingToken);
-        await AuditScanAsync(audit, job, "success", "扫描完成并激活。");
+        await AuditScanAsync(audit, job, "success", tableFailures.Count == 0
+            ? "扫描完成并激活。" : $"扫描部分成功并激活，失败表 {tableFailures.Count} 张。");
         _backlog.Decrement();
     }
 

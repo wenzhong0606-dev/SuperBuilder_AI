@@ -97,7 +97,8 @@ public sealed class MetadataVectorBackfillJob
 		CancellationToken ct)
 	{
 		var retrieved = await _qdrant.RetrieveVectorAsync(id, ct);
-		if (retrieved is null) return;
+		if (retrieved is null)
+			throw new InvalidOperationException($"向量回填失败：point {id} 不存在。");
 
 		var (vector, oldPayload) = retrieved.Value;
 		var payload = new System.Collections.Generic.Dictionary<string, object>(oldPayload)

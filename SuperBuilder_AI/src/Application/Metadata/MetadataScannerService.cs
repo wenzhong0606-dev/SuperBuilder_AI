@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using System.Collections.Concurrent;
 using System.Data.Common;
+using System.Text.Json;
 using System.Threading;
 using SuperBuilder_AI.Data;
 using SuperBuilder_AI.Interfaces;
@@ -49,6 +50,8 @@ public class MetadataScannerService
         ScanTelemetry? telemetry = null,
         bool cleanupOrphans = false,
         ScanScope? scope = null,
+        IReadOnlyCollection<MetadataScanJobFailure>? retryFailures = null,
+        ICollection<ScanTableFailure>? failedTables = null,
         CancellationToken ct = default)
     {
         telemetry ??= new ScanTelemetry();
@@ -67,7 +70,12 @@ public class MetadataScannerService
         ReportStage(telemetry, progress, "Connecting", "正在连接业务数据库…", 3, "DatabaseConnecting");
 
         // §L.6 / C2：范围扫描先按 scope 发现（可跨库逐库汇总），再在结果上过滤（Databases/Schemas/系统库/前缀/视图/空表）。
-        var (tables, columns, foreignKeys) = await DiscoverScopedAsync(connectionString, dataSource.DbType, scope, telemetry, ct);
+        var tableFailures = new List<ScanTableFailure>();
+        var (tables, columns, foreignKeys) = await DiscoverScopedAsync(connectionString, dataSource.DbType, scope, retryFailures, tableFailures, telemetry, ct);
+        if (failedTables is not null)
+            foreach (var failure in tableFailures) failedTables.Add(failure);
+        if (tables.Count == 0 && tableFailures.Count > 0)
+            throw new InvalidOperationException("所选表的字段读取全部失败，保留当前激活版本。");
         telemetry.Details.TablesDiscovered = tables.Count;
         telemetry.AddEvent("Info", "TablesDiscovered", $"已发现 {tables.Count} 张数据表。", tables.Count, tables.Count);
         ReportStage(telemetry, progress, "DiscoveringColumns", "正在读取字段结构…", 12, "TablesReady");
@@ -100,7 +108,7 @@ public class MetadataScannerService
 
         telemetry.AddEvent("Info", "MetadataCompared", $"已加载 {existsTables.Count} 张历史元数据表用于差异比对。");
 
-        if (cleanupOrphans)
+        if (cleanupOrphans && scope is null && retryFailures is null && tableFailures.Count == 0)
         {
             ReportStage(telemetry, progress, "CleaningOrphans", "正在检查失效元数据…", 27, "OrphanCheckStarted");
 
@@ -118,10 +126,10 @@ public class MetadataScannerService
                 .ToListAsync(ct));
 
             var sourceTableNames = new HashSet<string>(
-                tables.Select(t => t.TableName ?? string.Empty),
+                tables.Select(t => PhyTableKey(t.CatalogName, t.SchemaName, t.TableName)),
                 StringComparer.OrdinalIgnoreCase);
             var sourceColumnsByTable = columns
-                .GroupBy(c => c.TableName ?? string.Empty, StringComparer.OrdinalIgnoreCase)
+                .GroupBy(c => PhyTableKey(c.CatalogName, c.SchemaName, c.TableName), StringComparer.OrdinalIgnoreCase)
                 .ToDictionary(
                     g => g.Key,
                     g => new HashSet<string>(g.Select(c => c.ColumnName ?? string.Empty), StringComparer.OrdinalIgnoreCase),
@@ -130,7 +138,7 @@ public class MetadataScannerService
             var orphanRemoved = 0;
             foreach (var existingTable in existsTables)
             {
-                var tableName = existingTable.TableName ?? string.Empty;
+                var tableName = PhyTableKey(existingTable.CatalogName, existingTable.SchemaName, existingTable.TableName);
                 if (!sourceTableNames.Contains(tableName))
                 {
                     var tableProtected = protectedTables.Contains(existingTable.Id)
@@ -216,7 +224,8 @@ public class MetadataScannerService
                         DataType = column.DataType ?? string.Empty,
                         Length = column.Length,
                         IsNullable = column.IsNullable,
-                        IsPrimaryKey = column.IsPrimaryKey
+                        IsPrimaryKey = column.IsPrimaryKey,
+                        MetadataVersion = batchVersion
                     };
                     metadataTable.Columns.Add(metadataColumn);
                     telemetry.Details.AddedColumns++;
@@ -493,7 +502,7 @@ public class MetadataScannerService
     {
         try
         {
-            var fks = await _reader.GetForeignKeysAsync(connectionString, dbType);
+            var fks = await _reader.GetForeignKeysAsync(connectionString, dbType, ct);
             return fks ?? new List<ForeignKeyMetadataDto>();
         }
         catch (OperationCanceledException)
@@ -518,7 +527,14 @@ public class MetadataScannerService
     /// 未指定 scope 时行为与历史单库发现完全一致，不影响既有用例。
     /// </summary>
     private async Task<(List<TableMetadataDto> tables, List<ColumnMetadataDto> columns, List<ForeignKeyMetadataDto> foreignKeys)>
-        DiscoverScopedAsync(string connectionString, string dbType, ScanScope? scope, ScanTelemetry telemetry, CancellationToken ct)
+        DiscoverScopedAsync(
+            string connectionString,
+            string dbType,
+            ScanScope? scope,
+            IReadOnlyCollection<MetadataScanJobFailure>? retryFailures,
+            ICollection<ScanTableFailure> failedTables,
+            ScanTelemetry telemetry,
+            CancellationToken ct)
     {
         var tables = new List<TableMetadataDto>();
         var columns = new List<ColumnMetadataDto>();
@@ -539,10 +555,47 @@ public class MetadataScannerService
             targets.Add(connectionString);
         }
 
+        var retryKeys = retryFailures is null ? null : new HashSet<string>(
+            retryFailures.Where(f => !string.IsNullOrWhiteSpace(f.TableName))
+                .Select(f => PhyTableKey(f.Database, f.Schema, f.TableName)),
+            StringComparer.OrdinalIgnoreCase);
+
         foreach (var cs in targets)
         {
-            tables.AddRange(await _reader.GetTablesAsync(cs, dbType, ct));
-            columns.AddRange(await _reader.GetColumnsAsync(cs, dbType, ct));
+            var discovered = await _reader.GetTablesAsync(cs, dbType, ct);
+            foreach (var table in discovered)
+            {
+                ct.ThrowIfCancellationRequested();
+                if (scope is not null && !scope.IsTableInScope(table)) continue;
+                if (retryKeys is not null && !retryKeys.Contains(PhyTableKey(table.CatalogName, table.SchemaName, table.TableName))) continue;
+
+                for (var attempt = 1; attempt <= 3; attempt++)
+                {
+                    try
+                    {
+                        var readColumns = await _reader.GetColumnsAsync(cs, dbType, new[] { table.TableName ?? string.Empty }, ct);
+                        columns.AddRange(readColumns.Where(c => PhyTableKey(c.CatalogName, c.SchemaName, c.TableName)
+                            == PhyTableKey(table.CatalogName, table.SchemaName, table.TableName)));
+                        tables.Add(table);
+                        break;
+                    }
+                    catch (OperationCanceledException) when (ct.IsCancellationRequested)
+                    {
+                        throw;
+                    }
+                    catch (Exception ex) when (attempt < 3)
+                    {
+                        telemetry.AddWarning("ColumnReadRetry", $"表 {table.TableName} 字段读取失败（{ex.GetType().Name}），正在重试 {attempt}/3。");
+                    }
+                    catch (Exception ex)
+                    {
+                        failedTables.Add(new ScanTableFailure(table.CatalogName, table.SchemaName,
+                            table.TableName ?? string.Empty, "DiscoveringColumns", ex.GetType().Name,
+                            $"字段读取失败（{ex.GetType().Name}）。", attempt));
+                        telemetry.AddWarning("ColumnReadFailed", $"表 {table.TableName} 字段读取失败，已保留旧版元数据。");
+                    }
+                }
+            }
             foreignKeys.AddRange(await TryLoadForeignKeysAsync(cs, dbType, telemetry, ct));
         }
 
@@ -820,20 +873,15 @@ public class MetadataScannerService
             .Where(t => t.TenantId == tenantId && t.DataSourceId == dsId && t.MetadataVersion == batch)
             .ToListAsync(ct);
 
-        foreach (var t in newTables)
-        {
-            if (!NeedsIndex(t)) continue;
-            if (string.IsNullOrWhiteSpace(t.VectorId) || t.VectorStatus != "Synced")
-                throw new MetadataActivationBlockedException("vector_index_incomplete");
-            foreach (var c in t.Columns)
-            {
-                if (string.IsNullOrWhiteSpace(c.VectorId) || c.VectorStatus != "Synced")
-                    throw new MetadataActivationBlockedException("vector_index_incomplete");
-                if (c.Semantic != null
-                    && (string.IsNullOrWhiteSpace(c.Semantic.VectorId) || c.Semantic.VectorStatus != "Synced"))
-                    throw new MetadataActivationBlockedException("vector_index_incomplete");
-            }
-        }
+        var incompleteTables = newTables
+            .Where(t => string.IsNullOrWhiteSpace(t.VectorId) || t.VectorStatus != "Synced"
+                || t.Columns.Any(c => string.IsNullOrWhiteSpace(c.VectorId) || c.VectorStatus != "Synced"
+                    || (c.Semantic != null
+                        && (string.IsNullOrWhiteSpace(c.Semantic.VectorId) || c.Semantic.VectorStatus != "Synced"))))
+            .Select(t => new IncompleteVectorTable(t.CatalogName, t.SchemaName, t.TableName))
+            .ToList();
+        if (incompleteTables.Count > 0)
+            throw new MetadataActivationBlockedException("vector_index_incomplete", incompleteVectorTables: incompleteTables);
 
         // 2) 引用重映射（§L.5b）：先按物理键建立 旧Id→新Id 映射，孤儿引用先收集、不立即改写。
         var oldTables = await _context.MetadataTables
@@ -916,6 +964,25 @@ public class MetadataScannerService
             throw new MetadataActivationBlockedException("orphaned_references", orphans);
 
         // 3) 仅翻指针（§L.5）：激活前所有检查通过。
+        var oldVectorIds = oldTables
+            .SelectMany(t => new[] { t.VectorId }
+                .Concat(t.Columns.SelectMany(c => new[] { c.VectorId, c.Semantic?.VectorId })))
+            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .Select(id => id!)
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+        if (seed != batch && oldVectorIds.Count > 0)
+        {
+            _context.MetadataVectorGcRequests.Add(new MetadataVectorGcRequest
+            {
+                TenantId = tenantId,
+                DataSourceId = dsId,
+                OldVersion = seed,
+                Reason = "StagingGc",
+                Status = "Pending",
+                PayloadJson = JsonSerializer.Serialize(oldVectorIds)
+            });
+        }
         dataSource.ActiveMetadataVersion = batch;
         job.ActivatedVersion = batch;
         await _context.SaveChangesAsync(ct);

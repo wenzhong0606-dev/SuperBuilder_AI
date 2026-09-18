@@ -651,6 +651,8 @@ public static class ResourceKeys
         public const string DataSourceFullRescan = "Content.DataSourceFullRescan";
         public const string DataSourceCancelScan = "Content.DataSourceCancelScan";
         public const string DataSourceRetryFailed = "Content.DataSourceRetryFailed";
+        public const string DataSourceScanFailureItems = "Content.DataSourceScanFailureItems";
+        public const string DataSourceScanRetryCount = "Content.DataSourceScanRetryCount";
         public const string DataSourceTestConnection = "Content.DataSourceTestConnection";
         public const string DataSourceDisable = "Content.DataSourceDisable";
         public const string DataSourceDeleteCleanup = "Content.DataSourceDeleteCleanup";
@@ -2447,6 +2449,8 @@ public static class ResourceKeys
         [Content.DataSourceFullRescan] = new("Content", Page: "DataSource", DefaultValue: "Full re-scan"),
         [Content.DataSourceCancelScan] = new("Content", Page: "DataSource", DefaultValue: "Cancel scan"),
         [Content.DataSourceRetryFailed] = new("Content", Page: "DataSource", DefaultValue: "Retry failed items"),
+        [Content.DataSourceScanFailureItems] = new("Content", Page: "DataSource", DefaultValue: "Failed items ({0})"),
+        [Content.DataSourceScanRetryCount] = new("Content", Page: "DataSource", DefaultValue: "Retried {0} times"),
         [Content.DataSourceTestConnection] = new("Content", Page: "DataSource", DefaultValue: "Test connection"),
         [Content.DataSourceDisable] = new("Content", Page: "DataSource", DefaultValue: "Disable"),
         [Content.DataSourceDeleteCleanup] = new("Content", Page: "DataSource", DefaultValue: "Delete & cleanup"),
