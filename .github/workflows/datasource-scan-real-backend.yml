@@ -61,7 +61,7 @@ jobs:
             sleep 2
           done
 
-      - name: Run all five real-backend scenarios
+      - name: Run real-backend acceptance scenarios
         env:
           SB_REAL_QDRANT_HOST: "127.0.0.1"
           SB_REAL_QDRANT_PORT: "6334"
@@ -83,8 +83,8 @@ jobs:
           passed=$(printf '%s\n' "$counters" | grep -oE '\bpassed="[0-9]+"' | grep -oE '[0-9]+')
           failed=$(printf '%s\n' "$counters" | grep -oE '\bfailed="[0-9]+"' | grep -oE '[0-9]+')
           echo "RealBackend: total=$total passed=$passed failed=$failed"
-          test "$total" -eq 5
-          test "$passed" -eq 5
+          test "$total" -eq 6
+          test "$passed" -eq 6
           test "$failed" -eq 0
 
       - name: Upload acceptance results
