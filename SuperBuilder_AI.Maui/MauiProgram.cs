@@ -5,6 +5,7 @@ using Microsoft.Maui;
 using Microsoft.Maui.Devices;
 using Microsoft.Maui.Storage;
 using SuperBuilder_AI.Components.Services;
+using SuperBuilder_AI.Maui.Services;
 using System.IO;
 using System.Text.Json;
 
@@ -39,6 +40,10 @@ public static class MauiProgram
         builder.Services.AddScoped<IApiClient, ApiClient>();
         builder.Services.AddScoped<AskSessionStore>();
         builder.Services.AddScoped<FileDownloadService>();
+        // Phase 1（M8-05）：MAUI 无 httpOnly cookie 概念，沿用本地存储方案（计划明确豁免）。
+        builder.Services.AddScoped<CircuitSessionContext>();
+        builder.Services.AddScoped<IAuthPersistence, MauiAuthPersistence>();
+        builder.Services.AddScoped<ILoginCompletion, MauiLoginCompletion>();
         builder.Services.AddHttpClient("SuperBuilderApi", client =>
         {
             // 基地址按平台取默认回环；物理设备（独立机器）通过 Resources/Raw/appsettings.json 的

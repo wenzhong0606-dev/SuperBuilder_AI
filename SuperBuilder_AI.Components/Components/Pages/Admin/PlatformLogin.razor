@@ -4,6 +4,7 @@
 @inject AuthStore Session
 @inject NavigationManager Nav
 @inject LocalizationService L10n
+@inject ILoginCompletion LoginCompletion
 
 <div class="login-wrap">
     <section class="login-hero">
@@ -75,9 +76,9 @@
             Error = loginErr ?? L10n.T(Keys.PlatformLogin.LoginFailed, "平台管理员登录失败：用户不存在、口令错误或无权访问。");
             return;
         }
-        // 复用与业务登录一致的会话写入路径（AuthStore → localStorage sb_auth_v1）。
+        // 写入 AppState；持久化 + 跳转交由 ILoginCompletion 按宿主分流（Web 经交接码写 httpOnly cookie，MAUI 落本地存储）。
         await Session.SetFromLoginAsync(r);
         await L10n.InitializeAsync(r.TenantId, r.UserId, r.AvailableCultures, r.DefaultCulture);
-        Nav.NavigateTo("/admin/tenants");
+        await LoginCompletion.CompleteLoginAsync(r, "/admin/tenants");
     }
 }

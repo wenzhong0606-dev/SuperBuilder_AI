@@ -6,6 +6,7 @@
 @inject NavigationManager Nav
 @inject LocalizationService L10n
 @inject IJSRuntime JS
+@inject ILoginCompletion LoginCompletion
 
 <div class="login-wrap">
     <section class="login-hero">
@@ -236,15 +237,14 @@
             Error = loginErr ?? L10n.T(Keys.Login.LoginFailed, "登录失败：用户不存在或已禁用。");
             return;
         }
-        // 写入 AppState 并持久化到 localStorage（刷新不掉登录）
+        // 写入 AppState；持久化 + 跳转交由 ILoginCompletion 按宿主分流（Web 经交接码写 httpOnly cookie，MAUI 落本地存储）。
         await Session.SetFromLoginAsync(r);
         await L10n.InitializeAsync(r.TenantId, r.UserId, r.AvailableCultures, r.DefaultCulture);
-        Nav.NavigateTo("/ask");
+        await LoginCompletion.CompleteLoginAsync(r, "/ask");
     }
 
     private async Task Logout()
     {
-        await Session.ClearAsync();
-        StateHasChanged();
+        await LoginCompletion.LogoutAsync();
     }
 }

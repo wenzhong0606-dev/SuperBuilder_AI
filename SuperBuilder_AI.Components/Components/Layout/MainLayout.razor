@@ -3,9 +3,9 @@
 @inject ThemeService Theme
 @inject NavigationManager Nav
 @inject AppState State
-@inject AuthStore Session
 @inject IJSRuntime JS
 @inject LocalizationService L10n
+@inject ILoginCompletion LoginCompletion
 
 <IconSprite />
 
@@ -135,8 +135,7 @@
         try
         {
             if (Nav.Uri.EndsWith("/login", StringComparison.OrdinalIgnoreCase)) return;
-            await Session.ClearAsync();
-            Nav.NavigateTo("/login");
+            await LoginCompletion.LogoutAsync();
         }
         catch
         {
@@ -175,9 +174,7 @@
     private async Task Logout()
     {
         UserMenuOpen = false;
-        await Session.ClearAsync();
-        State.ClearSession();
-        Nav.NavigateTo("/login", forceLoad: true);
+        await LoginCompletion.LogoutAsync();
     }
 
     private async Task ToggleTheme()

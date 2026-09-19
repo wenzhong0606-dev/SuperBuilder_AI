@@ -1,0 +1,21 @@
+namespace SuperBuilder_AI.Components.Services;
+
+/// <summary>
+/// 电路级会话 id 桥接（Phase 1，M8-05 加固）。
+///
+/// <para>
+/// Blazor Server 组件运行在 SignalR 电路内，组件生命周期中 <c>IHttpContextAccessor.HttpContext</c>
+/// 通常为 null（电路不处于初始 HTTP 请求上下文），因此无法在组件内直接读取请求 cookie。
+/// 解决方案：在 <c>_Host.cshtml</c> 初始 GET 期间（HttpContext 可用）读取 <c>sb_sess</c> 会话 id，
+/// 经内联脚本注入 <c>window.__sbSessionId</c>；<see cref="AuthGate"/> 在电路建立后通过 JS 互操作读取该值，
+/// 存入本 Scoped 上下文，供 <see cref="WebAuthPersistence"/> 在还原 / 保存时定位服务端会话。
+/// </para>
+///
+/// <para>MAUI Hybrid 无 httpOnly cookie 概念，<see cref="MauiAuthPersistence"/> 不使用本桥接
+/// （AuthGate 读取会得到空值，无副作用）。</para>
+/// </summary>
+public sealed class CircuitSessionContext
+{
+    /// <summary>当前电路对应的服务端会话 id（来自 httpOnly cookie 的脱敏副本，仅电路内使用）。未登录为 null。</summary>
+    public string? SessionId { get; set; }
+}

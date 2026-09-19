@@ -1,7 +1,9 @@
 @page "/"
 @using Microsoft.AspNetCore.Components.Web
+@using Microsoft.AspNetCore.Http
 @namespace SuperBuilder_AI.Web
 @addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+@inject IHttpContextAccessor HttpContextAccessor
 
 <!DOCTYPE html>
 <html lang="zh">
@@ -10,6 +12,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <base href="~/" />
     <script>document.documentElement.setAttribute('data-theme', (function(){try{return localStorage.getItem('sb-theme')||'light'}catch(e){return 'light'}})());</script>
+    @* Phase 1（M8-05）：初始 GET 期间 HttpContext 可用，读取 httpOnly 会话 cookie 的脱敏 id，注入 JS 变量供电路内 AuthGate 经互操作读取（组件生命周期内 IHttpContextAccessor 为 null，见 hardening §8.1(j)）。 *@
+    @{ var sbSessionId = HttpContextAccessor.HttpContext?.Request.Cookies["sb_sess"] ?? ""; }
+    <script>window.__sbSessionId = '@sbSessionId';</script>
     <link href="_content/SuperBuilder_AI.Components/lib/bootstrap/css/bootstrap.min.css" rel="stylesheet" />
     <link href="_content/SuperBuilder_AI.Components/css/app.css" rel="stylesheet" />
     <script src="_content/SuperBuilder_AI.Components/js/chart.umd.min.js"></script>

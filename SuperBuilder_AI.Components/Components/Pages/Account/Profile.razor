@@ -1,9 +1,9 @@
 @page "/settings"
 @inject AppState State
-@inject AuthStore Session
 @inject ThemeService Theme
 @inject NavigationManager Nav
 @inject IJSRuntime JS
+@inject ILoginCompletion LoginCompletion
 
 <AuthGuard>
     <PageHead Icon="sb-ico-settings" Key="Profile" Title="个人设置" Desc="查看账号与租户信息，调整界面偏好。">
@@ -72,8 +72,6 @@
 
     private async Task Logout()
     {
-        await Session.ClearAsync();
-        State.ClearSession();
-        Nav.NavigateTo("/login", forceLoad: true);
+        await LoginCompletion.LogoutAsync();
     }
 }

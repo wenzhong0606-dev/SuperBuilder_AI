@@ -24,6 +24,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\SuperBuilder_AI\SuperBuilder_AI.csproj" />
     <ProjectReference Include="..\..\SuperBuilder_AI.Components\SuperBuilder_AI.Components.csproj" />
+    <ProjectReference Include="..\..\SuperBuilder_AI.Web\SuperBuilder_AI.Web.csproj" />
   </ItemGroup>
 
 </Project>

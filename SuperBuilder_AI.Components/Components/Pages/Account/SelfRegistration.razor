@@ -6,6 +6,7 @@
 @inject NavigationManager Nav
 @inject LocalizationService L10n
 @inject IJSRuntime JS
+@inject ILoginCompletion LoginCompletion
 
 <div class="login-wrap">
     <section class="login-hero">
@@ -139,6 +140,6 @@
         };
         await Session.SetFromLoginAsync(login);
         await L10n.InitializeAsync(r.TenantId, r.UserId, login.AvailableCultures, login.DefaultCulture);
-        Nav.NavigateTo("/ask");
+        await LoginCompletion.CompleteLoginAsync(login, "/ask");
     }
 }

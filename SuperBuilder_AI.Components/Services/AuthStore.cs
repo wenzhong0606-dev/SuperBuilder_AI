@@ -1,5 +1,4 @@
-using System.Text.Json;
-using Microsoft.JSInterop;
+using System.Collections.Generic;
 
 namespace SuperBuilder_AI.Components.Services;
 
@@ -7,79 +6,53 @@ namespace SuperBuilder_AI.Components.Services;
 /// 会话态的持久化与生命周期管理（RCL 共享，两个 Head 各自注册为 Scoped）。
 ///
 /// <para>
-/// 职责：把 <see cref="AppState"/> 中的登录令牌持久化到 <c>localStorage</c>（刷新/重开浏览器不掉登录），
-/// 应用启动时自举还原，并经 <c>GET /api/auth/me</c> 校验令牌仍有效；失效时统一清除。
-/// 所有 JS 互操作都包在 try/catch 内（预渲染阶段无 JS 运行时、WebView 异常等均静默降级），不影响主流程。
+/// Phase 1 重构（M8-05 加固）：本类不再直接触碰 <c>localStorage</c>，而是委托
+/// <see cref="IAuthPersistence"/>。具体存储后端由宿主注入——Web 为服务端内存会话
+/// （httpOnly cookie，浏览器不持有令牌），MAUI 为本地安全存储 / localStorage。
+/// 这样浏览器端同源 XSS 无法读取令牌：令牌仅驻留服务端内存与 <see cref="AppState"/> 之间流转，
+/// <see cref="AppState"/> 为 Blazor Server 服务端 DI 实例，不经 <c>[Parameter]</c> 序列化边界传给浏览器。
 /// </para>
 ///
 /// <para>
-/// <b>XSS 边界（M8-05 明确）：</b><c>localStorage</c> 中的令牌可被页面上任意 JavaScript 读取，
-/// 因此同源 XSS 可窃取令牌并冒用会话——这是 localStorage 方案的固有边界，无法靠 HttpOnly 缓解
-/// （HttpOnly 仅适用于 Cookie，而 Blazor Server 经 SignalR 持有令牌、不使用 Cookie 会话）。
-/// 采用的缓解组合：① <b>短期访问令牌</b>——后端签发带 <c>ExpiresInSeconds</c> 的短时效 JWT，
-/// 过期即失效，缩小被窃取后的可利用窗口；② <b>CSP</b>——Web 宿主注入内容安全策略（见 <c>SuperBuilder_AI.Web/Program.cs</c>），
-/// 禁止外部脚本源与非常规连接目标，从源头压低 XSS 植入与令牌外泄风险；③ 令牌仅在内存 <see cref="AppState"/> 与
-/// localStorage 间流转，不进入 URL/日志。当前为「过期即重新登录」模型，尚未实现静默刷新（refresh token）——
-/// 属后端契约增强，列入后续议题。
+/// 职责：把 <see cref="AppState"/> 会话快照经 <see cref="IAuthPersistence"/> 持久化（刷新/重开不掉登录），
+/// 应用启动时自举还原，并经 <c>GET /api/auth/me</c> 校验令牌仍有效；失效时统一清除。
+/// 所有映射异常都静默降级，不影响主流程。
 /// </para>
 /// </summary>
 public sealed class AuthStore
 {
-    private readonly IJSRuntime _js;
+    private readonly IAuthPersistence _persistence;
     private readonly AppState _state;
     private readonly IApiClient _api;
-    private const string StorageKey = "sb_auth_v1";
 
-    public AuthStore(IJSRuntime js, AppState state, IApiClient api)
+    public AuthStore(IAuthPersistence persistence, AppState state, IApiClient api)
     {
-        _js = js;
+        _persistence = persistence;
         _state = state;
         _api = api;
     }
 
-    /// <summary>将当前 AppState 会话快照写入 localStorage。</summary>
+    /// <summary>将当前 AppState 会话快照持久化到注入的 IAuthPersistence 后端。</summary>
     public async Task SaveAsync()
     {
         try
         {
-            var snap = new AuthSnapshot
-            {
-                Token = _state.Token,
-                TenantId = _state.TenantId,
-                HomeTenantId = _state.HomeTenantId,
-                UserId = _state.UserId,
-                Username = _state.Username,
-                Permissions = _state.Permissions as System.Collections.Generic.List<string>
-                    ?? new System.Collections.Generic.List<string>(_state.Permissions),
-                AvailableCultures = new System.Collections.Generic.List<string>(_state.AvailableCultures),
-                DefaultCulture = _state.DefaultCulture,
-            };
-            await _js.InvokeVoidAsync("localStorage.setItem", StorageKey, JsonSerializer.Serialize(snap));
+            await _persistence.SaveAsync(SessionData.FromState(_state));
         }
         catch
         {
-            // 预渲染/JS 不可用时静默跳过
+            // 持久化失败（存储不可用）不阻断主流程，仅不保存。
         }
     }
 
-    /// <summary>从 localStorage 还原会话到 AppState（不触发网络校验）。</summary>
+    /// <summary>从 IAuthPersistence 还原会话到 AppState（不触发网络校验）。</summary>
     public async Task RestoreAsync()
     {
         try
         {
-            var raw = await _js.InvokeAsync<string?>("localStorage.getItem", StorageKey);
-            if (string.IsNullOrEmpty(raw)) return;
-            var snap = JsonSerializer.Deserialize<AuthSnapshot>(raw);
-            if (snap is null || string.IsNullOrEmpty(snap.Token)) return;
-
-            _state.Token = snap.Token;
-            _state.TenantId = snap.TenantId;
-            _state.HomeTenantId = snap.HomeTenantId;
-            _state.UserId = snap.UserId;
-            _state.Username = snap.Username ?? "";
-            _state.Permissions = snap.Permissions ?? new System.Collections.Generic.List<string>();
-            _state.AvailableCultures = snap.AvailableCultures ?? new System.Collections.Generic.List<string> { "zh-CN" };
-            _state.DefaultCulture = snap.DefaultCulture ?? "zh-CN";
+            var data = await _persistence.LoadAsync();
+            if (data is null) return;
+            data.ApplyTo(_state);
         }
         catch
         {
@@ -92,13 +65,13 @@ public sealed class AuthStore
         }
     }
 
-    /// <summary>清除会话：先清 AppState，再移除 localStorage 记录。</summary>
+    /// <summary>清除会话：先清 AppState，再清除持久化后端。</summary>
     public async Task ClearAsync()
     {
         _state.ClearSession();
         try
         {
-            await _js.InvokeVoidAsync("localStorage.removeItem", StorageKey);
+            await _persistence.ClearAsync();
         }
         catch
         {
@@ -133,21 +106,9 @@ public sealed class AuthStore
         _state.HomeTenantId = r.HomeTenantId;
         _state.UserId = r.UserId;
         _state.Username = r.Username;
-        _state.Permissions = r.Permissions ?? new System.Collections.Generic.List<string>();
-        _state.AvailableCultures = r.AvailableCultures ?? new System.Collections.Generic.List<string> { "zh-CN" };
+        _state.Permissions = r.Permissions ?? new List<string>();
+        _state.AvailableCultures = r.AvailableCultures ?? new List<string> { "zh-CN" };
         _state.DefaultCulture = r.DefaultCulture ?? "zh-CN";
         await SaveAsync();
-    }
-
-    private sealed class AuthSnapshot
-    {
-        public string? Token { get; set; }
-        public long TenantId { get; set; }
-        public long HomeTenantId { get; set; }
-        public long UserId { get; set; }
-        public string? Username { get; set; }
-        public System.Collections.Generic.List<string>? Permissions { get; set; }
-        public System.Collections.Generic.List<string>? AvailableCultures { get; set; }
-        public string? DefaultCulture { get; set; }
     }
 }

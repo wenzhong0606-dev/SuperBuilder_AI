@@ -1,5 +1,6 @@
 using SuperBuilder_AI.Components.Services;
 using SuperBuilder_AI.Web;
+using SuperBuilder_AI.Web.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -25,6 +26,17 @@ builder.Services.AddScoped<IDataSourceApiClient, DataSourceApiClient>();
 builder.Services.AddScoped<IApiClient, ApiClient>();
 builder.Services.AddScoped<AskSessionStore>();
 builder.Services.AddScoped<FileDownloadService>();
+
+// Phase 1（M8-05）：服务端内存会话 + httpOnly cookie 加固。
+// 浏览器不再持有令牌；令牌仅驻留服务端 WebSessionStore，浏览器仅持不透明会话 id（sb_sess）。
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddSingleton<WebSessionStore>();
+builder.Services.AddSingleton<PendingHandoffStore>();
+builder.Services.AddSingleton<IWebSessionIssuer, WebSessionIssuer>();
+builder.Services.AddSingleton<SessionCookieService>();
+builder.Services.AddScoped<CircuitSessionContext>();
+builder.Services.AddScoped<IAuthPersistence, WebAuthPersistence>();
+builder.Services.AddScoped<ILoginCompletion, WebLoginCompletion>();
 
 // 直接使用 API 的 HTTPS 端口，避免 HTTP -> HTTPS 自动重定向时 Authorization 头被移除。
 // 可用 appsettings:ApiBaseUrl 覆盖（例如仅启用 HTTP 的本地环境）。
@@ -68,6 +80,7 @@ if (enableCsp)
 
 app.MapRazorPages();
 app.MapBlazorHub();
+app.MapSessionEndpoints();
 app.MapFallbackToPage("/_Host");
 
 app.Run();
