@@ -17,9 +17,9 @@ namespace SuperBuilder_AI.Web.Services;
 public sealed class WebAuthPersistence : IAuthPersistence
 {
     private readonly CircuitSessionContext _ctx;
-    private readonly WebSessionStore _store;
+    private readonly IWebSessionStore _store;
 
-    public WebAuthPersistence(CircuitSessionContext ctx, WebSessionStore store)
+    public WebAuthPersistence(CircuitSessionContext ctx, IWebSessionStore store)
     {
         _ctx = ctx;
         _store = store;

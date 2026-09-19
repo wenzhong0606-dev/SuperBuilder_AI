@@ -1,6 +1,6 @@
 # 认证令牌存储加固改造方案（httpOnly cookie + 服务端会话 + Redis 刷新）
 
-> 状态：计划（未开发） ｜ 关联：M8-05（XSS 边界）、P11.0 安全轨道、P0-04B（令牌吊销）
+> 状态：Phase 0 / 1 / 2 / 3 均已实现（2026-09-19）｜ 关联：M8-05（XSS 边界）、P11.0 安全轨道、P0-04B（令牌吊销）
 > 目标：消除 `localStorage` 存放 JWT 带来的凭据窃取风险，实现静默续期与可吊销会话，并降低 XSS 攻击后的凭据离线复用能力，满足商业化安全/合规。
 
 ---
@@ -124,6 +124,8 @@ Web(服务端) ──Bearer(服务端内存持有)──────> API(自定
 ### Phase 3 — Redis 会话 + 可吊销 + 合规
 *多实例横向扩展与即时吊销，满足等保/ISO 27001。*
 
+> **2026-09-19 已实现**：`IWebSessionStore` 抽象 + 内存（`WebSessionStore`，单实例/无 Redis 回退）与 Redis（`RedisWebSessionStore`）双后端；`Program.cs` 按 **独立开关** `Session:Redis:Configuration` 选择后端（不依赖 `RateLimit:Store:Type`），缺省回退内存。会话 id 改用 `RandomNumberGenerator` 生成 256bit 熵（§8.2(f)）；`/auth/session/start` 在签发新会话前移除旧会话（防会话固定 §8.2(d)）；新增 `userId→会话 id 集合` 索引与 `RemoveByUserId` 支持跨实例吊销。跨组件的令牌即时失效仍由 API 侧 `AuthMiddleware` 的 `SecurityStamp` 每请求校验兜底（令牌死亡 → API 401 → Web 跳登录）。单测：`RedisWebSessionStoreTests`（Moq 模拟 `IDatabase`）+ `WebSessionStoreTests.RemoveByUserId` 全绿；主工程单测 1336 全过。
+
 - `WebSessionStore`：增加 Redis 后端，复用 `IConnectionMultiplexer`（**新增独立开关** `Session:Redis:Configuration`，不要依赖 `RateLimit:Store:Type`，否则限流用 Memory 时会话无法跨实例）。连接串缺失时回退内存（单实例兼容）。
 - **[更正] 多实例 Blazor Server 必须配粘性会话（LB affinity）**：Phase 1 内存方案在多实例 + 无粘性 LB 时，F5/重连落到冷实例会因该实例无会话而登出；Phase 3(Redis) 仅共享「认证数据」（重连任一经 Redis 还原 AppState），**不共享活动电路 UI 状态**。故无论哪档，商业化多实例都建议 LB 粘性作兜底（详见 §8.1(b)）。
 - **[补充] 登录时轮转 sessionId**：登录成功签发全新 `sessionId` 并使旧 id 失效，防会话固定（§8.2(d)）；`sessionId` 用 `RandomNumberGenerator` 生成 ≥128bit 熵，勿用 `Guid.NewGuid()`（§8.2(f)）。
@@ -154,11 +156,12 @@ Web(服务端) ──Bearer(服务端内存持有)──────> API(自定
 ## 5. 测试与验收清单
 
 - [x] 单测：`WebSessionStore` 增删查/过期；`AuthStore` 由 localStorage 改为 session 后 `Save/Restore/Clear` 行为。（`WebSessionStoreTests` + `AuthStoreTests`，2026-09-19）
+- [x] Phase 3：`IWebSessionStore` 双后端（内存 + Redis），按独立开关 `Session:Redis:Configuration` 选择、缺省回退内存；`userId→会话` 吊销索引 + `RemoveByUserId`；登录时轮转会话 id（防会话固定）；会话 id 用 `RandomNumberGenerator` 生成 256bit 熵。单测 `RedisWebSessionStoreTests`（Moq 模拟 `IDatabase`，覆盖 Create/Get/Set/Remove/RemoveByUserId 与键空间）全绿（2026-09-19）
 - [x] 单测：handoff code 仅可消费一次、过期/重放拒绝、消费后轮转为独立 sessionId；Session API 缺 antiforgery token 时拒绝。（`PendingHandoffStoreTests` 覆盖一次性/过期/未知码；antiforgery 拒绝项随 `/auth/session/start|end` 端点接入 antiforgery 后补）
 - [x] 单测：`POST /api/auth/refresh` 正常轮换、旧 token 复用吊销 family（含整链吊销）、refresh 过期返回 401、伪造 token 返回 401、`SecurityStamp` 变更后拒绝。（`RefreshTokenStoreTests` 5 项 + `AuthControllerRefreshTests` 3 项，2026-09-19；并发刷新「最多一次成功」由 `ExecuteUpdateAsync` 受影响行数=1 原子保证，单测覆盖顺序复用=ReuseDetected）
 - [ ] `AuthMiddleware` 吊销：改密后旧 access+refresh 均拒。
 - [ ] E2E（Playwright，CI `M13-09`）：未登录首屏直接进登录页（无 Home 闪烁）；F5 保持登录；localStorage 无令牌；注入 `<script>document.cookie/localStorage</script>` 仿真 XSS 拿不到令牌。
-- [ ] 真容器（§9.1 同类）：多实例 + Redis 会话共享 + 管理员禁用即时失效。
+- [ ] 真容器（§9.1 同类）：多实例 + Redis 会话共享 + 管理员禁用即时失效（部署验证，代码层已完成）。
 
 ---
 

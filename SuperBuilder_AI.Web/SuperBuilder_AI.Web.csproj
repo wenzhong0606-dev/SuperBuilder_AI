@@ -9,6 +9,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\SuperBuilder_AI.Components\SuperBuilder_AI.Components.csproj" />
+    <!-- Phase 3：Redis 会话后端（仅当 Session:Redis:Configuration 配置时启用；缺省回退内存，不引入 Redis 依赖运行成本）。 -->
+    <PackageReference Include="StackExchange.Redis" Version="2.8.31" />
   </ItemGroup>
 
 </Project>

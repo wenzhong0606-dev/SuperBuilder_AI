@@ -90,4 +90,22 @@ public sealed class WebSessionStoreTests
 
 		Assert.Null(store.Get(id));
 	}
+
+	[Fact]
+	public void RemoveByUserId_removes_all_sessions_for_user()
+	{
+		var store = CreateStore(480);
+		var a = store.Create(Sample());
+		var b = store.Create(Sample()); // 同一 UserId=2
+		var other = store.Create(new SessionData(
+			Token: "x", TenantId: 1, HomeTenantId: 1, UserId: 99, Username: "other",
+			Permissions: new List<string>(), AvailableCultures: new List<string> { "zh-CN" }, DefaultCulture: "zh-CN"));
+
+		var removed = store.RemoveByUserId(2);
+
+		Assert.Equal(2, removed);
+		Assert.Null(store.Get(a));
+		Assert.Null(store.Get(b));
+		Assert.NotNull(store.Get(other)); // 其他用户不受影响
+	}
 }

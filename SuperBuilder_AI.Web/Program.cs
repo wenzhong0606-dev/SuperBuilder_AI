@@ -1,6 +1,7 @@
 using SuperBuilder_AI.Components.Services;
 using SuperBuilder_AI.Web;
 using SuperBuilder_AI.Web.Services;
+using StackExchange.Redis;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -27,10 +28,22 @@ builder.Services.AddScoped<IApiClient, ApiClient>();
 builder.Services.AddScoped<AskSessionStore>();
 builder.Services.AddScoped<FileDownloadService>();
 
-// Phase 1（M8-05）：服务端内存会话 + httpOnly cookie 加固。
-// 浏览器不再持有令牌；令牌仅驻留服务端 WebSessionStore，浏览器仅持不透明会话 id（sb_sess）。
+// Phase 1/3（M8-05）：服务端会话 + httpOnly cookie 加固。
+// 浏览器不再持有令牌；令牌仅驻留服务端会话存储，浏览器仅持不透明会话 id（sb_sess）。
+// 会话后端：配置 Session:Redis:Configuration 时启用 Redis（多实例共享 + 跨实例吊销，Phase 3）；
+// 否则回退内存（单实例 / 无 Redis 兼容）。两者均实现 IWebSessionStore，开关独立、不依赖 RateLimit:Store:Type。
 builder.Services.AddHttpContextAccessor();
-builder.Services.AddSingleton<WebSessionStore>();
+var sessionRedis = builder.Configuration["Session:Redis:Configuration"];
+if (!string.IsNullOrWhiteSpace(sessionRedis))
+{
+    var multiplexer = ConnectionMultiplexer.Connect(sessionRedis);
+    builder.Services.AddSingleton(multiplexer);
+    builder.Services.AddSingleton<IWebSessionStore>(new RedisWebSessionStore(multiplexer, builder.Configuration));
+}
+else
+{
+    builder.Services.AddSingleton<IWebSessionStore, WebSessionStore>();
+}
 builder.Services.AddSingleton<PendingHandoffStore>();
 builder.Services.AddSingleton<IWebSessionIssuer, WebSessionIssuer>();
 builder.Services.AddSingleton<SessionCookieService>();
