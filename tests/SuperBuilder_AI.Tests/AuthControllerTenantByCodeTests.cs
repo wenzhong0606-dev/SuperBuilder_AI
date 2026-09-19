@@ -33,7 +33,7 @@ public sealed class AuthControllerTenantByCodeTests
     }
 
     private static AuthController Build(SuperBIContext db, IConfiguration config)
-        => new AuthController(db, new IdentityService(db, new PasswordHasher()), new TokenService("mw-test-key"), new PasswordHasher(), config, new TenantLanguageService(db, new NoopAuditService()));
+        => new AuthController(db, new IdentityService(db, new PasswordHasher()), new TokenService("mw-test-key"), new PasswordHasher(), config, new TenantLanguageService(db, new NoopAuditService()), new RefreshTokenStore(db, config));
 
     private static async Task SeedTenantsAsync(SuperBIContext db)
     {

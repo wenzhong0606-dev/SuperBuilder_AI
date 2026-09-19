@@ -154,6 +154,7 @@ public class SuperBIContext : DbContext
 
         #region P10.1 Identity
         public DbSet<User> Users { get; set; }
+    public DbSet<RefreshToken> RefreshTokens { get; set; }
         public DbSet<Role> Roles { get; set; }
         public DbSet<Permission> Permissions { get; set; }
         public DbSet<UserRole> UserRoles { get; set; }
@@ -771,6 +772,22 @@ public class SuperBIContext : DbContext
 		builder.Entity<RowLevelSecurityPolicy>().HasOne<DataSource>().WithMany().HasForeignKey(x => x.DataSourceId).OnDelete(DeleteBehavior.Restrict);
 		builder.Entity<RowLevelSecurityPolicy>().HasOne<MetadataTable>().WithMany().HasForeignKey(x => x.MetadataTableId).OnDelete(DeleteBehavior.Cascade);
 		builder.Entity<RowLevelSecurityPolicy>().HasOne<MetadataColumn>().WithMany().HasForeignKey(x => x.MetadataColumnId).OnDelete(DeleteBehavior.Restrict);
+		#endregion
+
+		#region P2 Refresh Token（Phase 2 认证）
+		builder.Entity<RefreshToken>().ToTable(tb => tb.HasComment("刷新令牌（Phase 2，仅存哈希与轮换链）"));
+		// 唯一 TokenHash：防止明文重复存储，并作为并发刷新/重放的天然去重约束。
+		builder.Entity<RefreshToken>().HasIndex(r => r.TokenHash).IsUnique().HasDatabaseName("IX_RefreshTokens_TokenHash");
+		builder.Entity<RefreshToken>().HasIndex(r => new { r.UserId, r.FamilyId }).HasDatabaseName("IX_RefreshTokens_User_Family");
+		builder.Entity<RefreshToken>().HasIndex(r => r.ExpiresAtUtc).HasDatabaseName("IX_RefreshTokens_ExpiresAt");
+		builder.Entity<RefreshToken>().Property(r => r.TokenHash).IsRequired().HasMaxLength(128).HasComment("刷新令牌 SHA-256 哈希（小写 hex，唯一）");
+		builder.Entity<RefreshToken>().Property(r => r.SecurityStamp).IsRequired().HasMaxLength(64).HasComment("签发时安全戳（赎回比对）");
+		builder.Entity<RefreshToken>().Property(r => r.FamilyId).IsRequired().HasMaxLength(64).HasComment("令牌族（登录新建、刷新沿用）");
+		builder.Entity<RefreshToken>().Property(r => r.ExpiresAtUtc).IsRequired().HasComment("过期时间(UTC)");
+		builder.Entity<RefreshToken>().Property(r => r.RevokedAtUtc).HasComment("撤销时间(UTC，非 null=失效)");
+		builder.Entity<RefreshToken>().Property(r => r.ReplacedByTokenHash).HasMaxLength(128).HasComment("轮换链：被替换后新令牌哈希");
+		builder.Entity<RefreshToken>().Property(r => r.ClientIp).HasMaxLength(64).HasComment("客户端IP(审计)");
+		builder.Entity<RefreshToken>().Property(r => r.UserAgent).HasMaxLength(256).HasComment("客户端UA(审计)");
 		#endregion
 
 		#region M2-02 PlatformAdminTenantScope

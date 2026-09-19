@@ -155,7 +155,7 @@ Web(服务端) ──Bearer(服务端内存持有)──────> API(自定
 
 - [x] 单测：`WebSessionStore` 增删查/过期；`AuthStore` 由 localStorage 改为 session 后 `Save/Restore/Clear` 行为。（`WebSessionStoreTests` + `AuthStoreTests`，2026-09-19）
 - [x] 单测：handoff code 仅可消费一次、过期/重放拒绝、消费后轮转为独立 sessionId；Session API 缺 antiforgery token 时拒绝。（`PendingHandoffStoreTests` 覆盖一次性/过期/未知码；antiforgery 拒绝项随 `/auth/session/start|end` 端点接入 antiforgery 后补）
-- [ ] 单测：`POST /api/auth/refresh` 正常轮换、并发刷新仅一次成功、旧 token 复用吊销 family、refresh 失效返回 401、`SecurityStamp` 变更后拒绝。
+- [x] 单测：`POST /api/auth/refresh` 正常轮换、旧 token 复用吊销 family（含整链吊销）、refresh 过期返回 401、伪造 token 返回 401、`SecurityStamp` 变更后拒绝。（`RefreshTokenStoreTests` 5 项 + `AuthControllerRefreshTests` 3 项，2026-09-19；并发刷新「最多一次成功」由 `ExecuteUpdateAsync` 受影响行数=1 原子保证，单测覆盖顺序复用=ReuseDetected）
 - [ ] `AuthMiddleware` 吊销：改密后旧 access+refresh 均拒。
 - [ ] E2E（Playwright，CI `M13-09`）：未登录首屏直接进登录页（无 Home 闪烁）；F5 保持登录；localStorage 无令牌；注入 `<script>document.cookie/localStorage</script>` 仿真 XSS 拿不到令牌。
 - [ ] 真容器（§9.1 同类）：多实例 + Redis 会话共享 + 管理员禁用即时失效。

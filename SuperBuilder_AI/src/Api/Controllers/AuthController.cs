@@ -42,8 +42,9 @@ public sealed class AuthController : ControllerBase
 	private readonly IPasswordHasher _hasher;
 	private readonly IConfiguration _config;
 	private readonly ITenantLanguageService _tenantLanguage;
+	private readonly IRefreshTokenStore _refreshStore;
 
-	public AuthController(SuperBIContext db, IIdentityService identity, ITokenService token, IPasswordHasher hasher, IConfiguration configuration, ITenantLanguageService tenantLanguage)
+	public AuthController(SuperBIContext db, IIdentityService identity, ITokenService token, IPasswordHasher hasher, IConfiguration configuration, ITenantLanguageService tenantLanguage, IRefreshTokenStore refreshStore)
 	{
 		_db = db;
 		_identity = identity;
@@ -51,6 +52,7 @@ public sealed class AuthController : ControllerBase
 		_hasher = hasher;
 		_config = configuration;
 		_tenantLanguage = tenantLanguage;
+		_refreshStore = refreshStore;
 	}
 
 	/// <summary>登录并签发访问令牌。</summary>
@@ -98,12 +100,22 @@ public sealed class AuthController : ControllerBase
 		}
 
 		var perms = await _identity.GetPermissionsAsync(request.TenantId, user.Id, cancellationToken);
-		var token = _token.Issue(request.TenantId, user.Id, user.Username, perms, user.SecurityStamp);
+		var clientIp = HttpContext?.Connection?.RemoteIpAddress?.ToString();
+		var userAgent = HttpContext?.Request?.Headers?.UserAgent.ToString();
+
+		// Phase 2：签发 access + refresh 对；refresh 明文仅此一次返回，哈希交由 store 持久化。
+		var (accessToken, refreshPlain) = _token.IssuePair(request.TenantId, user.Id, user.Username, perms, user.SecurityStamp);
+		var refreshLifetimeDays = _config.GetValue("Auth:RefreshTokenLifetimeDays", 14.0);
+		await _refreshStore.CreateAsync(
+			user.Id, request.TenantId, user.SecurityStamp, clientIp, userAgent,
+			DateTimeOffset.UtcNow.AddDays(refreshLifetimeDays), cancellationToken);
+
 		var locale = await ResolveTenantLocaleAsync(request.TenantId, cancellationToken);
 
 		return Ok(new AuthResult
 		{
-			Token = token,
+			Token = accessToken,
+			RefreshToken = refreshPlain,
 			ExpiresInSeconds = (int)_token.Lifetime.TotalSeconds,
 			TenantId = request.TenantId,
 			UserId = user.Id,
@@ -112,6 +124,57 @@ public sealed class AuthController : ControllerBase
 			AvailableCultures = locale.Available,
 			DefaultCulture = locale.Default,
 		});
+	}
+
+	/// <summary>用刷新令牌换取新访问令牌（Phase 2）。[AllowAnonymous]，需在匿名白名单放行。</summary>
+	[HttpPost("refresh")]
+	[AllowAnonymous]
+	public async Task<IActionResult> Refresh(
+		[FromBody] RefreshRequest request,
+		CancellationToken cancellationToken = default)
+	{
+		if (request is null || string.IsNullOrWhiteSpace(request.RefreshToken))
+			return BadRequest(new { error = "refreshToken 必填。" });
+
+		var outcome = await _refreshStore.RedeemAsync(
+			request.RefreshToken,
+			HttpContext?.Connection?.RemoteIpAddress?.ToString(),
+			HttpContext?.Request?.Headers?.UserAgent.ToString(),
+			cancellationToken);
+
+		switch (outcome.Status)
+		{
+			case RefreshRedeemStatus.Success:
+				var perms = await _identity.GetPermissionsAsync(outcome.TenantId, outcome.UserId, cancellationToken);
+				var accessToken = _token.Issue(outcome.TenantId, outcome.UserId, outcome.Username ?? string.Empty, perms, outcome.SecurityStamp);
+				var locale = await ResolveTenantLocaleAsync(outcome.TenantId, cancellationToken);
+				return Ok(new AuthResult
+				{
+					Token = accessToken,
+					RefreshToken = outcome.NewRefreshToken,
+					ExpiresInSeconds = (int)_token.Lifetime.TotalSeconds,
+					TenantId = outcome.TenantId,
+					UserId = outcome.UserId,
+					Username = outcome.Username ?? string.Empty,
+					Permissions = perms,
+					AvailableCultures = locale.Available,
+					DefaultCulture = locale.Default,
+				});
+
+			case RefreshRedeemStatus.Expired:
+				return Unauthorized(new { error = "刷新令牌已过期，请重新登录。" });
+			case RefreshRedeemStatus.Revoked:
+				return Unauthorized(new { error = "刷新令牌已失效，请重新登录。" });
+			case RefreshRedeemStatus.ReuseDetected:
+				return Unauthorized(new { error = "检测到刷新令牌复用，已吊销会话，请重新登录。" });
+			case RefreshRedeemStatus.StampMismatch:
+				return Unauthorized(new { error = "凭据已变更（口令/角色），请重新登录。" });
+			case RefreshRedeemStatus.ConcurrencyFailure:
+				return Unauthorized(new { error = "刷新令牌已被使用，请重新登录。" });
+			case RefreshRedeemStatus.Unknown:
+			default:
+				return Unauthorized(new { error = "无效的刷新令牌。" });
+		}
 	}
 
 	/// <summary>返回当前已认证主体。</summary>
@@ -210,11 +273,20 @@ public sealed class LoginRequest
 	public string? Password { get; set; }
 }
 
+/// <summary>刷新令牌赎回请求（Phase 2）。</summary>
+public sealed class RefreshRequest
+{
+	/// <summary>刷新令牌明文（登录/上次刷新响应返回）。</summary>
+	public string? RefreshToken { get; set; }
+}
+
 /// <summary>登录/当前用户响应。</summary>
 public sealed class AuthResult
 {
 	public string? Token { get; set; }
 	public int ExpiresInSeconds { get; set; }
+	/// <summary>刷新令牌明文（Phase 2）。仅登录与刷新响应中返回一次；API 仅持久化其哈希。</summary>
+	public string? RefreshToken { get; set; }
 	public long TenantId { get; set; }
 	public long UserId { get; set; }
 	public string Username { get; set; } = string.Empty;

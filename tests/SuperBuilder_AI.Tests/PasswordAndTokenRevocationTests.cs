@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using SuperBuilder_AI.Controllers;
 using SuperBuilder_AI.Data;
@@ -23,6 +24,13 @@ namespace SuperBuilder_AI.Tests;
 public class PasswordAndTokenRevocationTests
 {
 	private const string Key = "pw-test-key";
+
+	private static IConfiguration Config() => new ConfigurationBuilder()
+		.AddInMemoryCollection(new Dictionary<string, string?> { ["Auth:RefreshTokenLifetimeDays"] = "14" })
+		.Build();
+
+	private static IRefreshTokenStore RefreshStore(SuperBIContext db) => new RefreshTokenStore(db, Config());
+
 
 	#region P0-04A PasswordHasher
 
@@ -106,7 +114,7 @@ public class PasswordAndTokenRevocationTests
 	public async Task Login_NullPasswordHash_Is_Rejected_As_NotInitialized()
 	{
 		var ctx = CreateUserContext(null, out _);
-		var ctrl = new AuthController(ctx, new FakeIdentity(), new TokenService(Key), new PasswordHasher(), null!, new TenantLanguageService(ctx, new NoopAuditService()));
+		var ctrl = new AuthController(ctx, new FakeIdentity(), new TokenService(Key), new PasswordHasher(), Config(), new TenantLanguageService(ctx, new NoopAuditService()), RefreshStore(ctx));
 
 		var result = await ctrl.Login(new LoginRequest { Username = "alice", TenantId = 1, Password = "whatever" });
 
@@ -118,7 +126,7 @@ public class PasswordAndTokenRevocationTests
 	public async Task Login_WrongPassword_Is_Rejected()
 	{
 		var ctx = CreateUserContext("s3cret", out _);
-		var ctrl = new AuthController(ctx, new FakeIdentity(), new TokenService(Key), new PasswordHasher(), null!, new TenantLanguageService(ctx, new NoopAuditService()));
+		var ctrl = new AuthController(ctx, new FakeIdentity(), new TokenService(Key), new PasswordHasher(), Config(), new TenantLanguageService(ctx, new NoopAuditService()), RefreshStore(ctx));
 
 		var result = await ctrl.Login(new LoginRequest { Username = "alice", TenantId = 1, Password = "wrong" });
 
@@ -130,7 +138,7 @@ public class PasswordAndTokenRevocationTests
 	{
 		var ctx = CreateUserContext("s3cret", out var stamp);
 		var tokenSvc = new TokenService(Key);
-		var ctrl = new AuthController(ctx, new FakeIdentity(), tokenSvc, new PasswordHasher(), null!, new TenantLanguageService(ctx, new NoopAuditService()));
+		var ctrl = new AuthController(ctx, new FakeIdentity(), tokenSvc, new PasswordHasher(), Config(), new TenantLanguageService(ctx, new NoopAuditService()), RefreshStore(ctx));
 
 		var result = await ctrl.Login(new LoginRequest { Username = "alice", TenantId = 1, Password = "s3cret" });
 

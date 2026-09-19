@@ -403,6 +403,8 @@ builder.Services.AddSingleton<SuperBuilder_AI.Services.Auth.ITokenService>(
 	new SuperBuilder_AI.Services.Auth.TokenService(authSigningKey, authAccessTokenLifetime));
 builder.Services.AddSingleton<SuperBuilder_AI.Services.Auth.IPasswordHasher>(
 	new SuperBuilder_AI.Services.Auth.PasswordHasher());
+// Phase 2：刷新令牌轮换（Scoped，依赖 SuperBIContext）。
+builder.Services.AddScoped<SuperBuilder_AI.Services.Auth.IRefreshTokenStore, SuperBuilder_AI.Services.Auth.RefreshTokenStore>();
 
 // SB-P0-08：开放跨域仅允许 Development 显式启用；其他环境必须提供有限白名单并 fail-fast。
 var corsPolicy = SuperBuilder_AI.Api.Security.CorsOriginPolicy.Resolve(

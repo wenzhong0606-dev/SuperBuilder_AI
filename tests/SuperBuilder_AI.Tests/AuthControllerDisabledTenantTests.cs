@@ -31,7 +31,7 @@ public sealed class AuthControllerDisabledTenantTests
 	}
 
 	private static AuthController Build(SuperBIContext db, IConfiguration config)
-		=> new AuthController(db, new IdentityService(db, new PasswordHasher()), new TokenService("mw-test-key"), new PasswordHasher(), config, new TenantLanguageService(db, new NoopAuditService()));
+		=> new AuthController(db, new IdentityService(db, new PasswordHasher()), new TokenService("mw-test-key"), new PasswordHasher(), config, new TenantLanguageService(db, new NoopAuditService()), new RefreshTokenStore(db, config));
 
 	private static IConfiguration Config()
 		=> new ConfigurationBuilder()

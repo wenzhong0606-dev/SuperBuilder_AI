@@ -250,6 +250,7 @@ public sealed class AuthMiddleware
 		if (IsPrefix(path, "/evaluation")) return true;
 		if (IsPrefix(path, "/health")) return true;
 		if (IsPrefix(path, "/api/auth/login")) return true;
+		if (IsPrefix(path, "/api/auth/refresh")) return true;
 		if (IsPrefix(path, "/api/auth/login-options")) return true;
 		if (IsPrefix(path, "/api/auth/tenant-by-code")) return true;
 		if (IsPrefix(path, "/api/platform-bootstrap")) return true;
