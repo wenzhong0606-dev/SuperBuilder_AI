@@ -32,4 +32,18 @@ internal static class E2EConfig
                 "E2E 集成环境未配置：请设置 SB_E2E_BASE_URL 及对应凭据（见 tests/SuperBuilder_AI.E2E.Tests/README.md）后运行。");
         }
     }
+
+    /// <summary>
+    /// Ask 闭环（生成查询计划 → SQL → 执行 → 发布）必须走真实 LLM（QueryUnderstanding / SQL 生成）。
+    /// 普通 CI（<c>CI=true</c> 且未声明 <c>SB_LIVE_AI=true</c>）在 Program.cs 中注入
+    /// <c>CiBlockedQwenService</c> 直接抛异常，无法走通 Ask 管线；此类用例应诚实跳过，
+    /// 交由独立的 Live AI Regression（在线 Qwen）验证，避免普通 Build/E2E 消耗 AI Token 且假失败。
+    /// </summary>
+    public static void RequireLiveAi()
+    {
+        var ci = string.Equals(Environment.GetEnvironmentVariable("CI"), "true", StringComparison.OrdinalIgnoreCase);
+        var liveAi = string.Equals(Environment.GetEnvironmentVariable("SB_LIVE_AI"), "true", StringComparison.OrdinalIgnoreCase);
+        Skip.If(ci && !liveAi,
+            "Ask 闭环需要真实 LLM；普通 CI 已阻断 Qwen（CiBlockedQwenService），跳过（由 Live AI Regression 验证）。");
+    }
 }

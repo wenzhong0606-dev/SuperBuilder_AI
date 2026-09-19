@@ -25,6 +25,7 @@ public sealed class AppRuntimeE2ETests
     public async Task Admin_Ask_Publish_TwoStage_Run_Renders()
     {
         E2EConfig.Require(_fx.BaseUrl, E2EConfig.User, E2EConfig.Password, E2EConfig.Tenant);
+        E2EConfig.RequireLiveAi();
         var page = await _fx.NewPageAsync();
         // 管理员 = e2eadmin（TenantId=4，e2eapp 租户，含 app:create/app:edit/app:publish），走 API 登录规避限流与表单形态差异
         await LoginHelper.ApiLoginByCodeAsync(page, E2EConfig.User!, E2EConfig.Password!, E2EConfig.Tenant!);
@@ -57,6 +58,7 @@ public sealed class AppRuntimeE2ETests
     public async Task Reader_Without_AppPublish_Cannot_SeePublishButton()
     {
         E2EConfig.Require(_fx.BaseUrl, E2EConfig.ReaderUser, E2EConfig.ReaderPassword, E2EConfig.ReaderTenant);
+        E2EConfig.RequireLiveAi();
         var page = await _fx.NewPageAsync();
         // 读者 = e2ereader（TenantId=4，e2eapp 租户，viewer 角色仅含 app:view）：
         // 必须与管理员共用同一租户/数据源，否则 Ask 无可用数据源 → 0 行 → publish-box 不渲染；
@@ -81,6 +83,7 @@ public sealed class AppRuntimeE2ETests
     public async Task Admin_Ask_UnmappedBusiness_ReturnsFriendlyGuidance()
     {
         E2EConfig.Require(_fx.BaseUrl, E2EConfig.User, E2EConfig.Password, E2EConfig.Tenant);
+        E2EConfig.RequireLiveAi();
         var page = await _fx.NewPageAsync();
         await LoginHelper.ApiLoginByCodeAsync(page, E2EConfig.User!, E2EConfig.Password!, E2EConfig.Tenant!);
 
