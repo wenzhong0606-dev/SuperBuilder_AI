@@ -27,7 +27,7 @@ public sealed class AppRuntimeE2ETests
         E2EConfig.Require(_fx.BaseUrl, E2EConfig.User, E2EConfig.Password, E2EConfig.Tenant);
         var page = await _fx.NewPageAsync();
         // 管理员 = e2eadmin（TenantId=4，e2eapp 租户，含 app:create/app:edit/app:publish），走 API 登录规避限流与表单形态差异
-        await LoginHelper.ApiLoginAsync(page, E2EConfig.User!, E2EConfig.Password!, long.Parse(E2EConfig.Tenant!));
+        await LoginHelper.ApiLoginByCodeAsync(page, E2EConfig.User!, E2EConfig.Password!, E2EConfig.Tenant!);
 
         // 1) Ask 提问，等待出现可发布的轮次卡片
         await page.FillAsync("[data-testid=ask-input]", AskQuestion);
@@ -61,7 +61,7 @@ public sealed class AppRuntimeE2ETests
         // 读者 = e2ereader（TenantId=4，e2eapp 租户，viewer 角色仅含 app:view）：
         // 必须与管理员共用同一租户/数据源，否则 Ask 无可用数据源 → 0 行 → publish-box 不渲染；
         // 其角色不含 app:publish，用于验证 PermissionGuard 隐藏发布按钮。
-        await LoginHelper.ApiLoginAsync(page, E2EConfig.ReaderUser!, E2EConfig.ReaderPassword!, long.Parse(E2EConfig.ReaderTenant!));
+        await LoginHelper.ApiLoginByCodeAsync(page, E2EConfig.ReaderUser!, E2EConfig.ReaderPassword!, E2EConfig.ReaderTenant!);
 
         await page.FillAsync("[data-testid=ask-input]", AskQuestion);
         await page.ClickAsync("[data-testid=ask-submit]");
@@ -82,7 +82,7 @@ public sealed class AppRuntimeE2ETests
     {
         E2EConfig.Require(_fx.BaseUrl, E2EConfig.User, E2EConfig.Password, E2EConfig.Tenant);
         var page = await _fx.NewPageAsync();
-        await LoginHelper.ApiLoginAsync(page, E2EConfig.User!, E2EConfig.Password!, long.Parse(E2EConfig.Tenant!));
+        await LoginHelper.ApiLoginByCodeAsync(page, E2EConfig.User!, E2EConfig.Password!, E2EConfig.Tenant!);
 
         // 明确使用未映射的销售类问题（即便 SB_E2E_ASK_QUESTION 指向已映射问题也不受影响）
         await page.FillAsync("[data-testid=ask-input]", "本月各品类销售额 Top 10");
