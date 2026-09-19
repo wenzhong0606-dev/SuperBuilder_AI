@@ -109,6 +109,11 @@ public sealed class AuthStore
         _state.Permissions = r.Permissions ?? new List<string>();
         _state.AvailableCultures = r.AvailableCultures ?? new List<string> { "zh-CN" };
         _state.DefaultCulture = r.DefaultCulture ?? "zh-CN";
+        // 验收 #4：续期链路字段——刷新令牌与访问令牌绝对过期时间（后者由 ExpiresInSeconds 派生）。
+        _state.RefreshToken = r.RefreshToken;
+        _state.AccessTokenExpiresAtUtc = r.AccessTokenExpiresAtUtc
+            ?? (r.ExpiresInSeconds > 0 ? DateTimeOffset.UtcNow.AddSeconds(r.ExpiresInSeconds) : (DateTimeOffset?)null);
+        _state.RefreshTokenExpiresAtUtc = r.RefreshTokenExpiresAtUtc;
         await SaveAsync();
     }
 }

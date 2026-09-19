@@ -19,6 +19,15 @@ public sealed class AppState
     public System.Collections.Generic.IReadOnlyList<string> AvailableCultures { get; set; } = new[] { "zh-CN" };
     public string DefaultCulture { get; set; } = "zh-CN";
 
+    /// <summary>刷新令牌明文（验收 #4）：仅驻服务端会话/本地安全存储，浏览器不持有；供静默续期使用。</summary>
+    public string? RefreshToken { get; set; }
+
+    /// <summary>访问令牌绝对过期时间（UTC，验收 #4）：由登录响应 ExpiresInSeconds 派生；临近过期触发静默续期。</summary>
+    public System.DateTimeOffset? AccessTokenExpiresAtUtc { get; set; }
+
+    /// <summary>刷新令牌绝对过期时间（UTC，验收 #4）：临近/超过则续期必失败，应强制重新登录。</summary>
+    public System.DateTimeOffset? RefreshTokenExpiresAtUtc { get; set; }
+
     public bool IsAuthenticated => !string.IsNullOrEmpty(Token);
 
     /// <summary>
@@ -29,8 +38,9 @@ public sealed class AppState
 
     public event Action? SessionRestoredChanged;
 
-    /// <summary>会话失效（如 token 过期/被服务端拒绝）时由 ApiClient 触发，供壳层回收并跳登录。</summary>
-    public event Action? SessionExpired;
+    /// <summary>会话失效（如 token 过期/被服务端拒绝）时由 ApiClient 触发，供壳层回收并跳登录。
+    /// 携带 userId，供宿主（Web）吊销该用户全部服务端会话（验收 #5：改密/停用即时强踢）。</summary>
+    public event Action<long>? SessionExpired;
 
     /// <summary>由 <see cref="AuthStore"/> 在还原结束后调用，通知守卫可以判定登录态。</summary>
     public void MarkSessionRestored()
@@ -55,8 +65,11 @@ public sealed class AppState
         Permissions = System.Array.Empty<string>();
         AvailableCultures = new[] { "zh-CN" };
         DefaultCulture = "zh-CN";
+        RefreshToken = null;
+        AccessTokenExpiresAtUtc = null;
+        RefreshTokenExpiresAtUtc = null;
     }
 
-    /// <summary>通知监听方会话已失效。</summary>
-    public void NotifySessionExpired() => SessionExpired?.Invoke();
+    /// <summary>通知监听方会话已失效（验收 #5：携带 userId 供吊销该用户全部服务端会话）。</summary>
+    public void NotifySessionExpired(long userId) => SessionExpired?.Invoke(userId);
 }

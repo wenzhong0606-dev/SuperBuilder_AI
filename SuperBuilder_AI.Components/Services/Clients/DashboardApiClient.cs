@@ -10,5 +10,5 @@ namespace SuperBuilder_AI.Components.Services;
 /// </summary>
 public sealed class DashboardApiClient : ApiClientBase, IDashboardApiClient
 {
-    public DashboardApiClient(IHttpClientFactory factory, AppState appState) : base(factory, appState) { }
+    public DashboardApiClient(IHttpClientFactory factory, AppState appState, IAuthRefreshCoordinator? coordinator = null) : base(factory, appState, coordinator) { }
 }

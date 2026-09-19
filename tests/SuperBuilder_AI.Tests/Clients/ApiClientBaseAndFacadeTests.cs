@@ -136,7 +136,7 @@ public class ApiClientBaseAndFacadeTests
         var facade = HttpTestDoubles.BuildFacade(handler, out var app);
         app.Token = "x";
         var expired = false;
-        app.SessionExpired += () => expired = true;
+        app.SessionExpired += (_) => expired = true;
 
         await facade.SwitchTenantAsync(7);
 

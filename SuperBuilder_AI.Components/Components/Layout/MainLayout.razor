@@ -130,7 +130,7 @@
     /// 必须包在 try/catch 内，否则会逃逸并中断 SignalR 电路（M8-05「消除不受控 async void」）。
     /// 已处于登录页则直接返回，避免并发 401 触发的「登录—Ask」回跳循环。
     /// </remarks>
-    private async void OnSessionExpired()
+    private async void OnSessionExpired(long userId)
     {
         try
         {

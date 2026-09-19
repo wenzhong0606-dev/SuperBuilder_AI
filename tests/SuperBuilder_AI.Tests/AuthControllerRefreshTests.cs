@@ -102,6 +102,48 @@ public sealed class AuthControllerRefreshTests
 	}
 
 	[Fact]
+	public async Task Login_ReturnsRefreshToken_ThenRefreshSucceeds()
+	{
+		// P0 回归：真实登录（经 Login 端点）→ 取回的 refresh token 必须能用于 /api/auth/refresh。
+		// 此前 Login 用 IssuePair 生成 token A 返回客户端，而 CreateAsync 另存 token B，
+		// 客户端拿 A 刷新时哈希查不到 → 401。本测试强制覆盖「登录→刷新」整链路。
+		var ctx = CreateContext(out var connection);
+		await using var _ = connection;
+		await using var __ = ctx;
+
+		var hasher = new PasswordHasher();
+		var password = "longping00";
+		const string securityStamp = "STAMP-A";
+		ctx.Tenants.Add(new Tenant { Id = TenantId, TenantCode = "t1001", TenantName = "T1001", Enabled = true });
+		ctx.Users.Add(new User
+		{
+			Id = UserId,
+			TenantId = TenantId,
+			Username = "alice",
+			Status = UserStatus.Active,
+			SecurityStamp = securityStamp,
+			PasswordHash = hasher.Hash(password),
+		});
+		await ctx.SaveChangesAsync();
+
+		var config = Config();
+		var store = new RefreshTokenStore(ctx, config);
+		var ctrl = Build(ctx, config, store);
+
+		var login = await ctrl.Login(
+			new LoginRequest { Username = "alice", TenantId = TenantId, Password = password },
+			CancellationToken.None);
+		var loginOk = Assert.IsType<OkObjectResult>(login);
+		var auth = Assert.IsType<AuthResult>(loginOk.Value);
+		Assert.False(string.IsNullOrEmpty(auth.RefreshToken), "登录必须返回 refresh token 明文");
+
+		var refresh = await ctrl.Refresh(
+			new RefreshRequest { RefreshToken = auth.RefreshToken },
+			CancellationToken.None);
+		Assert.IsType<OkObjectResult>(refresh);
+	}
+
+	[Fact]
 	public async Task Refresh_ReusedOldToken_ReturnsUnauthorized()
 	{
 		var ctx = CreateContext(out var connection);

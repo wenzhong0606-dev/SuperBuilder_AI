@@ -110,7 +110,7 @@ public class FocusedApiClientTests
         var client = HttpTestDoubles.BuildFocused<IdentityApiClient>(handler, out var app);
         app.Token = "existing";
         var expiredRaised = false;
-        app.SessionExpired += () => expiredRaised = true;
+        app.SessionExpired += (_) => expiredRaised = true;
 
         await client.SwitchTenantAsync(7);
 
@@ -136,7 +136,7 @@ public class FocusedApiClientTests
         var client = HttpTestDoubles.BuildFocused<IdentityApiClient>(handler, out var app);
         appRef = app;
         var expiredRaised = false;
-        app.SessionExpired += () => expiredRaised = true;
+        app.SessionExpired += (_) => expiredRaised = true;
 
         await client.SwitchTenantAsync(7);
 
@@ -156,12 +156,33 @@ public class FocusedApiClientTests
         var client = HttpTestDoubles.BuildFocused<AdminApiClient>(handler, out var app);
         app.Token = "expired-token";
         var expiredRaised = false;
-        app.SessionExpired += () => expiredRaised = true;
+        app.SessionExpired += (_) => expiredRaised = true;
 
         var (result, _) = await client.GetAdminLanguagesAsync();
 
         Assert.Null(result);
         Assert.True(expiredRaised);
+    }
+
+    /// <summary>
+    /// 验收 #5：携带令牌的 401 必须携带 userId 通知 SessionExpired，供宿主（Web）吊销该用户全部服务端会话（改密/停用即时强踢）。
+    /// </summary>
+    [Fact]
+    public async Task Token_Carrying_401_Carries_UserId_To_SessionExpired()
+    {
+        var handler = new StubHttpMessageHandler(_ =>
+            HttpTestDoubles.StatusResponse(HttpStatusCode.Unauthorized));
+        var client = HttpTestDoubles.BuildFocused<AdminApiClient>(handler, out var app);
+        app.Token = "expired-token";
+        app.UserId = 7;
+        long? capturedUserId = null;
+        app.SessionExpired += (long id) => capturedUserId = id;
+
+        var (result, _) = await client.GetAdminLanguagesAsync();
+
+        Assert.Null(result);
+        Assert.True(capturedUserId.HasValue);
+        Assert.Equal(7, capturedUserId.Value);
     }
     #endregion
 

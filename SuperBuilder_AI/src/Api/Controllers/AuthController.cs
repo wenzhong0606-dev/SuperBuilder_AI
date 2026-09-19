@@ -103,10 +103,11 @@ public sealed class AuthController : ControllerBase
 		var clientIp = HttpContext?.Connection?.RemoteIpAddress?.ToString();
 		var userAgent = HttpContext?.Request?.Headers?.UserAgent.ToString();
 
-		// Phase 2：签发 access + refresh 对；refresh 明文仅此一次返回，哈希交由 store 持久化。
-		var (accessToken, refreshPlain) = _token.IssuePair(request.TenantId, user.Id, user.Username, perms, user.SecurityStamp);
+		// Phase 2：refresh 令牌仅由 RefreshTokenStore.CreateAsync 生成并持久化哈希，明文仅此一次返回。
+		// （不再经 TokenService.IssuePair 另行生成第二份，否则客户端拿到的与数据库不一致 → 刷新 401。）
+		var accessToken = _token.Issue(request.TenantId, user.Id, user.Username, perms, user.SecurityStamp);
 		var refreshLifetimeDays = _config.GetValue("Auth:RefreshTokenLifetimeDays", 14.0);
-		await _refreshStore.CreateAsync(
+		var (refreshPlain, _) = await _refreshStore.CreateAsync(
 			user.Id, request.TenantId, user.SecurityStamp, clientIp, userAgent,
 			DateTimeOffset.UtcNow.AddDays(refreshLifetimeDays), cancellationToken);
 

@@ -15,7 +15,7 @@ namespace SuperBuilder_AI.Components.Services;
 /// </summary>
 public sealed class AdminApiClient : ApiClientBase, IAdminApiClient
 {
-    public AdminApiClient(IHttpClientFactory factory, AppState appState) : base(factory, appState) { }
+    public AdminApiClient(IHttpClientFactory factory, AppState appState, IAuthRefreshCoordinator? coordinator = null) : base(factory, appState, coordinator) { }
 
     public async Task<(IReadOnlyList<AdminLanguageView>? Result, string? Error)> GetAdminLanguagesAsync(CancellationToken ct = default)
     {

@@ -39,22 +39,6 @@ public interface ITokenService
 	/// </summary>
 	TimeSpan Lifetime => TimeSpan.FromMinutes(60);
 
-	/// <summary>
-	/// 签发访问令牌与刷新令牌对（Phase 2）。
-	/// 刷新令牌为 <see cref="System.Security.Cryptography.RandomNumberGenerator"/> 生成的 32 字节（64 hex）高熵不透明随机串；
-	/// 其明文仅此一次返回，调用方须交由 <c>IRefreshTokenStore</c> 持久化哈希。
-	/// 默认实现直接复用 <see cref="Issue"/> 与本地随机源，具体实现可覆盖。
-	/// </summary>
-	(string AccessToken, string RefreshToken) IssuePair(long tenantId, long userId, string username, IEnumerable<string> permissions, string? securityStamp = null, long? homeTenantId = null)
-	{
-		var access = Issue(tenantId, userId, username, permissions, securityStamp, homeTenantId);
-		var buf = new byte[32];
-		using var rng = System.Security.Cryptography.RandomNumberGenerator.Create();
-		rng.GetBytes(buf);
-		var refresh = System.Convert.ToHexString(buf);
-		return (access, refresh);
-	}
-
 	/// <summary>为指定主体签发一个 HMAC 签名令牌。</summary>
 	string Issue(long tenantId, long userId, string username, IEnumerable<string> permissions, string? securityStamp = null, long? homeTenantId = null);
 

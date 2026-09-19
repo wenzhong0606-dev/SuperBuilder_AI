@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.DataProtection;
 using SuperBuilder_AI.Components.Services;
 using SuperBuilder_AI.Web;
 using SuperBuilder_AI.Web.Services;
@@ -8,6 +9,15 @@ var builder = WebApplication.CreateBuilder(args);
 // 经典 Blazor Server：_Host.cshtml 提供 HTML 壳，组件经 SignalR 在服务器端渲染
 builder.Services.AddRazorPages();
 builder.Services.AddServerSideBlazor();
+// 验收 #4：antiforgery 服务（令牌生成 + 标记 cookie），供 /auth/session/start|end 的 POST 双提交校验。
+builder.Services.AddAntiforgery();
+// 验收 #5：DataProtection 密钥环持久化——antiforgery 标记 cookie 依赖密钥环；
+// 持久化到文件系统（可在 Session:DataProtectionKeyPath 覆盖，CI 设为临时目录），
+// 避免进程重启后密钥环丢失导致所有会话/cookie 失效、用户被批量登出。
+var dpKeyPath = builder.Configuration["Session:DataProtectionKeyPath"]
+    ?? System.IO.Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.LocalApplicationData), "SuperBuilder_AI", "dp-keys");
+builder.Services.AddDataProtection()
+    .PersistKeysToFileSystem(new System.IO.DirectoryInfo(dpKeyPath));
 
 // 共享服务（Scoped，每个 SignalR 电路一个实例）
 builder.Services.AddScoped<AppState>();
@@ -50,6 +60,9 @@ builder.Services.AddSingleton<SessionCookieService>();
 builder.Services.AddScoped<CircuitSessionContext>();
 builder.Services.AddScoped<IAuthPersistence, WebAuthPersistence>();
 builder.Services.AddScoped<ILoginCompletion, WebLoginCompletion>();
+// 验收 #4：静默续期——刷新调用（Web 经 HttpClient POST api/auth/refresh）+ 协调器（per-circuit 单飞、原子写回服务端会话）。
+builder.Services.AddScoped<IRefreshTokenCaller, HttpRefreshTokenCaller>();
+builder.Services.AddScoped<IAuthRefreshCoordinator, AuthRefreshCoordinator>();
 
 // 直接使用 API 的 HTTPS 端口，避免 HTTP -> HTTPS 自动重定向时 Authorization 头被移除。
 // 可用 appsettings:ApiBaseUrl 覆盖（例如仅启用 HTTP 的本地环境）。
@@ -68,6 +81,8 @@ var app = builder.Build();
 
 app.UseStaticFiles();
 app.UseRouting();
+// 验收 #4：antiforgery 中间件——为请求写入 HttpOnly 标记 cookie，配合 POST 端点的令牌校验抵御 CSRF。
+app.UseAntiforgery();
 
 // M8-05：内容安全策略（CSP）——仅作用于 Blazor Server Web 宿主（MAUI Hybrid 经文件系统 WebView 加载，不经此管线）。
 // 基线策略：默认仅信任同源；脚本/样式允许内联（_Host 主题脚本与组件内联 style 需要），

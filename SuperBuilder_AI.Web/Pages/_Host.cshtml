@@ -1,9 +1,16 @@
 @page "/"
 @using Microsoft.AspNetCore.Components.Web
 @using Microsoft.AspNetCore.Http
+@using Microsoft.AspNetCore.Antiforgery
 @namespace SuperBuilder_AI.Web
 @addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
 @inject IHttpContextAccessor HttpContextAccessor
+@inject IAntiforgery Antiforgery
+@{
+    // 验收 #4：生成 antiforgery 令牌（同时写入 HttpOnly 标记 cookie），供浏览器端 POST 双提交校验。
+    // 该令牌是标准 AJAX 双提交令牌，设计为 JS 可读，不泄露会话 id。
+    var afToken = Antiforgery.GetAndStoreTokens(HttpContextAccessor.HttpContext!).RequestToken;
+}
 
 <!DOCTYPE html>
 <html lang="zh">
@@ -12,21 +19,23 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <base href="~/" />
     <script>document.documentElement.setAttribute('data-theme', (function(){try{return localStorage.getItem('sb-theme')||'light'}catch(e){return 'light'}})());</script>
-    @* Phase 1（M8-05）：初始 GET 期间 HttpContext 可用，读取 httpOnly 会话 cookie 的脱敏 id，注入 JS 变量供电路内 AuthGate 经互操作读取（组件生命周期内 IHttpContextAccessor 为 null，见 hardening §8.1(j)）。 *@
-    @{ var sbSessionId = HttpContextAccessor.HttpContext?.Request.Cookies["sb_sess"] ?? ""; }
-    <script>window.__sbSessionId = '@sbSessionId';</script>
+    <script>window.__afToken = '@afToken';</script>
+    @* Phase 1（M8-05）+ 验收 #2 加固：初始 GET 期间 HttpContext 可用，读取 httpOnly 会话 cookie 的脱敏 id，
+       通过 Blazor 组件参数（param-SessionId）注入电路。会话 id 不进入任何 window 全局变量，
+       浏览器端 JavaScript 永远接触不到（消除 XSS 经页面全局变量读取并重放的通道）。 *@
     <link href="_content/SuperBuilder_AI.Components/lib/bootstrap/css/bootstrap.min.css" rel="stylesheet" />
     <link href="_content/SuperBuilder_AI.Components/css/app.css" rel="stylesheet" />
     <script src="_content/SuperBuilder_AI.Components/js/chart.umd.min.js"></script>
     <script src="_content/SuperBuilder_AI.Components/js/chart.js"></script>
     <script src="_content/SuperBuilder_AI.Components/js/dashboard-designer.js"></script>
+    <script src="js/auth-handoff.js"></script>
 </head>
 <body>
     @* 经典 Blazor Server：不使用 ServerPrerendered。预渲染阶段没有 SignalR 电路（IClientProxy 为 null），
        组件在「预渲染→电路接管」交接窗口内触发 JS 互操作/StateHasChanged 时，框架会把 JS.BeginInvokeJS 推送给
        尚为 null 的客户端代理，抛出 NullReferenceException（Microsoft.AspNetCore.SignalR.ClientProxyExtensions.SendAsync）。
        改用 Server 后组件只在已建立电路后渲染，IClientProxy 始终有效，且首屏主题由下方内联脚本设置 data-theme 防闪烁。 *@
-    <component type="typeof(App)" render-mode="Server" />
+    <component type="typeof(App)" render-mode="Server" param-SessionId="@(HttpContextAccessor.HttpContext?.Request.Cookies["sb_sess"] ?? "")" />
     <script src="_content/SuperBuilder_AI.Components/lib/bootstrap/js/bootstrap.bundle.min.js"></script>
     <script src="_framework/blazor.server.js"></script>
 </body>

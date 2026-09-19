@@ -15,7 +15,7 @@ namespace SuperBuilder_AI.Components.Services;
 /// </summary>
 public sealed class BiApiClient : ApiClientBase, IBiApiClient
 {
-    public BiApiClient(IHttpClientFactory factory, AppState appState) : base(factory, appState) { }
+    public BiApiClient(IHttpClientFactory factory, AppState appState, IAuthRefreshCoordinator? coordinator = null) : base(factory, appState, coordinator) { }
 
     public async Task<string?> AskRawAsync(string question, long? dataSourceId, CancellationToken ct = default)
     {

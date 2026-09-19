@@ -13,7 +13,7 @@ namespace SuperBuilder_AI.Components.Services;
 /// </summary>
 public sealed class DataSourceApiClient : ApiClientBase, IDataSourceApiClient
 {
-    public DataSourceApiClient(IHttpClientFactory factory, AppState appState) : base(factory, appState) { }
+    public DataSourceApiClient(IHttpClientFactory factory, AppState appState, IAuthRefreshCoordinator? coordinator = null) : base(factory, appState, coordinator) { }
 
     /// <summary>M4-05 触发后台扫描：POST 创建任务并入队，从 202 响应体解析 jobId。</summary>
     public async Task<(bool Ok, int Status, long? JobId, string? Error, string? Code)> StartScanAsync(long dataSourceId, CancellationToken ct = default)

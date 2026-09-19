@@ -238,6 +238,8 @@ public sealed class AuthResult
 {
     public string? Token { get; set; }
     public int ExpiresInSeconds { get; set; }
+    /// <summary>刷新令牌明文（验收 #4）：登录/刷新响应中返回一次；本类反序列化自 API，须承载该字段以免续期链路断流。</summary>
+    public string? RefreshToken { get; set; }
     public long TenantId { get; set; }
     /// <summary>M2-05：归属主租户（切换后 TenantId=生效租户、HomeTenantId=主租户）。</summary>
     public long HomeTenantId { get; set; }
@@ -246,6 +248,10 @@ public sealed class AuthResult
     public System.Collections.Generic.List<string>? Permissions { get; set; }
     public System.Collections.Generic.List<string>? AvailableCultures { get; set; }
     public string? DefaultCulture { get; set; }
+    /// <summary>访问令牌绝对过期时间（UTC，验收 #4）：登录响应未携带时由 <see cref="AuthStore.SetFromLoginAsync"/> 按 ExpiresInSeconds 派生。</summary>
+    public System.DateTimeOffset? AccessTokenExpiresAtUtc { get; set; }
+    /// <summary>刷新令牌绝对过期时间（UTC，验收 #4）：通常由配置派生，API 响应一般不包含。</summary>
+    public System.DateTimeOffset? RefreshTokenExpiresAtUtc { get; set; }
 }
 
 /// <summary>M2-06 自助注册响应（字段与后端 SelfRegistrationResult 对齐，camelCase 解析）。</summary>

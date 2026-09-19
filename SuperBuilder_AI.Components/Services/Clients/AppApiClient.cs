@@ -14,7 +14,7 @@ namespace SuperBuilder_AI.Components.Services;
 /// </summary>
 public sealed class AppApiClient : ApiClientBase, IAppApiClient
 {
-    public AppApiClient(IHttpClientFactory factory, AppState appState) : base(factory, appState) { }
+    public AppApiClient(IHttpClientFactory factory, AppState appState, IAuthRefreshCoordinator? coordinator = null) : base(factory, appState, coordinator) { }
 
     /// <summary>发布为应用：将结构化 App DSL 经默认路径（P8 <c>BuildFromDslAsync</c>）保存到 <c>api/apps</c>。</summary>
     public async Task<(bool Ok, string? Code, string? Error)> PublishAppAsync(

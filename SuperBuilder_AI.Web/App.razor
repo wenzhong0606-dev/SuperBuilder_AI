@@ -2,6 +2,7 @@
 @using Microsoft.AspNetCore.Components.Web
 @using SuperBuilder_AI.Components.Components
 @using SuperBuilder_AI.Components.Components.Layout
+@using SuperBuilder_AI.Components.Services
 @namespace SuperBuilder_AI.Web
 
 <AuthGate>
@@ -22,4 +23,16 @@
     // 页面定义在 RCL 中，需额外扫描该装配件
     private static readonly IReadOnlyList<System.Reflection.Assembly> _extra =
         new[] { typeof(SuperBuilder_AI.Components.Components.Routes).Assembly };
+
+    // 验收 #2：服务端在初始 HTTP 请求读取 httpOnly 会话 cookie 后，经组件参数把会话 id 注入电路。
+    // 不进入 window 全局，浏览器端 JS 接触不到。AuthGate 经 CircuitSessionContext 读取该值定位服务端会话。
+    [Inject] private CircuitSessionContext CircuitCtx { get; set; } = default!;
+
+    [Parameter] public string? SessionId { get; set; }
+
+    protected override void OnInitialized()
+    {
+        if (!string.IsNullOrEmpty(SessionId))
+            CircuitCtx.SessionId = SessionId;
+    }
 }

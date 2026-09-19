@@ -14,7 +14,7 @@ namespace SuperBuilder_AI.Components.Services;
 /// </summary>
 public sealed class IdentityApiClient : ApiClientBase, IIdentityApiClient
 {
-    public IdentityApiClient(IHttpClientFactory factory, AppState appState) : base(factory, appState) { }
+    public IdentityApiClient(IHttpClientFactory factory, AppState appState, IAuthRefreshCoordinator? coordinator = null) : base(factory, appState, coordinator) { }
 
     public async Task<(AuthResult? Result, string? Error, string? Code)> LoginAsync(string username, long tenantId, string? password = null, CancellationToken ct = default)
     {

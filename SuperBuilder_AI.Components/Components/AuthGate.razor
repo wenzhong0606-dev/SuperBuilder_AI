@@ -3,7 +3,6 @@
 @inject NavigationManager Nav
 @inject AuthStore Session
 @inject LocalizationService L10n
-@inject IJSRuntime JS
 @inject CircuitSessionContext CircuitCtx
 
 @* Phase 0 门禁前移（hardening §3 Phase 0）：会话还原 / 网络校验 / 本地化统一在此 OnAfterRenderAsync 完成。
@@ -30,19 +29,11 @@ else
     {
         if (!firstRender) return;
 
-        // Phase 1（M8-05）：从 _Host 注入的 window.__sbSessionId 读取会话 id（组件内 IHttpContextAccessor 为 null），
-        // 写入电路级上下文供 WebAuthPersistence 定位服务端会话。MAUI 无该变量，得到空值（无副作用）。
-        try
-        {
-            var sid = await JS.InvokeAsync<string?>("eval", "window.__sbSessionId || ''");
-            if (!string.IsNullOrEmpty(sid)) CircuitCtx.SessionId = sid;
-        }
-        catch
-        {
-            // JS 互操作失败时退化为未登录（还原逻辑会据此处理）。
-        }
+        // 验收 #2：会话 id 已由 App.razor 在初始 HTTP 请求期经组件参数（param-SessionId）服务端注入
+        // CircuitSessionContext，组件内不再经 JS 读取 window.__sbSessionId（消除 XSS 暴露通道）。
+        // MAUI 不使用该桥接（CircuitCtx.SessionId 保持 null，无副作用）。
 
-        // 还原必须放在 OnAfterRenderAsync（交互式电路已建立、IJSRuntime 可用）而非 OnInitializedAsync：
+        // 还原必须放在 OnAfterRenderAsync（交互式电路已建立）而非 OnInitializedAsync：
         // 预渲染阶段 IJSRuntime 不可用，localStorage 还原会失败。
         await Session.RestoreAsync();
         StateHasChanged();

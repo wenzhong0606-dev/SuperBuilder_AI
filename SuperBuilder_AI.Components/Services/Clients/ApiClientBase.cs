@@ -26,11 +26,30 @@ public abstract class ApiClientBase
 {
     protected readonly IHttpClientFactory Factory;
     protected readonly AppState AppState;
+    protected readonly IAuthRefreshCoordinator? Coordinator;
 
-    protected ApiClientBase(IHttpClientFactory factory, AppState appState)
+    protected ApiClientBase(IHttpClientFactory factory, AppState appState, IAuthRefreshCoordinator? coordinator = null)
     {
         Factory = factory;
         AppState = appState;
+        Coordinator = coordinator;
+    }
+
+    /// <summary>
+    /// 验收 #4：请求前确保访问令牌未临近过期。临近过期则由 <see cref="Coordinator"/> 静默续期（原子、单飞）。
+    /// 续期失败不抛异常——交由后续 401 路径统一触发登出，本方法对调用方透明。
+    /// </summary>
+    private async Task EnsureFreshTokenAsync(CancellationToken ct)
+    {
+        if (Coordinator is null || !AppState.IsAuthenticated) return;
+        try
+        {
+            await Coordinator.EnsureFreshTokenAsync(ct);
+        }
+        catch
+        {
+            // 静默降级：续期异常不应阻断本次请求
+        }
     }
 
 
@@ -63,8 +82,10 @@ public abstract class ApiClientBase
         // 请求未携带令牌 → 401 只说明"当时未登录"，不能据此推断已登录会话已失效
         if (!requestCarriedToken) return;
         if (!AppState.IsAuthenticated) return;
+        // 验收 #5：捕获 userId 于清除前，供宿主（Web）吊销该用户全部服务端会话（改密/停用即时强踢）。
+        var userId = AppState.UserId;
         AppState.ClearSession();
-        AppState.NotifySessionExpired();
+        AppState.NotifySessionExpired(userId);
     }
 
     /// <summary>
@@ -109,6 +130,7 @@ public abstract class ApiClientBase
     /// <summary>类型化读取：GET 任意端点并反序列化为 T，失败时返回 null 且不抛异常。</summary>
     public async Task<T?> GetAsync<T>(string relativeUrl, CancellationToken ct = default) where T : class
     {
+        await EnsureFreshTokenAsync(ct);
         var client = CreateClient();
         var sentWithToken = !string.IsNullOrEmpty(AppState.Token);
         try
@@ -132,6 +154,7 @@ public abstract class ApiClientBase
     /// </summary>
     public async Task<(JsonElement? Data, int Status, string? Error, string? Code)> GetJsonAsync(string relativeUrl, CancellationToken ct = default)
     {
+        await EnsureFreshTokenAsync(ct);
         var client = CreateClient();
         var sentWithToken = !string.IsNullOrEmpty(AppState.Token);
         try
@@ -162,6 +185,7 @@ public abstract class ApiClientBase
     /// </summary>
     public async Task<(JsonElement? Data, int Status, string? Error, string? Code)> PostJsonAsync(string relativeUrl, object? body = null, CancellationToken ct = default)
     {
+        await EnsureFreshTokenAsync(ct);
         var client = CreateClient();
         var sentWithToken = !string.IsNullOrEmpty(AppState.Token);
         try
@@ -191,6 +215,7 @@ public abstract class ApiClientBase
     /// <summary>纯文本读取：不解析 JSON，供 /health、/metrics 等非 JSON 端点使用。</summary>
     public async Task<(string? Text, int Status, string? Error)> GetTextAsync(string relativeUrl, CancellationToken ct = default)
     {
+        await EnsureFreshTokenAsync(ct);
         var client = CreateClient();
         var sentWithToken = !string.IsNullOrEmpty(AppState.Token);
         try
@@ -216,6 +241,7 @@ public abstract class ApiClientBase
     public async Task<(bool Ok, int Status, string? Error, string? Code)> SendAsync(
         HttpMethod method, string relativeUrl, object? body = null, CancellationToken ct = default)
     {
+        await EnsureFreshTokenAsync(ct);
         var client = CreateClient();
         var sentWithToken = !string.IsNullOrEmpty(AppState.Token);
         try

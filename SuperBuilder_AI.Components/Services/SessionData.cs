@@ -19,7 +19,10 @@ public sealed record SessionData(
     List<string> Permissions,
     List<string> AvailableCultures,
     string? DefaultCulture,
-    DateTimeOffset? ExpiresAtUtc = null)
+    DateTimeOffset? ExpiresAtUtc = null,
+    string? RefreshToken = null,
+    DateTimeOffset? AccessTokenExpiresAtUtc = null,
+    DateTimeOffset? RefreshTokenExpiresAtUtc = null)
 {
     /// <summary>从登录结果构造会话数据（Web 侧签发服务端会话用）。</summary>
     public static SessionData FromLoginResult(AuthResult r)
@@ -33,7 +36,11 @@ public sealed record SessionData(
             Permissions: r.Permissions as List<string> ?? new List<string>(r.Permissions ?? new List<string>()),
             AvailableCultures: r.AvailableCultures as List<string> ?? new List<string> { "zh-CN" },
             DefaultCulture: r.DefaultCulture ?? "zh-CN",
-            ExpiresAtUtc: null);
+            ExpiresAtUtc: null,
+            RefreshToken: r.RefreshToken,
+            AccessTokenExpiresAtUtc: r.AccessTokenExpiresAtUtc
+                ?? (r.ExpiresInSeconds > 0 ? DateTimeOffset.UtcNow.AddSeconds(r.ExpiresInSeconds) : (DateTimeOffset?)null),
+            RefreshTokenExpiresAtUtc: r.RefreshTokenExpiresAtUtc);
     }
 
     /// <summary>从已登录的 AppState 构造会话数据。</summary>
@@ -48,7 +55,10 @@ public sealed record SessionData(
             Permissions: state.Permissions as List<string> ?? new List<string>(state.Permissions),
             AvailableCultures: new List<string>(state.AvailableCultures),
             DefaultCulture: state.DefaultCulture,
-            ExpiresAtUtc: null);
+            ExpiresAtUtc: null,
+            RefreshToken: state.RefreshToken,
+            AccessTokenExpiresAtUtc: state.AccessTokenExpiresAtUtc,
+            RefreshTokenExpiresAtUtc: state.RefreshTokenExpiresAtUtc);
     }
 
     /// <summary>将本数据应用到 AppState（还原路径）。</summary>
@@ -62,5 +72,8 @@ public sealed record SessionData(
         state.Permissions = Permissions ?? new List<string>();
         state.AvailableCultures = AvailableCultures ?? new List<string> { "zh-CN" };
         state.DefaultCulture = DefaultCulture ?? "zh-CN";
+        state.RefreshToken = RefreshToken;
+        state.AccessTokenExpiresAtUtc = AccessTokenExpiresAtUtc;
+        state.RefreshTokenExpiresAtUtc = RefreshTokenExpiresAtUtc;
     }
 }

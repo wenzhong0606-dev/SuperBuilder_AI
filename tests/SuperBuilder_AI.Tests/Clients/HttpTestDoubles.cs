@@ -53,7 +53,9 @@ public static class HttpTestDoubles
     {
         var factory = new StubHttpClientFactory(handler);
         var app = new AppState();
-        var client = (TClient)Activator.CreateInstance(typeof(TClient), factory, app)!;
+        // 注意：聚焦客户端的构造函数第 3 参 IAuthRefreshCoordinator? 是 C# 可选参数，
+        // 反射的默认绑定器不会自动补默认值，故此处必须显式传 null（否则 MissingMethodException）。
+        var client = (TClient)Activator.CreateInstance(typeof(TClient), factory, app, null)!;
         appState = app;
         return client;
     }
