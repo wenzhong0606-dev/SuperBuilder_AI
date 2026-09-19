@@ -417,6 +417,12 @@ jobs:
           # 在请求期抛 "缺少 SecretStore:MasterKey"。注入后与 build job 行为一致，DataSourceScan/RlsIsolation
           # 等数据源头相关用例才能真正落到有数据的状态（而非空库 0=0 假通过）。
           SecretStore__MasterKey: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+          # M0/Phase 1 E2E 修复：E2E 登录走真实表单（Login.razor），而该页在平台未初始化时
+          # 渲染"初始化入口"而非登录表单（无 login-username 字段），导致所有用例卡在 30s 超时。
+          # 故与 controller-runtime job 一致，经部署配置落地一名平台管理员（幂等），
+          # 使 api/platform-bootstrap/status 返回 required=false，登录表单正常渲染。
+          PlatformBootstrap__Username: "ci-platform-admin"
+          PlatformBootstrap__Password: "${{ env.CI_PLATFORM_PASSWORD }}"
         run: |
           dotnet run --project SuperBuilder_AI/SuperBuilder_AI.csproj --configuration Release --no-restore --no-build --urls http://127.0.0.1:5050 > /tmp/sb-api.log 2>&1 &
           echo $! > /tmp/sb-api.pid
@@ -453,6 +459,8 @@ jobs:
           SB_E2E_TENANT: "e2eapp"
           SB_E2E_READER_USER: e2ereader
           SB_E2E_READER_PASSWORD: longping00
+          # e2ereader 同属 e2eapp 租户（E2ESandboxSeedService 种子），其租户编码与管理员一致。
+          SB_E2E_READER_TENANT: "e2eapp"
         # 关键：测试工程必须"自带完整 restore+build"而非复用 slnf 的 --no-restore。
         # slnf 的 restore/build 携带全局 -p:TargetFrameworks=net10.0（规避 Components 的
         # android/ios workload），会使该全局属性传入测试工程的 NuGet 资产关联，导致
