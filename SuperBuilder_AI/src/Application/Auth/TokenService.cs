@@ -32,6 +32,13 @@ public sealed record TokenPrincipal(
 /// </summary>
 public interface ITokenService
 {
+	/// <summary>
+	/// 访问令牌有效期。默认 60 分钟；可用配置 <c>Auth:AccessTokenLifetimeMinutes</c> 覆盖。
+	/// 既驱动令牌载荷 <c>exp</c>，也为各登录/切换入口返回的 <c>ExpiresInSeconds</c> 提供单一来源，
+	/// 避免 DTO 告知客户端的过期时间与令牌真实过期脱节。
+	/// </summary>
+	TimeSpan Lifetime => TimeSpan.FromMinutes(60);
+
 	/// <summary>为指定主体签发一个 HMAC 签名令牌。</summary>
 	string Issue(long tenantId, long userId, string username, IEnumerable<string> permissions, string? securityStamp = null, long? homeTenantId = null);
 
@@ -59,15 +66,18 @@ public interface ITokenService
 public sealed class TokenService : ITokenService
 {
 	private readonly byte[] _key;
-	private readonly TimeSpan _lifetime = TimeSpan.FromMinutes(60);
 
-	public TokenService(string? signingKey)
+	/// <inheritdoc />
+	public TimeSpan Lifetime { get; }
+
+	public TokenService(string? signingKey, TimeSpan? lifetime = null)
 	{
 		if (string.IsNullOrWhiteSpace(signingKey))
 			throw new ArgumentException("A non-empty signing key is required.", nameof(signingKey));
 
 		var key = signingKey.Trim();
 		_key = Encoding.UTF8.GetBytes(key);
+		Lifetime = lifetime ?? TimeSpan.FromMinutes(60);
 	}
 
 	public string Issue(long tenantId, long userId, string username, IEnumerable<string> permissions, string? securityStamp = null, long? homeTenantId = null)
@@ -83,7 +93,7 @@ public sealed class TokenService : ITokenService
 			// M2-05：切换后 tid=生效租户；htid=归属主租户（缺省与 tid 一致，旧调用方无感）。
 			Htid = homeTenantId ?? tenantId,
 			Iat = now.ToUnixTimeSeconds(),
-			Exp = now.Add(_lifetime).ToUnixTimeSeconds(),
+			Exp = now.Add(Lifetime).ToUnixTimeSeconds(),
 		};
 
 		var headerB64 = Base64Url(JsonSerializer.SerializeToUtf8Bytes(new { alg = "HS256", typ = "JWT" }));

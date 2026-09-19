@@ -1,0 +1,61 @@
+@implements IDisposable
+@inject AppState State
+@inject NavigationManager Nav
+@inject AuthStore Session
+@inject LocalizationService L10n
+
+@* Phase 0 门禁前移（hardening §3 Phase 0）：会话还原 / 网络校验 / 本地化统一在此 OnAfterRenderAsync 完成。
+   未还原前显示极简 splash（不套 MainLayout 壳），消除首屏 home→login 闪烁。
+   还原职责此前散落在 MainLayout / BlankLayout；AuthGate 包裹 RouteView 后，若还原仍留在被门禁
+   阻挡的 MainLayout，会形成「门禁等还原、MainLayout 等渲染」的初始化死锁，故前移到此始终被渲染的根门禁。 *@
+@if (!State.SessionRestored)
+{
+    <div style="display:flex;align-items:center;justify-content:center;min-height:60vh;">
+        <span class="muted">@L10n.T(Keys.Content.SharedAuthChecking, "正在校验会话…")</span>
+    </div>
+}
+else
+{
+    @ChildContent
+}
+
+@code {
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    protected override void OnInitialized() => State.SessionRestoredChanged += OnSessionState;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+
+        // 还原必须放在 OnAfterRenderAsync（交互式电路已建立、IJSRuntime 可用）而非 OnInitializedAsync：
+        // 预渲染阶段 IJSRuntime 不可用，localStorage 还原会失败。
+        await Session.RestoreAsync();
+        StateHasChanged();
+
+        if (State.IsAuthenticated)
+        {
+            // 网络校验失败时保留本地会话（不登出），避免撕裂 SignalR 电路。
+            try { await Session.ValidateAsync(); } catch { /* 网络异常不登出 */ }
+            // 本地化初始化失败不影响主流程。
+            try { await L10n.InitializeAsync(State.TenantId, State.UserId, State.AvailableCultures, State.DefaultCulture); } catch { /* 本地化失败不影响主流程 */ }
+            StateHasChanged();
+        }
+        else if (!IsAnonymousRoute(Nav.Uri))
+        {
+            Nav.NavigateTo("/login", forceLoad: true);
+        }
+    }
+
+    private static readonly System.Collections.Generic.HashSet<string> AnonymousPaths = new(System.StringComparer.OrdinalIgnoreCase)
+    {
+        "", "/", "/login", "/register", "/self-registration", "/platform-login"
+    };
+
+    private static bool IsAnonymousRoute(string uri)
+        => AnonymousPaths.Contains(new System.Uri(uri).AbsolutePath.TrimEnd('/'));
+
+    private void OnSessionState() => _ = InvokeAsync(StateHasChanged);
+
+    public void Dispose() => State.SessionRestoredChanged -= OnSessionState;
+}

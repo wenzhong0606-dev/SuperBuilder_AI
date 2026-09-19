@@ -5,10 +5,10 @@ using Xunit;
 namespace SuperBuilder_AI.E2E;
 
 [Collection("playwright")]
-public sealed class AuthFlowTests
+public sealed class AuthFlowE2ETests
 {
     private readonly PlaywrightFixture _fx;
-    public AuthFlowTests(PlaywrightFixture fx) => _fx = fx;
+    public AuthFlowE2ETests(PlaywrightFixture fx) => _fx = fx;
 
     /// <summary>未登录访问受保护页（/ask）必须重定向到 /login。</summary>
     [SkippableFact]

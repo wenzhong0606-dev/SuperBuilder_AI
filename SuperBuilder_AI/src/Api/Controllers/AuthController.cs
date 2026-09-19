@@ -104,7 +104,7 @@ public sealed class AuthController : ControllerBase
 		return Ok(new AuthResult
 		{
 			Token = token,
-			ExpiresInSeconds = 3600,
+			ExpiresInSeconds = (int)_token.Lifetime.TotalSeconds,
 			TenantId = request.TenantId,
 			UserId = user.Id,
 			Username = user.Username,

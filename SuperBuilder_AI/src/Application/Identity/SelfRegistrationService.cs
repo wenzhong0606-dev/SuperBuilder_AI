@@ -150,7 +150,7 @@ public sealed class SelfRegistrationService : ISelfRegistrationService
 
         return new SelfRegistrationResult(
             true, "ok",
-            Token: token, ExpiresInSeconds: 3600,
+            Token: token, ExpiresInSeconds: (int)_token.Lifetime.TotalSeconds,
             TenantId: tenant.Id, UserId: created.Id.Value, Username: adminUsername,
             Permissions: perms, AvailableCultures: cultures, DefaultCulture: defaultCulture);
     }

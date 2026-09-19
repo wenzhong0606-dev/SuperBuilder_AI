@@ -395,8 +395,12 @@ builder.Services.AddScoped<GoldenBaselineComparisonService>();
 var authSigningKey = SuperBuilder_AI.Services.Auth.AuthSigningKeyPolicy.Validate(
 	builder.Configuration["Auth:SigningKey"],
 	builder.Environment.IsDevelopment());
+var authAccessTokenLifetimeMinutes = builder.Configuration.GetValue<int?>("Auth:AccessTokenLifetimeMinutes");
+var authAccessTokenLifetime = authAccessTokenLifetimeMinutes is { } minutes && minutes > 0
+	? TimeSpan.FromMinutes(minutes)
+	: (TimeSpan?)null;
 builder.Services.AddSingleton<SuperBuilder_AI.Services.Auth.ITokenService>(
-	new SuperBuilder_AI.Services.Auth.TokenService(authSigningKey));
+	new SuperBuilder_AI.Services.Auth.TokenService(authSigningKey, authAccessTokenLifetime));
 builder.Services.AddSingleton<SuperBuilder_AI.Services.Auth.IPasswordHasher>(
 	new SuperBuilder_AI.Services.Auth.PasswordHasher());
 

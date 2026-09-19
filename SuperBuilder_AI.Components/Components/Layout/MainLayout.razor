@@ -110,29 +110,17 @@
         if (!firstRender) return;
         try
         {
+            // 主题读取/应用需在浏览器中执行（预渲染阶段无 JS 运行时）。
+            // 初始主题已由 _Host/index 内联脚本写入 data-theme，避免首屏闪烁。
+            // 会话还原 / 网络校验 / 本地化已统一前移到根门禁 AuthGate（hardening Phase 0），
+            // 此处仅保留主题应用，避免「门禁等还原、MainLayout 等渲染」死锁。
             var theme = await JS.InvokeAsync<string>("SuperBuilder.getTheme");
             IsDark = theme == "dark";
             await Theme.ApplyAsync(theme);
         }
         catch
         {
-            // 主题获取失败时退避默认主题，不阻断会话自举。
-        }
-
-        // 会话自举：先从 localStorage 还原令牌（纯本地、无网络，必然快速完成）。
-        // 还原结束立即重渲染，让页面脱离"正在恢复登录会话…"——网络校验不得阻塞 UI。
-        // （F5 后首次带令牌执行 ValidateAsync / L10n.InitializeAsync，此二步此前在登录流程里
-        //  因首屏未登录被跳过、从未真正跑过；若其挂起或抛错会使 StateHasChanged 永不到达。）
-        await Session.RestoreAsync();
-        StateHasChanged();
-
-        // 网络校验与本地化仅在已还原出令牌时执行；任一失败均保留本地会话，
-        // 不向外抛出（避免撕裂 SignalR 电路、导致页面永久停在预渲染态）。
-        if (State.IsAuthenticated)
-        {
-            try { await Session.ValidateAsync(); } catch { /* 网络异常不登出 */ }
-            try { await L10n.InitializeAsync(State.TenantId, State.UserId, State.AvailableCultures, State.DefaultCulture); } catch { /* 本地化失败不影响主流程 */ }
-            StateHasChanged();
+            // 主题获取失败时退避默认主题。
         }
     }
 

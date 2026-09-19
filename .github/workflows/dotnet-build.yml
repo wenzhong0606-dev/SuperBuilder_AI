@@ -450,6 +450,7 @@ jobs:
           SB_E2E_API_URL: http://127.0.0.1:5050
           SB_E2E_USER: e2eadmin
           SB_E2E_PASSWORD: longping00
+          SB_E2E_TENANT: "e2eapp"
           SB_E2E_READER_USER: e2ereader
           SB_E2E_READER_PASSWORD: longping00
         # 关键：测试工程必须"自带完整 restore+build"而非复用 slnf 的 --no-restore。

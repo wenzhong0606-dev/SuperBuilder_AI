@@ -179,7 +179,7 @@ public sealed class TenantMembershipController : ControllerBase
 			homeTenantId, request.TenantId, request.TenantId, true));
 
 		return Ok(new TenantSwitchResult(
-			token, 3600, request.TenantId, homeTenantId, callerId, user.Username,
+			token, (int)_token.Lifetime.TotalSeconds, request.TenantId, homeTenantId, callerId, user.Username,
 			perms, locale.Available, locale.Default));
 	}
 
